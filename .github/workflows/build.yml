@@ -3,7 +3,7 @@ name: build-test-package
 # Classroom Studio CI — every push to main builds the WPF app on a free Windows
 # runner, runs TestRunner, and only packages when ALL tests are green.
 # Green -> a GitHub Release appears with the zip (visible via the releases API).
-# Red   -> an Issue opens with the tail of the test log (visible via issues API).
+# Red   -> an Issue opens naming the failed step + the tail of the test log.
 
 on:
   workflow_dispatch:
@@ -13,6 +13,7 @@ on:
 permissions:
   contents: write   # publish the green-build release
   issues: write     # open an issue when CI fails
+  actions: read     # read step conclusions for the failure issue
 
 jobs:
   build:
@@ -28,13 +29,19 @@ jobs:
       - name: Compile-check bridge.py
         run: python -m py_compile ams-shell/bridge/bridge.py
 
+      # stronger: the bridge must actually START (catches missing imports like os)
+      - name: Smoke-run bridge.py (ping_bridge)
+        shell: pwsh
+        run: |
+          $out = '{"op":"ping_bridge"}' | python ams-shell/bridge/bridge.py 2>&1 | Out-String
+          if ($out -notmatch '"pong"') { Write-Host $out; exit 1 }
+
       - name: Restore
         run: dotnet restore ams-shell/AMS.sln
 
       - name: Build (Release)
         run: dotnet build ams-shell/AMS.sln -c Release --no-restore
 
-      # If the test project path differs, fix it here once.
       - name: Run TestRunner
         shell: pwsh
         run: |
@@ -71,11 +78,16 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            let tail = '(no test log)';
-            try { tail = fs.readFileSync('test-output.txt', 'utf8').split('\n').slice(-80).join('\n'); } catch (e) {}
+            let tail = '(no test log — failure happened before the test step)';
+            try { tail = fs.readFileSync('test-output.txt', 'utf8').split('\n').slice(-60).join('\n'); } catch (e) {}
+            const jobs = await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner, repo: context.repo.repo, run_id: context.runId
+            });
+            const steps = jobs.data.jobs.flatMap(j => (j.steps || []).map(s =>
+              `${s.conclusion === 'success' ? 'PASS' : (s.conclusion === 'failure' ? 'FAIL' : 'skip')} — ${s.name}`)).join('\n');
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `CI failed — run #${context.runNumber}`,
-              body: '```\n' + tail + '\n```'
+              body: '**Steps:**\n' + steps + '\n\n**Test log tail:**\n```\n' + tail + '\n```'
             });

@@ -2,7 +2,7 @@
 
 > **این فایل مرجع زنده‌ی پروژه است. قانون: بعد از هر تغییر مهم، Notion AI این فایل را در همین ریپو به‌روز می‌کند.**
 > در جلسه‌ی جدید با Notion AI کافی است بگویید: «از ریپوی pedrampedi81-dotcom/smc فایل project-state/PROJECT-STATE.md را بخوان» تا تصویر کلی برگردد.
-> آخرین به‌روزرسانی: 2026-09-07 · نسخه‌ی در کار: **v0.9.58**
+> آخرین به‌روزرسانی: 2026-09-07 (به‌روزرسانی دوم) · نسخه‌ی در کار: **v0.9.58**
 
 ---
 
@@ -15,19 +15,19 @@
 2. **پل پایتون** `bridge/bridge.py` + `ams_serial.py` + `ams_crypto.py` (کانال رمزنگاری‌شده AES-128، قاب E|n|hex، PSK از ams_key.json یا env AMS_PSK)
 3. **بردها**: Raspberry Pi Pico = مغز (کیبورد HID + سنسور نور BH1750 + هاب فرمان) · Arduino Pro Micro = بازو (موس + صدا) — Pico از طریق UART به Pro Micro فرمان پاس می‌دهد
 
-## ۲) وضعیت لحظه‌ای (2026-09-07)
+## ۲) وضعیت لحظه‌ای (2026-09-07 — به‌روزرسانی دوم)
 
-- آخرین release بررسی‌شده: **v0.9.58** — کیپد و self-containment اعمال شده، ولی با **۳ تست قرمز** ساخته شد (BundleVersion هنوز 0.9.57 مانده + دو تست vein) → **قابل انتشار نیست تا سبز شود**
-- فیکس‌لیست کامل v0.9.58: `project-state/CLAUDE-IMPLEMENT-v0.9.58.md` را به Claude Code بدهید
-- **باگ مهم پیدا و فیکس‌شده توسط Notion AI (کامیت 459e24dc):** `bridge.py` فاقد `import os` بود → هر Connect روی هر سیستمی با NameError می‌مرد (ریشه‌ی محتملِ وصل‌نشدن روی سیستم جدید)
-- CI روی GitHub Actions فعال است (رانر ویندوزی رایگان)؛ ران‌های ۱ تا ۵ قرمز بودند — ریشه‌ها: باگ import os + قدم smoke مبتنی بر پروسه که روی رانر ناپایدار بود (race/هنگ) → در CI v5 با چک‌های قطعی جایگزین شد
-- **منتظر:** نتیجه‌ی ران بعدی (سبز → Release با زیپ ظاهر می‌شود / قرمز → Issue با نام قدم شکست)
+- **تست محلی سبز شد: 689 passed / 0 failed** ✅ — پچ v0.9.58b (اسکریپت Notion AI، اجرا توسط Claude Code؛ کامیت 14f9484 ← merge 9bc1580): خطای کامپایل نگهبان مِتا + شمردن نسخه‌های داخل داده‌ی تست + اسکیپ CI-safe دارون
+- **معمای «no test log» ران‌های ۶–۸ حل شد (CI v5.2، کامیت a8831177، پوش مستقیم Notion AI):** قدم تست به‌جای `tests/TestRunner.csproj` مسیر ناموجود `tests/TestRunner` را می‌داد و MSBuild روی STDERR می‌مرد در حالی که Tee فقط STDOUT را می‌گرفت. حالا: بیلد جدای TestRunner + مسیر درست csproj + `2>&1` به داخل لاگ + پاک‌سازی tests/bin|obj کامیت‌شده + `paths-ignore` برای پوش‌های فقط-سندی (project-state/** و ‎**.md دیگر CI را اجرا نمی‌کنند)
+- **ران #9: 668 passed / 1 failed** — کمبود ۲۰تایی نسبت به محلی = اسکیپ‌های طراحی‌شده‌ی دارون روی CI ✅؛ آن یک قرمز = سقف زمانی wall-clock در تست‌های parallel-group که روی رانر اشتراکی flake است (خودِ هم‌پوشانی با assert قطعی MaxInFlight پین می‌ماند)
+- **پچ v0.9.58c آماده و تأییدشده (`tools/patch-v0.9.58c.py`):** سقف‌های زمانی فقط روی CI تشخیصی می‌شوند (کف‌ها و MaxInFlight همه‌جا سخت می‌مانند) + ایشوی قرمز از این بعد خطوط FAIL/SKIP/error را خودش نشان می‌دهد
+- **منتظر:** اجرای v0.9.58c توسط Claude Code و push → ران #10 (سبز ⇒ اولین Release با `Classroom-Studio-release.zip`)
 
 ## ۳) ریپو و چرخه‌ی CI
 
 - ریپو: `github.com/pedrampedi81-dotcom/smc` (private)
 - هر push به `main` → بیلد Release + py_compile پشته‌ی bridge + چک import + TestRunner
-- **سبز → Release با `Classroom-Studio-release.zip` + sha256 + لاگ تست · قرمز → Issue با نام قدم شکست‌خورده**
+- **سبز → Release با `Classroom-Studio-release.zip` + sha256 + لاگ تست · قرمز → Issue با نام قدم شکست‌خورده** (از CI v5.2 خطوط FAIL/SKIP هم در ایشو هست)
 - قانون طلایی: **publish فقط با `0 failed`** — بدون استثنا
 - نقشه‌ی کار: Claude Code فقط کد می‌نویسد و push می‌کند؛ Notion AI نتیجه را می‌خواند، بازرسی می‌کند، و برای باگ‌های کوچک مستقیم پچ push می‌کند
 - ⚠️ ران‌ها را در تب Actions دستی Cancel نکنید — گزارش‌دهی issue را قاتی می‌کند
@@ -83,12 +83,12 @@
 - **نگاشت نهایی: key1 → Num Lock = اجرا/توقف · key2 → Scroll Lock = مکث/ادامه**
 - فرم‌ور: digitalio + Pull.UP + دیبانس ۴۰ms، لبه‌ی فشردن، پول حتی داخل حلقه‌ی WLUX
 - اپ: GlobalHotkeyService علاوه بر هات‌کی‌های کاربر همیشه 0x90/0x91 را هم ثبت می‌کند؛ Options پیش‌فرض Num Lock/Scroll Lock (قابل تغییر)
-- پیاده‌سازی در DLL v0.9.58 تأیید شد (NUM_LOCK/SCROLL_LOCK/GP2/GP3 هست) — تست‌هایش در فیکس‌لیست مانده
+- پیاده‌سازی در DLL v0.9.58 تأیید شد (NUM_LOCK/SCROLL_LOCK/GP2/GP3 هست) و assertionهایش در TestRunner سبزند
 
 ## ۹) اقلام باز (به ترتیب اولویت)
 
-1. **فیکس‌لیست v0.9.58** → `project-state/CLAUDE-IMPLEMENT-v0.9.58.md` به Claude Code (BundleVersion، دو تست vein، assertionهای کیپد+wildcard csproj+متا، حذف __pycache__ از زیپ)
-2. نتیجه‌ی ران CI بعدی را چک کنم (Notion AI)
+1. ~~فیکس‌لیست v0.9.58~~ ✅ انجام شد — با پچ مستقیم v0.9.58b (سند CLAUDE-IMPLEMENT-v0.9.58.md تاریخی شد؛ BundleVersion/vein/csproj-wildcard/متا در main فعلی سبز تأیید شدند، __pycache__ حذف و .gitignore اضافه شد)
+2. **اجرای پچ v0.9.58c (`tools/patch-v0.9.58c.py`) با Claude Code و push** → بعد نتیجه‌ی ران #10 را چک می‌کنم (Notion AI)؛ سبز ⇒ بستن ۹ ایشوی قدیمی «CI failed»
 3. روی سخت‌افزار: هود تاریک → Connect به پورت data پیکو → Calibrate → `test-light-sensor.amsj` → `test-board-v6.amsj` (تست ۲ «arm keyboard ok» تعیین‌کننده‌ی مسیر UART است)
 4. تست دستی روی ویندوز: auto-fill ۲۰ کیبورد، پنل تنظیمات داخلی، next/else چسبیده به رگ، tooltip زیر آیکون
 5. بکلاگ: ایمپورتر AMK (daroon1)، موارد بصری v0.9.46-52، زیرصفحه‌ی pin-dictionary v3→v5
@@ -103,6 +103,8 @@
 - مسیرها همیشه نسبت به exe؛ تنظیماتِ ناموجود → خودکار AUTO/پیش‌فرض (self-healing)
 - اسکریپت‌های بزرگ با heredoc و بعد `ls -la` تأیید
 - پاکسازی تاریخچه COM فقط برای خانواده‌های مجاز و با بکاپ
+- CI: مسیر `--project` باید خودِ فایل csproj باشد و stderr حتماً با `2>&1` وارد لاگ شود — «لاگ خالی» یعنی مرگ قبل از اجرای تست، نه شکست تست
+- سقف‌های زمانی wall-clock (Stopwatch) روی رانرهای اشتراکی flake‌اند — کف‌ها (معنای join) همه‌جا سخت، سقف‌ها فقط روی CI تشخیصی
 
 ## ۱۱) محیط کاربر
 

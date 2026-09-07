@@ -444,16 +444,19 @@ class TestRunner
 
         // We need to call AmkImporter which runs python subprocess
         // Use Task.Run with a short timeout
-        var importTask = Task.Run(() =>
-            AmkImporter.Import(
-                @"C:\Users\wasteland\Documents\ams\pc\daroon1.amk",
-                @"C:\Users\wasteland\Documents\ams\pc"));
+        // v0.9.58b — daroon1.amk lives only on the dev machine; on CI the import/PNG/native steps skip cleanly
+        var daroonAmk = @"C:\Users\wasteland\Documents\ams\pc\daroon1.amk";
+        var daroonPresent = File.Exists(daroonAmk);
+        var importTask = daroonPresent
+            ? Task.Run(() => AmkImporter.Import(daroonAmk, @"C:\Users\wasteland\Documents\ams\pc"))
+            : null;
 
-        var result = importTask.Wait(TimeSpan.FromSeconds(60)) ? importTask.Result : null;
+        var result = importTask is not null && importTask.Wait(TimeSpan.FromSeconds(60)) ? importTask.Result : null;
 
         if (result == null)
         {
-            Assert(false, "Import timed out or failed");
+            if (daroonPresent) Assert(false, "Import timed out or failed");
+            else Console.WriteLine("SKIP: daroon1.amk not present on this machine — daroon import test skipped (CI-safe)");
         }
         else
         {
@@ -579,7 +582,10 @@ class TestRunner
             var jf = Path.Combine(Path.GetTempPath(), "decoded_test.json");
             if (File.Exists(jf)) File.Delete(jf);
         }
-        Assert(pngSuccess, "PNG images extracted from daroon1.amk");
+        if (!pngSuccess && !daroonPresent)
+            Console.WriteLine("SKIP: daroon1.amk not present on this machine — PNG extraction test skipped (CI-safe)");
+        else
+            Assert(pngSuccess, "PNG images extracted from daroon1.amk");
 
         // ── Step 10: v0.7.8 — Random Package definition + hold params (firmware 1.7) ──
         Console.WriteLine();
@@ -723,13 +729,20 @@ class TestRunner
         var exDir = Path.Combine(Path.GetTempPath(), "ams-imgx-" + Guid.NewGuid().ToString("n"));
         try
         {
-            var imgs = AmkImageExtractor.ExtractImages(amkPath, exDir);
-            Assert(imgs.Count >= 3, $"native extractor found embedded pictures (got {imgs.Count}, want >= 3)");
-            Assert(imgs.Count > 0 && imgs.All(File.Exists), "all extracted PNGs exist on disk");
-            if (imgs.Count > 0)
+            if (!daroonPresent)
             {
-                using var bmp = new System.Drawing.Bitmap(imgs[0]);
-                Assert(bmp.Width > 1 && bmp.Height > 1, $"extracted image loads with dimensions ({bmp.Width}x{bmp.Height})");
+                Console.WriteLine("SKIP: daroon1.amk not present on this machine — native image extraction test skipped (CI-safe)");
+            }
+            else
+            {
+                var imgs = AmkImageExtractor.ExtractImages(amkPath, exDir);
+                Assert(imgs.Count >= 3, $"native extractor found embedded pictures (got {imgs.Count}, want >= 3)");
+                Assert(imgs.Count > 0 && imgs.All(File.Exists), "all extracted PNGs exist on disk");
+                if (imgs.Count > 0)
+                {
+                    using var bmp = new System.Drawing.Bitmap(imgs[0]);
+                    Assert(bmp.Width > 1 && bmp.Height > 1, $"extracted image loads with dimensions ({bmp.Width}x{bmp.Height})");
+                }
             }
         }
         finally { try { Directory.Delete(exDir, true); } catch { } }
@@ -3422,19 +3435,36 @@ class TestRunner
             "v0.9.58: Pico firmware sends NUM_LOCK (BTN1) and SCROLL_LOCK (BTN2)");
         Assert(p58exp.Contains("btn1") && p58exp.Contains("digitalio.DigitalInOut(board.GP2)"),
             "v0.9.58: keypad button reader on GP2 with pull-up");
-        // (c) meta guard: every pinned minor in TestRunner matches current version
-        var srcRunner = File.ReadAllText("TestRunner.cs");
-        // Only count version pins in assertion strings (not in step header comments)
-        var assertLines = srcRunner.Split('
-')
-            .Where(l => l.Contains("Assert(") || l.Contains("Contains("))
-            .Aggregate("", (a, l) => a + l + " ");
-        var pinned = System.Text.RegularExpressions.Regex.Matches(assertLines, @"0\.9\.(\d+)")
-            .Select(m => int.Parse(m.Groups[1].Value))
-            .Where(n => n >= 36).Distinct().OrderBy(n => n).ToList();
+        // (c) meta guard: every version PIN in this file matches the current release.
+        // Pin lines are the assertions that check the csproj Version tag, the app banner or
+        // the Pico bundle version. Version strings inside test DATA (PONG replies like
+        // "pico-light 0.9.44") and historical message labels ("v0.9.50: ...") are NOT pins:
+        // the label form v0.9.N: is excluded explicitly. v0.9.58b — the first draft had a
+        // raw newline inside the char literal (compile error) and counted data strings, so
+        // it could never go green; the file path is now resolved by walking up from the
+        // build output (CI runs `dotnet run` from the repo root, so the cwd differs).
+        string srcRunner = "";
+        for (DirectoryInfo? dirWalk = new DirectoryInfo(AppContext.BaseDirectory); dirWalk is not null && srcRunner.Length == 0; dirWalk = dirWalk.Parent)
+        {
+            foreach (var candPath in new[] { Path.Combine(dirWalk.FullName, "tests", "TestRunner.cs"), Path.Combine(dirWalk.FullName, "TestRunner.cs") })
+                if (File.Exists(candPath)) { srcRunner = File.ReadAllText(candPath); break; }
+        }
+        Assert(srcRunner.Length > 1000, "v0.9.58: meta guard located TestRunner.cs on disk");
+        var pinned = new List<int>();
+        foreach (var metaLine in srcRunner.Split('\n'))
+        {
+            if (!metaLine.Contains("<Version>0.9.") && !metaLine.Contains("Classroom Studio v0.9.") && !metaLine.Contains("BundleVersion")) continue;
+            foreach (System.Text.RegularExpressions.Match metaMatch in System.Text.RegularExpressions.Regex.Matches(metaLine, @"0\.9\.(\d+)"))
+            {
+                bool isLabel = metaMatch.Index > 0 && metaLine[metaMatch.Index - 1] == 'v'
+                               && metaMatch.Index + metaMatch.Length < metaLine.Length && metaLine[metaMatch.Index + metaMatch.Length] == ':';
+                if (!isLabel) pinned.Add(int.Parse(metaMatch.Groups[1].Value));
+            }
+        }
         var curMinor = 58;
-        Assert(pinned.All(n => n == curMinor),
-            $"v0.9.58: all pinned version minors match current release 0.9.{curMinor} (found: {string.Join(", ", pinned)})");
+        var pinnedText = string.Join(", ", pinned.Distinct().OrderBy(n => n));
+        Assert(pinned.Count > 0 && pinned.Distinct().All(n => n == curMinor),
+            $"v0.9.58: all version pins match current release 0.9.{curMinor} (found: {pinnedText})");
 
         Console.WriteLine($"=== Results: {passed} passed, {failed} failed ===");
         Environment.Exit(failed > 0 ? 1 : 0);

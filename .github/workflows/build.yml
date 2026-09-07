@@ -102,7 +102,9 @@ jobs:
           script: |
             const fs = require('fs');
             const read = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (e) { return ''; } };
-            const tail = read('ci-test-output.txt').split('\n').slice(-60).join('\n');
+            const allLines = read('ci-test-output.txt').split('\n');
+            const failLines = allLines.filter(l => /^(FAIL:|SKIP:)|error CS|error MSB|Build FAILED/i.test(l)).slice(-40);
+            const tail = allLines.slice(-60).join('\n');
             const jobs = await github.rest.actions.listJobsForWorkflowRun({
               owner: context.repo.owner, repo: context.repo.repo, run_id: context.runId
             });
@@ -117,5 +119,6 @@ jobs:
               body: '**Run:** ' + runUrl
                 + '\n\n**Jobs:**\n' + jobLines.join('\n')
                 + '\n\n**Steps:**\n' + stepLines.join('\n')
+                + '\n\n**Failure lines:**\n```\n' + (failLines.join('\n') || '(none matched)') + '\n```'
                 + '\n\n**Test log tail:**\n```\n' + (tail || '(no test log — failure before the test step)') + '\n```'
             });

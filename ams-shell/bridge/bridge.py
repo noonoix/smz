@@ -27,6 +27,10 @@ dokme Run دوباره فعال نمی‌شد.
 روی یک پورت = دزدیده‌شدن پاسخ‌ها). نوشتن هم‌زمان حین خواندنِ مسدود، مسیر امن
 pyserial است.
 
+v0.9.59 — انتخاب خودکار لینک در connect: اگر پورت به PING با role=brain/pico-light
+  جواب داد (پیکو)، لینک متن‌باز PicoLink بدون نیاز به ams_key.json — کیبورد و نور
+  همان‌جا روی پیکو و فرمان‌های بازو روی UART به پرو میکرو پاس داده می‌شوند؛
+  وگرنه همان BoardLink رمزشده‌ی همیشگی برای اتصال مستقیم به پرو میکرو.
 اجرا:
   python bridge.py --pydir "C:\Users\wasteland\Documents\ams\pc"
   (--pydir = پوشه‌ای که ams_serial.py و ams_crypto.py در آن است)
@@ -89,6 +93,135 @@ def detect_board_port():
     return cands[0].device if cands and score(cands[0]) >= 50 else None
 
 
+class PicoError(Exception):
+    pass
+
+
+class PicoLink:
+    """v0.9.59 — لینک متن‌باز با مغز پیکو (فرم‌ور pico-light روی پورت data).
+
+    پیکو همان‌جا کیبورد HID و سنسور نور را اجرا می‌کند و فرمان‌های بازو
+    (MMOVE/WSND/…) را روی UART به پرو میکرو پاس می‌دهد؛ پس اپ دیگر مستقیم
+    با برد حرف نمی‌زند. همان رابط BoardLink (connect/command/_send/close/events)
+    را پیاده می‌کند تا حلقهٔ worker فرقی بین دو لینک نبیند. بدون رمزنگاری و
+    بدون نیاز به ams_key.json — کانال PC↔Pico متن‌باز است؛ مسیر رمزشده فقط
+    برای اتصال مستقیم به پرو میکرو (BoardLink) باقی می‌ماند.
+    """
+
+    def __init__(self, port="AUTO", baud=115200, settle_s=1.0):
+        self.port = port
+        self.baud = baud
+        self.settle_s = settle_s
+        self.ser = None
+        self.fw_ver = None
+        self.role = "brain"        # در رویداد connected به اپ می‌رسد
+        self.events = []           # خطوط EVT که وسط پاسخ‌ها رسیدند
+        self.tx = 0
+        self.rx = 0
+        self._rxbuf = bytearray()
+
+    def connect(self):
+        import serial
+        self.ser = serial.Serial(self.port, self.baud, timeout=0.2, write_timeout=2)
+        time.sleep(self.settle_s)   # پورت data پیکو با باز شدن، برد را ریست نمی‌کند
+        self._rxbuf.clear()
+        try:
+            self.ser.reset_input_buffer()
+        except Exception:
+            pass
+        pong = self.command("PING", timeout=2.5)
+        if "role=brain" not in pong and "pico-light" not in pong:
+            try:
+                self.ser.close()
+            except Exception:
+                pass
+            self.ser = None
+            raise PicoError("این پورت مغز پیکو نیست: " + pong[:60])
+        # "OK|PONG|pico-light x|role=brain…|arm=promicro" ← هویت برای LEDهای اپ
+        self.fw_ver = pong[len("OK|PONG|"):] if pong.startswith("OK|PONG|") else pong
+        return self.port
+
+    def command(self, cmd, timeout=5.0):
+        if self.ser is None:
+            raise PicoError("not connected")
+        self._send(cmd)
+        deadline = time.monotonic() + timeout
+        while True:
+            line = self._read_line(max(0.05, deadline - time.monotonic()))
+            if line is None:
+                raise PicoError("ERR|TIMEOUT|" + cmd.split("|")[0])
+            if line.startswith("EVT|"):
+                self.events.append(line)   # رویداد مسلح، جایگزین پاسخ نمی‌شود
+                continue
+            return line
+
+    def _send(self, text):
+        if self.ser is None:
+            raise PicoError("not connected")
+        self.ser.write(text.encode("ascii") + b"\n")
+        self.ser.flush()
+        self.tx += 1
+
+    def _read_line(self, timeout=0.5):
+        """یک خط کامل؛ بایت‌های نیمه‌تمام در بافر می‌مانند (همان قاعدهٔ ams_serial)."""
+        end = time.monotonic() + timeout
+        while True:
+            nl = self._rxbuf.find(b"\n")
+            if nl >= 0:
+                raw = bytes(self._rxbuf[:nl])
+                del self._rxbuf[:nl + 1]
+                self.rx += 1
+                return raw.decode("utf-8", "replace").strip()
+            if time.monotonic() >= end:
+                return None
+            chunk = self.ser.read(64)
+            if chunk:
+                self._rxbuf += chunk
+            else:
+                time.sleep(0.02)
+
+    def halt(self):
+        try:
+            self._send("HALT")
+        except Exception:
+            pass
+
+    def close(self):
+        try:
+            if self.ser is not None:
+                self._send("HALT")
+                self._send("BYE")
+        except Exception:
+            pass
+        try:
+            if self.ser is not None:
+                self.ser.close()
+        except Exception:
+            pass
+        self.ser = None
+
+
+def open_link(port):
+    """v0.9.59 — مغز پیکو اول، بازوی رمزشده به‌عنوان fallback.
+
+    روی پورت PING می‌فرستد: پاسخ با role=brain/pico-light ← PicoLink متن‌باز؛
+    هر پاسخ/سکوت دیگر ← همان BoardLink رمزشده‌ی همیشگی (پرو میکرو مستقیم).
+    """
+    link = PicoLink(port=port)
+    try:
+        dev = link.connect()
+        return link, dev
+    except Exception:
+        try:
+            link.close()
+        except Exception:
+            pass
+    from ams_serial import BoardLink   # import تنبل — مسیر پیکو به ams_key.json نیاز ندارد
+    link = BoardLink(port=port)
+    dev = link.connect()
+    return link, dev
+
+
 def main():
     emit({"event": "stage", "stage": "bridge_started"})
     ap = argparse.ArgumentParser()
@@ -134,11 +267,12 @@ def main():
                     if port.strip().upper() in ("AUTO", ""):
                         port = detect_board_port() or "AUTO"   # v0.9.5 — اسکن خودکار
                     emit({"event": "stage", "stage": "port_open", "port": port})
-                    link = BoardLink(port=port)
-                    dev = link.connect()
+                    # v0.9.59 — مغز پیکو اول: لینک متن‌باز pico-light اگر PING با
+                    # role=brain جواب داد؛ وگرنه همان BoardLink رمزشده برای پرو میکرو.
+                    link, dev = open_link(port)
                     state["link"] = link
                     emit({"event": "stage", "stage": "hello_ok", "fw": dev})
-                    emit({"event": "connected", "port": dev, "fw": link.fw_ver})
+                    emit({"event": "connected", "port": dev, "fw": link.fw_ver, "role": getattr(link, "role", None)})
 
                 elif op == "list_ports":
                     # v0.9.43 — اتصال دستی: فهرست پورت‌های واقعی تا کاربر پورت پیکو را خودش انتخاب کند

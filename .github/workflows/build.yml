@@ -44,6 +44,10 @@ jobs:
       - name: Pin the import-os regression
         run: python -c "import pathlib; s = pathlib.Path('ams-shell/bridge/bridge.py').read_text(encoding='utf-8'); assert '\nimport os\n' in s, 'bridge.py lost import os again'"
 
+      # v0.9.59 — the Pico brain transport is behavior-tested with a fake data port
+      - name: Behavior-test Pico brain transport
+        run: python tools/test_bridge_pico.py
+
       - name: Restore
         run: dotnet restore ams-shell/AMS.sln
 

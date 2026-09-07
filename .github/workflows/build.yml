@@ -9,6 +9,10 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+    # doc-only pushes (project state, patch notes) do not need a build+test cycle
+    paths-ignore:
+      - 'project-state/**'
+      - '**.md'
 
 permissions:
   contents: write   # publish the green-build release
@@ -46,12 +50,25 @@ jobs:
       - name: Build (Release)
         run: dotnet build ams-shell/AMS.sln -c Release --no-restore
 
+      # v0.9.58b — why runs #6-#8 died at the test step with an EMPTY log:
+      # the step said `dotnet run --project tests/TestRunner` but the project file is
+      # tests/TestRunner.csproj — MSBuild fails instantly, and since the error goes to
+      # STDERR while Tee only captured STDOUT, the issue reported "no test log".
+      # Fixes: build the test project as its own step (compile errors now surface in
+      # full), wipe the committed tests/bin + tests/obj artifacts first (they carry the
+      # dev machine's absolute paths), merge STDERR into the log, use the real csproj.
+      - name: Build TestRunner
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force tests/bin, tests/obj -ErrorAction SilentlyContinue
+          dotnet build tests/TestRunner.csproj -c Release
+
       # fresh filename on purpose: the repo carries historical test-output.txt files
       # and a stale one must never be mistaken for this run's log.
       - name: Run TestRunner
         shell: pwsh
         run: |
-          dotnet run --project tests/TestRunner -c Release | Tee-Object ci-test-output.txt
+          dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object ci-test-output.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (Select-String -Path ci-test-output.txt -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
 
@@ -92,7 +109,7 @@ jobs:
             const jobLines = jobs.data.jobs.map(j => `job: ${j.conclusion || j.status} — ${j.name}`);
             const stepLines = jobs.data.jobs.flatMap(j => (j.steps || []).map(s =>
               `${s.conclusion || s.status} — ${s.name}`));
-            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const runUrl = 'https://github.com/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + context.runId;
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,

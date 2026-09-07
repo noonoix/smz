@@ -1,0 +1,96 @@
+PASS: openFile definition exists
+PASS: playScript definition exists
+PASS: mouseClick command correct (got: MCLICK|left,1)
+PASS: mouseMove command correct (got: MMOVE|100,200,abs,1)
+PASS: typeText secret produces CLIPBOARD cmd (got: CLIPBOARD:secret123, KCOMBO|162+86)
+PASS: openFile generates Start-Process in script
+PASS: Script contains the executable path
+PASS: AppSettings round-trip preserves ToolkitDir
+PASS: forLoop summary correct: 'For 5 minute'
+PASS: sound armed summary correct: 'Sound trigger ò90  left click (armed)'
+PASS: findImage is a container step
+PASS: findImage has 'pictures' field
+PASS: delay summary: 'Delay 100 to 300 ms'
+
+--- Import Test: daroon1.amk ---
+Top-level steps: 58
+  WARN: native extractor: picture #1 (13x13)  daroon1_pic1_13x13.png
+  WARN: native extractor: picture #2 (12x16)  daroon1_pic2_12x16.png
+  WARN: native extractor: picture #3 (2x48)  daroon1_pic3_2x48.png
+  WARN: native extractor: picture #4 (2x48)  daroon1_pic4_2x48.png
+  WARN: native extractor: picture #5 (2x48)  daroon1_pic5_2x48.png
+  WARN: native extractor: picture #6 (2x48)  daroon1_pic6_2x48.png
+  WARN: native extractor: picture #7 (2x48)  daroon1_pic7_2x48.png
+  WARN: native extractor: picture #8 (2x48)  daroon1_pic8_2x48.png
+  WARN: native extractor: picture #9 (2x48)  daroon1_pic9_2x48.png
+  WARN: native extractor: 9 embedded picture(s)  daroon1_images/
+PASS: Import produced >=50 top-level steps (got 58)
+PASS: findImage steps: 9 (expected >=3)
+PASS: forLoop steps: 13 (expected >=5)
+PASS: comment steps (Else/Next/EndIf): 29 (expected >=10)
+PASS: Else branch comments: 8 (expected >=2)
+PASS: findImage with picture paths: 9 (expected >=3)
+PASS: keyDown steps: 20
+PASS: keyUp steps: 20
+PASS: delay steps: 40
+PASS: randomMousePosition steps: 7
+PASS: No disabled steps by default (got 0)
+
+--- Tree Summary ---
+Total nodes: 165
+  findImage: 9
+  forLoop: 13
+  comment (Else/Next/EndIf): 29
+  keyDown/keyUp: 20/20
+  delay: 40
+  randomMousePosition: 7
+
+--- PNG Extraction Test ---
+  Extracted 9 PNG images
+    img_000_13x13.png: 560 bytes
+    img_001_12x16.png: 610 bytes
+    img_002_2x48.png: 317 bytes
+    img_003_2x48.png: 329 bytes
+    img_004_2x48.png: 329 bytes
+PASS: PNG images extracted from daroon1.amk
+
+--- v0.7.8: Random Package + hold range + DelayMax ---
+PASS: randomPackage definition exists
+PASS: randomPackage is a scope container
+PASS: randomPackage has mode/minCount/maxCount fields
+PASS: mouseClick without hold stays firmware-1.6 compatible
+PASS: mouseClick with hold range (got MCLICK|right,2,30,90)
+PASS: hold min/max swap is normalized
+PASS: keystroke with hold range (got KCOMBO|162+115,40,120)
+PASS: DelayMax survives JSON round-trip
+PASS: DelayMax=0 is omitted from .amsj (clean files)
+PASS: shuffleAll picks every enabled child once (got 9)
+PASS: disabled child excluded from the pool
+PASS: no child fires twice in shuffleAll
+PASS: every pass draws a fresh order (checked 5 passes)
+PASS: randomSubset count stays within [3,5] over 200 passes
+PASS: randomSubset never repeats a child within one pass
+PASS: min/max swap + pool cap handled (got 3)
+PASS: SETRES still goes first
+PASS: engine runs the shuffled package (got 9 pings)
+PASS: script generator marks Random Package (app-side) in the .ps1
+
+--- v0.7.9: FindElseBranch ---
+PASS: Else marker found after the If step
+PASS: End If without Else  no branch
+PASS: scan stops at a non-comment sibling (left the If scope)
+PASS: imported AMK Else text ("Else - .") recognized
+
+--- v0.8.0: accordion collapse ---
+PASS: collapsed loop hides its children (got 2 rows, want 2)
+PASS: collapsed row shows ?
+PASS: expanded loop shows children again (got 4 rows, want 4)
+PASS: child numbering intact (got 1.1)
+PASS: expanded row shows ?
+
+--- v0.8.2: native image extraction ---
+PASS: native extractor found embedded pictures (got 9, want >= 3)
+PASS: all extracted PNGs exist on disk
+PASS: extracted image loads with dimensions (13x13)
+
+=== Results: 56 passed, 0 failed ===

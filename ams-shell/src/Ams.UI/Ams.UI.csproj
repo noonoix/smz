@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <!-- WinForms for System.Drawing (screen capture / template bitmaps) and
+         Cursor.Position (findImage clickRestoreCursor) — VisionService -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Resources\ams.ico</ApplicationIcon>
+    <!-- Neutral educational branding. This changes the build output/process name to
+         ClassroomStudio.exe; it does not claim affiliation with a school or bypass anti-cheat. -->
+    <AssemblyName>ClassroomStudio</AssemblyName>
+    <AssemblyTitle>Classroom Studio</AssemblyTitle>
+    <Product>Classroom Studio</Product>
+    <Description>Educational classroom workflow and input-automation studio</Description>
+    <Version>0.9.58</Version>
+    <RootNamespace>Ams.UI</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+    <PackageReference Include="NAudio" Version="2.2.0" />
+    <!-- Correct package id is WPF-UI (hyphenated). The camelCase "Wpf.Ui" package
+         only carries .NET Framework assemblies and fails on net8.0 (MC3074). -->
+    <PackageReference Include="WPF-UI" Version="3.0.5" />
+    <!-- v0.9.50 — board checkup HELLO handshake reads the serial port directly -->
+    <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\ams.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\bridge\**">
+      <Link>bridge\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <!-- v0.9.50 — board preparation companions, copied next to the exe like bridge.py -->
+    <None Include="..\..\caterina\Caterina.hex">
+      <Link>caterina\Caterina.hex</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\tools\isp_flash.py">
+      <Link>tools\isp_flash.py</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

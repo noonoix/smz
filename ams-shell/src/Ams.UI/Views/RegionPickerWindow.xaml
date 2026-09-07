@@ -1,0 +1,31 @@
+<Window x:Class="Ams.UI.Views.RegionPickerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="انتخاب ناحیه" WindowStyle="None" AllowsTransparency="True"
+        Background="#01000000" Topmost="True" ShowInTaskbar="False" Cursor="Cross"
+        KeyDown="Window_KeyDown"
+        MouseLeftButtonDown="Window_MouseLeftButtonDown"
+        MouseLeftButtonUp="Window_MouseLeftButtonUp"
+        MouseMove="Window_MouseMove"
+        MouseDoubleClick="Window_MouseDoubleClick"
+        MouseRightButtonDown="Window_MouseRightButtonDown">
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Region Picker overlay — interaction flow from §5.5.12:
+         click-hold-drag → live size tooltip → release keeps an adjustable
+         box → double-click confirms · Esc / right-click cancels ·
+         Shift+Arrows fine-adjust. Yellow translucent box (30% opacity) +
+         red handles per §13.6.
+         ═══════════════════════════════════════════════════════════════ -->
+
+    <Canvas x:Name="Canvas">
+        <Rectangle x:Name="Rect" Fill="#4DFFDF5D" Stroke="#F85149" StrokeThickness="2"
+                   Visibility="Collapsed" />
+        <TextBlock x:Name="InfoText" Foreground="#FFDF5D" FontFamily="Cascadia Code" FontSize="14"
+                   Background="#B31E1F24" Padding="8,4" Visibility="Collapsed" />
+        <TextBlock x:Name="HintText"
+                   Text="برای انتخاب ناحیه بکش · دابل‌کلیک = تأیید · Esc / کلیک راست = لغو · Shift+جهت‌نما = تنظیم اندازه"
+                   Foreground="#E8EAED" Background="#B31E1F24" Padding="10,6" FontSize="13"
+                   Canvas.Left="24" Canvas.Top="24" />
+    </Canvas>
+</Window>

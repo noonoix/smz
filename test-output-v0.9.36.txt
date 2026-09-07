@@ -1,0 +1,18 @@
+PASS: openFile definition exists
+PASS: playScript definition exists
+PASS: mouseClick command correct (got: MCLICK|left,1)
+PASS: mouseMove command correct (got: MMOVE|100,200,abs,1)
+PASS: typeText secret produces CLIPBOARD cmd (got: CLIPBOARD:secret123, KCOMBO|162+86)
+PASS: openFile generates Start-Process in script
+PASS: Script contains the executable path
+PASS: AppSettings round-trip preserves ToolkitDir
+PASS: forLoop summary correct: 'For 5 minute'
+PASS: sound armed summary correct: 'Sound trigger ≥90 → left click (armed)'
+PASS: findImage is a container step
+PASS: findImage has 'pictures' field
+PASS: delay summary: 'Delay 100 to 300 ms'
+
+--- Import Test: daroon1.amk ---
+FAIL: Import timed out or failed
+
+--- PNG Extraction Test ---

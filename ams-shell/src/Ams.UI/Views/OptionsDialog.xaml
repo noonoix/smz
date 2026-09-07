@@ -1,0 +1,189 @@
+<Window x:Class="Ams.UI.Views.OptionsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="تنظیمات" Width="500" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{StaticResource BgPanelBrush}"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        FontFamily="Segoe UI" FontSize="13"
+        PreviewKeyDown="Window_PreviewKeyDown">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <!-- Tab selector -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                <ToggleButton x:Name="TabSerial" Content="سریال / برد" Padding="10,3"
+                              IsChecked="True" Click="TabSerial_ClickRestore"
+                              Background="{StaticResource BgElevatedBrush}"
+                              BorderBrush="{StaticResource BorderSubtleBrush}"
+                              BorderThickness="1" Foreground="{StaticResource TextPrimaryBrush}"
+                              Cursor="Hand" Margin="0,0,4,0" />
+                <ToggleButton x:Name="TabPlayback" Content="پخش" Padding="10,3"
+                              Click="TabPlayback_Click"
+                              Background="{StaticResource BgElevatedBrush}"
+                              BorderBrush="{StaticResource BorderSubtleBrush}"
+                              BorderThickness="1" Foreground="{StaticResource TextPrimaryBrush}"
+                              Cursor="Hand" />
+                <ToggleButton x:Name="TabHotkeys" Content="هاتکی‌ها" Padding="10,3"
+                              Click="TabHotkeys_Click"
+                              Background="{StaticResource BgElevatedBrush}"
+                              BorderBrush="{StaticResource BorderSubtleBrush}"
+                              BorderThickness="1" Foreground="{StaticResource TextPrimaryBrush}"
+                              Cursor="Hand" Margin="4,0,0,0" />
+                <ToggleButton x:Name="TabRoles" Content="تقسیم کار بردها" Padding="10,3"
+                              Click="TabRoles_Click"
+                              Background="{StaticResource BgElevatedBrush}"
+                              BorderBrush="{StaticResource BorderSubtleBrush}"
+                              BorderThickness="1" Foreground="{StaticResource TextPrimaryBrush}"
+                              Cursor="Hand" Margin="4,0,0,0" />
+            </StackPanel>
+
+            <!-- Serial / Board -->
+            <StackPanel x:Name="SerialPanel">
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="پورت COM (AUTO پیشنهاد می‌شود)" Foreground="{StaticResource TextSecondaryBrush}" Width="120" VerticalAlignment="Center" />
+                    <ui:TextBox x:Name="PortBox" FontFamily="Cascadia Code" Width="200" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,4">
+                    <TextBlock Text="پوشه‌ی Python" Foreground="{StaticResource TextSecondaryBrush}" Width="120" VerticalAlignment="Center" />
+                    <ui:TextBox x:Name="DirBox" FontFamily="Cascadia Code" Width="200" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,4">
+                    <TextBlock Text="پوشه‌ی Toolkit" Foreground="{StaticResource TextSecondaryBrush}" Width="120" VerticalAlignment="Center" />
+                    <ui:TextBox x:Name="ToolkitBox" FontFamily="Cascadia Code" Width="200" />
+                </StackPanel>
+
+            </StackPanel>
+
+            <!-- Playback -->
+            <StackPanel x:Name="PlaybackPanel" Visibility="Collapsed">
+                <!-- Word humanize -->
+                <TextBlock Text="انسانی‌سازی کلمات (wmin/wmax در Type Text، به ms)" TextAlignment="Right"
+                           Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                    <TextBlock Text="حداقل ms" Foreground="{StaticResource TextSecondaryBrush}" Width="60" VerticalAlignment="Center" />
+                    <ui:TextBox x:Name="WordDelayMinBox" FontFamily="Cascadia Code" Width="70" />
+                    <TextBlock Text="  حداکثر ms" Foreground="{StaticResource TextSecondaryBrush}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                    <ui:TextBox x:Name="WordDelayMaxBox" FontFamily="Cascadia Code" Width="70" />
+                </StackPanel>
+                <!-- Mouse speed -->
+                <TextBlock Text="سرعت حرکت موس (px/s) — در طول هر حرکت انسانی پیوسته بین حداقل/حداکثر تغییر می‌کند. وقتی «مدت حرکت» استپ 0/0 باشد استفاده می‌شود. پیش‌فرض کالیبره‌ی انسانی: ۳۰۰–۲۰۰۰ (کف مؤثر ۱۵۰)."
+                           TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,8,0,4" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                    <TextBlock Text="حداقل px/s" Foreground="{StaticResource TextSecondaryBrush}" Width="60" VerticalAlignment="Center" />
+                    <ui:TextBox x:Name="MouseSpeedMinBox" FontFamily="Cascadia Code" Width="70" />
+                    <TextBlock Text="  حداکثر px/s" Foreground="{StaticResource TextSecondaryBrush}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                    <ui:TextBox x:Name="MouseSpeedMaxBox" FontFamily="Cascadia Code" Width="70" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                    <Button Content="اندازه‌گیری از دست من…" Click="Calibrate_Click" Padding="10,4" />
+                    <Button Content="بازنشانی به پیش‌فرض انسانی" Click="HumanDefaults_Click" Padding="10,4" Margin="8,0,0,0" />
+                </StackPanel>
+                <!-- v0.9.0 — the dead "Repeat mode" radios were removed: they had no binding or
+                     handler and did nothing. The real repeat settings live in the main window's
+                     Play Options panel (AMK bottom panel). -->
+            </StackPanel>
+
+            <!-- v0.9.48 — compact board-role tab: two option cards, top-anchored; inactive tabs are
+                 Collapsed (not Hidden) so the window fits the visible tab instead of all four. -->
+            <StackPanel x:Name="RolesPanel" Visibility="Collapsed">
+                <TextBlock Text="تقسیم وظایف اجرایی بین بردها" FontWeight="SemiBold" FontSize="14"
+                           TextAlignment="Right" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4" />
+                <TextBlock Text="برد اجراکننده‌ی فرمان‌های کیبورد را انتخاب کن:"
+                           TextAlignment="Right" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,8" />
+                <Border Background="{StaticResource BgElevatedBrush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                        BorderThickness="1" CornerRadius="6" Padding="10,8">
+                    <RadioButton x:Name="KbdPicoRadio" GroupName="kbdBoard" VerticalContentAlignment="Top"
+                                 Foreground="{StaticResource TextPrimaryBrush}">
+                        <StackPanel>
+                            <TextBlock Text="Raspberry Pi Pico — مغز" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}" TextAlignment="Right" />
+                            <TextBlock Text="کیبورد و حسگر نور؛ فرمان‌های موس/صدا را روی UART برای بازو می‌فرستد"
+                                       FontSize="11" TextWrapping="Wrap" TextAlignment="Right"
+                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                        </StackPanel>
+                    </RadioButton>
+                </Border>
+                <Border Background="{StaticResource BgElevatedBrush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                        BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,6,0,0">
+                    <RadioButton x:Name="KbdArmRadio" GroupName="kbdBoard" VerticalContentAlignment="Top"
+                                 Foreground="{StaticResource TextPrimaryBrush}">
+                        <StackPanel>
+                            <TextBlock Text="Arduino Pro Micro — بازو" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}" TextAlignment="Right" />
+                            <TextBlock Text="موس و صدا (+ کیبورد در صورت انتخاب)"
+                                       FontSize="11" TextWrapping="Wrap" TextAlignment="Right"
+                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                        </StackPanel>
+                    </RadioButton>
+                </Border>
+                <TextBlock Text="این انتخاب هنگام Export داخل code.py ثبت می‌شود؛ پس از تغییر، خروجی پیکو را دوباره بساز."
+                           TextWrapping="Wrap" TextAlignment="Right" Foreground="{StaticResource TextTertiaryBrush}"
+                           FontSize="11" Margin="0,8,0,0" />
+            </StackPanel>
+
+            <!-- Hotkeys — auto-capture mode -->
+            <StackPanel x:Name="HotkeysPanel" Visibility="Collapsed">
+                <TextBlock Text="ترکیب کلیدها را برای اکشن‌های پخش تنظیم کن." TextAlignment="Right"
+                           Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,8" />
+                <TextBlock Text="روی فیلد پایین کلیک کن و بعد ترکیب کلید دلخواه را فشار بده." TextAlignment="Right"
+                           Foreground="{StaticResource TextTertiaryBrush}" Margin="0,0,0,10"
+                           FontSize="11" TextWrapping="Wrap" />
+
+                <!-- Run/Stop hotkey row — v0.9.43: paired (user request, 4 keys → 2) -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,6" Height="34">
+                    <TextBlock Text="▶/■ اجرا و توقف" Foreground="{StaticResource TextPrimaryBrush}" Width="130"
+                               VerticalAlignment="Center" />
+                    <Border x:Name="RunStopHkCapture" BorderBrush="{StaticResource BorderSubtleBrush}"
+                            BorderThickness="1" CornerRadius="3" Background="{StaticResource BgElevatedBrush}"
+                            Cursor="Hand" Height="28" Padding="8,0" MinWidth="120"
+                            MouseDown="HotkeyField_Click" Tag="runstopHk">
+                        <TextBlock x:Name="RunStopHkDisplay" Text="Shift+F1"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   FontFamily="Cascadia Code" FontSize="12"
+                                   VerticalAlignment="Center" HorizontalAlignment="Center" />
+                    </Border>
+                    <Button Content="✕" Width="24" Height="24" Margin="6,0,0,0"
+                            BorderThickness="0" Background="Transparent" Foreground="{StaticResource TextSecondaryBrush}"
+                            Cursor="Hand" Click="HotkeyClear_Click" Tag="runstopHk"
+                            ToolTip="پاک‌کردن هاتکی" />
+                </StackPanel>
+
+                <!-- Pause/Resume hotkey row — v0.9.43: paired -->
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,6" Height="34">
+                    <TextBlock Text="⏸/▶ مکث و ادامه" Foreground="{StaticResource TextPrimaryBrush}" Width="130"
+                               VerticalAlignment="Center" />
+                    <Border x:Name="PauseResumeHkCapture" BorderBrush="{StaticResource BorderSubtleBrush}"
+                            BorderThickness="1" CornerRadius="3" Background="{StaticResource BgElevatedBrush}"
+                            Cursor="Hand" Height="28" Padding="8,0" MinWidth="120"
+                            MouseDown="HotkeyField_Click" Tag="pauseresumeHk">
+                        <TextBlock x:Name="PauseResumeHkDisplay" Text="Shift+F3"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   FontFamily="Cascadia Code" FontSize="12"
+                                   VerticalAlignment="Center" HorizontalAlignment="Center" />
+                    </Border>
+                    <Button Content="✕" Width="24" Height="24" Margin="6,0,0,0"
+                            BorderThickness="0" Background="Transparent" Foreground="{StaticResource TextSecondaryBrush}"
+                            Cursor="Hand" Click="HotkeyClear_Click" Tag="pauseresumeHk"
+                            ToolTip="پاک‌کردن هاتکی" />
+                </StackPanel>
+
+                <TextBlock Text="برای لغو ضبط، Escape را بزن. برای غیرفعال‌کردن، خالی بگذار." TextAlignment="Right"
+                           Foreground="{StaticResource TextTertiaryBrush}" Margin="0,8,0,0"
+                           FontSize="11" />
+            </StackPanel>
+
+        </StackPanel>
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,14,0,0">
+                <ui:Button Content="تأیید" Appearance="Primary" Width="90" Margin="0,0,8,0"
+                           IsDefault="True" Click="Ok_Click" />
+                <ui:Button Content="انصراف" Appearance="Secondary" Width="90" IsCancel="True" Click="Cancel_Click" />
+        </StackPanel>
+    </Grid>
+</Window>

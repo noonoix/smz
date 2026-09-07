@@ -1,0 +1,30 @@
+<Window x:Class="Ams.UI.Views.CalibrationWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="یادگیری از دست من" Width="560" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="#FF1B1B1F" Foreground="#FFE8E8E8" FontFamily="Segoe UI">
+    <StackPanel Margin="18">
+        <TextBlock TextWrapping="Wrap" FontSize="13" Margin="0,0,0,10"
+                   Text="طبیعی در کادر تایپ کن و موس را داخل ناحیه حرکت بده تا نوار پر شود (۲۰ ثانیه). فقط زمان‌بندی و سرعت اندازه می‌شود — متنی که تایپ می‌کنی هرگز ذخیره یا ارسال نمی‌شود." TextAlignment="Right"/>
+        <TextBox x:Name="TypeBox" Height="70" AcceptsReturn="True" TextWrapping="Wrap"
+                 VerticalScrollBarVisibility="Auto" Margin="0,0,0,10"
+                 PreviewKeyDown="TypeBox_PreviewKeyDown"
+                 Background="#FF26262B" Foreground="#FFE8E8E8" CaretBrush="#FFE8E8E8"/>
+        <Border x:Name="MouseArea" Height="170" CornerRadius="6" Margin="0,0,0,10"
+                Background="#FF232328" BorderBrush="#FF3A3A42" BorderThickness="1"
+                MouseMove="MouseArea_MouseMove">
+            <TextBlock Text="موس را این‌جا حرکت بده" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Foreground="#FF777777" IsHitTestVisible="False"/>
+        </Border>
+        <ProgressBar x:Name="Progress" Height="6" Minimum="0" Maximum="20000" Margin="0,0,0,8"/>
+        <TextBlock x:Name="StatusText" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"
+                   Foreground="#FFB0B0B0" Margin="0,0,0,12" MinHeight="34"
+                   Text="«شروع» را بزن و ۲۰ ثانیه طبیعی تایپ و حرکت بده" TextAlignment="Right"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="StartBtn" Content="شروع" Width="96" Margin="0,0,8,0" Click="StartStop_Click"/>
+            <Button x:Name="ApplyBtn" Content="اعمال" Width="96" Margin="0,0,8,0" IsEnabled="False" Click="Apply_Click"/>
+            <Button Content="انصراف" Width="80" Click="Cancel_Click"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

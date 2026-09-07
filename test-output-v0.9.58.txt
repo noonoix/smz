@@ -1,0 +1,7 @@
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.cs(3428,43): error CS1010: Newline in constant [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.csproj]
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.cs(3428,43): error CS1011: Empty character literal [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.csproj]
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.cs(3428,44): error CS1003: Syntax error, ',' expected [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.csproj]
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.cs(3429,1): error CS1010: Newline in constant [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.csproj]
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.cs(3431,50): error CS1026: ) expected [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.csproj]
+
+The build failed. Fix the build errors and run again.

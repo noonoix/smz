@@ -1,0 +1,14 @@
+  Determining projects to restore...
+  Restored C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\ams-shell\src\Ams.UI\Ams.UI.csproj (in 183 ms).
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\ams-shell\src\Ams.UI\Ams.UI_komtopas_wpftmp.csproj]
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\ams-shell\src\Ams.UI\Ams.UI.csproj]
+  Ams.UI -> C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\ams-shell\src\Ams.UI\bin\Release\net8.0-windows\ClassroomStudio.dll
+
+Build succeeded.
+
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\ams-shell\src\Ams.UI\Ams.UI_komtopas_wpftmp.csproj]
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\ams-shell\src\Ams.UI\Ams.UI.csproj]
+    2 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:03.96

@@ -1,0 +1,69 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         AMS design tokens — design doc section 13.3 (v2.0)
+         Dark-first engineering-tool aesthetic. No decorative gradients.
+         ═══════════════════════════════════════════════════════════════ -->
+
+    <!-- Backgrounds -->
+    <Color x:Key="BgBaseColor">#FF1E1F24</Color>
+    <Color x:Key="BgPanelColor">#FF26272E</Color>
+    <Color x:Key="BgElevatedColor">#FF2E3038</Color>
+    <Color x:Key="BorderSubtleColor">#FF33353D</Color>
+
+    <!-- Text -->
+    <Color x:Key="TextPrimaryColor">#FFE8EAED</Color>
+    <Color x:Key="TextSecondaryColor">#FF9AA0A6</Color>
+    <Color x:Key="TextTertiaryColor">#FF6B7280</Color>
+
+    <!-- Semantic -->
+    <Color x:Key="AccentColor">#FF4F8CFF</Color>
+    <Color x:Key="OkColor">#FF3FB950</Color>
+    <Color x:Key="WarnColor">#FFD29922</Color>
+    <Color x:Key="ErrorColor">#FFF85149</Color>
+
+    <!-- Step category colors (always paired with an icon, never color alone) -->
+    <Color x:Key="StepMouseColor">#FF58A6FF</Color>
+    <Color x:Key="StepKeyboardColor">#FFA371F7</Color>
+    <Color x:Key="StepFindImageColor">#FF39C5CF</Color>
+    <Color x:Key="StepFlowColor">#FFF0883E</Color>
+    <Color x:Key="StepDelayColor">#FF8B949E</Color>
+    <Color x:Key="StepDelayBrightColor">#FFB9C1CB</Color>
+    <Color x:Key="StepPackageColor">#FFF778BA</Color>
+    <!-- playAudio brush — between keyboard (purple) and package (pink) -->
+    <Color x:Key="StepAudioColor">#FFB158FF</Color>
+
+    <!-- Region Picker overlay (section 13.6) -->
+    <Color x:Key="RegionPickerColor">#FFFFDF5D</Color>
+
+    <!-- Brushes -->
+    <SolidColorBrush x:Key="BgBaseBrush" Color="{StaticResource BgBaseColor}" />
+    <SolidColorBrush x:Key="BgPanelBrush" Color="{StaticResource BgPanelColor}" />
+    <SolidColorBrush x:Key="BgElevatedBrush" Color="{StaticResource BgElevatedColor}" />
+    <SolidColorBrush x:Key="BorderSubtleBrush" Color="{StaticResource BorderSubtleColor}" />
+
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}" />
+    <SolidColorBrush x:Key="TextTertiaryBrush" Color="{StaticResource TextTertiaryColor}" />
+
+    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
+    <SolidColorBrush x:Key="OkBrush" Color="{StaticResource OkColor}" />
+    <SolidColorBrush x:Key="WarnBrush" Color="{StaticResource WarnColor}" />
+    <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource ErrorColor}" />
+
+    <SolidColorBrush x:Key="StepMouseBrush" Color="{StaticResource StepMouseColor}" />
+    <SolidColorBrush x:Key="StepKeyboardBrush" Color="{StaticResource StepKeyboardColor}" />
+    <SolidColorBrush x:Key="StepFindImageBrush" Color="{StaticResource StepFindImageColor}" />
+    <SolidColorBrush x:Key="StepFlowBrush" Color="{StaticResource StepFlowColor}" />
+    <SolidColorBrush x:Key="StepDelayBrush" Color="{StaticResource StepDelayColor}" />
+    <SolidColorBrush x:Key="StepDelayBrightBrush" Color="{StaticResource StepDelayBrightColor}" />
+    <SolidColorBrush x:Key="StepPackageBrush" Color="{StaticResource StepPackageColor}" />
+    <SolidColorBrush x:Key="StepAudioBrush" Color="{StaticResource StepAudioColor}" />
+
+    <SolidColorBrush x:Key="RegionPickerBrush" Color="{StaticResource RegionPickerColor}" Opacity="0.3" />
+
+    <!-- Hotkey capture active border (fallback when user presses modifier) -->
+    <SolidColorBrush x:Key="SelectedBorderBrush" Color="#FF4F8CFF" />
+
+</ResourceDictionary>

@@ -1,0 +1,410 @@
+<Window x:Class="Ams.UI.Views.BoardPrepWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="آماده‌سازی برد — USB" Width="740" Height="700" MinWidth="620" MinHeight="540"
+        WindowStartupLocation="CenterOwner" FlowDirection="RightToLeft"
+        Background="{StaticResource BgPanelBrush}"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        FontFamily="Segoe UI" FontSize="13">
+
+    <!-- v0.9.50 — board preparation window (port of AMS USB Studio):
+         tab 1 builds Caterina HEX files with a custom USB identity,
+         tab 2 installs the board definition into the Arduino IDE,
+         tab 3 flashes via ISP (bundled tools\isp_flash.py),
+         tab 4 is the read-only board checkup. -->
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="104" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- v0.9.52 - illustrated step rail: each tab shows what happens in that step. -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+            <ToggleButton x:Name="TabHex" Padding="10,6" Click="TabHex_Click"
+                          Background="{StaticResource BgElevatedBrush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                          BorderThickness="1" Foreground="{StaticResource TextPrimaryBrush}" Cursor="Hand" Margin="0,0,6,0"
+                          ToolTip="قدم ۱: فایل HEX با هویت USB سفارشی ساخته می‌شود">
+                <StackPanel Orientation="Horizontal">
+                    <Viewbox Width="30" Height="26" Margin="0,0,8,0">
+                        <Canvas Width="32" Height="28">
+                            <Path Data="M6,2 H18 L24,8 V26 H6 Z" Fill="#1E2A3A" Stroke="#7AA2F7" StrokeThickness="1.6" />
+                            <Path Data="M18,2 V8 H24" Stroke="#7AA2F7" StrokeThickness="1.6" />
+                            <Path Data="M10,14 H20 M10,18 H20 M10,22 H16" Stroke="#9ECE6A" StrokeThickness="1.6" />
+                        </Canvas>
+                    </Viewbox>
+                    <TextBlock Text="۱ · ساخت HEX" VerticalAlignment="Center" TextAlignment="Right" />
+                </StackPanel>
+            </ToggleButton>
+            <ToggleButton x:Name="TabIde" Padding="10,6" Click="TabIde_Click"
+                          Background="{StaticResource BgElevatedBrush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                          BorderThickness="1" Foreground="{StaticResource TextPrimaryBrush}" Cursor="Hand" Margin="0,0,6,0"
+                          ToolTip="قدم ۲: همان هویت در Arduino IDE نصب می‌شود">
+                <StackPanel Orientation="Horizontal">
+                    <Viewbox Width="30" Height="26" Margin="0,0,8,0">
+                        <Canvas Width="32" Height="28">
+                            <Path Data="M3,4 H29 V20 H3 Z" Fill="#1E2A3A" Stroke="#7AA2F7" StrokeThickness="1.6" />
+                            <Path Data="M3,8 H29" Stroke="#7AA2F7" StrokeThickness="1.4" />
+                            <Path Data="M12,24 H20" Stroke="#7AA2F7" StrokeThickness="1.6" />
+                            <Path Data="M16,10 V17 M13,14 L16,17 L19,14" Stroke="#9ECE6A" StrokeThickness="1.8" />
+                        </Canvas>
+                    </Viewbox>
+                    <TextBlock Text="۲ · نصب در IDE" VerticalAlignment="Center" TextAlignment="Right" />
+                </StackPanel>
+            </ToggleButton>
+            <ToggleButton x:Name="TabFlash" Padding="10,6" Click="TabFlash_Click"
+                          Background="{StaticResource BgElevatedBrush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                          BorderThickness="1" Foreground="{StaticResource TextPrimaryBrush}" Cursor="Hand" Margin="0,0,6,0"
+                          ToolTip="قدم ۳: برد پروگرمر با شش سیم به برد مقصد و خودش با USB به کامپیوتر">
+                <StackPanel Orientation="Horizontal">
+                    <Viewbox Width="38" Height="26" Margin="0,0,8,0">
+                        <Canvas Width="46" Height="28">
+                            <Path Data="M2,8 H10 V20 H2 Z" Fill="#1E2A3A" Stroke="#7AA2F7" StrokeThickness="1.4" />
+                            <Path Data="M6,20 V24 H2 H10" Stroke="#7AA2F7" StrokeThickness="1.2" />
+                            <Path Data="M14,6 H26 V22 H14 Z" Fill="#22314A" Stroke="#9ECE6A" StrokeThickness="1.4" />
+                            <Path Data="M32,6 H44 V22 H32 Z" Fill="#22314A" Stroke="#E0AF68" StrokeThickness="1.4" />
+                            <Path Data="M26,8 H32 M26,11 H32 M26,14 H32 M26,17 H32 M26,20 H32 M26,5 H32" Stroke="#E0AF68" StrokeThickness="1.1" />
+                            <Path Data="M10,14 H14" Stroke="#7AA2F7" StrokeThickness="1.4" />
+                        </Canvas>
+                    </Viewbox>
+                    <TextBlock Text="۳ · فلش ISP" VerticalAlignment="Center" TextAlignment="Right" />
+                </StackPanel>
+            </ToggleButton>
+            <ToggleButton x:Name="TabCheckup" Padding="10,6" Click="TabCheckup_Click"
+                          Background="{StaticResource BgElevatedBrush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                          BorderThickness="1" Foreground="{StaticResource TextPrimaryBrush}" Cursor="Hand"
+                          ToolTip="قدم ۴: وضعیت برد خوانده می‌شود — چیزی نوشته نمی‌شود">
+                <StackPanel Orientation="Horizontal">
+                    <Viewbox Width="30" Height="26" Margin="0,0,8,0">
+                        <Canvas Width="32" Height="28">
+                            <Path Data="M4,6 H22 V20 H4 Z" Fill="#1E2A3A" Stroke="#7AA2F7" StrokeThickness="1.5" />
+                            <Path Data="M8,10 H14 M8,14 H12" Stroke="#7AA2F7" StrokeThickness="1.2" />
+                            <Path Data="M18,16 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0" Fill="#0F1720" Stroke="#9ECE6A" StrokeThickness="1.8" />
+                            <Path Data="M22,20 L28,26" Stroke="#9ECE6A" StrokeThickness="2.2" />
+                        </Canvas>
+                    </Viewbox>
+                    <TextBlock Text="۴ · چکاپ برد" VerticalAlignment="Center" TextAlignment="Right" />
+                </StackPanel>
+            </ToggleButton>
+        </StackPanel>
+
+        <!-- Panels (never Visibility.Hidden — hidden panels still occupy layout space, v0.9.48 lesson) -->
+        <Grid Grid.Row="1">
+
+            <!-- ── Tab 1: build HEX ── -->
+            <ScrollViewer x:Name="PanelHex" Visibility="Visible" VerticalScrollBarVisibility="Auto" Padding="14,0,14,0">
+                <StackPanel>
+                    <TextBlock Text="سه قدم: ۱) HEX با هویت سفارشی بساز ← ۲) برد را در Arduino IDE نصب کن ← ۳) با ISP فلش کن. تب چکاپ وضعیت برد را می‌خواند."
+                               Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,10" TextAlignment="Right" />
+
+                    <Border Background="{StaticResource BgElevatedBrush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                            BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="هویت دستگاه (VID/PID)" FontWeight="SemiBold" Margin="0,0,0,6" TextAlignment="Right" />
+                            <ComboBox x:Name="CmbIdentity" DisplayMemberPath="Name" SelectionChanged="AnyField_Changed" />
+                            <TextBlock Text="همه‌ی هویت‌ها CDC هستند — پورت سریال و آپلود USB هرگز قطع نمی‌شود."
+                                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap" TextAlignment="Right" />
+                            <CheckBox x:Name="ChkCustom" Content="VID/PID و نام‌های سفارشی (پیشرفته)" Margin="0,10,0,0"
+                                      Checked="ChkCustom_Checked" Unchecked="ChkCustom_Checked" />
+                            <Grid x:Name="GridAdvanced" Visibility="Collapsed" Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="VID:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <TextBox x:Name="TxtVid" FlowDirection="LeftToRight" Grid.Column="1" Text="0x1D50" Margin="0,0,10,0" FontFamily="Consolas" />
+                                <TextBlock Text="PID:" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <TextBox x:Name="TxtPid" FlowDirection="LeftToRight" Grid.Column="3" Text="0x615E" FontFamily="Consolas" />
+                                <TextBlock Text="نام محصول:" Grid.Row="1" VerticalAlignment="Center" Margin="0,8,6,0" TextAlignment="Right" />
+                                <TextBox x:Name="TxtProduct" Grid.Row="1" Grid.Column="1" Margin="0,8,10,0" />
+                                <TextBlock Text="سازنده:" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="0,8,6,0" TextAlignment="Right" />
+                                <TextBox x:Name="TxtManuf" Grid.Row="1" Grid.Column="3" Margin="0,8,0,0" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{StaticResource BgElevatedBrush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                            BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="سریال‌نامبر یکتا" FontWeight="SemiBold" Margin="0,0,0,6" TextAlignment="Right" />
+                            <StackPanel Orientation="Horizontal">
+                                <TextBox x:Name="TxtSerial" FlowDirection="LeftToRight" Width="220" FontFamily="Consolas" />
+                                <Button x:Name="BtnRandom" Content="🎲 تصادفی" Click="BtnRandom_Click" Margin="8,0,0,0" Padding="10,3" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <TextBlock Text="پیشوند:" VerticalAlignment="Center" Margin="0,0,6,0" TextAlignment="Right" />
+                                <TextBox x:Name="TxtPrefix" FlowDirection="LeftToRight" Width="90" Text="AMS" FontFamily="Consolas" />
+                                <TextBlock Text="تعداد فایل (۱–۵۰۰):" VerticalAlignment="Center" Margin="14,0,6,0" TextAlignment="Right" />
+                                <TextBox x:Name="TxtCount" FlowDirection="LeftToRight" Width="56" Text="1" FontFamily="Consolas" />
+                            </StackPanel>
+                            <TextBlock Text="بیش از یک فایل = هر فایل یک سریال تصادفی تازه با همین پیشوند می‌گیرد."
+                                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap" TextAlignment="Right" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{StaticResource BgElevatedBrush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                            BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="مسیرها" FontWeight="SemiBold" Margin="0,0,0,6" TextAlignment="Right" />
+                            <TextBlock Text="فایل Caterina.hex:" FontSize="12" Margin="0,0,0,4" TextAlignment="Right" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="TxtCaterina" FlowDirection="LeftToRight" FontFamily="Consolas" FontSize="12" />
+                                <Button Grid.Column="1" Content="انتخاب…" Click="BtnBrowseCaterina_Click" Margin="8,0,0,0" Padding="10,3" />
+                            </Grid>
+                            <TextBlock Text="پوشه‌ی خروجی HEXها:" FontSize="12" Margin="0,10,0,4" TextAlignment="Right" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="TxtOutputDir" FlowDirection="LeftToRight" FontFamily="Consolas" FontSize="12" />
+                                <Button Grid.Column="1" Content="انتخاب…" Click="BtnBrowseOutput_Click" Margin="8,0,0,0" Padding="10,3" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{StaticResource BgElevatedBrush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                            BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="مشخصات برد (همین‌جا ثبت می‌شود — قدم ۲ خودکار همین را می‌گیرد)"
+                                       FontWeight="SemiBold" Margin="0,0,0,6" TextAlignment="Right" />
+                            <TextBlock x:Name="TxtBoardSpecs1" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"
+                                       TextWrapping="Wrap" TextAlignment="Right" />
+                        </StackPanel>
+                    </Border>
+
+                    <Button x:Name="BtnGenerate" Content="🚀 ساخت فایل HEX" Click="BtnGenerate_Click"
+                            Padding="14,8" FontWeight="SemiBold" Background="{StaticResource AccentBrush}"
+                            Foreground="White" BorderThickness="0" Cursor="Hand" HorizontalAlignment="Right" />
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ── Tab 2: install the board in the Arduino IDE ── -->
+            <ScrollViewer x:Name="PanelIde" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="14,0,14,0">
+                <StackPanel>
+                    <Border Background="{StaticResource BgElevatedBrush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                            BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="محل نصب برد «Classroom Studio Board»" FontWeight="SemiBold" Margin="0,0,0,6" TextAlignment="Right" />
+                            <RadioButton x:Name="RadioSketchbook" GroupName="IdeTarget" IsChecked="True"
+                                         Checked="IdeTarget_Changed" Unchecked="IdeTarget_Changed">
+                                <RadioButton.Content>
+                                    <TextBlock Text="پوشه‌ی Sketchbook (پیش‌فرض — بدون نیاز به ادمین، با آپدیت IDE پاک نمی‌شود)" TextWrapping="Wrap" TextAlignment="Right" />
+                                </RadioButton.Content>
+                            </RadioButton>
+                            <RadioButton x:Name="RadioBoardsTxt" GroupName="IdeTarget" Margin="0,6,0,0"
+                                         Checked="IdeTarget_Changed" Unchecked="IdeTarget_Changed">
+                                <RadioButton.Content>
+                                    <TextBlock Text="boards.txt داخل خودِ IDE (مستقیم — ممکن است ادمین بخواهد)" TextWrapping="Wrap" TextAlignment="Right" />
+                                </RadioButton.Content>
+                            </RadioButton>
+                            <Grid Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="LblIdePath" Text="پوشه‌ی Sketchbook:" VerticalAlignment="Center" Margin="0,0,6,0" TextAlignment="Right" />
+                                <TextBox x:Name="TxtIdePath" FlowDirection="LeftToRight" Grid.Column="1" FontFamily="Consolas" FontSize="12" />
+                                <Button x:Name="BtnIdePathBrowse" Grid.Column="2" Content="انتخاب…" Click="BtnIdePathBrowse_Click" Margin="8,0,0,0" Padding="10,3" />
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                <Button Content="🔍 تشخیص خودکار" Click="BtnIdeDetect_Click" Padding="10,3" />
+                                <Button x:Name="BtnInstall" Content="⚡ نصب خودکار" Click="BtnInstall_Click"
+                                        Padding="12,3" Margin="10,0,0,0" FontWeight="SemiBold" />
+                                <Button x:Name="BtnUninstall" Content="حذف نصب" Click="BtnUninstall_Click"
+                                        Padding="12,3" Margin="10,0,0,0" />
+                            </StackPanel>
+                            <TextBlock Text="بعد از نصب، Arduino IDE را یک بار ببند و باز کن؛ از Tools → Board برد Classroom Studio Board را انتخاب کن — هر اسکچی که با آن کامپایل شود هویت USB سفارشی می‌گیرد."
+                                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,10,0,0" TextWrapping="Wrap" TextAlignment="Right" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{StaticResource BgElevatedBrush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                            BorderThickness="1" CornerRadius="6" Padding="12">
+                        <StackPanel>
+                            <TextBlock Text="مشخصات برد — با انتخاب هویت در قدم ۱ همه‌ی فیلدها خودکار پر می‌شوند — قابل ویرایش"
+                                       FontWeight="SemiBold" Margin="0,0,0,8" TextWrapping="Wrap" TextAlignment="Right" />
+                            <Grid x:Name="GridBoardSpecs">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="شناسه‌ی برد (id):" VerticalAlignment="Center" Margin="0,0,6,0" TextAlignment="Right" />
+                                <TextBox x:Name="TxtBoardId" FlowDirection="LeftToRight" Grid.Column="1" Margin="0,0,10,0"
+                                         FontFamily="Consolas" TextChanged="BoardSpec_Changed" />
+                                <TextBlock Text="نام برد:" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,6,0" TextAlignment="Right" />
+                                <TextBox x:Name="TxtBoardName" FlowDirection="LeftToRight" Grid.Column="3" TextChanged="BoardSpec_Changed" />
+
+                                <TextBlock Text="بوت‌لودر VID:" Grid.Row="1" VerticalAlignment="Center" Margin="0,8,6,0" TextAlignment="Right" />
+                                <TextBox x:Name="TxtBootVid" FlowDirection="LeftToRight" Grid.Row="1" Grid.Column="1" Margin="0,8,10,0"
+                                         FontFamily="Consolas" TextChanged="BoardSpec_Changed" />
+                                <TextBlock Text="بوت‌لودر PID:" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="0,8,6,0" TextAlignment="Right" />
+                                <TextBox x:Name="TxtBootPid" FlowDirection="LeftToRight" Grid.Row="1" Grid.Column="3" Margin="0,8,0,0"
+                                         FontFamily="Consolas" TextChanged="BoardSpec_Changed" />
+
+                                <TextBlock Text="اپلیکیشن PID:" Grid.Row="2" VerticalAlignment="Center" Margin="0,8,6,0" TextAlignment="Right" />
+                                <TextBox x:Name="TxtAppPid" FlowDirection="LeftToRight" Grid.Row="2" Grid.Column="1" Margin="0,8,10,0"
+                                         FontFamily="Consolas" TextChanged="BoardSpec_Changed" />
+                                <TextBlock Text="نام محصول:" Grid.Row="2" Grid.Column="2" VerticalAlignment="Center" Margin="0,8,6,0" TextAlignment="Right" />
+                                <TextBox x:Name="TxtBoardProduct" FlowDirection="LeftToRight" Grid.Row="2" Grid.Column="3" Margin="0,8,0,0"
+                                         TextChanged="BoardSpec_Changed" />
+
+                                <TextBlock Text="سازنده:" Grid.Row="3" VerticalAlignment="Center" Margin="0,8,6,0" TextAlignment="Right" />
+                                <TextBox x:Name="TxtBoardManuf" FlowDirection="LeftToRight" Grid.Row="3" Grid.Column="1" Margin="0,8,10,0"
+                                         TextChanged="BoardSpec_Changed" />
+                            </Grid>
+                            <TextBlock Text="PID اپلیکیشن = PID بوت‌لودر + ۱ (باید متفاوت باشند) · فیلد خالی = مقدار هویت انتخاب‌شده"
+                                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,8,0,0"
+                                       TextWrapping="Wrap" TextAlignment="Right" />
+                            <StackPanel Orientation="Horizontal" Margin="0,10,0,10">
+                                <Button x:Name="BtnSpecsReset" Content="↺ بازنشانی به پیش‌فرض دستگاه" Click="BtnSpecsReset_Click" Padding="10,3" />
+                                <Button x:Name="BtnSpecsRefresh" Content="🔄 به‌روزرسانی پیش‌نمایش" Click="BtnSpecsRefresh_Click" Padding="10,3" Margin="10,0,0,0" />
+                            </StackPanel>
+                            <TextBlock x:Name="TxtBoardSpecs" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"
+                                       TextAlignment="Right" TextWrapping="Wrap" Margin="0,0,0,8" />
+                            <TextBlock Text="پیش‌نمایش بلوک برد (با هویت تب «ساخت HEX» همگام است)" FontWeight="SemiBold" Margin="0,0,0,6" TextAlignment="Right" />
+                            <TextBox x:Name="TxtPreview" FlowDirection="LeftToRight" IsReadOnly="True" FontFamily="Consolas" FontSize="11"
+                                     Height="230" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto"
+                                     HorizontalScrollBarVisibility="Auto" Background="{StaticResource BgBaseBrush}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ── Tab 3: ISP flash ── -->
+            <ScrollViewer x:Name="PanelFlash" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="14,0,14,0">
+                <StackPanel>
+                    <Border Background="{StaticResource BgElevatedBrush}" BorderBrush="{StaticResource WarnBrush}"
+                            BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,10">
+                        <TextBlock Foreground="{StaticResource WarnBrush}" TextWrapping="Wrap"
+                                   Text="⚠ فایل HEX وارد Arduino IDE نمی‌شود — IDE فقط HEX تولید می‌کند. و هرگز HEX بوت‌لودر را با دکمه‌ی Upload یا avrdude روی پورت USB خودِ برد فلش نکن: بوت‌لودر نمی‌تواند خودش را بازنویسی کند و برد خراب می‌شود. فقط از طریق ISP (برد پروگرمر با اسکچ ArduinoISP + شش سیم)." TextAlignment="Right" />
+                    </Border>
+
+                    <Border Background="{StaticResource BgElevatedBrush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                            BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="فایل HEX" FontWeight="SemiBold" Margin="0,0,0,6" TextAlignment="Right" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="CmbHex" FlowDirection="LeftToRight" IsEditable="True" FontFamily="Consolas" FontSize="12" SelectionChanged="FlashField_Changed" />
+                                <Button Grid.Column="1" Content="🔄 تازه‌سازی" Click="BtnRefreshHex_Click" Margin="6,0,0,0" Padding="8,3" />
+                                <Button Grid.Column="2" Content="انتخاب…" Click="BtnBrowseHex_Click" Margin="6,0,0,0" Padding="8,3" />
+                            </Grid>
+
+                            <TextBlock Text="پورت پروگرمر (بردی که اسکچ ArduinoISP رویش است):" FontSize="12" Margin="0,12,0,4" TextAlignment="Right" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="CmbFlashPort" FlowDirection="LeftToRight" IsEditable="True" FontFamily="Consolas" FontSize="12" SelectionChanged="FlashField_Changed" />
+                                <Button Grid.Column="1" Content="🔍 تشخیص پورت" Click="BtnDetectPort_Click" Margin="6,0,0,0" Padding="8,3" />
+                            </Grid>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                <CheckBox x:Name="ChkCheckOnly" Content="فقط چک (بدون نوشتن)"
+                                          Checked="FlashField_Changed" Unchecked="FlashField_Changed" />
+                                <CheckBox x:Name="ChkErase" Content="پاک‌سازی اول (erase)" Margin="12,0,0,0" IsChecked="True"
+                                          Checked="FlashField_Changed" Unchecked="FlashField_Changed" />
+                                <CheckBox x:Name="ChkFixFuses" Content="ترمیم فیوزها" Margin="12,0,0,0"
+                                          Checked="FlashField_Changed" Unchecked="FlashField_Changed" />
+                            </StackPanel>
+
+                            <TextBlock Text="دستور دستی (PowerShell):" FontSize="12" Margin="0,12,0,4" TextAlignment="Right" />
+                            <TextBox x:Name="TxtManualCmd" FlowDirection="LeftToRight" IsReadOnly="True" FontFamily="Consolas" FontSize="11"
+                                     Height="64" TextWrapping="Wrap" Background="{StaticResource BgBaseBrush}" />
+
+                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                <Button x:Name="BtnFlash" Content="⚡ فلش خودکار به برد" Click="BtnFlash_Click"
+                                        Padding="12,4" FontWeight="SemiBold" Background="{StaticResource AccentBrush}"
+                                        Foreground="White" BorderThickness="0" Cursor="Hand" />
+                                <Button x:Name="BtnCopyCmd" Content="📋 کپی دستور (دستی)" Click="BtnCopyCmd_Click"
+                                        Padding="10,3" Margin="10,0,0,0" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ── Tab 4: board checkup ── -->
+            <Grid x:Name="PanelCheckup" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="150" />
+                </Grid.RowDefinitions>
+                <StackPanel Orientation="Horizontal">
+                    <Button x:Name="BtnScan" Content="🔍 اسکن پورت‌ها" Click="BtnScan_Click" Padding="12,4" />
+                    <Button x:Name="BtnCheckup" Content="🤝 چکاپ کامل (اسکن + HELLO)" Click="BtnCheckup_Click"
+                            Padding="12,4" Margin="10,0,0,0" FontWeight="SemiBold" />
+                    <Button x:Name="BtnCleanupCom" Content="🧹 پاکسازی تاریخچه‌ی COM…" Click="BtnCleanupCom_Click"
+                            Padding="12,4" Margin="10,0,0,0"
+                            ToolTip="حذف ورودی‌های پورتِ بردهایی که الان وصل نیستند — با اجازه‌ی ادمین و بکاپ .reg" />
+                    <CheckBox x:Name="ChkShowHistory" Content="نمایش تاریخچه (پورت‌های وصل‌نشده)" VerticalAlignment="Center" Margin="14,0,0,0"
+                              Checked="ChkShowHistory_Changed" Unchecked="ChkShowHistory_Changed" />
+                </StackPanel>
+                <ListBox x:Name="ListPorts" FlowDirection="LeftToRight" Grid.Row="1" Margin="0,10" FontFamily="Consolas" FontSize="12"
+                         Background="{StaticResource BgElevatedBrush}" BorderBrush="{StaticResource BorderSubtleBrush}" />
+                <ListBox x:Name="ListSummary" Grid.Row="2" FontFamily="Segoe UI" FontSize="12"
+                         Background="{StaticResource BgElevatedBrush}" BorderBrush="{StaticResource BorderSubtleBrush}">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Right" />
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                </ListBox>
+            </Grid>
+        </Grid>
+
+        <!-- v0.9.52 - one shared wizard navigator for every step -->
+        <Grid Grid.Row="2" Margin="0,10,0,6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Button x:Name="BtnPrevStep" Grid.Column="0" Content="→ قدم قبل" Click="BtnPrevStep_Click" Padding="12,4" />
+            <TextBlock x:Name="TxtStepHint" Grid.Column="1" VerticalAlignment="Center" TextAlignment="Center"
+                       TextWrapping="Wrap" FontSize="12" Margin="10,0,10,0"
+                       Foreground="{StaticResource TextSecondaryBrush}" />
+            <Button x:Name="BtnNextStep" Grid.Column="2" Content="قدم بعدی ←" Click="BtnNextStep_Click"
+                    Padding="14,4" FontWeight="SemiBold" Background="{StaticResource AccentBrush}"
+                    Foreground="White" BorderThickness="0" Cursor="Hand" />
+        </Grid>
+
+        <!-- shared log -->
+        <TextBox x:Name="TxtLog" FlowDirection="LeftToRight" Grid.Row="3" IsReadOnly="True" TextWrapping="Wrap"
+                 VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="12"
+                 Background="{StaticResource BgElevatedBrush}" Foreground="{StaticResource TextPrimaryBrush}"
+                 BorderBrush="{StaticResource BorderSubtleBrush}" />
+
+        <!-- status line -->
+        <TextBlock x:Name="TxtStatus" Grid.Row="4" Margin="0,8,0,0"
+                   Foreground="{StaticResource TextSecondaryBrush}" Text="آماده" TextAlignment="Right" />
+    </Grid>
+</Window>

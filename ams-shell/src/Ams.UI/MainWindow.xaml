@@ -1,0 +1,776 @@
+<Window x:Class="Ams.UI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:vm="clr-namespace:Ams.UI.ViewModels"
+        xmlns:conv="clr-namespace:Ams.UI.Converters"
+        Title="Classroom Studio" Width="1280" Height="720" MinWidth="1024" MinHeight="640"
+        WindowStartupLocation="CenterScreen"
+        Icon="pack://application:,,,/Resources/ams.ico"
+        Background="{StaticResource BgBaseBrush}"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        Closing="Window_Closing"
+        Loaded="MainWindow_Loaded">
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         AMS main shell v0.6 — design doc section 13.1
+         Plain Window → standard Windows chrome (minimize / maximize / close).
+         v0.6: app icon · steps area on a white document canvas (AMK-like,
+         user request) · right-click context menu (AMK parity) · drag&drop
+         reorder/re-parent · real Import .amk via amk_toolkit decoder.
+         ═══════════════════════════════════════════════════════════════ -->
+
+    <Window.Resources>
+        <conv:StepTypeBrushConverter x:Key="StepTypeBrush" />
+        <conv:ConnectionBrushConverter x:Key="ConnectionBrush" />
+        <!-- steps canvas (light document on dark chrome) — WCAG-checked pair -->
+        <SolidColorBrush x:Key="TreeBgBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="TreeTextBrush" Color="#1F2328" />
+        <SolidColorBrush x:Key="TreeSecondaryBrush" Color="#57606A" />
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+        <!-- v0.7.4 — icon rail buttons: quiet chrome, tinted hover/press on the dark rail -->
+        <Style x:Key="RailButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Margin" Value="4,1" />
+            <Setter Property="Padding" Value="0,3" />
+            <!-- v0.9.43 — submenus open on hover (user request), not only by clicking the ▾ caret;
+                 tighter margins keep all 12 sections visible on shorter windows -->
+            <EventSetter Event="MouseEnter" Handler="RailButton_MouseEnter" />
+            <!-- v0.9.55 - the hover hint drops BELOW the icon and switches off while that
+                 icon's submenu is open, so tooltip and submenu never overlap (user report) -->
+            <Setter Property="ToolTipService.Placement" Value="Bottom" />
+            <Setter Property="ToolTipService.VerticalOffset" Value="8" />
+            <Setter Property="ToolTipService.InitialShowDelay" Value="700" />
+            <Setter Property="ToolTipService.ShowDuration" Value="4000" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="b" Background="{TemplateBinding Background}"
+                                CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="b" Property="Background" Value="#14FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="b" Property="Background" Value="#26FFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Window.DataContext>
+        <vm:MainViewModel />
+    </Window.DataContext>
+
+    <Window.InputBindings>
+        <KeyBinding Key="N" Modifiers="Control" Command="{Binding NewDocumentCommand}" />
+        <KeyBinding Key="O" Modifiers="Control" Command="{Binding OpenDocumentCommand}" />
+        <KeyBinding Key="S" Modifiers="Control" Command="{Binding SaveCommand}" />
+        <KeyBinding Key="F2" Command="{Binding EditSelectedCommand}" />
+        <KeyBinding Key="Delete" Command="{Binding DeleteSelectedCommand}" />
+        <KeyBinding Key="D" Modifiers="Control" Command="{Binding ToggleDisabledCommand}" />
+        <KeyBinding Key="Z" Modifiers="Control" Command="{Binding UndoCommand}" />
+        <KeyBinding Key="Y" Modifiers="Control" Command="{Binding RedoCommand}" />
+        <KeyBinding Key="X" Modifiers="Control" Command="{Binding CutCommand}" />
+        <KeyBinding Key="C" Modifiers="Control" Command="{Binding CopyCommand}" />
+        <KeyBinding Key="V" Modifiers="Control" Command="{Binding PasteCommand}" />
+        <KeyBinding Key="Up" Modifiers="Alt" Command="{Binding MoveUpCommand}" />
+        <KeyBinding Key="Down" Modifiers="Alt" Command="{Binding MoveDownCommand}" />
+        <KeyBinding Key="F1" Modifiers="Shift" Command="{Binding RunCommand}" />
+        <KeyBinding Key="F2" Modifiers="Shift" Command="{Binding StopCommand}" />
+    </Window.InputBindings>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />   <!-- menu bar -->
+            <RowDefinition Height="*" />      <!-- main content -->
+            <RowDefinition Height="Auto" />   <!-- serial log panel -->
+            <RowDefinition Height="Auto" />   <!-- status bar -->
+        </Grid.RowDefinitions>
+
+        <!-- ══ Menu bar (design doc section 2) — all items wired ══ -->
+        <Menu Grid.Row="0" Padding="4,2"
+              Background="{StaticResource BgPanelBrush}"
+              Foreground="{StaticResource TextPrimaryBrush}" FontSize="13">
+            <MenuItem Header="_File">
+                <MenuItem Header="_New Script" InputGestureText="Ctrl+N" Command="{Binding NewDocumentCommand}" />
+                <MenuItem Header="_Open…" InputGestureText="Ctrl+O" Command="{Binding OpenDocumentCommand}" />
+                <Separator />
+                <MenuItem Header="_Save" InputGestureText="Ctrl+S" Command="{Binding SaveCommand}" />
+                <MenuItem Header="Save _As…" Command="{Binding SaveAsCommand}" />
+                <Separator />
+                <MenuItem Header="_Import .amk…" Command="{Binding ImportAmkCommand}" />
+                <MenuItem Header="_Generate Script…" Command="{Binding GenerateCommand}" />
+                <MenuItem Header="Export _Pico Firmware… (per system)" Command="{Binding ExportPicoFirmwareCommand}"
+                          ToolTip="خروجی CircuitPython برای رزبری پای پیکو — یک‌بار در هر سیستم" />
+                <Separator />
+                <MenuItem Header="E_xit" Command="{Binding ExitCommand}" />
+            </MenuItem>
+            <MenuItem Header="_Edit">
+                <!-- v0.9.43 — Undo/Redo were hotkey-only since v0.9.30; now visible (user: «undo/redo ندارد») -->
+                <MenuItem Header="_Undo" InputGestureText="Ctrl+Z" Command="{Binding UndoCommand}" />
+                <MenuItem Header="_Redo" InputGestureText="Ctrl+Y" Command="{Binding RedoCommand}" />
+                <Separator />
+                <MenuItem Header="_Edit Action" InputGestureText="F2" Command="{Binding EditSelectedCommand}" />
+                <MenuItem Header="_Delete Action" InputGestureText="Del" Command="{Binding DeleteSelectedCommand}" />
+                <MenuItem Header="Enable/_Disable Step" InputGestureText="Ctrl+D" Command="{Binding ToggleDisabledCommand}" />
+                <Separator />
+                <!-- v0.9.0 — Cut/Copy/Paste existed only in the right-click menu; add them here
+                     so the shortcuts are discoverable (they use the app's step clipboard) -->
+                <MenuItem Header="Cu_t" InputGestureText="Ctrl+X" Command="{Binding CutCommand}" />
+                <MenuItem Header="_Copy" InputGestureText="Ctrl+C" Command="{Binding CopyCommand}" />
+                <MenuItem Header="_Paste" InputGestureText="Ctrl+V" Command="{Binding PasteCommand}" />
+                <Separator />
+                <MenuItem Header="Move _Up" InputGestureText="Alt+Up" Command="{Binding MoveUpCommand}" />
+                <MenuItem Header="Move Dow_n" InputGestureText="Alt+Down" Command="{Binding MoveDownCommand}" />
+                <Separator />
+                <MenuItem Header="Batch Edit _Delays…" Command="{Binding BatchDelaysCommand}" />
+            </MenuItem>
+            <MenuItem Header="_Insert">
+                <MenuItem Header="Mouse _Click" Command="{Binding AddStepCommand}" CommandParameter="mouseClick" />
+                <MenuItem Header="Mouse _Position" Command="{Binding AddStepCommand}" CommandParameter="mouseMove" />
+                <MenuItem Header="Mouse _Scroll" Command="{Binding AddStepCommand}" CommandParameter="mouseScroll" />
+                <MenuItem Header="_Random Mouse Position" Command="{Binding AddStepCommand}" CommandParameter="randomMousePosition" />
+                <Separator />
+                <MenuItem Header="_Keystroke" Command="{Binding AddStepCommand}" CommandParameter="keystroke" />
+                <MenuItem Header="_Type Text" Command="{Binding AddStepCommand}" CommandParameter="typeText" />
+                <MenuItem Header="Key _Down" Command="{Binding AddStepCommand}" CommandParameter="keyDown" />
+                <MenuItem Header="Key _Up" Command="{Binding AddStepCommand}" CommandParameter="keyUp" />
+                <Separator />
+                <MenuItem Header="_Delay" Command="{Binding AddStepCommand}" CommandParameter="delay" />
+                <MenuItem Header="_For Loop" Command="{Binding AddStepCommand}" CommandParameter="forLoop" />
+                <MenuItem Header="Random Pac_kage" Command="{Binding AddStepCommand}" CommandParameter="randomPackage" />
+                <MenuItem Header="Run in Parallel (grou_p) — children start together; next step waits for the longest" Command="{Binding AddStepCommand}" CommandParameter="parallelGroup" />
+                <Separator />
+                <MenuItem Header="_Find Image On Screen" Command="{Binding AddStepCommand}" CommandParameter="findImage" />
+                <MenuItem Header="_Wait For Sound" Command="{Binding AddStepCommand}" CommandParameter="waitForSound" />
+                <MenuItem Header="Wait For _Light (BH1750)" Command="{Binding AddStepCommand}" CommandParameter="waitForLight" />
+                <Separator />
+                <MenuItem Header="Open _File / Program" Command="{Binding AddStepCommand}" CommandParameter="openFile" />
+                <MenuItem Header="_Play Audio (wav/mp3)" Command="{Binding AddStepCommand}" CommandParameter="playAudio" />
+                <MenuItem Header="_Run Exe" Command="{Binding AddStepCommand}" CommandParameter="runExe" />
+                <MenuItem Header="_Play Script (.amsj)" Command="{Binding AddStepCommand}" CommandParameter="playScript" />
+                <MenuItem Header="Insert _Label" Command="{Binding AddStepCommand}" CommandParameter="label" />
+                <MenuItem Header="_Go To Label" Command="{Binding AddStepCommand}" CommandParameter="gotoLabel" />
+                <Separator />
+                <MenuItem Header="Co_mment" Command="{Binding AddStepCommand}" CommandParameter="comment" />
+                <MenuItem Header="_Raw Command" Command="{Binding AddStepCommand}" CommandParameter="rawCommand" />
+            </MenuItem>
+            <MenuItem Header="_Tools">
+                <MenuItem Header="_Options…" Command="{Binding OptionsCommand}" />
+                <MenuItem Header="_Board Preparation… (USB identity)" Command="{Binding BoardPrepCommand}" />
+            </MenuItem>
+        </Menu>
+
+        <!-- ══ Main content ══ -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="60" />   <!-- icon rail -->
+                <ColumnDefinition Width="*" />    <!-- steps list -->
+                <ColumnDefinition Width="320" />  <!-- inspector -->
+            </Grid.ColumnDefinitions>
+
+            <!-- Icon rail (section 13.1) — quick add · v0.7.4 redesign (user feedback:
+                 was iconless text) — colored icon + caption + rich tooltip per category.
+                 v0.9.41: every Insert-tab entry is reachable from here — a section with
+                 sub-entries shows a ▾ caret that opens that section's own submenu. -->
+            <!-- v0.9.44 — leaving the rail with the mouse closes the hover-opened submenu -->
+            <Border Grid.Column="0" MouseLeave="RailBorder_MouseLeave"
+                    Background="{StaticResource BgPanelBrush}"
+                    BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="0,0,1,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="0,8">
+                        <Button Style="{StaticResource RailButton}" Command="{Binding AddStepCommand}" CommandParameter="mouseClick"
+                                ToolTip="کلیک موس — کلیک در موقعیت فعلی · ▾ برای زیرمنوی این بخش">
+                            <Button.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Mouse Click" CommandParameter="mouseClick"
+                                              Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                    <MenuItem Header="Mouse Position" CommandParameter="mouseMove"
+                                              Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                    <MenuItem Header="Mouse Scroll" CommandParameter="mouseScroll"
+                                              Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                    <MenuItem Header="Random Mouse Position" CommandParameter="randomMousePosition"
+                                              Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                            <StackPanel>
+                                <TextBlock Text="🖱️" FontSize="15" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center" Foreground="{StaticResource StepMouseBrush}" />
+                                <TextBlock Text="Mouse" FontSize="8" HorizontalAlignment="Center" Foreground="#FFFFFF" Margin="0,1,0,0" />
+                                <TextBlock Text="▾" FontSize="9" HorizontalAlignment="Center" Foreground="#9AA4B2" Margin="0,-1,0,0"
+                                           PreviewMouseLeftButtonDown="RailSubmenu_PreviewMouseLeftButtonDown" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource RailButton}" Command="{Binding AddStepCommand}" CommandParameter="keystroke"
+                                ToolTip="ضربه‌ی کلید — ترکیب کلیدها (مثل Alt+F4) · ▾ برای زیرمنوی این بخش">
+                            <Button.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Keystroke" CommandParameter="keystroke"
+                                              Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                    <MenuItem Header="Type Text" CommandParameter="typeText"
+                                              Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                    <MenuItem Header="Key Down" CommandParameter="keyDown"
+                                              Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                    <MenuItem Header="Key Up" CommandParameter="keyUp"
+                                              Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                            <StackPanel>
+                                <TextBlock Text="⌨️" FontSize="15" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center" Foreground="{StaticResource StepKeyboardBrush}" />
+                                <TextBlock Text="Keys" FontSize="8" HorizontalAlignment="Center" Foreground="#FFFFFF" Margin="0,1,0,0" />
+                                <TextBlock Text="▾" FontSize="9" HorizontalAlignment="Center" Foreground="#9AA4B2" Margin="0,-1,0,0"
+                                           PreviewMouseLeftButtonDown="RailSubmenu_PreviewMouseLeftButtonDown" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource RailButton}" Command="{Binding AddStepCommand}" CommandParameter="findImage"
+                                ToolTip="جست‌وجوی تصویر روی صفحه — تشخیص PC-side (Shift+F11)">
+                            <StackPanel>
+                                <TextBlock Text="🖼️" FontSize="15" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center" Foreground="{StaticResource StepFindImageBrush}" />
+                                <TextBlock Text="Image" FontSize="8" HorizontalAlignment="Center" Foreground="#FFFFFF" Margin="0,1,0,0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource RailButton}" Command="{Binding AddStepCommand}" CommandParameter="waitForSound"
+                                ToolTip="انتظار صدا — سنسور روی A0 (دکمه‌ی کالیبره در داخل)">
+                            <StackPanel>
+                                <TextBlock Text="🔊" FontSize="15" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center" Foreground="{StaticResource WarnBrush}" />
+                                <TextBlock Text="Sound" FontSize="8" HorizontalAlignment="Center" Foreground="#FFFFFF" Margin="0,1,0,0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource RailButton}" Command="{Binding AddStepCommand}" CommandParameter="waitForLight"
+                                ToolTip="انتظار نور — BH1750 (GY-302/GY-30) روی I2C پیکو: بازهٔ لوکس بعد از تثبیت n ثانیه (دکمهٔ کالیبره در داخل)">
+                            <StackPanel>
+                                <TextBlock Text="💡" FontSize="15" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center" Foreground="{StaticResource StepFindImageBrush}" />
+                                <TextBlock Text="Light" FontSize="8" HorizontalAlignment="Center" Foreground="#FFFFFF" Margin="0,1,0,0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource RailButton}" Command="{Binding AddStepCommand}" CommandParameter="forLoop"
+                                ToolTip="حلقه — تعداد / زمان / بی‌نهایت · ▾ برای زیرمنوی این بخش">
+                            <Button.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="For Loop" CommandParameter="forLoop"
+                                              Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                    <MenuItem Header="Run in Parallel (group)" CommandParameter="parallelGroup"
+                                              Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                            <StackPanel>
+                                <TextBlock Text="🔁" FontSize="15" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center" Foreground="{StaticResource StepFlowBrush}" />
+                                <TextBlock Text="Loop" FontSize="8" HorizontalAlignment="Center" Foreground="#FFFFFF" Margin="0,1,0,0" />
+                                <TextBlock Text="▾" FontSize="9" HorizontalAlignment="Center" Foreground="#9AA4B2" Margin="0,-1,0,0"
+                                           PreviewMouseLeftButtonDown="RailSubmenu_PreviewMouseLeftButtonDown" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource RailButton}" Command="{Binding AddStepCommand}" CommandParameter="randomPackage"
+                                ToolTip="بسته‌ی تصادفی — فرزندان هر بار با الگوی تصادفی تازه اجرا می‌شوند">
+                            <StackPanel>
+                                <TextBlock Text="🎲" FontSize="15" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center" Foreground="{StaticResource StepPackageBrush}" />
+                                <TextBlock Text="RndPkg" FontSize="8" HorizontalAlignment="Center" Foreground="#FFFFFF" Margin="0,1,0,0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource RailButton}" Command="{Binding AddStepCommand}" CommandParameter="delay"
+                                ToolTip="تاخیر — بازه‌ی تصادفی (انسانی‌سازی داخلی)">
+                            <StackPanel>
+                                <TextBlock Text="⏱️" FontSize="15" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center" Foreground="{StaticResource StepDelayBrightBrush}" />
+                                <TextBlock Text="Delay" FontSize="8" HorizontalAlignment="Center" Foreground="#FFFFFF" Margin="0,1,0,0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource RailButton}" Command="{Binding AddStepCommand}" CommandParameter="comment"
+                                ToolTip="یادداشت — یک ردیف توضیح در اسکریپت · ▾ برای زیرمنوی این بخش">
+                            <Button.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Comment" CommandParameter="comment"
+                                              Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                    <MenuItem Header="Raw Command" CommandParameter="rawCommand"
+                                              Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                            <StackPanel>
+                                <TextBlock Text="💬" FontSize="15" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center" Foreground="{StaticResource OkBrush}" />
+                                <TextBlock Text="Note" FontSize="8" HorizontalAlignment="Center" Foreground="#FFFFFF" Margin="0,1,0,0" />
+                                <TextBlock Text="▾" FontSize="9" HorizontalAlignment="Center" Foreground="#9AA4B2" Margin="0,-1,0,0"
+                                           PreviewMouseLeftButtonDown="RailSubmenu_PreviewMouseLeftButtonDown" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource RailButton}" Command="{Binding AddStepCommand}" CommandParameter="playAudio"
+                                ToolTip="پخش صدا — فایل wav/mp3 (تکرار اختیاری)">
+                            <StackPanel>
+                                <TextBlock Text="🔈" FontSize="15" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center" Foreground="{StaticResource StepAudioBrush}" />
+                                <TextBlock Text="Audio" FontSize="8" HorizontalAlignment="Center" Foreground="#FFFFFF" Margin="0,1,0,0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource RailButton}" Command="{Binding AddStepCommand}" CommandParameter="runExe"
+                                ToolTip="اجرای exe — هر فایل اجرایی (minimized / normal / maximized) · ▾ برای زیرمنوی این بخش">
+                            <Button.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Run Exe" CommandParameter="runExe"
+                                              Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                    <MenuItem Header="Open File / Program" CommandParameter="openFile"
+                                              Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                    <MenuItem Header="Play Script (.amsj)" CommandParameter="playScript"
+                                              Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                            <StackPanel>
+                                <TextBlock Text="🚀" FontSize="15" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center" Foreground="{StaticResource StepPackageBrush}" />
+                                <TextBlock Text="Run" FontSize="8" HorizontalAlignment="Center" Foreground="#FFFFFF" Margin="0,1,0,0" />
+                                <TextBlock Text="▾" FontSize="9" HorizontalAlignment="Center" Foreground="#9AA4B2" Margin="0,-1,0,0"
+                                           PreviewMouseLeftButtonDown="RailSubmenu_PreviewMouseLeftButtonDown" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource RailButton}" Command="{Binding AddStepCommand}" CommandParameter="label"
+                                ToolTip="برچسب و پرش — نقطهٔ نشانه‌گذاری و پرش به آن · ▾ برای زیرمنوی این بخش">
+                            <Button.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Insert Label" CommandParameter="label"
+                                              Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                    <MenuItem Header="Go To Label" CommandParameter="gotoLabel"
+                                              Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                            <StackPanel>
+                                <TextBlock Text="🏷️" FontSize="15" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center" Foreground="{StaticResource StepFlowBrush}" />
+                                <TextBlock Text="Label" FontSize="8" HorizontalAlignment="Center" Foreground="#FFFFFF" Margin="0,1,0,0" />
+                                <TextBlock Text="▾" FontSize="9" HorizontalAlignment="Center" Foreground="#9AA4B2" Margin="0,-1,0,0"
+                                           PreviewMouseLeftButtonDown="RailSubmenu_PreviewMouseLeftButtonDown" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Steps column (v0.7.5): list + bottom panel -->
+            <Grid Grid.Column="1" Margin="4">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+            <!-- Steps list (sections 13.1 + 4) — v0.7: AMK-style flat numbered list on the white
+                 document canvas: every node always renders · right-click context menu ·
+                 drag & drop move · Windows-native multi-select (Extended: Ctrl toggle / Shift range) -->
+            <ListBox x:Name="StepsList" Margin="0"
+                      ItemsSource="{Binding FlatSteps}"
+                      SelectionMode="Extended"
+                      SelectionChanged="StepsList_OnSelectionChanged"
+                      MouseDoubleClick="StepsList_OnMouseDoubleClick"
+                      PreviewMouseLeftButtonDown="StepsList_PreviewMouseLeftButtonDown"
+                      PreviewMouseRightButtonDown="StepsList_PreviewMouseRightButtonDown"
+                      PreviewMouseMove="StepsList_PreviewMouseMove"
+                      DragOver="StepsList_DragOver"
+                      Drop="StepsList_Drop"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                      AllowDrop="True"
+                      Background="{StaticResource TreeBgBrush}" BorderThickness="0"
+                      Foreground="{StaticResource TreeTextBrush}" FontSize="13">
+
+                <ListBox.ContextMenu>
+                    <ContextMenu Background="{StaticResource BgPanelBrush}"
+                                 Foreground="{StaticResource TextPrimaryBrush}">
+                        <MenuItem Header="Edit Action" InputGestureText="F2"
+                                  Command="{Binding PlacementTarget.DataContext.EditSelectedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <MenuItem Header="Delete Action" InputGestureText="Del"
+                                  Command="{Binding PlacementTarget.DataContext.DeleteSelectedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <MenuItem Header="Add Action">
+                            <MenuItem Header="Mouse Click" CommandParameter="mouseClick"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="Mouse Position" CommandParameter="mouseMove"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="Mouse Scroll" CommandParameter="mouseScroll"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="Random Mouse Position" CommandParameter="randomMousePosition"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <Separator />
+                            <MenuItem Header="Keystroke" CommandParameter="keystroke"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="Type Text" CommandParameter="typeText"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="Key Down" CommandParameter="keyDown"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="Key Up" CommandParameter="keyUp"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <Separator />
+                            <MenuItem Header="Delay" CommandParameter="delay"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="For Loop" CommandParameter="forLoop"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="Random Package" CommandParameter="randomPackage"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <!-- v0.9.43 — was missing from the right-click menu -->
+                            <MenuItem Header="Run in Parallel (group)" CommandParameter="parallelGroup"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <Separator />
+                            <MenuItem Header="Find Image On Screen" CommandParameter="findImage"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="Wait For Sound" CommandParameter="waitForSound"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="Wait For Light (BH1750)" CommandParameter="waitForLight"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <Separator />
+                            <!-- v0.9.43 — these two were missing from the right-click menu -->
+                            <MenuItem Header="Play Audio (wav/mp3)" CommandParameter="playAudio"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="Run Exe" CommandParameter="runExe"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="Open File / Program" CommandParameter="openFile"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="Play Script (.amsj)" CommandParameter="playScript"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="Insert Label" CommandParameter="label"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="Go To Label" CommandParameter="gotoLabel"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <Separator />
+                            <MenuItem Header="Comment" CommandParameter="comment"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="Raw Command" CommandParameter="rawCommand"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        </MenuItem>
+                        <Separator />
+                        <MenuItem Header="Cut" InputGestureText="Ctrl+X"
+                                  Command="{Binding PlacementTarget.DataContext.CutCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <MenuItem Header="Copy" InputGestureText="Ctrl+C"
+                                  Command="{Binding PlacementTarget.DataContext.CopyCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <MenuItem Header="Paste" InputGestureText="Ctrl+V"
+                                  Command="{Binding PlacementTarget.DataContext.PasteCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <Separator />
+                        <MenuItem Header="Enable/Disable Step" InputGestureText="Ctrl+D"
+                                  Command="{Binding PlacementTarget.DataContext.ToggleDisabledCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <MenuItem Header="Disable All But This"
+                                  Command="{Binding PlacementTarget.DataContext.DisableAllButThisCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <MenuItem Header="Enable All But This"
+                                  Command="{Binding PlacementTarget.DataContext.EnableAllButThisCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <Separator />
+                        <MenuItem Header="Batch Edit Delays…"
+                                  Command="{Binding PlacementTarget.DataContext.BatchDelaysCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                    </ContextMenu>
+                </ListBox.ContextMenu>
+
+                <!-- v0.7.1 — explicit chrome: WPF-UI's implicit dark ListBox style painted over
+                     our white canvas (the old plain TreeView template respected it). These plain
+                     templates bind Background directly and give visible hover/selected states. -->
+                <ListBox.Template>
+                    <ControlTemplate TargetType="ListBox">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6">
+                            <ScrollViewer Padding="{TemplateBinding Padding}" Focusable="False">
+                                <ItemsPresenter />
+                            </ScrollViewer>
+                        </Border>
+                    </ControlTemplate>
+                </ListBox.Template>
+
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Padding" Value="0" />
+                        <Setter Property="Margin" Value="0" />
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <Border x:Name="row" Background="{TemplateBinding Background}">
+                                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="row" Property="Background" Value="#EAF1FB" />
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="row" Property="Background" Value="#D8E6FB" />
+                                        </Trigger>
+                                        <MultiTrigger>
+                                            <MultiTrigger.Conditions>
+                                                <Condition Property="IsSelected" Value="True" />
+                                                <Condition Property="IsMouseOver" Value="True" />
+                                            </MultiTrigger.Conditions>
+                                            <Setter TargetName="row" Property="Background" Value="#C9DDFB" />
+                                        </MultiTrigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Height="28" Background="{Binding RowBg}">
+                            <!-- v0.9.36 — row content only; scope bracket is ONE overlay above the ListBox -->
+                            <Grid Margin="{Binding Indent}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="16" />
+                                    <ColumnDefinition Width="80" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="2*" />
+                                    <ColumnDefinition Width="90" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="1" Text="{Binding Number}" VerticalAlignment="Center"
+                                           Foreground="{StaticResource TreeSecondaryBrush}" FontFamily="Cascadia Code" />
+                                <TextBlock Grid.Column="2" Text="{Binding Name}" VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" />
+                                <!-- v0.9.38 — the accordion toggle moved out of the left gutter and now sits
+                                     immediately before the description text (AMK parity, user feedback). RowTextAnchor
+                                     is the anchor the scope bracket measures against, so the vein stays left of it. -->
+                                <Grid x:Name="RowTextAnchor" Grid.Column="3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="14" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Background="Transparent" VerticalAlignment="Stretch"
+                                            Visibility="{Binding ShowToggle, Converter={StaticResource BoolToVis}}"
+                                            PreviewMouseLeftButtonDown="ScopeToggle_PreviewMouseLeftButtonDown"
+                                            Cursor="Hand" ToolTip="جمع/بازکردن زیراستپ‌ها">
+                                        <TextBlock Text="{Binding ToggleGlyph}" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                   FontSize="11" Foreground="{StaticResource TreeSecondaryBrush}" />
+                                    </Border>
+                                    <TextBlock x:Name="SummaryText" Grid.Column="1" Text="{Binding Summary}" VerticalAlignment="Center"
+                                               Margin="{Binding SummaryInset}"
+                                               Foreground="{StaticResource TreeSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                </Grid>
+                                <TextBlock Grid.Column="4" Text="{Binding DelayText, StringFormat={}{0} ms}" VerticalAlignment="Center"
+                                           TextAlignment="Right" Margin="0,0,12,0" FontFamily="Cascadia Code"
+                                           Foreground="{StaticResource TreeSecondaryBrush}" />
+
+                                <!-- Disabled step (DIS=1): greyed out, skipped by the runner (§9.5) -->
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsDisabled}" Value="True">
+                                                <Setter Property="Opacity" Value="0.45" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Style>
+                            </Grid>
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <!-- v0.9.36 — ONE physical bracket, not per-row fragments. Code-behind places it
+                 14px before the selected scope head's real SummaryText coordinate and stretches
+                 it to the tail row. Hidden for plain rows and when no scope head is selected. -->
+            <Canvas x:Name="ScopeVeinCanvas" Grid.Row="0" Panel.ZIndex="20"
+                    IsHitTestVisible="False" ClipToBounds="True">
+                <Border x:Name="ScopeVeinBracket" Width="10" Visibility="Collapsed"
+                        BorderBrush="#E5484D" BorderThickness="2,2,0,2"
+                        CornerRadius="3,0,0,3" SnapsToDevicePixels="True"
+                        UseLayoutRounding="True" />
+                <!-- v0.9.38 — the same small bend the head and tail caps have, drawn at the Else row:
+                     the Then branch and the Else branch (with every sub-step under it) stay inside one bracket. -->
+                <Border x:Name="ScopeVeinElseTick" Width="10" Height="2" Visibility="Collapsed"
+                        Background="#E5484D" SnapsToDevicePixels="True"
+                        UseLayoutRounding="True" />
+            </Canvas>
+
+            <!-- App-side run settings (AMK bottom-panel parity) — app-side run settings (§9.1:
+                 NOT saved into the .amsj file); collapse/expand via the header · v0.7.6: dark chrome
+                 (on-machine variant adopted); number boxes AUTO-SIZE — the fixed 24px height
+                 clipped the digits (user report: "10 نصفه دیده میشه") -->
+            <Border Grid.Row="1" Margin="0,6,0,0" Background="{StaticResource BgPanelBrush}"
+                    BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="6">
+                <StackPanel Margin="10,5">
+                    <Button x:Name="PlayOptToggle" Click="PlayOptToggle_Click"
+                            HorizontalAlignment="Left" Background="Transparent" BorderThickness="0"
+                            Cursor="Hand" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Padding="0,2">
+                        <TextBlock x:Name="PlayOptToggleText" Text="▾ گزینه‌های پخش" />
+                    </Button>
+                    <StackPanel x:Name="PlayOptBody" Margin="2,4,2,4">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <RadioButton GroupName="playMode" Content="بدون تکرار (یک بار)"
+                                         IsChecked="{Binding PlayModeOnce}" Foreground="{StaticResource TextPrimaryBrush}" VerticalContentAlignment="Center" />
+                            <RadioButton GroupName="playMode" Content="تکرار"
+                                         IsChecked="{Binding PlayModeTimes}" Foreground="{StaticResource TextPrimaryBrush}" Margin="16,0,4,0" VerticalContentAlignment="Center" />
+                            <TextBox Text="{Binding PlayRepeatTimes, UpdateSourceTrigger=PropertyChanged}" Width="46"
+                                     FontSize="12" Padding="4,2" TextAlignment="Center"
+                                     VerticalAlignment="Center" VerticalContentAlignment="Center"
+                                     Background="{StaticResource BgBaseBrush}" Foreground="{StaticResource TextPrimaryBrush}"
+                                     BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" />
+                            <TextBlock Text="بار" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" Margin="4,0,0,0" />
+                            <RadioButton GroupName="playMode" Content="تکرار به مدت"
+                                         IsChecked="{Binding PlayModeTimed}" Foreground="{StaticResource TextPrimaryBrush}" Margin="16,0,4,0" VerticalContentAlignment="Center" />
+                            <TextBox Text="{Binding PlayRepeatValue, UpdateSourceTrigger=PropertyChanged}" Width="46"
+                                     FontSize="12" Padding="4,2" TextAlignment="Center"
+                                     VerticalAlignment="Center" VerticalContentAlignment="Center"
+                                     Background="{StaticResource BgBaseBrush}" Foreground="{StaticResource TextPrimaryBrush}"
+                                     BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" />
+                            <ComboBox SelectedIndex="{Binding PlayRepeatUnitIndex}" Width="92" Margin="4,0,0,0"
+                                      Padding="4,1" FontSize="12" VerticalAlignment="Center" VerticalContentAlignment="Center"
+                                      Foreground="{StaticResource TextPrimaryBrush}" Background="{StaticResource BgElevatedBrush}"
+                                      BorderBrush="{StaticResource BorderSubtleBrush}">
+                                <ComboBoxItem Content="second" />
+                                <ComboBoxItem Content="minute" />
+                                <ComboBoxItem Content="hour" />
+                            </ComboBox>
+                            <TextBlock Text="" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" Margin="4,0,0,0" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0" VerticalAlignment="Center">
+                            <CheckBox Content="وقتی تکرار تمام شد کامپیوتر خاموش شود"
+                                      IsChecked="{Binding ShutdownWhenFinished}" Foreground="{StaticResource TextPrimaryBrush}" VerticalContentAlignment="Center" />
+                            <CheckBox Content="وقتی اسکریپت متوقف شد پنجره‌ی اصلی فعال نشود"
+                                      IsChecked="{Binding NoActivateWhenStopped}" Foreground="{StaticResource TextPrimaryBrush}" Margin="16,0,0,0" VerticalContentAlignment="Center" />
+                            <Button Content="ذخیره‌ی لاگ اجرا…" Command="{Binding SaveLogCommand}"
+                                    Margin="16,0,0,0" Padding="8,3" FontSize="12" Cursor="Hand" />
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+            </Grid>
+
+            <!-- Inspector (section 13.1) -->
+            <Border Grid.Column="2"
+                    Background="{StaticResource BgPanelBrush}"
+                    BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1,0,0,0"
+                    Padding="16">
+                <StackPanel>
+                    <TextBlock Text="بازرس" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,12" />
+                    <TextBlock Text="{Binding SelectedNode.Summary, TargetNullValue='یک استپ را انتخاب کن تا پارامترهایش این‌جا ویرایش شوند.'}"
+                               TextWrapping="Wrap"
+                               Foreground="{StaticResource TextSecondaryBrush}" />
+                    <TextBlock Text="تاخیر بعد از استپ (ms)" Margin="0,16,0,4"
+                               Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" />
+                    <ui:TextBox Text="{Binding SelectedNode.Delay, UpdateSourceTrigger=LostFocus, TargetNullValue=''}"
+                                LostFocus="InspectorDelay_OnLostFocus"
+                                FontFamily="Cascadia Code" />
+                    <ui:Button Content="بازکردن دیالوگ استپ…" Appearance="Secondary" Margin="0,16,0,0"
+                               Command="{Binding EditSelectedCommand}" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ══ Serial log panel (section 13.1, collapsible, 160 px) ══ -->
+        <Border Grid.Row="2"
+                Background="{StaticResource BgPanelBrush}"
+                BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="0,1,0,0">
+            <Expander IsExpanded="True"
+                      Background="{StaticResource BgPanelBrush}"
+                      Foreground="{StaticResource TextPrimaryBrush}">
+                <Expander.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="لاگ سریال" />
+                        <!-- v0.9.43 — the serial log is clearable (user request) -->
+                        <Button Content="🧹 پاک‌سازی" Command="{Binding ClearLogCommand}"
+                                FontSize="11" Padding="8,1" Margin="12,0,0,0" Cursor="Hand"
+                                ToolTip="پاک‌کردن همه‌ی خطوط لاگ" />
+                    </StackPanel>
+                </Expander.Header>
+                <ListBox ItemsSource="{Binding LogLines}" Height="160"
+                         Background="Transparent" BorderThickness="0"
+                         FontFamily="Cascadia Code" FontSize="12"
+                         Foreground="{StaticResource TextSecondaryBrush}" />
+            </Expander>
+        </Border>
+
+        <!-- ══ Status bar (section 13.1) — connection chip + file + Run/Stop ══ -->
+        <Border Grid.Row="3"
+                Background="{StaticResource BgPanelBrush}"
+                BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="0,1,0,0"
+                Padding="12,4">
+            <DockPanel>
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                    <Ellipse Width="10" Height="10" VerticalAlignment="Center"
+                             Fill="{Binding Connection, Converter={StaticResource ConnectionBrush}}" />
+                    <TextBlock Text="{Binding StatusText}" Margin="8,0,0,0" VerticalAlignment="Center" FontSize="12" />
+                    <ui:Button Content="{Binding ConnectButtonText}" Command="{Binding ConnectCommand}"
+                               Appearance="Secondary" Margin="12,0,0,0" Padding="12,2" />
+                    <!-- v0.9.43 — manual board connect: pick the Pico port yourself (AUTO = auto-detect) -->
+                    <ComboBox x:Name="PortPicker" Width="150" Margin="8,0,0,0" IsEditable="True"
+                              ItemsSource="{Binding PortChoices}" Text="{Binding PortText, UpdateSourceTrigger=PropertyChanged}"
+                              FontSize="11" Padding="4,1" VerticalContentAlignment="Center"
+                              ToolTip="پورت برد — AUTO یعنی تشخیص خودکار؛ برای اتصال دستی، پورت پیکو را انتخاب یا تایپ کن" />
+                    <Button Content="⟳" Command="{Binding RefreshPortsCommand}" Width="26" Height="24"
+                            Margin="4,0,0,0" Padding="0" Cursor="Hand" FontSize="13"
+                            BorderThickness="0" Background="Transparent"
+                            Foreground="{StaticResource TextSecondaryBrush}"
+                            ToolTip="تازه‌سازی فهرست پورت‌ها" />
+                    <!-- v0.9.44 — per-board presence lights: the Pico brain and the Pro Micro arm
+                         get their own LEDs, lit from the post-connect PING identity probe -->
+                    <TextBlock Text="│" Margin="12,0,4,0" VerticalAlignment="Center" Foreground="{StaticResource BorderSubtleBrush}" />
+                    <Ellipse Width="9" Height="9" VerticalAlignment="Center"
+                             ToolTip="Raspberry Pi Pico — مغز (کیبورد/نور)؛ روشن یعنی پیکو پاسخ داده">
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Fill" Value="#3A4048" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding PicoPresent}" Value="True">
+                                        <Setter Property="Fill" Value="#3FB950" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+                    <TextBlock Text="Pico" Margin="4,0,0,0" VerticalAlignment="Center" FontSize="11"
+                               Foreground="{StaticResource TextSecondaryBrush}" />
+                    <Ellipse Width="9" Height="9" VerticalAlignment="Center" Margin="10,0,0,0"
+                             ToolTip="Arduino Pro Micro — بازو (موس/صدا)؛ اتصال مستقیم به پرو میکرو هم همین را روشن می‌کند">
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Fill" Value="#3A4048" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ArmPresent}" Value="True">
+                                        <Setter Property="Fill" Value="#3FB950" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+                    <TextBlock Text="Pro Micro" Margin="4,0,0,0" VerticalAlignment="Center" FontSize="11"
+                               Foreground="{StaticResource TextSecondaryBrush}" />
+                    <TextBlock Text="{Binding FileText}" Margin="16,0,0,0" VerticalAlignment="Center" FontSize="12"
+                               Foreground="{StaticResource TextSecondaryBrush}" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" HorizontalAlignment="Right">
+                    <ui:Button Content="{Binding RunLabel}" Command="{Binding RunCommand}"
+                               IsEnabled="{Binding IsNotRunning}"
+                               Appearance="Primary" Margin="4,0" Padding="16,2" />
+                    <ui:Button Content="⏸ مکث" Command="{Binding PauseCommand}"
+                               IsEnabled="{Binding IsNotPaused}"
+                               Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}"
+                               Appearance="Secondary" Margin="4,0" Padding="16,2" />
+                    <ui:Button Content="▶ ادامه" Command="{Binding ResumeCommand}"
+                               IsEnabled="{Binding IsPaused}"
+                               Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}"
+                               Appearance="Secondary" Margin="4,0" Padding="16,2" />
+                    <ui:Button Content="{Binding StopLabel}" Command="{Binding StopCommand}"
+                               Appearance="Danger" Margin="4,0" Padding="16,2" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- v0.9.55 - Settings is no longer a detachable window: the whole tab (all four
+             sections) is hosted INSIDE the main window as a right-side panel (user request). -->
+        <Grid x:Name="SettingsOverlay" Grid.Row="0" Grid.RowSpan="4" Panel.ZIndex="60"
+              Visibility="Collapsed" Background="#99000000">
+            <Border HorizontalAlignment="Right" Width="540"
+                    Background="{StaticResource BgPanelBrush}"
+                    BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1,0,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" Margin="14,10,10,0">
+                        <Button x:Name="BtnCloseSettings" DockPanel.Dock="Right" Content="✕"
+                                Width="26" Height="24" Padding="0" Cursor="Hand" BorderThickness="0"
+                                Background="Transparent" Foreground="{StaticResource TextSecondaryBrush}"
+                                Click="BtnCloseSettings_Click" ToolTip="بستن تنظیمات" />
+                        <TextBlock Text="تنظیمات" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="14,0,14,0">
+                        <ContentControl x:Name="SettingsHost" />
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

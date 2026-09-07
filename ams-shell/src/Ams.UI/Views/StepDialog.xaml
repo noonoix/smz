@@ -1,0 +1,31 @@
+<Window x:Class="Ams.UI.Views.StepDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="Step" Width="440" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{StaticResource BgPanelBrush}"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        FontFamily="Segoe UI" FontSize="13">
+
+    <!-- Generic step dialog — the form is built in code from the step's FieldDefs
+         (design doc §5.5.x dialog maps). Standard window chrome (min/max/close). -->
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- v0.9.55 - the vertical scrollbar no longer touches the Persian hints: the content keeps a 14px inset -->
+        <ScrollViewer Grid.Row="0" MaxHeight="480" VerticalScrollBarVisibility="Auto" Padding="14,0,14,0">
+            <StackPanel x:Name="FormPanel" />
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <ui:Button Content="تأیید" Appearance="Primary" Width="90" Margin="0,0,8,0"
+                       IsDefault="True" Click="Ok_Click" />
+            <ui:Button Content="انصراف" Appearance="Secondary" Width="90" IsCancel="True" />
+        </StackPanel>
+    </Grid>
+</Window>

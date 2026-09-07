@@ -1,0 +1,202 @@
+<Window x:Class="Ams.UI.Views.SearchPictureDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="جست‌وجوی تصویر" Width="610" Height="680"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{StaticResource BgPanelBrush}"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        FontFamily="Segoe UI" FontSize="12">
+    <!-- Find Image dialog — mirrors AMK's "Search Picture" (v0.7.7) · v0.7.9: actually WIRED
+         (it existed since v0.7.7 but was never shown — the generic dialog opened instead;
+         user report + screenshots) + re-themed DARK like the Play Options panel so the
+         fields are clearly readable and the selected picture's thumbnail is visible -->
+    <Window.Resources>
+        <!-- dark field chrome matching the Play Options panel (adopted from the on-machine recolor) -->
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource BgElevatedBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderSubtleBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="{StaticResource BgBaseBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderSubtleBrush}" />
+            <Setter Property="CaretBrush" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="Padding" Value="4,2" />
+        </Style>
+    </Window.Resources>
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="این اکشن تصویر را روی صفحه جست‌وجو می‌کند و سپس روی آن کلیک می‌کند." TextAlignment="Right"
+                   Margin="2,0,0,8" />
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="14,0,14,0">
+            <StackPanel>
+                <!-- Group A — the picture (thumbnail + list + actions) -->
+                <GroupBox Header="تصویری که باید جست‌وجو شود" Padding="8" Margin="0,0,0,8"
+                          BorderBrush="{StaticResource BorderSubtleBrush}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <Border Grid.Row="0" Grid.Column="0" Width="104" Height="104"
+                                BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1"
+                                Background="White" CornerRadius="4"
+                                ToolTip="پیش‌نمایش تصویر انتخاب‌شده">
+                            <Image x:Name="Preview" Margin="3"
+                                   Stretch="None"
+                                   RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                        </Border>
+
+                        <StackPanel Grid.Row="0" Grid.Column="1" Margin="12,0,0,0">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="درصد شباهت:" TextAlignment="Right" VerticalAlignment="Center" />
+                                <TextBox x:Name="SimilarityBox" Width="52" Margin="6,0,2,0" TextAlignment="Center"
+                                         Background="{StaticResource BgBaseBrush}" Foreground="{StaticResource TextPrimaryBrush}"
+                                         BorderBrush="{StaticResource BorderSubtleBrush}" CaretBrush="{StaticResource TextPrimaryBrush}" />
+                                <TextBlock Text="%" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                                <Button Content="برش BMP از صفحه (Shift + F11)" Margin="18,0,0,0" Padding="10,4"
+                                        Click="CutBmp_Click" Cursor="Hand"
+                                        ToolTip="یک ناحیه از صفحه انتخاب کن و به‌عنوان تصویر مرجع ذخیره کن" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <Button Content="مشاهده‌ی موقعیت BMP" Padding="10,4" Click="ViewPosition_Click" Cursor="Hand"
+                                        ToolTip="یک بار جست‌وجو کن و ببین تصویر هم‌اکنون کجاست" />
+                                <Button Content="افزودن تصویر" Padding="10,4" Margin="10,0,0,0" Click="AddPicture_Click" Cursor="Hand"
+                                        ToolTip="چند تصویر = منطق OR (§3.3.1)" />
+                                <Button x:Name="RemoveBtn" Content="حذف تصویر" Padding="10,4" Margin="10,0,0,0"
+                                        Click="RemovePicture_Click" Cursor="Hand" IsEnabled="False" />
+                            </StackPanel>
+                            <TextBlock Margin="0,8,0,0">
+                                <Hyperlink Click="CommentLink_Click" Foreground="#58A6FF"><Run Text="یادداشت برای این تصویر" /></Hyperlink>
+                            </TextBlock>
+                            <TextBox x:Name="CommentBox" Visibility="Collapsed" Margin="0,4,0,0"
+                                     Background="{StaticResource BgBaseBrush}" Foreground="{StaticResource TextPrimaryBrush}"
+                                     BorderBrush="{StaticResource BorderSubtleBrush}" CaretBrush="{StaticResource TextPrimaryBrush}"
+                                     ToolTip="یادداشت برای این تصویر (با استپ ذخیره می‌شود)" />
+                        </StackPanel>
+
+                        <ListBox x:Name="PictureList" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                                 Height="58" Margin="0,8,0,0" FontFamily="Cascadia Code" FontSize="11"
+                                 Background="{StaticResource BgBaseBrush}" Foreground="{StaticResource TextPrimaryBrush}"
+                                 BorderBrush="{StaticResource BorderSubtleBrush}"
+                                 SelectionChanged="PictureList_SelectionChanged"
+                                 ToolTip="فهرست تصاویر — برای پیش‌نمایش انتخاب کن" />
+                    </Grid>
+                </GroupBox>
+
+                <!-- Timeout (left) + Where / When-found / On-timeout (right) -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <GroupBox Grid.Column="0" Header="Timeout جست‌وجوی تصویر" Padding="8" Margin="0,0,8,8"
+                              VerticalAlignment="Top" BorderBrush="{StaticResource BorderSubtleBrush}">
+                        <StackPanel>
+                            <CheckBox x:Name="NeverBox" Content="بدون Timeout"
+                                      Checked="Never_Changed" Unchecked="Never_Changed" />
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <TextBox x:Name="TimeoutValueBox" Width="52" TextAlignment="Center"
+                                         Background="{StaticResource BgBaseBrush}" Foreground="{StaticResource TextPrimaryBrush}"
+                                         BorderBrush="{StaticResource BorderSubtleBrush}" CaretBrush="{StaticResource TextPrimaryBrush}" />
+                                <ComboBox x:Name="TimeoutUnitCombo" Width="86" Margin="6,0,0,0"
+                                          Background="{StaticResource BgElevatedBrush}" Foreground="{StaticResource TextPrimaryBrush}"
+                                          BorderBrush="{StaticResource BorderSubtleBrush}">
+                                    <ComboBoxItem Content="ms" />
+                                    <ComboBoxItem Content="second" />
+                                    <ComboBoxItem Content="minute" />
+                                    <ComboBoxItem Content="hour" />
+                                </ComboBox>
+                            </StackPanel>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <StackPanel Grid.Column="1">
+                        <GroupBox Header="کجا جست‌وجو شود" Padding="8" Margin="0,0,0,8"
+                                  BorderBrush="{StaticResource BorderSubtleBrush}">
+                            <StackPanel>
+                                <ComboBox x:Name="ScopeCombo" SelectionChanged="Scope_Changed"
+                                          Background="{StaticResource BgElevatedBrush}" Foreground="{StaticResource TextPrimaryBrush}"
+                                          BorderBrush="{StaticResource BorderSubtleBrush}">
+                                    <ComboBoxItem Content="جست‌وجو در کل صفحه" />
+                                    <ComboBoxItem Content="جست‌وجو از موقعیت فعلی موس" />
+                                    <ComboBoxItem Content="جست‌وجو در ناحیه‌ی مشخص" />
+                                </ComboBox>
+                                <StackPanel x:Name="RegionRow" Orientation="Horizontal" Margin="0,6,0,0" Visibility="Collapsed">
+                                    <Button Content="انتخاب ناحیه روی صفحه…" Padding="8,3" Click="PickRegion_Click" Cursor="Hand" />
+                                    <TextBlock x:Name="RegionText" VerticalAlignment="Center" Margin="8,0,0,0"
+                                               Foreground="{StaticResource TextSecondaryBrush}" FontFamily="Cascadia Code" />
+                                </StackPanel>
+                            </StackPanel>
+                        </GroupBox>
+                        <GroupBox Header="وقتی تصویر پیدا شد چه شود" Padding="8" Margin="0,0,0,8"
+                                  BorderBrush="{StaticResource BorderSubtleBrush}">
+                            <ComboBox x:Name="OnFoundCombo"
+                                      Background="{StaticResource BgElevatedBrush}" Foreground="{StaticResource TextPrimaryBrush}"
+                                      BorderBrush="{StaticResource BorderSubtleBrush}">
+                                <ComboBoxItem Content="حرکت موس روی تصویر و کلیک" />
+                                <ComboBoxItem Content="فقط حرکت موس روی تصویر" />
+                                <ComboBoxItem Content="کلیک روی تصویر بدون جابه‌جایی موس" />
+                                <ComboBoxItem Content="هیچ کاری نکن" />
+                            </ComboBox>
+                        </GroupBox>
+                        <GroupBox Header="اگر جست‌وجو Timeout شد چه شود" Padding="8" Margin="0,0,0,8"
+                                  BorderBrush="{StaticResource BorderSubtleBrush}">
+                            <ComboBox x:Name="OnTimeoutCombo"
+                                      Background="{StaticResource BgElevatedBrush}" Foreground="{StaticResource TextPrimaryBrush}"
+                                      BorderBrush="{StaticResource BorderSubtleBrush}"
+                                      ToolTip="وقتی درج If Else فعال است غیرفعال می‌شود (§3.3.1 — شاخه‌ی Else شکست را مدیریت می‌کند)">
+                                <ComboBoxItem Content="توقف اسکریپت با راهنمایی کاربر" />
+                                <ComboBoxItem Content="توقف اسکریپت بدون راهنمایی" />
+                                <ComboBoxItem Content="ادامه به اکشن بعدی" />
+                            </ComboBox>
+                        </GroupBox>
+                    </StackPanel>
+                </Grid>
+
+                <CheckBox x:Name="IfElseBox" Content="درج If Else"
+                          Checked="IfElse_Changed" Unchecked="IfElse_Changed"
+                          ToolTip="فرزندان = شاخه‌ی Then (تصویر پیدا شد) · یک ردیف «شاخه‌ی Else» بعد از استپ اضافه می‌شود — فرزندانش وقتی اجرا می‌شوند که تصویر پیدا نشود (v0.7.9)" />
+                <CheckBox x:Name="ParkBox" Margin="0,6,0,0"
+                          Content="اجازه بده موس به‌طور خودکار برای یک ثانیه به گوشه‌ی بالا-چپ برود" />
+
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="نام استپ:" TextAlignment="Right" VerticalAlignment="Center" />
+                    <TextBox x:Name="NameBox" Width="150" Margin="6,0,14,0"
+                             Background="{StaticResource BgBaseBrush}" Foreground="{StaticResource TextPrimaryBrush}"
+                             BorderBrush="{StaticResource BorderSubtleBrush}" CaretBrush="{StaticResource TextPrimaryBrush}" />
+                    <TextBlock Text="تاخیر:" TextAlignment="Right" VerticalAlignment="Center" />
+                    <TextBox x:Name="DelayBox" Width="52" Margin="6,0,4,0" TextAlignment="Center"
+                             Background="{StaticResource BgBaseBrush}" Foreground="{StaticResource TextPrimaryBrush}"
+                             BorderBrush="{StaticResource BorderSubtleBrush}" CaretBrush="{StaticResource TextPrimaryBrush}" />
+                    <TextBlock Text="ms · حداکثر:" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                    <TextBox x:Name="DelayMaxBox" Width="52" Margin="6,0,4,0" TextAlignment="Center"
+                             Background="{StaticResource BgBaseBrush}" Foreground="{StaticResource TextPrimaryBrush}"
+                             BorderBrush="{StaticResource BorderSubtleBrush}" CaretBrush="{StaticResource TextPrimaryBrush}"
+                             ToolTip="۰ = تاخیر ثابت؛ وقتی بزرگ‌تر از تاخیر است، هر بار مقدار تصادفی بین آن دو استفاده می‌شود (v0.7.8)" />
+                    <TextBlock Text="ms" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
+            <Button Content="تأیید" Width="90" Padding="0,6" IsDefault="True" Click="Ok_Click" Cursor="Hand"
+                    Background="{StaticResource AccentBrush}" Foreground="White" />
+            <Button Content="انصراف" Width="90" Padding="0,6" Margin="12,0,0,0" IsCancel="True" Cursor="Hand" />
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,345 @@
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\ams-shell\src\Ams.UI\Services\VisionService.cs(131,72): warning CS8629: Nullable value type may be null. [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\ams-shell\src\Ams.UI\Ams.UI_0dzabkq0_wpftmp.csproj]
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\ams-shell\src\Ams.UI\Services\VisionService.cs(131,72): warning CS8629: Nullable value type may be null. [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\ams-shell\src\Ams.UI\Ams.UI.csproj]
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.cs(550,27): warning CS8602: Dereference of a possibly null reference. [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.csproj]
+PASS: openFile definition exists
+PASS: playScript definition exists
+PASS: mouseClick command correct (got: MCLICK|left,1)
+PASS: mouseMove command correct (got: MMOVE|100,200,abs,1)
+PASS: typeText secret produces CLIPBOARD cmd (got: CLIPBOARD:secret123, KCOMBO|162+86)
+PASS: typeText word humanize inserts DLY (got: KTEXT|25,70,hello , DLY|167, KTEXT|25,70,world , DLY|141, KTEXT|25,70,foo)
+PASS: typeText 'hello world foo': 3 KTEXT + 2 DLY (got 3KTEXT/2DLY, cmds: KTEXT|25,70,hello  | DLY|167 | KTEXT|25,70,world  | DLY|141 | KTEXT|25,70,foo)
+PASS: typeText no word humanize: no DLY (got: KTEXT|25,70,hello world)
+PASS: punctuation pauses fire after ',' and '.' mid-line (got 2×DLY|200)
+PASS: punctuation splitting preserves the exact source text (got "Hi, ok. Bye")
+PASS: thinking pause fires between words only at 100% (got 2×DLY|1500)
+PASS: typoChance=100 injects one backspace correction per word (got 2)
+PASS: typo sequence types exactly one slip char per word before correcting (typed 13 chars)
+PASS: typo cadence 3/3 over 10 words fires exactly at words 3, 6, 9 (got 3)
+PASS: typo cadence 2–4 over 10 words stays in bounds (got 2–4 corrections)
+PASS: typo cadence re-rolls N after each correction (distinct counts: 2,3,4)
+PASS: single-char words cannot take a slip and do not consume the cadence (got 2)
+PASS: cadence range takes precedence over legacy typoChance (got 2, chance mode would give 10)
+PASS: wordPauseChance=0 streams the whole line as ONE chunk (got: KTEXT|80,220,hello world foo)
+PASS: wordPauseChance=100 keeps the legacy pause-after-every-word behavior
+PASS: merged and split streams always preserve the exact text
+PASS: merged and split streams always preserve the exact text
+PASS: merged and split streams always preserve the exact text
+PASS: merged and split streams always preserve the exact text
+PASS: merged and split streams always preserve the exact text
+PASS: wordPauseChance=50 produces both flowing and pausing runs
+PASS: gentleDefaults with no keys reproduces the old fixed Gentle preset (idle breaks off)
+PASS: gentleDefaults respects explicit per-step overrides (arc range + duration range)
+PASS: the Random Mouse Position defaults path is unchanged
+PASS: typeText tuning fields are marked hidden in clipboard mode
+PASS: Find Image and Mouse Position carry the tunable human-move fields with hide-when-off metadata
+PASS: 150 fuzzed humanized moves all land EXACTLY on the chosen target (0 missed)
+PASS: all fuzzed paths stay on screen (0 escapes)
+PASS: parallel group: two 300ms delays overlap (elapsed 341ms; sequential would be ≥600)
+PASS: parallel group joins on the LONGEST branch (elapsed 464ms ≈ 450, not 570)
+PASS: the step AFTER a parallel group runs only after the join (elapsed 439ms)
+PASS: two branches truly overlapped on the bridge (max in-flight 2 ≥ 2)
+PASS: outside a parallel group commands stay strictly sequential
+PASS: inside a parallel group the mouse is app-paced per-point (interleaves with typing)
+PASS: the typing branch ran concurrently on the same bridge
+PASS: generated script warns and emits parallel-group children sequentially (one serial channel)
+PASS: defaults produce the single legacy chunk (got: KTEXT|80,220,plain text)
+PASS: multi-line keystrokes text is typed with Enter, not pasted (got: KTEXT|80,220,first line | KCOMBO|13 | KTEXT|80,220,second line)
+PASS: openFile generates Start-Process in script
+PASS: Script contains the executable path
+PASS: AppSettings round-trip preserves ToolkitDir
+PASS: forLoop summary correct: 'For 5 minute'
+PASS: sound armed summary correct: 'Sound trigger ≥90 → left click (armed)'
+PASS: findImage is a container step
+PASS: findImage has 'pictures' field
+PASS: delay summary: 'Delay 100 to 300 ms'
+
+--- Import Test: daroon1.amk ---
+Top-level steps: 58
+  WARN: native extractor: picture #1 (13x13) → daroon1_pic1_13x13.png
+  WARN: native extractor: picture #2 (12x16) → daroon1_pic2_12x16.png
+  WARN: native extractor: picture #3 (2x48) → daroon1_pic3_2x48.png
+  WARN: native extractor: picture #4 (2x48) → daroon1_pic4_2x48.png
+  WARN: native extractor: picture #5 (2x48) → daroon1_pic5_2x48.png
+  WARN: native extractor: picture #6 (2x48) → daroon1_pic6_2x48.png
+  WARN: native extractor: picture #7 (2x48) → daroon1_pic7_2x48.png
+  WARN: native extractor: picture #8 (2x48) → daroon1_pic8_2x48.png
+  WARN: native extractor: picture #9 (2x48) → daroon1_pic9_2x48.png
+  WARN: native extractor: 9 embedded picture(s) → daroon1_images/
+PASS: Import produced >=50 top-level steps (got 58)
+PASS: findImage steps: 9 (expected >=3)
+PASS: forLoop steps: 13 (expected >=5)
+PASS: comment steps (Else/Next/EndIf): 29 (expected >=10)
+PASS: Else branch comments: 8 (expected >=2)
+PASS: findImage with picture paths: 9 (expected >=3)
+PASS: keyDown steps: 20
+PASS: keyUp steps: 20
+PASS: delay steps: 40
+PASS: randomMousePosition steps: 7
+PASS: No disabled steps by default (got 0)
+
+--- Tree Summary ---
+Total nodes: 165
+  findImage: 9
+  forLoop: 13
+  comment (Else/Next/EndIf): 29
+  keyDown/keyUp: 20/20
+  delay: 40
+  randomMousePosition: 7
+
+--- PNG Extraction Test ---
+  Extracted 9 PNG images
+    img_000_13x13.png: 560 bytes
+    img_001_12x16.png: 610 bytes
+    img_002_2x48.png: 317 bytes
+    img_003_2x48.png: 329 bytes
+    img_004_2x48.png: 329 bytes
+PASS: PNG images extracted from daroon1.amk
+
+--- v0.7.8: Random Package + hold range + DelayMax ---
+PASS: randomPackage definition exists
+PASS: randomPackage is a scope container
+PASS: randomPackage has mode/minCount/maxCount fields
+PASS: mouseClick without hold stays firmware-1.6 compatible
+PASS: mouseClick with hold range (got MCLICK|right,2,30,90)
+PASS: hold min/max swap is normalized
+PASS: keystroke with hold range (got KCOMBO|162+115,40,120)
+PASS: DelayMax survives JSON round-trip
+PASS: DelayMax=0 is omitted from .amsj (clean files)
+PASS: shuffleAll picks every enabled child once (got 9)
+PASS: disabled child excluded from the pool
+PASS: no child fires twice in shuffleAll
+PASS: every pass draws a fresh order (checked 5 passes)
+PASS: randomSubset count stays within [3,5] over 200 passes
+PASS: randomSubset never repeats a child within one pass
+PASS: min/max swap + pool cap handled (got 3)
+PASS: SETRES still goes first
+PASS: engine runs the shuffled package (got 9 pings)
+PASS: script generator marks Random Package (app-side) in the .ps1
+
+--- v0.7.9: FindElseBranch ---
+PASS: Else marker found after the If step
+PASS: End If without Else → no branch
+PASS: scan stops at a non-comment sibling (left the If scope)
+PASS: imported AMK Else text ("Else — …") recognized
+
+--- v0.8.0: accordion collapse ---
+PASS: collapsed loop hides its children (got 2 rows, want 2)
+PASS: collapsed row shows ▸
+PASS: expanded loop shows children again (got 4 rows, want 4)
+PASS: child numbering intact (got 1.1)
+PASS: expanded row shows ▾
+
+--- v0.8.2: native image extraction ---
+PASS: native extractor found embedded pictures (got 9, want >= 3)
+PASS: all extracted PNGs exist on disk
+PASS: extracted image loads with dimensions (13x13)
+
+--- v0.8.3: label / go to label ---
+PASS: label step definition exists
+PASS: gotoLabel step definition exists
+PASS: label summary shows the name (got: 🏷 start)
+PASS: FindLabelRow is case-insensitive
+PASS: FindLabelRow returns -1 when missing
+PASS: goto jumps forward over steps (sent: SETRES|1920,1080, PING|L1, PING|L3)
+PASS: goto escapes a loop to a root-level label (sent: SETRES|1920,1080, PING|in, PING|after)
+PASS: unresolved goto stops the script with a warning (no crash)
+
+--- v0.9.2: HumanMouse engine ---
+PASS: v0.9.2: dense human micro-step stream (got 445 pts)
+PASS: fallback control points stay few (got 3)
+PASS: path lands exactly on target (got 900,700)
+PASS: all waypoints stay on screen (clamped)
+PASS: reaction pause in range (got 209)
+PASS: settle pause in range (got 528)
+PASS: off-screen target is clamped
+PASS: median micro-step ≈ human 3px (got 4)
+PASS: median cadence ≈ human 5ms (got 3)
+PASS: dense trail decimated to control points ending on target (got 4 pts, end 1500,900)
+PASS: move 1: no long break yet
+PASS: move 2: the 0-5s long break fires
+PASS: move 3: counter reset after the break
+PASS: move time bounded (worst 2775 ms over 500 draws)
+PASS: speed max 0 = firmware-paced move (no app delays)
+PASS: legacy randomMousePosition props get the human defaults
+PASS: legacy/default fixed curve 30 migrates automatically to dynamic 15–45 range
+PASS: word chunk keeps its trailing space (got: KTEXT|25,70,hello  | DLY|101 | KTEXT|25,70,world)
+PASS: typeText Persian auto-fallback (got: CLIPBOARD:آمار دست واقع شما, KCOMBO|162+86)
+PASS: curvePct=0 path is nearly straight (max perp dev 0.00% < 2%)
+PASS: curvePct=100 is visibly curvier (0.33% vs 0.00%)
+PASS: curvePct=200 selects a real semicircular arc (height 585px)
+PASS: arc stream has no reset/back-jump (max micro-step 4.2px)
+PASS: arc stream never leaves the target after first arrival (v0.9.5 reset regression)
+PASS: curvePct=120 is already clearly circular (26.3% bow)
+PASS: curvePct=120 does not append/replay a second path from the original start
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc mode at curvePct=200 always sweeps visibly (got 12/12 with dev>20%)
+PASS: curvePct=200 arc mode is much curvier than 100 (48.75% vs 0.33%)
+PASS: curvature continuously explores 120–190 inside one path (120.2–187.2)
+PASS: curvature profile changes smoothly without abrupt per-point jumps
+PASS: speed continuously explores configured range inside one path (435–1183px/s)
+PASS: dynamic speed profile produces multiple micro-step delay levels in one move
+PASS: micro-step spacing changes through 2.0–3.2px during one move without a jump
+PASS: legacy fixed curvePct=180 migrates to dynamic 165–195 range
+PASS: fixed duration 800ms hits its target (sum=794ms over 403 micro-steps)
+PASS: duration range 400–1500 draws a fresh target per move (min=543 max=1456 distinct=12)
+PASS: duration range still times the path when the global speed range is disabled (max 0)
+PASS: old files without duration fields keep speed-driven timing (0/0)
+PASS: global hotkey maps Shift+Add to VK_ADD (numpad +)
+PASS: global hotkey maps numpad Subtract
+PASS: global hotkey maps Ctrl+Multiply to VK_MULTIPLY
+PASS: global hotkey maps numpad Divide
+PASS: global hotkey maps Alt+OemPlus and preserves Alt modifier
+PASS: global hotkey maps NumPad0..9 keys
+PASS: invalid global hotkey is rejected deterministically
+PASS: generated script uses the human-mouse function
+PASS: no invalid [Math]::Random in the PS 5.1 output
+PASS: generated script braces are balanced
+PASS: humanized Mouse Position step uses the engine too
+PASS: generated script preserves the full curvature range
+PASS: generated script continuously profiles curvature, speed and micro-step spacing
+PASS: generated script carries the per-step duration range
+PASS: generated script samples a fresh duration target per move
+PASS: generated script emits word pauses as app-side Step-Delay
+PASS: generated script never sends app-side DLY to the board
+PASS: randomMousePosition streams one dense path (calls=1, pts=249)
+PASS: stream ends inside the region (got 428,254)
+PASS: old bridge falls back to human=1 control points
+
+--- v0.9.16: seeded GetCommands ---
+PASS: v0.9.16: GetCommands(node, 42) twice → identical output (deterministic)
+PASS: v0.9.16: 24 seeds produce variety (12 distinct counts; counts are a narrow space so full uniqueness is not guaranteed)
+PASS: v0.9.16: 24 seeds produce near-unique sequences (24/24 distinct)
+PASS: v0.9.16: default RNG restored and unseeded path works after seeded calls
+
+--- v0.9.17: single-key hotkeys ---
+PASS: v0.9.17: TryParseGesture('F7') → mods=0, vk=0x76 (VK_F7)
+PASS: v0.9.17: TryParseGesture('F24') → vk=0x87 (VK_F24)
+PASS: v0.9.17: TryParseGesture('Multiply') → mods=0, vk=0x6A (VK_MULTIPLY)
+PASS: v0.9.17: TryParseGesture('Add') → mods=0, vk=0x6B (VK_ADD)
+PASS: v0.9.17: TryParseGesture('Decimal') → vk=0x6E (VK_DECIMAL)
+PASS: v0.9.17: TryParseGesture('Subtract') → vk=0x6D (VK_SUBTRACT)
+PASS: v0.9.17: TryParseGesture('Divide') → vk=0x6F (VK_DIVIDE)
+PASS: v0.9.17: TryParseGesture('Insert') → mods=0
+PASS: v0.9.17: TryParseGesture('Delete') parses OK
+PASS: v0.9.17: TryParseGesture('Home') parses OK
+PASS: v0.9.17: TryParseGesture('End') parses OK
+PASS: v0.9.17: TryParseGesture('PageUp') parses OK
+PASS: v0.9.17: TryParseGesture('PageDown') parses OK
+PASS: v0.9.17: TryParseGesture('PrintScreen') parses OK
+PASS: v0.9.17: TryParseGesture('Scroll') parses OK
+PASS: v0.9.17: TryParseGesture('Pause') parses OK
+PASS: v0.9.17: TryParseGesture('Ctrl+Add') mods has MOD_CTRL, vk=0x6B
+PASS: v0.9.17: TryParseGesture('Shift+F1') mods has MOD_SHIFT, vk=0x70
+PASS: v0.9.17: TryParseGesture('Alt+Insert') mods has MOD_ALT
+PASS: v0.9.17: invalid combo still rejected
+PASS: v0.9.17: 'Ctrl+A' accepted as combo (modifier present)
+PASS: v0.9.17: TryParseGesture('Space') parses OK — safety check is in UI, not parser
+PASS: v0.9.17: TryParseGesture('Enter') parses OK — safety check is in UI, not parser
+PASS: v0.9.17: TryParseGesture('A') → mods=0 (parser accepts; UI blocks unsafe single keys)
+PASS: v0.9.17: TryParseGesture('Tab') parses OK
+PASS: v0.9.17: TryParseGesture('Back') parses OK
+PASS: v0.9.17: TryParseGesture('OemMinus') parses OK
+PASS: v0.9.17: TryParseGesture('OemPlus') parses OK
+PASS: v0.9.17: bare 'Ctrl' rejected (not a valid gesture)
+PASS: v0.9.17: bare 'Shift' rejected
+PASS: v0.9.17: bare 'Alt' rejected
+PASS: v0.9.17: empty gesture rejected
+PASS: v0.9.17: whitespace gesture rejected
+
+--- Step 19: v0.9.18 image detection ---
+PASS: v0.9.18: 70% similarity maps to NCC ~0.921 (was 0.70)
+PASS: v0.9.18: NCC bar never drops below 0.85, even at 1%
+PASS: v0.9.18: similarity -> NCC mapping is monotonic
+PASS: v0.9.18: colour tolerance tightens as similarity rises
+PASS: v0.9.18: aligned red icon located at exactly (120,60)
+PASS: v0.9.18: red icon found at all 6 sub-grid offsets (got 6/6)
+PASS: v0.9.18: blue icon REJECTED for a red template at 70% (was a false positive)
+PASS: v0.9.18: blue-vs-red never matches at ANY similarity 1..100
+PASS: v0.9.18: faint low-contrast template rejected on a flat screen
+PASS: v0.9.18: uniform template rejected (zero variance)
+PASS: v0.9.18: two identical icons still HIT (duplicate, not ambiguity)
+PASS: v0.9.18: 16x16 red icon matches itself under the 0.95 floor
+PASS: v0.9.18: 16x16 blue icon rejected for a red template
+PASS: v0.9.18: template larger than the search area rejected safely
+
+--- Step 20: v0.9.19 foreground colour gate ---
+PASS: v0.9.19: small blue glyph REJECTED for red template at 70% (dilution bug)
+PASS: v0.9.19: small blue glyph REJECTED for red template at 85%
+PASS: v0.9.19: real small red glyph still found at exactly (101,51)
+PASS: v0.9.19: two identical small glyphs still HIT (colour-verified duplicate)
+PASS: v0.9.19: two blue lookalikes REJECTED (duplicate rescue is colour-checked)
+PASS: v0.9.19: 2x48 sliver template rejected outright
+PASS: v0.9.19: slight hue shift (220->225) still HITs at 85%
+
+--- Step 21: v0.9.20/v0.9.21 parallel interleave + bridge discovery ---
+PASS: v0.9.20: KTEXT chunked to 1 char per op (got 6)
+PASS: v0.9.21: per-char ops use the instant 0,0 header (no board-side delay)
+PASS: v0.9.20: chunked payloads reassemble to the original text
+PASS: v0.9.21: comma inside the payload is a literal char, not a delimiter
+PASS: v0.9.20: bridge.py found by walking up from a deep exe folder (release-zip layout)
+PASS: v0.9.20: flat-publish bridge.py (loose next to the exe) is a candidate
+
+--- Step 22: v0.9.23 human-calibrated defaults ---
+PASS: v0.9.24: human mouse speed defaults 300/2000 px/s (dense recording)
+PASS: v0.9.24: untouched factory range migrates to the current human defaults
+PASS: v0.9.23: custom user speed range preserved
+PASS: v0.9.23: deliberately disabled timing (0/0) preserved
+PASS: v0.9.24: HumanMouse.Config speed default aligned to 2000
+PASS: v0.9.23: human typing fallback 80/220 ms
+PASS: v0.9.23: personal typing cadence defaults 80/220 ms
+
+--- Step 23: v0.9.23 typing-aware suppression + calibration ---
+PASS: v0.9.23: typing-active window is 900 ms and needs a real first keystroke
+PASS: v0.9.23: suppression halves mouse speed, never produces 0 ms
+PASS: v0.9.23: calibration accepts a full sample set
+PASS: v0.9.23: typing range sane and brackets the median (got 107/119/136)
+PASS: v0.9.23: mouse range sane and brackets the median (got 272/310/363)
+PASS: v0.9.23: mouse median recovers the synthetic ~300 px/s (got 310)
+PASS: v0.9.23: calibration refuses too few keystrokes
+PASS: v0.9.23: calibration refuses too few mouse samples
+
+--- Step 24: v0.9.24 Persian dialogs + speed recalibration ---
+PASS: v0.9.24: shared key hmin has a Persian description
+PASS: v0.9.24: colliding key 'text' resolves per step type
+PASS: v0.9.24: shared key works without a step type
+PASS: v0.9.24: unknown keys fall back to the English label
+PASS: v0.9.24: reverse field lookup resolves the step type
+PASS: v0.9.24: overshoot default 25% (user's hand overshot 2/4 recorded moves)
+PASS: v0.9.24: mid-pause default max 500ms (recorded hesitations ran 297–485ms)
+
+=== Results: 282 passed, 0 failed ===

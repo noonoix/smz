@@ -1,0 +1,1908 @@
+{
+  "file": "C:/Users/wasteland/Documents/ams/pc/daroon1.amk",
+  "banner": "Automatic Mouse and Keyboard Script File, http://www.robot-soft.com",
+  "version": 140,
+  "tail_hex": "",
+  "records": [
+    {
+      "idx": 0,
+      "TYPE": 2,
+      "DLY": 333,
+      "DIS": 0,
+      "image": {
+        "width": 13,
+        "height": 13,
+        "bpp": 32,
+        "index": 0,
+        "file": "img_000_13x13.png"
+      },
+      "SML": 85,
+      "CMT": "",
+      "TOUT": -1,
+      "FDO": "click no move",
+      "TDO": "continue",
+      "IF": 0,
+      "ATM": 0,
+      "TUNT": "ms"
+    },
+    {
+      "idx": 1,
+      "TYPE": 2,
+      "DLY": 0,
+      "DIS": 0,
+      "image": {
+        "width": 12,
+        "height": 16,
+        "bpp": 32,
+        "index": 1,
+        "file": "img_001_12x16.png"
+      },
+      "SML": 75,
+      "CMT": "",
+      "TOUT": 0,
+      "FDO": "click no move",
+      "TDO": "continue",
+      "IF": 1,
+      "ATM": 0,
+      "TUNT": "ms"
+    },
+    {
+      "idx": 2,
+      "TYPE": 6,
+      "DLY": 0,
+      "DIS": 0
+    },
+    {
+      "idx": 3,
+      "TYPE": 7,
+      "DLY": 0,
+      "DIS": 0
+    },
+    {
+      "idx": 4,
+      "TYPE": 2,
+      "DLY": 0,
+      "DIS": 0,
+      "image": {
+        "width": 2,
+        "height": 48,
+        "bpp": 32,
+        "index": 2,
+        "file": "img_002_2x48.png"
+      },
+      "SML": 75,
+      "CMT": "",
+      "TOUT": 0,
+      "FDO": "click no move",
+      "TDO": "continue",
+      "IF": 1,
+      "ATM": 0,
+      "TUNT": "ms",
+      "sub": [
+        {
+          "idx": 0,
+          "TYPE": 15,
+          "DLY": 0,
+          "DIS": 0,
+          "CTRL": 0,
+          "SHFT": 0,
+          "ALT": 1,
+          "WIN": 0,
+          "NKEY": 1,
+          "KEY": 115
+        },
+        {
+          "idx": 1,
+          "TYPE": 8,
+          "DLY": 1000,
+          "DIS": 0,
+          "LPTP": 1,
+          "TO": 100,
+          "TIME": "10 hour",
+          "sub": [
+            {
+              "idx": 0,
+              "TYPE": 34,
+              "DLY": 2000,
+              "DIS": 0,
+              "code": {
+                "ops": [
+                  "ExecuteFile('C:\\\\Users\\\\kapisam\\\\Desktop\\\\sia\\\\exit.bat', GetMousePositionX(), Normal, GetMousePositionX())"
+                ],
+                "items": [
+                  [
+                    "fun",
+                    "ExecuteFile"
+                  ],
+                  [
+                    "str",
+                    "C:\\Users\\kapisam\\Desktop\\sia\\exit.bat"
+                  ],
+                  [
+                    "fun",
+                    "GetMousePositionX"
+                  ],
+                  [
+                    "nflg",
+                    0
+                  ],
+                  [
+                    "num",
+                    5.0
+                  ],
+                  [
+                    "enum",
+                    "ShowWindowType"
+                  ],
+                  [
+                    "fun",
+                    "GetMousePositionX"
+                  ]
+                ]
+              }
+            },
+            {
+              "idx": 1,
+              "TYPE": 23,
+              "DLY": 0,
+              "DIS": 0,
+              "FILE": "main.amk"
+            }
+          ]
+        },
+        {
+          "idx": 2,
+          "TYPE": 9,
+          "DLY": 1000,
+          "DIS": 0
+        }
+      ]
+    },
+    {
+      "idx": 5,
+      "TYPE": 6,
+      "DLY": 0,
+      "DIS": 0
+    },
+    {
+      "idx": 6,
+      "TYPE": 7,
+      "DLY": 0,
+      "DIS": 0
+    },
+    {
+      "idx": 7,
+      "TYPE": 17,
+      "NAME": "60",
+      "DLY": 0,
+      "DIS": 0,
+      "KEY": 55
+    },
+    {
+      "idx": 8,
+      "TYPE": 24,
+      "DLY": 55,
+      "DIS": 0,
+      "wait_ms": 88,
+      "wait_min": 0,
+      "RAND": 1
+    },
+    {
+      "idx": 9,
+      "TYPE": 18,
+      "NAME": "60",
+      "DLY": 0,
+      "DIS": 0,
+      "KEY": 55
+    },
+    {
+      "idx": 10,
+      "TYPE": 24,
+      "DLY": 10000,
+      "DIS": 0,
+      "wait_ms": 2000,
+      "wait_min": 0,
+      "RAND": 1
+    },
+    {
+      "idx": 11,
+      "TYPE": 17,
+      "NAME": "60",
+      "DLY": 0,
+      "DIS": 0,
+      "KEY": 56
+    },
+    {
+      "idx": 12,
+      "TYPE": 24,
+      "DLY": 55,
+      "DIS": 0,
+      "wait_ms": 88,
+      "wait_min": 0,
+      "RAND": 1
+    },
+    {
+      "idx": 13,
+      "TYPE": 18,
+      "NAME": "60",
+      "DLY": 0,
+      "DIS": 0,
+      "KEY": 56
+    },
+    {
+      "idx": 14,
+      "TYPE": 24,
+      "DLY": 700,
+      "DIS": 0,
+      "wait_ms": 200,
+      "wait_min": 0,
+      "RAND": 1
+    },
+    {
+      "idx": 15,
+      "TYPE": 32,
+      "DLY": 55,
+      "DIS": 0,
+      "RGNL": 1301,
+      "RGNT": 0,
+      "RGNR": 1679,
+      "RGNB": 1049
+    },
+    {
+      "idx": 16,
+      "TYPE": 8,
+      "DLY": 1,
+      "DIS": 0,
+      "LPTP": 1,
+      "TO": 100,
+      "TIME": "10 minute",
+      "sub": [
+        {
+          "idx": 0,
+          "TYPE": 17,
+          "DLY": 0,
+          "DIS": 0,
+          "KEY": 86
+        },
+        {
+          "idx": 1,
+          "TYPE": 24,
+          "DLY": 50,
+          "DIS": 0,
+          "wait_ms": 88,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 2,
+          "TYPE": 18,
+          "DLY": 333,
+          "DIS": 0,
+          "KEY": 86
+        },
+        {
+          "idx": 3,
+          "TYPE": 24,
+          "DLY": 300,
+          "DIS": 0,
+          "wait_ms": 88,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 4,
+          "TYPE": 34,
+          "DLY": 3,
+          "DIS": 0,
+          "code": {
+            "ops": [
+              "ExecuteFile('C:\\\\Users\\\\kapisam\\\\Desktop\\\\sia\\\\sound.vbs', GetMousePositionX(), Normal, GetMousePositionX())"
+            ],
+            "items": [
+              [
+                "fun",
+                "ExecuteFile"
+              ],
+              [
+                "str",
+                "C:\\Users\\kapisam\\Desktop\\sia\\sound.vbs"
+              ],
+              [
+                "fun",
+                "GetMousePositionX"
+              ],
+              [
+                "nflg",
+                0
+              ],
+              [
+                "num",
+                5.0
+              ],
+              [
+                "enum",
+                "ShowWindowType"
+              ],
+              [
+                "fun",
+                "GetMousePositionX"
+              ]
+            ]
+          }
+        },
+        {
+          "idx": 5,
+          "TYPE": 17,
+          "DLY": 0,
+          "DIS": 0,
+          "KEY": 50
+        },
+        {
+          "idx": 6,
+          "TYPE": 24,
+          "DLY": 61,
+          "DIS": 0,
+          "wait_ms": 88,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 7,
+          "TYPE": 18,
+          "DLY": 0,
+          "DIS": 0,
+          "KEY": 50
+        },
+        {
+          "idx": 8,
+          "TYPE": 24,
+          "DLY": 300,
+          "DIS": 0,
+          "wait_ms": 120,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 9,
+          "TYPE": 2,
+          "DLY": 0,
+          "DIS": 0,
+          "image": {
+            "width": 2,
+            "height": 48,
+            "bpp": 32,
+            "index": 3,
+            "file": "img_003_2x48.png"
+          },
+          "SML": 75,
+          "CMT": "",
+          "TOUT": 0,
+          "FDO": "click no move",
+          "TDO": "continue",
+          "IF": 1,
+          "ATM": 0,
+          "TUNT": "ms",
+          "sub": [
+            {
+              "idx": 0,
+              "TYPE": 15,
+              "DLY": 0,
+              "DIS": 0,
+              "CTRL": 0,
+              "SHFT": 0,
+              "ALT": 1,
+              "WIN": 0,
+              "NKEY": 1,
+              "KEY": 115
+            },
+            {
+              "idx": 1,
+              "TYPE": 8,
+              "DLY": 1000,
+              "DIS": 0,
+              "LPTP": 1,
+              "TO": 100,
+              "TIME": "10 hour",
+              "sub": [
+                {
+                  "idx": 0,
+                  "TYPE": 34,
+                  "DLY": 2000,
+                  "DIS": 0,
+                  "code": {
+                    "ops": [
+                      "ExecuteFile('C:\\\\Users\\\\kapisam\\\\Desktop\\\\sia\\\\exit.bat', GetMousePositionX(), Normal, GetMousePositionX())"
+                    ],
+                    "items": [
+                      [
+                        "fun",
+                        "ExecuteFile"
+                      ],
+                      [
+                        "str",
+                        "C:\\Users\\kapisam\\Desktop\\sia\\exit.bat"
+                      ],
+                      [
+                        "fun",
+                        "GetMousePositionX"
+                      ],
+                      [
+                        "nflg",
+                        0
+                      ],
+                      [
+                        "num",
+                        5.0
+                      ],
+                      [
+                        "enum",
+                        "ShowWindowType"
+                      ],
+                      [
+                        "fun",
+                        "GetMousePositionX"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "idx": 1,
+                  "TYPE": 23,
+                  "DLY": 0,
+                  "DIS": 0,
+                  "FILE": "main.amk"
+                }
+              ]
+            },
+            {
+              "idx": 2,
+              "TYPE": 9,
+              "DLY": 1000,
+              "DIS": 0
+            }
+          ]
+        },
+        {
+          "idx": 10,
+          "TYPE": 6,
+          "DLY": 0,
+          "DIS": 0
+        },
+        {
+          "idx": 11,
+          "TYPE": 7,
+          "DLY": 0,
+          "DIS": 0
+        }
+      ]
+    },
+    {
+      "idx": 17,
+      "TYPE": 9,
+      "DLY": 100,
+      "DIS": 0
+    },
+    {
+      "idx": 18,
+      "TYPE": 32,
+      "DLY": 55,
+      "DIS": 0,
+      "RGNL": 1301,
+      "RGNT": 0,
+      "RGNR": 1679,
+      "RGNB": 1049
+    },
+    {
+      "idx": 19,
+      "TYPE": 17,
+      "DLY": 0,
+      "DIS": 0,
+      "KEY": 56
+    },
+    {
+      "idx": 20,
+      "TYPE": 24,
+      "DLY": 61,
+      "DIS": 0,
+      "wait_ms": 88,
+      "wait_min": 0,
+      "RAND": 1
+    },
+    {
+      "idx": 21,
+      "TYPE": 18,
+      "DLY": 0,
+      "DIS": 0,
+      "KEY": 56
+    },
+    {
+      "idx": 22,
+      "TYPE": 24,
+      "DLY": 700,
+      "DIS": 0,
+      "wait_ms": 200,
+      "wait_min": 0,
+      "RAND": 1
+    },
+    {
+      "idx": 23,
+      "TYPE": 8,
+      "DLY": 1,
+      "DIS": 0,
+      "LPTP": 1,
+      "TO": 100,
+      "TIME": "10 minute",
+      "sub": [
+        {
+          "idx": 0,
+          "TYPE": 17,
+          "DLY": 0,
+          "DIS": 0,
+          "KEY": 86
+        },
+        {
+          "idx": 1,
+          "TYPE": 24,
+          "DLY": 50,
+          "DIS": 0,
+          "wait_ms": 88,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 2,
+          "TYPE": 18,
+          "DLY": 333,
+          "DIS": 0,
+          "KEY": 86
+        },
+        {
+          "idx": 3,
+          "TYPE": 24,
+          "DLY": 300,
+          "DIS": 0,
+          "wait_ms": 88,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 4,
+          "TYPE": 34,
+          "DLY": 3,
+          "DIS": 0,
+          "code": {
+            "ops": [
+              "ExecuteFile('C:\\\\Users\\\\kapisam\\\\Desktop\\\\sia\\\\sound.vbs', GetMousePositionX(), Normal, GetMousePositionX())"
+            ],
+            "items": [
+              [
+                "fun",
+                "ExecuteFile"
+              ],
+              [
+                "str",
+                "C:\\Users\\kapisam\\Desktop\\sia\\sound.vbs"
+              ],
+              [
+                "fun",
+                "GetMousePositionX"
+              ],
+              [
+                "nflg",
+                0
+              ],
+              [
+                "num",
+                5.0
+              ],
+              [
+                "enum",
+                "ShowWindowType"
+              ],
+              [
+                "fun",
+                "GetMousePositionX"
+              ]
+            ]
+          }
+        },
+        {
+          "idx": 5,
+          "TYPE": 17,
+          "DLY": 0,
+          "DIS": 0,
+          "KEY": 50
+        },
+        {
+          "idx": 6,
+          "TYPE": 24,
+          "DLY": 61,
+          "DIS": 0,
+          "wait_ms": 88,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 7,
+          "TYPE": 18,
+          "DLY": 0,
+          "DIS": 0,
+          "KEY": 50
+        },
+        {
+          "idx": 8,
+          "TYPE": 24,
+          "DLY": 300,
+          "DIS": 0,
+          "wait_ms": 120,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 9,
+          "TYPE": 2,
+          "DLY": 0,
+          "DIS": 0,
+          "image": {
+            "width": 2,
+            "height": 48,
+            "bpp": 32,
+            "index": 4,
+            "file": "img_004_2x48.png"
+          },
+          "SML": 75,
+          "CMT": "",
+          "TOUT": 0,
+          "FDO": "click no move",
+          "TDO": "continue",
+          "IF": 1,
+          "ATM": 0,
+          "TUNT": "ms",
+          "sub": [
+            {
+              "idx": 0,
+              "TYPE": 15,
+              "DLY": 0,
+              "DIS": 0,
+              "CTRL": 0,
+              "SHFT": 0,
+              "ALT": 1,
+              "WIN": 0,
+              "NKEY": 1,
+              "KEY": 115
+            },
+            {
+              "idx": 1,
+              "TYPE": 8,
+              "DLY": 1000,
+              "DIS": 0,
+              "LPTP": 1,
+              "TO": 100,
+              "TIME": "10 hour",
+              "sub": [
+                {
+                  "idx": 0,
+                  "TYPE": 34,
+                  "DLY": 2000,
+                  "DIS": 0,
+                  "code": {
+                    "ops": [
+                      "ExecuteFile('C:\\\\Users\\\\kapisam\\\\Desktop\\\\sia\\\\exit.bat', GetMousePositionX(), Normal, GetMousePositionX())"
+                    ],
+                    "items": [
+                      [
+                        "fun",
+                        "ExecuteFile"
+                      ],
+                      [
+                        "str",
+                        "C:\\Users\\kapisam\\Desktop\\sia\\exit.bat"
+                      ],
+                      [
+                        "fun",
+                        "GetMousePositionX"
+                      ],
+                      [
+                        "nflg",
+                        0
+                      ],
+                      [
+                        "num",
+                        5.0
+                      ],
+                      [
+                        "enum",
+                        "ShowWindowType"
+                      ],
+                      [
+                        "fun",
+                        "GetMousePositionX"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "idx": 1,
+                  "TYPE": 23,
+                  "DLY": 0,
+                  "DIS": 0,
+                  "FILE": "main.amk"
+                }
+              ]
+            },
+            {
+              "idx": 2,
+              "TYPE": 9,
+              "DLY": 1000,
+              "DIS": 0
+            }
+          ]
+        },
+        {
+          "idx": 10,
+          "TYPE": 6,
+          "DLY": 0,
+          "DIS": 0
+        },
+        {
+          "idx": 11,
+          "TYPE": 7,
+          "DLY": 0,
+          "DIS": 0
+        }
+      ]
+    },
+    {
+      "idx": 24,
+      "TYPE": 9,
+      "DLY": 100,
+      "DIS": 0
+    },
+    {
+      "idx": 25,
+      "TYPE": 32,
+      "DLY": 55,
+      "DIS": 0,
+      "RGNL": 1301,
+      "RGNT": 0,
+      "RGNR": 1679,
+      "RGNB": 1049
+    },
+    {
+      "idx": 26,
+      "TYPE": 17,
+      "DLY": 0,
+      "DIS": 0,
+      "KEY": 56
+    },
+    {
+      "idx": 27,
+      "TYPE": 24,
+      "DLY": 61,
+      "DIS": 0,
+      "wait_ms": 88,
+      "wait_min": 0,
+      "RAND": 1
+    },
+    {
+      "idx": 28,
+      "TYPE": 18,
+      "DLY": 0,
+      "DIS": 0,
+      "KEY": 56
+    },
+    {
+      "idx": 29,
+      "TYPE": 24,
+      "DLY": 700,
+      "DIS": 0,
+      "wait_ms": 200,
+      "wait_min": 0,
+      "RAND": 1
+    },
+    {
+      "idx": 30,
+      "TYPE": 8,
+      "DLY": 1,
+      "DIS": 0,
+      "LPTP": 1,
+      "TO": 100,
+      "TIME": "10 minute",
+      "sub": [
+        {
+          "idx": 0,
+          "TYPE": 17,
+          "DLY": 0,
+          "DIS": 0,
+          "KEY": 86
+        },
+        {
+          "idx": 1,
+          "TYPE": 24,
+          "DLY": 50,
+          "DIS": 0,
+          "wait_ms": 88,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 2,
+          "TYPE": 18,
+          "DLY": 333,
+          "DIS": 0,
+          "KEY": 86
+        },
+        {
+          "idx": 3,
+          "TYPE": 24,
+          "DLY": 300,
+          "DIS": 0,
+          "wait_ms": 88,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 4,
+          "TYPE": 34,
+          "DLY": 3,
+          "DIS": 0,
+          "code": {
+            "ops": [
+              "ExecuteFile('C:\\\\Users\\\\kapisam\\\\Desktop\\\\sia\\\\sound.vbs', GetMousePositionX(), Normal, GetMousePositionX())"
+            ],
+            "items": [
+              [
+                "fun",
+                "ExecuteFile"
+              ],
+              [
+                "str",
+                "C:\\Users\\kapisam\\Desktop\\sia\\sound.vbs"
+              ],
+              [
+                "fun",
+                "GetMousePositionX"
+              ],
+              [
+                "nflg",
+                0
+              ],
+              [
+                "num",
+                5.0
+              ],
+              [
+                "enum",
+                "ShowWindowType"
+              ],
+              [
+                "fun",
+                "GetMousePositionX"
+              ]
+            ]
+          }
+        },
+        {
+          "idx": 5,
+          "TYPE": 17,
+          "DLY": 0,
+          "DIS": 0,
+          "KEY": 50
+        },
+        {
+          "idx": 6,
+          "TYPE": 24,
+          "DLY": 61,
+          "DIS": 0,
+          "wait_ms": 88,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 7,
+          "TYPE": 18,
+          "DLY": 0,
+          "DIS": 0,
+          "KEY": 50
+        },
+        {
+          "idx": 8,
+          "TYPE": 24,
+          "DLY": 300,
+          "DIS": 0,
+          "wait_ms": 120,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 9,
+          "TYPE": 2,
+          "DLY": 0,
+          "DIS": 0,
+          "image": {
+            "width": 2,
+            "height": 48,
+            "bpp": 32,
+            "index": 5,
+            "file": "img_005_2x48.png"
+          },
+          "SML": 75,
+          "CMT": "",
+          "TOUT": 0,
+          "FDO": "click no move",
+          "TDO": "continue",
+          "IF": 1,
+          "ATM": 0,
+          "TUNT": "ms",
+          "sub": [
+            {
+              "idx": 0,
+              "TYPE": 15,
+              "DLY": 0,
+              "DIS": 0,
+              "CTRL": 0,
+              "SHFT": 0,
+              "ALT": 1,
+              "WIN": 0,
+              "NKEY": 1,
+              "KEY": 115
+            },
+            {
+              "idx": 1,
+              "TYPE": 8,
+              "DLY": 1000,
+              "DIS": 0,
+              "LPTP": 1,
+              "TO": 100,
+              "TIME": "10 hour",
+              "sub": [
+                {
+                  "idx": 0,
+                  "TYPE": 34,
+                  "DLY": 2000,
+                  "DIS": 0,
+                  "code": {
+                    "ops": [
+                      "ExecuteFile('C:\\\\Users\\\\kapisam\\\\Desktop\\\\sia\\\\exit.bat', GetMousePositionX(), Normal, GetMousePositionX())"
+                    ],
+                    "items": [
+                      [
+                        "fun",
+                        "ExecuteFile"
+                      ],
+                      [
+                        "str",
+                        "C:\\Users\\kapisam\\Desktop\\sia\\exit.bat"
+                      ],
+                      [
+                        "fun",
+                        "GetMousePositionX"
+                      ],
+                      [
+                        "nflg",
+                        0
+                      ],
+                      [
+                        "num",
+                        5.0
+                      ],
+                      [
+                        "enum",
+                        "ShowWindowType"
+                      ],
+                      [
+                        "fun",
+                        "GetMousePositionX"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "idx": 1,
+                  "TYPE": 23,
+                  "DLY": 0,
+                  "DIS": 0,
+                  "FILE": "main.amk"
+                }
+              ]
+            },
+            {
+              "idx": 2,
+              "TYPE": 9,
+              "DLY": 1000,
+              "DIS": 0
+            }
+          ]
+        },
+        {
+          "idx": 10,
+          "TYPE": 6,
+          "DLY": 0,
+          "DIS": 0
+        },
+        {
+          "idx": 11,
+          "TYPE": 7,
+          "DLY": 0,
+          "DIS": 0
+        }
+      ]
+    },
+    {
+      "idx": 31,
+      "TYPE": 9,
+      "DLY": 100,
+      "DIS": 0
+    },
+    {
+      "idx": 32,
+      "TYPE": 32,
+      "DLY": 55,
+      "DIS": 0,
+      "RGNL": 1301,
+      "RGNT": 0,
+      "RGNR": 1679,
+      "RGNB": 1049
+    },
+    {
+      "idx": 33,
+      "TYPE": 17,
+      "DLY": 0,
+      "DIS": 0,
+      "KEY": 56
+    },
+    {
+      "idx": 34,
+      "TYPE": 24,
+      "DLY": 61,
+      "DIS": 0,
+      "wait_ms": 88,
+      "wait_min": 0,
+      "RAND": 1
+    },
+    {
+      "idx": 35,
+      "TYPE": 18,
+      "DLY": 0,
+      "DIS": 0,
+      "KEY": 56
+    },
+    {
+      "idx": 36,
+      "TYPE": 24,
+      "DLY": 700,
+      "DIS": 0,
+      "wait_ms": 200,
+      "wait_min": 0,
+      "RAND": 1
+    },
+    {
+      "idx": 37,
+      "TYPE": 8,
+      "DLY": 1,
+      "DIS": 0,
+      "LPTP": 1,
+      "TO": 100,
+      "TIME": "10 minute",
+      "sub": [
+        {
+          "idx": 0,
+          "TYPE": 17,
+          "DLY": 0,
+          "DIS": 0,
+          "KEY": 86
+        },
+        {
+          "idx": 1,
+          "TYPE": 24,
+          "DLY": 50,
+          "DIS": 0,
+          "wait_ms": 88,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 2,
+          "TYPE": 18,
+          "DLY": 333,
+          "DIS": 0,
+          "KEY": 86
+        },
+        {
+          "idx": 3,
+          "TYPE": 24,
+          "DLY": 300,
+          "DIS": 0,
+          "wait_ms": 88,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 4,
+          "TYPE": 34,
+          "DLY": 3,
+          "DIS": 0,
+          "code": {
+            "ops": [
+              "ExecuteFile('C:\\\\Users\\\\kapisam\\\\Desktop\\\\sia\\\\sound.vbs', GetMousePositionX(), Normal, GetMousePositionX())"
+            ],
+            "items": [
+              [
+                "fun",
+                "ExecuteFile"
+              ],
+              [
+                "str",
+                "C:\\Users\\kapisam\\Desktop\\sia\\sound.vbs"
+              ],
+              [
+                "fun",
+                "GetMousePositionX"
+              ],
+              [
+                "nflg",
+                0
+              ],
+              [
+                "num",
+                5.0
+              ],
+              [
+                "enum",
+                "ShowWindowType"
+              ],
+              [
+                "fun",
+                "GetMousePositionX"
+              ]
+            ]
+          }
+        },
+        {
+          "idx": 5,
+          "TYPE": 17,
+          "DLY": 0,
+          "DIS": 0,
+          "KEY": 50
+        },
+        {
+          "idx": 6,
+          "TYPE": 24,
+          "DLY": 61,
+          "DIS": 0,
+          "wait_ms": 88,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 7,
+          "TYPE": 18,
+          "DLY": 0,
+          "DIS": 0,
+          "KEY": 50
+        },
+        {
+          "idx": 8,
+          "TYPE": 24,
+          "DLY": 300,
+          "DIS": 0,
+          "wait_ms": 120,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 9,
+          "TYPE": 2,
+          "DLY": 0,
+          "DIS": 0,
+          "image": {
+            "width": 2,
+            "height": 48,
+            "bpp": 32,
+            "index": 6,
+            "file": "img_006_2x48.png"
+          },
+          "SML": 75,
+          "CMT": "",
+          "TOUT": 0,
+          "FDO": "click no move",
+          "TDO": "continue",
+          "IF": 1,
+          "ATM": 0,
+          "TUNT": "ms",
+          "sub": [
+            {
+              "idx": 0,
+              "TYPE": 15,
+              "DLY": 0,
+              "DIS": 0,
+              "CTRL": 0,
+              "SHFT": 0,
+              "ALT": 1,
+              "WIN": 0,
+              "NKEY": 1,
+              "KEY": 115
+            },
+            {
+              "idx": 1,
+              "TYPE": 8,
+              "DLY": 1000,
+              "DIS": 0,
+              "LPTP": 1,
+              "TO": 100,
+              "TIME": "10 hour",
+              "sub": [
+                {
+                  "idx": 0,
+                  "TYPE": 34,
+                  "DLY": 2000,
+                  "DIS": 0,
+                  "code": {
+                    "ops": [
+                      "ExecuteFile('C:\\\\Users\\\\kapisam\\\\Desktop\\\\sia\\\\exit.bat', GetMousePositionX(), Normal, GetMousePositionX())"
+                    ],
+                    "items": [
+                      [
+                        "fun",
+                        "ExecuteFile"
+                      ],
+                      [
+                        "str",
+                        "C:\\Users\\kapisam\\Desktop\\sia\\exit.bat"
+                      ],
+                      [
+                        "fun",
+                        "GetMousePositionX"
+                      ],
+                      [
+                        "nflg",
+                        0
+                      ],
+                      [
+                        "num",
+                        5.0
+                      ],
+                      [
+                        "enum",
+                        "ShowWindowType"
+                      ],
+                      [
+                        "fun",
+                        "GetMousePositionX"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "idx": 1,
+                  "TYPE": 23,
+                  "DLY": 0,
+                  "DIS": 0,
+                  "FILE": "main.amk"
+                }
+              ]
+            },
+            {
+              "idx": 2,
+              "TYPE": 9,
+              "DLY": 1000,
+              "DIS": 0
+            }
+          ]
+        },
+        {
+          "idx": 10,
+          "TYPE": 6,
+          "DLY": 0,
+          "DIS": 0
+        },
+        {
+          "idx": 11,
+          "TYPE": 7,
+          "DLY": 0,
+          "DIS": 0
+        }
+      ]
+    },
+    {
+      "idx": 38,
+      "TYPE": 9,
+      "DLY": 100,
+      "DIS": 0
+    },
+    {
+      "idx": 39,
+      "TYPE": 32,
+      "DLY": 55,
+      "DIS": 0,
+      "RGNL": 1301,
+      "RGNT": 0,
+      "RGNR": 1679,
+      "RGNB": 1049
+    },
+    {
+      "idx": 40,
+      "TYPE": 17,
+      "DLY": 0,
+      "DIS": 0,
+      "KEY": 56
+    },
+    {
+      "idx": 41,
+      "TYPE": 24,
+      "DLY": 61,
+      "DIS": 0,
+      "wait_ms": 88,
+      "wait_min": 0,
+      "RAND": 1
+    },
+    {
+      "idx": 42,
+      "TYPE": 18,
+      "DLY": 0,
+      "DIS": 0,
+      "KEY": 56
+    },
+    {
+      "idx": 43,
+      "TYPE": 24,
+      "DLY": 700,
+      "DIS": 0,
+      "wait_ms": 200,
+      "wait_min": 0,
+      "RAND": 1
+    },
+    {
+      "idx": 44,
+      "TYPE": 8,
+      "DLY": 1,
+      "DIS": 0,
+      "LPTP": 1,
+      "TO": 100,
+      "TIME": "7 minute",
+      "sub": [
+        {
+          "idx": 0,
+          "TYPE": 17,
+          "DLY": 0,
+          "DIS": 0,
+          "KEY": 86
+        },
+        {
+          "idx": 1,
+          "TYPE": 24,
+          "DLY": 50,
+          "DIS": 0,
+          "wait_ms": 88,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 2,
+          "TYPE": 18,
+          "DLY": 333,
+          "DIS": 0,
+          "KEY": 86
+        },
+        {
+          "idx": 3,
+          "TYPE": 24,
+          "DLY": 300,
+          "DIS": 0,
+          "wait_ms": 88,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 4,
+          "TYPE": 34,
+          "DLY": 3,
+          "DIS": 0,
+          "code": {
+            "ops": [
+              "ExecuteFile('C:\\\\Users\\\\kapisam\\\\Desktop\\\\sia\\\\sound.vbs', GetMousePositionX(), Normal, GetMousePositionX())"
+            ],
+            "items": [
+              [
+                "fun",
+                "ExecuteFile"
+              ],
+              [
+                "str",
+                "C:\\Users\\kapisam\\Desktop\\sia\\sound.vbs"
+              ],
+              [
+                "fun",
+                "GetMousePositionX"
+              ],
+              [
+                "nflg",
+                0
+              ],
+              [
+                "num",
+                5.0
+              ],
+              [
+                "enum",
+                "ShowWindowType"
+              ],
+              [
+                "fun",
+                "GetMousePositionX"
+              ]
+            ]
+          }
+        },
+        {
+          "idx": 5,
+          "TYPE": 17,
+          "DLY": 0,
+          "DIS": 0,
+          "KEY": 50
+        },
+        {
+          "idx": 6,
+          "TYPE": 24,
+          "DLY": 61,
+          "DIS": 0,
+          "wait_ms": 88,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 7,
+          "TYPE": 18,
+          "DLY": 0,
+          "DIS": 0,
+          "KEY": 50
+        },
+        {
+          "idx": 8,
+          "TYPE": 24,
+          "DLY": 300,
+          "DIS": 0,
+          "wait_ms": 120,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 9,
+          "TYPE": 2,
+          "DLY": 0,
+          "DIS": 0,
+          "image": {
+            "width": 2,
+            "height": 48,
+            "bpp": 32,
+            "index": 7,
+            "file": "img_007_2x48.png"
+          },
+          "SML": 75,
+          "CMT": "",
+          "TOUT": 0,
+          "FDO": "click no move",
+          "TDO": "continue",
+          "IF": 1,
+          "ATM": 0,
+          "TUNT": "ms",
+          "sub": [
+            {
+              "idx": 0,
+              "TYPE": 15,
+              "DLY": 0,
+              "DIS": 0,
+              "CTRL": 0,
+              "SHFT": 0,
+              "ALT": 1,
+              "WIN": 0,
+              "NKEY": 1,
+              "KEY": 115
+            },
+            {
+              "idx": 1,
+              "TYPE": 8,
+              "DLY": 1000,
+              "DIS": 0,
+              "LPTP": 1,
+              "TO": 100,
+              "TIME": "10 hour",
+              "sub": [
+                {
+                  "idx": 0,
+                  "TYPE": 34,
+                  "DLY": 2000,
+                  "DIS": 0,
+                  "code": {
+                    "ops": [
+                      "ExecuteFile('C:\\\\Users\\\\kapisam\\\\Desktop\\\\sia\\\\exit.bat', GetMousePositionX(), Normal, GetMousePositionX())"
+                    ],
+                    "items": [
+                      [
+                        "fun",
+                        "ExecuteFile"
+                      ],
+                      [
+                        "str",
+                        "C:\\Users\\kapisam\\Desktop\\sia\\exit.bat"
+                      ],
+                      [
+                        "fun",
+                        "GetMousePositionX"
+                      ],
+                      [
+                        "nflg",
+                        0
+                      ],
+                      [
+                        "num",
+                        5.0
+                      ],
+                      [
+                        "enum",
+                        "ShowWindowType"
+                      ],
+                      [
+                        "fun",
+                        "GetMousePositionX"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "idx": 1,
+                  "TYPE": 23,
+                  "DLY": 0,
+                  "DIS": 0,
+                  "FILE": "main.amk"
+                }
+              ]
+            },
+            {
+              "idx": 2,
+              "TYPE": 9,
+              "DLY": 1000,
+              "DIS": 0
+            }
+          ]
+        },
+        {
+          "idx": 10,
+          "TYPE": 6,
+          "DLY": 0,
+          "DIS": 0
+        },
+        {
+          "idx": 11,
+          "TYPE": 7,
+          "DLY": 0,
+          "DIS": 0
+        }
+      ]
+    },
+    {
+      "idx": 45,
+      "TYPE": 9,
+      "DLY": 100,
+      "DIS": 0
+    },
+    {
+      "idx": 46,
+      "TYPE": 32,
+      "DLY": 55,
+      "DIS": 0,
+      "RGNL": 1301,
+      "RGNT": 0,
+      "RGNR": 1679,
+      "RGNB": 1049
+    },
+    {
+      "idx": 47,
+      "TYPE": 17,
+      "DLY": 0,
+      "DIS": 0,
+      "KEY": 56
+    },
+    {
+      "idx": 48,
+      "TYPE": 24,
+      "DLY": 61,
+      "DIS": 0,
+      "wait_ms": 88,
+      "wait_min": 0,
+      "RAND": 1
+    },
+    {
+      "idx": 49,
+      "TYPE": 18,
+      "DLY": 0,
+      "DIS": 0,
+      "KEY": 56
+    },
+    {
+      "idx": 50,
+      "TYPE": 24,
+      "DLY": 700,
+      "DIS": 0,
+      "wait_ms": 200,
+      "wait_min": 0,
+      "RAND": 1
+    },
+    {
+      "idx": 51,
+      "TYPE": 8,
+      "DLY": 1,
+      "DIS": 0,
+      "LPTP": 1,
+      "TO": 100,
+      "TIME": "10 minute",
+      "sub": [
+        {
+          "idx": 0,
+          "TYPE": 17,
+          "DLY": 0,
+          "DIS": 0,
+          "KEY": 86
+        },
+        {
+          "idx": 1,
+          "TYPE": 24,
+          "DLY": 50,
+          "DIS": 0,
+          "wait_ms": 88,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 2,
+          "TYPE": 18,
+          "DLY": 333,
+          "DIS": 0,
+          "KEY": 86
+        },
+        {
+          "idx": 3,
+          "TYPE": 24,
+          "DLY": 300,
+          "DIS": 0,
+          "wait_ms": 88,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 4,
+          "TYPE": 34,
+          "DLY": 3,
+          "DIS": 0,
+          "code": {
+            "ops": [
+              "ExecuteFile('C:\\\\Users\\\\kapisam\\\\Desktop\\\\sia\\\\sound.vbs', GetMousePositionX(), Normal, GetMousePositionX())"
+            ],
+            "items": [
+              [
+                "fun",
+                "ExecuteFile"
+              ],
+              [
+                "str",
+                "C:\\Users\\kapisam\\Desktop\\sia\\sound.vbs"
+              ],
+              [
+                "fun",
+                "GetMousePositionX"
+              ],
+              [
+                "nflg",
+                0
+              ],
+              [
+                "num",
+                5.0
+              ],
+              [
+                "enum",
+                "ShowWindowType"
+              ],
+              [
+                "fun",
+                "GetMousePositionX"
+              ]
+            ]
+          }
+        },
+        {
+          "idx": 5,
+          "TYPE": 17,
+          "DLY": 0,
+          "DIS": 0,
+          "KEY": 50
+        },
+        {
+          "idx": 6,
+          "TYPE": 24,
+          "DLY": 61,
+          "DIS": 0,
+          "wait_ms": 88,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 7,
+          "TYPE": 18,
+          "DLY": 0,
+          "DIS": 0,
+          "KEY": 50
+        },
+        {
+          "idx": 8,
+          "TYPE": 24,
+          "DLY": 300,
+          "DIS": 0,
+          "wait_ms": 120,
+          "wait_min": 0,
+          "RAND": 1
+        },
+        {
+          "idx": 9,
+          "TYPE": 2,
+          "DLY": 0,
+          "DIS": 0,
+          "image": {
+            "width": 2,
+            "height": 48,
+            "bpp": 32,
+            "index": 8,
+            "file": "img_008_2x48.png"
+          },
+          "SML": 75,
+          "CMT": "",
+          "TOUT": 0,
+          "FDO": "click no move",
+          "TDO": "continue",
+          "IF": 1,
+          "ATM": 0,
+          "TUNT": "ms",
+          "sub": [
+            {
+              "idx": 0,
+              "TYPE": 15,
+              "DLY": 0,
+              "DIS": 0,
+              "CTRL": 0,
+              "SHFT": 0,
+              "ALT": 1,
+              "WIN": 0,
+              "NKEY": 1,
+              "KEY": 115
+            },
+            {
+              "idx": 1,
+              "TYPE": 8,
+              "DLY": 1000,
+              "DIS": 0,
+              "LPTP": 1,
+              "TO": 100,
+              "TIME": "10 hour",
+              "sub": [
+                {
+                  "idx": 0,
+                  "TYPE": 34,
+                  "DLY": 2000,
+                  "DIS": 0,
+                  "code": {
+                    "ops": [
+                      "ExecuteFile('C:\\\\Users\\\\kapisam\\\\Desktop\\\\sia\\\\exit.bat', GetMousePositionX(), Normal, GetMousePositionX())"
+                    ],
+                    "items": [
+                      [
+                        "fun",
+                        "ExecuteFile"
+                      ],
+                      [
+                        "str",
+                        "C:\\Users\\kapisam\\Desktop\\sia\\exit.bat"
+                      ],
+                      [
+                        "fun",
+                        "GetMousePositionX"
+                      ],
+                      [
+                        "nflg",
+                        0
+                      ],
+                      [
+                        "num",
+                        5.0
+                      ],
+                      [
+                        "enum",
+                        "ShowWindowType"
+                      ],
+                      [
+                        "fun",
+                        "GetMousePositionX"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "idx": 1,
+                  "TYPE": 23,
+                  "DLY": 0,
+                  "DIS": 0,
+                  "FILE": "main.amk"
+                }
+              ]
+            },
+            {
+              "idx": 2,
+              "TYPE": 9,
+              "DLY": 1000,
+              "DIS": 0
+            }
+          ]
+        },
+        {
+          "idx": 10,
+          "TYPE": 6,
+          "DLY": 0,
+          "DIS": 0
+        },
+        {
+          "idx": 11,
+          "TYPE": 7,
+          "DLY": 0,
+          "DIS": 0
+        }
+      ]
+    },
+    {
+      "idx": 52,
+      "TYPE": 9,
+      "DLY": 100,
+      "DIS": 0
+    },
+    {
+      "idx": 53,
+      "TYPE": 32,
+      "DLY": 55,
+      "DIS": 0,
+      "RGNL": 1301,
+      "RGNT": 0,
+      "RGNR": 1679,
+      "RGNB": 1049
+    },
+    {
+      "idx": 54,
+      "TYPE": 17,
+      "DLY": 0,
+      "DIS": 0,
+      "KEY": 56
+    },
+    {
+      "idx": 55,
+      "TYPE": 24,
+      "DLY": 61,
+      "DIS": 0,
+      "wait_ms": 88,
+      "wait_min": 0,
+      "RAND": 1
+    },
+    {
+      "idx": 56,
+      "TYPE": 18,
+      "DLY": 0,
+      "DIS": 0,
+      "KEY": 56
+    },
+    {
+      "idx": 57,
+      "TYPE": 24,
+      "DLY": 700,
+      "DIS": 0,
+      "wait_ms": 200,
+      "wait_min": 0,
+      "RAND": 1
+    }
+  ]
+}

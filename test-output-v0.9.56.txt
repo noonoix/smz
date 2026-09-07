@@ -1,0 +1,802 @@
+PASS: openFile definition exists
+PASS: playScript definition exists
+PASS: mouseClick command correct (got: MCLICK|left,1)
+PASS: mouseMove command correct (got: MMOVE|100,200,abs,1)
+PASS: typeText secret produces CLIPBOARD cmd (got: CLIPBOARD:secret123, KCOMBO|162+86)
+PASS: typeText word humanize inserts DLY (got: KTEXT|25,70,hello , DLY|135, KTEXT|25,70,world , DLY|162, KTEXT|25,70,foo)
+PASS: typeText 'hello world foo': 3 KTEXT + 2 DLY (got 3KTEXT/2DLY, cmds: KTEXT|25,70,hello  | DLY|135 | KTEXT|25,70,world  | DLY|162 | KTEXT|25,70,foo)
+PASS: typeText no word humanize: no DLY (got: KTEXT|25,70,hello world)
+PASS: punctuation pauses fire after ',' and '.' mid-line (got 2×DLY|200)
+PASS: punctuation splitting preserves the exact source text (got "Hi, ok. Bye")
+PASS: thinking pause fires between words only at 100% (got 2×DLY|1500)
+PASS: typoChance=100 injects one backspace correction per word (got 2)
+PASS: typo sequence types exactly one slip char per word before correcting (typed 13 chars)
+PASS: typo cadence 3/3 over 10 words fires exactly at words 3, 6, 9 (got 3)
+PASS: typo cadence 2–4 over 10 words stays in bounds (got 2–4 corrections)
+PASS: typo cadence re-rolls N after each correction (distinct counts: 2,3,4)
+PASS: single-char words cannot take a slip and do not consume the cadence (got 2)
+PASS: cadence range takes precedence over legacy typoChance (got 2, chance mode would give 10)
+PASS: wordPauseChance=0 streams the whole line as ONE chunk (got: KTEXT|80,220,hello world foo)
+PASS: wordPauseChance=100 keeps the legacy pause-after-every-word behavior
+PASS: merged and split streams always preserve the exact text
+PASS: merged and split streams always preserve the exact text
+PASS: merged and split streams always preserve the exact text
+PASS: merged and split streams always preserve the exact text
+PASS: merged and split streams always preserve the exact text
+PASS: merged and split streams always preserve the exact text
+PASS: merged and split streams always preserve the exact text
+PASS: merged and split streams always preserve the exact text
+PASS: merged and split streams always preserve the exact text
+PASS: merged and split streams always preserve the exact text
+PASS: wordPauseChance=50 produces both flowing and pausing runs
+PASS: gentleDefaults with no keys reproduces the old fixed Gentle preset (idle breaks off)
+PASS: gentleDefaults respects explicit per-step overrides (arc range + duration range)
+PASS: the Random Mouse Position defaults path is unchanged
+PASS: typeText tuning fields are marked hidden in clipboard mode
+PASS: Find Image and Mouse Position carry the tunable human-move fields with hide-when-off metadata
+PASS: 150 fuzzed humanized moves all land EXACTLY on the chosen target (0 missed)
+PASS: all fuzzed paths stay on screen (0 escapes)
+PASS: parallel group: two 300ms delays overlap (elapsed 321ms; sequential would be ≥600)
+PASS: parallel group joins on the LONGEST branch (elapsed 456ms ≈ 450, not 570)
+PASS: the step AFTER a parallel group runs only after the join (elapsed 418ms)
+PASS: two branches truly overlapped on the bridge (max in-flight 2 ≥ 2)
+PASS: outside a parallel group commands stay strictly sequential
+PASS: inside a parallel group the mouse is app-paced per-point (interleaves with typing)
+PASS: the typing branch ran concurrently on the same bridge
+PASS: generated script warns and emits parallel-group children sequentially (one serial channel)
+PASS: defaults produce the single legacy chunk (got: KTEXT|80,220,plain text)
+PASS: multi-line keystrokes text is typed with Enter, not pasted (got: KTEXT|80,220,first line | KCOMBO|13 | KTEXT|80,220,second line)
+PASS: openFile generates Start-Process in script
+PASS: Script contains the executable path
+PASS: AppSettings round-trip preserves ToolkitDir
+PASS: forLoop summary correct: 'For 5 minute'
+PASS: sound armed summary correct: 'Sound trigger ≥90 → left click (armed)'
+PASS: findImage is a container step
+PASS: findImage has 'pictures' field
+PASS: delay summary: 'Delay 100 to 300 ms'
+
+--- Import Test: daroon1.amk ---
+Top-level steps: 58
+  WARN: native extractor: picture #1 (13x13) → daroon1_pic1_13x13.png
+  WARN: native extractor: picture #2 (12x16) → daroon1_pic2_12x16.png
+  WARN: native extractor: picture #3 (2x48) → daroon1_pic3_2x48.png
+  WARN: native extractor: picture #4 (2x48) → daroon1_pic4_2x48.png
+  WARN: native extractor: picture #5 (2x48) → daroon1_pic5_2x48.png
+  WARN: native extractor: picture #6 (2x48) → daroon1_pic6_2x48.png
+  WARN: native extractor: picture #7 (2x48) → daroon1_pic7_2x48.png
+  WARN: native extractor: picture #8 (2x48) → daroon1_pic8_2x48.png
+  WARN: native extractor: picture #9 (2x48) → daroon1_pic9_2x48.png
+  WARN: native extractor: 9 embedded picture(s) → daroon1_images/
+PASS: Import produced >=50 top-level steps (got 58)
+PASS: findImage steps: 9 (expected >=3)
+PASS: forLoop steps: 13 (expected >=5)
+PASS: comment steps (Else/Next/EndIf): 29 (expected >=10)
+PASS: Else branch comments: 8 (expected >=2)
+PASS: findImage with picture paths: 9 (expected >=3)
+PASS: keyDown steps: 20
+PASS: keyUp steps: 20
+PASS: delay steps: 40
+PASS: randomMousePosition steps: 7
+PASS: No disabled steps by default (got 0)
+
+--- Tree Summary ---
+Total nodes: 165
+  findImage: 9
+  forLoop: 13
+  comment (Else/Next/EndIf): 29
+  keyDown/keyUp: 20/20
+  delay: 40
+  randomMousePosition: 7
+
+--- PNG Extraction Test ---
+  Extracted 9 PNG images
+    img_000_13x13.png: 560 bytes
+    img_001_12x16.png: 610 bytes
+    img_002_2x48.png: 317 bytes
+    img_003_2x48.png: 329 bytes
+    img_004_2x48.png: 329 bytes
+PASS: PNG images extracted from daroon1.amk
+
+--- v0.7.8: Random Package + hold range + DelayMax ---
+PASS: randomPackage definition exists
+PASS: randomPackage is a scope container
+PASS: randomPackage has mode/minCount/maxCount fields
+PASS: mouseClick without hold stays firmware-1.6 compatible
+PASS: mouseClick with hold range (got MCLICK|right,2,30,90)
+PASS: hold min/max swap is normalized
+PASS: keystroke with hold range (got KCOMBO|162+115,40,120)
+PASS: DelayMax survives JSON round-trip
+PASS: DelayMax=0 is omitted from .amsj (clean files)
+PASS: shuffleAll picks every enabled child once (got 9)
+PASS: disabled child excluded from the pool
+PASS: no child fires twice in shuffleAll
+PASS: every pass draws a fresh order (checked 5 passes)
+PASS: randomSubset count stays within [3,5] over 200 passes
+PASS: randomSubset never repeats a child within one pass
+PASS: min/max swap + pool cap handled (got 3)
+PASS: SETRES still goes first
+PASS: engine runs the shuffled package (got 9 pings)
+PASS: script generator marks Random Package (app-side) in the .ps1
+
+--- v0.7.9: FindElseBranch ---
+PASS: Else marker found after the If step
+PASS: End If without Else → no branch
+PASS: scan stops at a non-comment sibling (left the If scope)
+PASS: imported AMK Else text ("Else — …") recognized
+
+--- v0.8.0: accordion collapse ---
+PASS: collapsed loop hides its children (got 2 rows, want 2)
+PASS: collapsed row shows ▸
+PASS: expanded loop shows children again (got 4 rows, want 4)
+PASS: child numbering intact (got 1.1)
+PASS: expanded row shows ▾
+
+--- v0.8.2: native image extraction ---
+PASS: native extractor found embedded pictures (got 9, want >= 3)
+PASS: all extracted PNGs exist on disk
+PASS: extracted image loads with dimensions (13x13)
+
+--- v0.8.3: label / go to label ---
+PASS: label step definition exists
+PASS: gotoLabel step definition exists
+PASS: label summary shows the name (got: 🏷 start)
+PASS: FindLabelRow is case-insensitive
+PASS: FindLabelRow returns -1 when missing
+PASS: goto jumps forward over steps (sent: SETRES|1920,1080, PING|L1, PING|L3)
+PASS: goto escapes a loop to a root-level label (sent: SETRES|1920,1080, PING|in, PING|after)
+PASS: unresolved goto stops the script with a warning (no crash)
+
+--- v0.9.2: HumanMouse engine ---
+PASS: v0.9.2: dense human micro-step stream (got 445 pts)
+PASS: fallback control points stay few (got 3)
+PASS: path lands exactly on target (got 900,700)
+PASS: all waypoints stay on screen (clamped)
+PASS: reaction pause in range (got 209)
+PASS: settle pause in range (got 528)
+PASS: off-screen target is clamped
+PASS: median micro-step ≈ human 3px (got 4)
+PASS: median cadence ≈ human 5ms (got 3)
+PASS: dense trail decimated to control points ending on target (got 4 pts, end 1500,900)
+PASS: move 1: no long break yet
+PASS: move 2: the 0-5s long break fires
+PASS: move 3: counter reset after the break
+PASS: move time bounded (worst 2775 ms over 500 draws)
+PASS: speed max 0 = firmware-paced move (no app delays)
+PASS: legacy randomMousePosition props get the human defaults
+PASS: legacy/default fixed curve 30 migrates automatically to dynamic 15–45 range
+PASS: word chunk keeps its trailing space (got: KTEXT|25,70,hello  | DLY|136 | KTEXT|25,70,world)
+PASS: typeText Persian auto-fallback (got: CLIPBOARD:آمار دست واقع شما, KCOMBO|162+86)
+PASS: curvePct=0 path is nearly straight (max perp dev 0.00% < 2%)
+PASS: curvePct=100 is visibly curvier (0.33% vs 0.00%)
+PASS: curvePct=200 selects a real semicircular arc (height 585px)
+PASS: arc stream has no reset/back-jump (max micro-step 4.2px)
+PASS: arc stream never leaves the target after first arrival (v0.9.5 reset regression)
+PASS: curvePct=120 is already clearly circular (26.3% bow)
+PASS: curvePct=120 does not append/replay a second path from the original start
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc move lands exactly on target
+PASS: arc move contains no large internal reset jump
+PASS: arc move never replays from start after arrival
+PASS: arc mode at curvePct=200 always sweeps visibly (got 12/12 with dev>20%)
+PASS: curvePct=200 arc mode is much curvier than 100 (48.75% vs 0.33%)
+PASS: curvature continuously explores 120–190 inside one path (120.2–187.2)
+PASS: curvature profile changes smoothly without abrupt per-point jumps
+PASS: speed continuously explores configured range inside one path (435–1183px/s)
+PASS: dynamic speed profile produces multiple micro-step delay levels in one move
+PASS: micro-step spacing changes through 2.0–3.2px during one move without a jump
+PASS: legacy fixed curvePct=180 migrates to dynamic 165–195 range
+PASS: fixed duration 800ms hits its target (sum=794ms over 403 micro-steps)
+PASS: duration range 400–1500 draws a fresh target per move (min=543 max=1456 distinct=12)
+PASS: duration range still times the path when the global speed range is disabled (max 0)
+PASS: old files without duration fields keep speed-driven timing (0/0)
+PASS: global hotkey maps Shift+Add to VK_ADD (numpad +)
+PASS: global hotkey maps numpad Subtract
+PASS: global hotkey maps Ctrl+Multiply to VK_MULTIPLY
+PASS: global hotkey maps numpad Divide
+PASS: global hotkey maps Alt+OemPlus and preserves Alt modifier
+PASS: global hotkey maps NumPad0..9 keys
+PASS: invalid global hotkey is rejected deterministically
+PASS: generated script uses the human-mouse function
+PASS: no invalid [Math]::Random in the PS 5.1 output
+PASS: generated script braces are balanced
+PASS: humanized Mouse Position step uses the engine too
+PASS: generated script preserves the full curvature range
+PASS: generated script continuously profiles curvature, speed and micro-step spacing
+PASS: generated script carries the per-step duration range
+PASS: generated script samples a fresh duration target per move
+PASS: generated script emits word pauses as app-side Step-Delay
+PASS: generated script never sends app-side DLY to the board
+PASS: randomMousePosition streams one dense path (calls=1, pts=391)
+PASS: stream ends inside the region (got 160,269)
+PASS: old bridge falls back to human=1 control points
+
+--- v0.9.16: seeded GetCommands ---
+PASS: v0.9.16: GetCommands(node, 42) twice → identical output (deterministic)
+PASS: v0.9.16: 24 seeds produce variety (12 distinct counts; counts are a narrow space so full uniqueness is not guaranteed)
+PASS: v0.9.16: 24 seeds produce near-unique sequences (24/24 distinct)
+PASS: v0.9.16: default RNG restored and unseeded path works after seeded calls
+
+--- v0.9.17: single-key hotkeys ---
+PASS: v0.9.17: TryParseGesture('F7') → mods=0, vk=0x76 (VK_F7)
+PASS: v0.9.17: TryParseGesture('F24') → vk=0x87 (VK_F24)
+PASS: v0.9.17: TryParseGesture('Multiply') → mods=0, vk=0x6A (VK_MULTIPLY)
+PASS: v0.9.17: TryParseGesture('Add') → mods=0, vk=0x6B (VK_ADD)
+PASS: v0.9.17: TryParseGesture('Decimal') → vk=0x6E (VK_DECIMAL)
+PASS: v0.9.17: TryParseGesture('Subtract') → vk=0x6D (VK_SUBTRACT)
+PASS: v0.9.17: TryParseGesture('Divide') → vk=0x6F (VK_DIVIDE)
+PASS: v0.9.17: TryParseGesture('Insert') → mods=0
+PASS: v0.9.17: TryParseGesture('Delete') parses OK
+PASS: v0.9.17: TryParseGesture('Home') parses OK
+PASS: v0.9.17: TryParseGesture('End') parses OK
+PASS: v0.9.17: TryParseGesture('PageUp') parses OK
+PASS: v0.9.17: TryParseGesture('PageDown') parses OK
+PASS: v0.9.17: TryParseGesture('PrintScreen') parses OK
+PASS: v0.9.17: TryParseGesture('Scroll') parses OK
+PASS: v0.9.17: TryParseGesture('Pause') parses OK
+PASS: v0.9.17: TryParseGesture('Ctrl+Add') mods has MOD_CTRL, vk=0x6B
+PASS: v0.9.17: TryParseGesture('Shift+F1') mods has MOD_SHIFT, vk=0x70
+PASS: v0.9.17: TryParseGesture('Alt+Insert') mods has MOD_ALT
+PASS: v0.9.17: invalid combo still rejected
+PASS: v0.9.17: 'Ctrl+A' accepted as combo (modifier present)
+PASS: v0.9.17: TryParseGesture('Space') parses OK — safety check is in UI, not parser
+PASS: v0.9.17: TryParseGesture('Enter') parses OK — safety check is in UI, not parser
+PASS: v0.9.17: TryParseGesture('A') → mods=0 (parser accepts; UI blocks unsafe single keys)
+PASS: v0.9.17: TryParseGesture('Tab') parses OK
+PASS: v0.9.17: TryParseGesture('Back') parses OK
+PASS: v0.9.17: TryParseGesture('OemMinus') parses OK
+PASS: v0.9.17: TryParseGesture('OemPlus') parses OK
+PASS: v0.9.17: bare 'Ctrl' rejected (not a valid gesture)
+PASS: v0.9.17: bare 'Shift' rejected
+PASS: v0.9.17: bare 'Alt' rejected
+PASS: v0.9.17: empty gesture rejected
+PASS: v0.9.17: whitespace gesture rejected
+
+--- Step 19: v0.9.18 image detection ---
+PASS: v0.9.18: 70% similarity maps to NCC ~0.921 (was 0.70)
+PASS: v0.9.18: NCC bar never drops below 0.85, even at 1%
+PASS: v0.9.18: similarity -> NCC mapping is monotonic
+PASS: v0.9.18: colour tolerance tightens as similarity rises
+PASS: v0.9.18: aligned red icon located at exactly (120,60)
+PASS: v0.9.18: red icon found at all 6 sub-grid offsets (got 6/6)
+PASS: v0.9.18: blue icon REJECTED for a red template at 70% (was a false positive)
+PASS: v0.9.18: blue-vs-red never matches at ANY similarity 1..100
+PASS: v0.9.18: faint low-contrast template rejected on a flat screen
+PASS: v0.9.18: uniform template rejected (zero variance)
+PASS: v0.9.18: two identical icons still HIT (duplicate, not ambiguity)
+PASS: v0.9.18: 16x16 red icon matches itself under the 0.95 floor
+PASS: v0.9.18: 16x16 blue icon rejected for a red template
+PASS: v0.9.18: template larger than the search area rejected safely
+
+--- Step 20: v0.9.19 foreground colour gate ---
+PASS: v0.9.19: small blue glyph REJECTED for red template at 70% (dilution bug)
+PASS: v0.9.19: small blue glyph REJECTED for red template at 85%
+PASS: v0.9.19: real small red glyph still found at exactly (101,51)
+PASS: v0.9.19: two identical small glyphs still HIT (colour-verified duplicate)
+PASS: v0.9.19: two blue lookalikes REJECTED (duplicate rescue is colour-checked)
+PASS: v0.9.19: 2x48 sliver template rejected outright
+PASS: v0.9.19: slight hue shift (220->225) still HITs at 85%
+
+--- Step 21: v0.9.20/v0.9.21 parallel interleave + bridge discovery ---
+PASS: v0.9.20: KTEXT chunked to 1 char per op (got 6)
+PASS: v0.9.21: per-char ops use the instant 0,0 header (no board-side delay)
+PASS: v0.9.20: chunked payloads reassemble to the original text
+PASS: v0.9.21: comma inside the payload is a literal char, not a delimiter
+PASS: v0.9.20: bridge.py found by walking up from a deep exe folder (release-zip layout)
+PASS: v0.9.20: flat-publish bridge.py (loose next to the exe) is a candidate
+
+--- Step 22: v0.9.23 human-calibrated defaults ---
+PASS: v0.9.24: human mouse speed defaults 300/2000 px/s (dense recording)
+PASS: v0.9.24: untouched factory range migrates to the current human defaults
+PASS: v0.9.23: custom user speed range preserved
+PASS: v0.9.23: deliberately disabled timing (0/0) preserved
+PASS: v0.9.24: HumanMouse.Config speed default aligned to 2000
+PASS: v0.9.23: human typing fallback 80/220 ms
+PASS: v0.9.23: personal typing cadence defaults 80/220 ms
+
+--- Step 23: v0.9.23 typing-aware suppression + calibration ---
+PASS: v0.9.23: typing-active window is 900 ms and needs a real first keystroke
+PASS: v0.9.23: suppression halves mouse speed, never produces 0 ms
+PASS: v0.9.23: calibration accepts a full sample set
+PASS: v0.9.23: typing range sane and brackets the median (got 107/119/136)
+PASS: v0.9.23: mouse range sane and brackets the median (got 272/310/363)
+PASS: v0.9.23: mouse median recovers the synthetic ~300 px/s (got 310)
+PASS: v0.9.23: calibration refuses too few keystrokes
+PASS: v0.9.23: calibration refuses too few mouse samples
+
+--- Step 24: v0.9.24 Persian dialogs + speed recalibration ---
+PASS: v0.9.24: shared key hmin has a Persian description
+PASS: v0.9.24: colliding key 'text' resolves per step type
+PASS: v0.9.24: shared key works without a step type
+PASS: v0.9.24: unknown keys fall back to the English label
+PASS: v0.9.24: reverse field lookup resolves the step type
+PASS: v0.9.24: overshoot default 25% (user's hand overshot 2/4 recorded moves)
+PASS: v0.9.24: mid-pause default max 500ms (recorded hesitations ran 297–485ms)
+
+--- Step 25: v0.9.25 full Persian coverage ---
+PASS: v0.9.25: every step field has a Persian entry (145 fields, 0 missing)
+PASS: v0.9.25: Find Image dialog fully Persian (headers, labels, buttons, combo items)
+PASS: v0.9.25: Options dialog fully Persian (tabs, labels, hotkey rows)
+PASS: v0.9.25: Calibration window Persian
+PASS: v0.9.25: Region picker Persian
+PASS: v0.9.25: main window panels Persian (Play Options / Inspector / Serial log)
+PASS: v0.9.25: option values/units and menus stay English per the user rule
+
+--- Step 26: v0.9.26 capped suppression + rare typing rests ---
+PASS: v0.9.26: ordinary micro-steps still double, never 0 ms
+PASS: v0.9.26: suppressed delay capped — a stretched move-time tail cannot park the cursor
+PASS: v0.9.26: cap stays sub-perceptual (got 140 ms)
+PASS: v0.9.26: mouse rests every 10–24 keys while typing (got 10–24; was 2–6)
+PASS: v0.9.26: rest length within 90–700 ms (got 90–700; v0.9.23 allowed up to 1200)
+PASS: v0.9.26: ~10% of rests stretch to 350–700 ms (got 9.9%)
+
+
+--- Step 27: v0.9.27 audio on dispatcher thread ---
+PASS: v0.9.27: playAudio case and StopAllAudio located
+PASS: v0.9.27: playAudio creates/opens/plays on the UI dispatcher (parallel branches have no pump)
+PASS: v0.9.27: PlaybackStopped attaches inside dispatcher (loop replay + self-close, v0.9.33 NAudio)
+PASS: v0.9.27: StopAllAudio marshals Stop/Close to the dispatcher thread (thread affinity)
+PASS: v0.9.27: StopAllAudio guards dispatcher shutdown (no hang/throw at app exit)
+
+
+--- Step 28: v0.9.28 vision warmup + honest per-strip timeout ---
+PASS: v0.9.28: warmup synthetic match finds the planted 36x36 needle (hot path primed)
+PASS: v0.9.28: VisionService.Warmup exists
+PASS: v0.9.28: stochastic 30% skip never applies to the first poll round
+PASS: v0.9.28: every poll round is timed and slow rounds are logged (evidence)
+PASS: v0.9.28: engine primes the vision hot path at run start
+
+
+--- Step 29: v0.9.29 loop field visibility + per-step label fix ---
+PASS: v0.9.29: count field hidden in time and infinite modes
+PASS: v0.9.29: the field of the ACTIVE loop law stays visible
+PASS: v0.9.29: v0.9.14 hide-when behavior unchanged
+PASS: v0.9.29: shell fields (step name / delay / delay max) have Persian labels
+PASS: v0.9.29: forLoop mode label resolves to Persian via the per-step dict
+PASS: v0.9.29: dialog receives the explicit step-type key (per-step overrides no longer dead)
+
+
+--- Step 30: v0.9.30 undo snapshots + flat If/Else ---
+PASS: v0.9.30: tree snapshot round-trips structure and props
+PASS: v0.9.30: restore rewires the [JsonIgnore] Parent links
+PASS: v0.9.30: flat Else…End If block located around a real step body
+PASS: v0.9.30: no markers → no structural block
+PASS: v0.9.30: Else without End If stays non-structural (safe legacy)
+PASS: v0.9.30: Else after a non-comment sibling is not the If's branch (v0.7.9 contract)
+PASS: v0.9.30: undo/redo snapshot infrastructure present in the view model
+PASS: v0.9.30: Ctrl+Z / Ctrl+V keybindings wired in the main window
+
+
+--- Step 31: v0.9.31 sound If/Else ---
+PASS: v0.9.31: If/Else mode sends plain WSND — the reaction lives in the branches, not the armed options
+PASS: v0.9.31: armed TRGSND preserved when If/Else is off (back-compat)
+PASS: v0.9.31: waitForSound yields a heard/not-heard outcome for branching
+PASS: v0.9.31: Else markers are offered for sound steps too
+PASS: v0.9.31: sound step gains insertIfElse; armed options hide when it is on
+
+
+--- Step 32: v0.9.32 sound calibrate fallback ---
+PASS: v0.9.32: primary SCAL path kept
+PASS: v0.9.32: WSND binary-search fallback exists
+PASS: v0.9.32: fallback reports the measured floor and suggestion
+PASS: v0.9.32: measuring label no longer promises a 2-second window
+PASS: v0.9.32: assembly version bumped (the v0.9.31 build had shipped with 0.9.29)
+
+
+--- Step 33: v0.9.33 loop replay + marker guard fixes ---
+PASS: v0.9.33: playback tracked with a stop-flag wrapper
+PASS: v0.9.33: loop replay never resurrects after StopAllAudio
+PASS: v0.9.33: out-of-range output device falls back to default with a log line
+PASS: v0.9.33: structural-marker delete protection covers sound If/Else too (add/edit/delete guards)
+PASS: v0.9.33: outputDevice label fixed (was mangled)
+
+
+--- Step 34: v0.9.34 retro scope-container + accordion + indent ---
+PASS: v0.9.34: waitForSound is a scope container too (accordion/bracket parity with findImage)
+PASS: v0.9.34: toggle lives on the If row (not bare Else rows) + deeper nesting indent
+PASS: v0.9.35+: UI marker ownership is separate from runtime LocateElseBlock
+PASS: v0.9.34+: the startup banner carries the current version
+PASS: v0.9.34: assembly version bumped (current build shipped as 0.9.35)
+
+
+--- Step 35: v0.9.35 Else/End If marker cluster ---
+PASS: v0.9.35: flat step between If and markers — no duplicate pair on edit
+PASS: v0.9.35: a later If's markers are never borrowed (missing pair gets created)
+PASS: v0.9.35: orphan duplicate pair removed, first pair kept
+PASS: v0.9.35: delete guard covers every block in the list, not just the first
+PASS: v0.9.35: orphan duplicate markers are NOT protected (user can delete them)
+
+
+--- Step 36: v0.9.36 atomic overlay + review fixes ---
+PASS: v0.9.36: UI locator returns the exact Else/End If pair across flat rows
+PASS: v0.9.36: flat-layout structural markers remain protected
+PASS: v0.9.36: no permanent/per-row vein state remains
+PASS: v0.9.36: exactly one ListBox-level scope bracket exists
+PASS: v0.9.36: old always-on and fragmented row veins are removed
+PASS: v0.9.36: bracket anchors to actual rendered text coordinates
+PASS: v0.9.36: automatic Open cleanup cannot be silently lost
+PASS: v0.9.36: Import snapshots the previous document before clearing it
+PASS: v0.9.36: batch delay and bulk enable/disable mutations are undoable
+PASS: v0.9.36: deleting/cutting an If head includes its owned Else/End If pair
+PASS: v0.9.36: paste keeps sibling order and unsafe partial block moves are blocked
+PASS: v0.9.36: version and banner match
+
+
+--- Step 37: v0.9.37 mandatory If/Else structure + white rows ---
+PASS: v0.9.37: an If with no markers gets Else + End If inserted directly after it
+PASS: v0.9.37: healing an already-complete document is a no-op (idempotent)
+PASS: v0.9.37: a paired If/Else block is never touched
+PASS: v0.9.37: the outer If gets its own pair when a nested If owned the markers (daroon1.amsj defect)
+PASS: v0.9.37: after healing, BOTH the outer and the nested If are paired
+PASS: v0.9.37: unpaired Ifs nested inside a container are healed too
+PASS: v0.9.37: File→Open heals structure and keeps the repaired document dirty
+PASS: v0.9.37: .amk import also lands with complete If/Else structure
+PASS: v0.9.37: pastel scope tints removed — rows keep the white list background
+PASS: v0.9.37: the scope bracket anchors at the leftmost row, so it spans the Else row
+PASS: v0.9.37: version and banner match
+
+--- Step 38: v0.9.38 toggle beside the text + Else bend ---
+PASS: v0.9.38: the description cell is wrapped in the named RowTextAnchor grid
+PASS: v0.9.38: the accordion toggle is rendered inside the text cell, not in the left gutter
+PASS: v0.9.38: the description text sits right of the toggle inside the same cell
+PASS: v0.9.38: the old 28px toggle gutter shrank to a 16px spacer
+PASS: v0.9.38: the overlay canvas owns a dedicated Else bend element
+PASS: v0.9.38: the Else bend is shown for the selected block and reset on every update
+PASS: v0.9.38: the overlay asks the view model for the Else row of the vein scope
+PASS: v0.9.38: scope Else rows are published and rebuilt with the flat list
+PASS: v0.9.38: the Else marker row index is captured while the scope markers are consumed
+PASS: v0.9.38: the bracket anchors on the text cell (toggle included), left of the toggle
+PASS: v0.9.38: version and banner match
+
+
+
+
+--- Step 39: v0.9.39 light sensor action + Pico export ---
+PASS: v0.9.39: waitForLight is a scope container like waitForSound
+PASS: v0.9.39: the light step exposes centre/tolerance/stabilization/mode fields
+PASS: v0.9.39: the light step emits WLUX (host waits) and TRGLUX (armed board keypress)
+PASS: v0.9.39: the runner handles waitForLight through its own await helper
+PASS: v0.9.39: the light step branches into the Else block when the range never stabilizes
+PASS: v0.9.39: generated scripts use a window-proportional timeout for the light step
+PASS: v0.9.39: the light step joins the findImage/waitForSound If-Else row plumbing
+PASS: v0.9.39: Calibrate samples the BH1750 with LCAL and returns the range centre
+PASS: v0.9.39: the step dialog shows the Calibrate button for waitForLight
+PASS: v0.9.39: File menu exports the Pico firmware for this system
+PASS: v0.9.39: the exporter writes code.py, boot.py, the calibration file and the flashing guide
+PASS: v0.9.39: the firmware matches the pin dictionary (SDA=GP20/SCL=GP21, 0x23, lux=raw/1.2) and presses keys over HID
+PASS: v0.9.39: Insert menu, context menu and the rail all offer the light step
+PASS: v0.9.39: the light fields have Persian labels in the step dialog
+PASS: v0.9.39: version and banner match
+
+--- Step 40: v0.9.40 accordion toggle reveals the scope vein ---
+PASS: v0.9.40: the view model exposes ScopeVeinNode as the single vein source of truth
+PASS: v0.9.40: ScopeVeinNode prefers the toggled block and falls back to the selection
+PASS: v0.9.40: FocusScopeVein sets the vein target without touching the selection
+PASS: v0.9.40: moving the selection clears the toggle-driven vein focus
+PASS: v0.9.40: ToggleCollapse focuses the vein on the toggled block (expand and collapse)
+PASS: v0.9.40: the accordion toggle click reveals the vein and redraws the overlay
+PASS: v0.9.40: the overlay resolves its row range from ScopeVeinNode
+PASS: v0.9.40: no selection-only vein path is left in the overlay
+PASS: v0.9.40: the v0.9.38 Else bend follows the same vein node
+PASS: v0.9.40: the v0.9.38 Else bend and the v0.9.39 light step are preserved
+PASS: v0.9.40: version and banner match
+
+--- Step 41: v0.9.41 spelling, marker veins, rail submenus, restart removal ---
+PASS: v0.9.41: no replacement characters are left in the step/view sources
+PASS: v0.9.41: the garbled comments in HumanMouse/RunEngine are repaired
+PASS: v0.9.41: the press-hold summary renders as a clean hold 88-180ms range
+PASS: v0.9.41: the misspelled Persian light tooltip is corrected
+PASS: v0.9.41: the armed light fields resolve their Persian labels
+PASS: v0.9.41: the qualified light keys live in FaByStep, not the shared table
+PASS: v0.9.41: a row still derives its toggle from having children
+PASS: v0.9.41: an Else marker row that owns sub-steps registers its own vein range
+PASS: v0.9.41: the random restart option is gone from UI, view model and settings
+PASS: v0.9.41: no reboot scheduling is left in the run loop
+PASS: v0.9.41: the icon rail block is still identifiable
+PASS: v0.9.41: every Insert entry is reachable from the rail (23 types, 0 missing)
+PASS: v0.9.41: every multi-entry rail section owns its own submenu (6 submenus)
+PASS: v0.9.41: clicking a rail caret opens that section's submenu
+PASS: v0.9.41: version and banner match
+
+--- Step 42: v0.9.42 conditionless steps adopt nothing and are named as a plain search ---
+PASS: v0.9.42: a Find Image without a condition accepts no children
+PASS: v0.9.42: a Find Image with Insert If-Else is still the If head
+PASS: v0.9.42: Wait For Light follows the same rule (same user-reported bug)
+PASS: v0.9.42: Wait For Sound without a condition accepts no children
+PASS: v0.9.42: unconditional containers (loop / package / parallel) are unchanged
+PASS: v0.9.42: conditionless Find Image is named Search for image (got: Search for image · 75% · entireScreen · timeout 3 second)
+PASS: v0.9.42: with a condition it reads as the If head (got: If image found · 75% · entireScreen · timeout 3 second)
+PASS: v0.9.42: the three steps under a conditionless Find Image are released (3 lifted, 6 rows)
+PASS: v0.9.42: they land right after the step, in the original order, at its own level
+PASS: v0.9.42: a real If head and its Else marker keep their branches
+PASS: v0.9.42: the light step releases its nested rows too
+PASS: v0.9.42: paste, drag-into and Insert all ask the node, not the type
+PASS: v0.9.42: no type-only container check is left on an insert path
+PASS: v0.9.42: opening, importing and editing run the release migration
+PASS: v0.9.42: version and banner match
+
+--- Step 43: v0.9.43 hover rail menus · clearable log · visible Undo/Redo · paired hotkeys · manual port · audio device dropdown ---
+PASS: v0.9.43: the Insert tab still lists 23 step types (got 23)
+PASS: v0.9.43: the vertical rail covers EVERY Insert-tab item (missing: )
+PASS: v0.9.43: the right-click Add Action menu covers every Insert item too (parallelGroup / playAudio / runExe were missing)
+PASS: v0.9.43: rail submenus open on hover, guarded against stealing typing focus
+PASS: v0.9.43: the serial log has a clear button wired to LogLines.Clear()
+PASS: v0.9.43: Undo/Redo are visible in the Edit menu (100 levels — more than the requested 10)
+PASS: v0.9.43: hotkeys are paired — one key toggles run/stop, another pause/resume
+PASS: v0.9.43: settings migrate the old 4 hotkeys into the 2 paired ones; the Options dialog shows 2 rows
+PASS: v0.9.43: manual board connect — the status-bar port picker is fed by bridge list_ports
+PASS: v0.9.43: a picked port label parses to the bare device; empty means AUTO
+PASS: v0.9.43: the audio output device is a dropdown of real NAudio devices, not a bare number
+PASS: v0.9.43: version and banner match
+
+--- Step 44: v0.9.44 rail-leave close · parallel vein · pico play options · board LEDs · keyboard board ---
+PASS: v0.9.44+: leaving both rail host and popup closes the submenu through one watcher
+PASS: v0.9.44+: both open paths share one non-async state machine (no popup capture loop)
+PASS: v0.9.44→48: Renumber registers a scope range for Parallel Group; the no-closing-marker rule is retracted — it now closes with # Next like every child-capable block
+PASS: v0.9.44: a parallel group is a scope container node
+PASS: v0.9.44: a parallel group still accepts children (unchanged)
+PASS: v0.9.44: code.py carries the baked play options (timed 600s) with a loop_due gate
+PASS: v0.9.44: once-mode bakes too (run the armed states a single pass)
+PASS: v0.9.44: the export call passes the live Play Options
+PASS: v0.9.44: a Pico brain answer lights both LEDs
+PASS: v0.9.44: a plain firmware-1.6 board lights only the Pro Micro arm LED
+PASS: v0.9.44: a brain without an arm lights only the Pico LED
+PASS: v0.9.44: the status bar has Pico / Pro Micro indicators fed by the post-connect PING
+PASS: v0.9.44: Options chooses which board executes the keyboard (pico / promicro)
+PASS: v0.9.44: with the arm chosen, code.py forwards keyboard commands over UART
+PASS: v0.9.44: with the Pico chosen, code.py types locally (KTEXT/KCOMBO/KDOWN/KUP handled)
+PASS: v0.9.44: version and banner match
+
+--- Step 45: v0.9.45 stable rail popup · visible board roles · structural Next ---
+PASS: v0.9.45: rail hover uses one 220ms dwell timer configured once
+PASS: v0.9.45+: one watcher closes only after the real cursor leaves both host and popup
+PASS: v0.9.45: hover and caret click share an idempotent open/close state machine
+PASS: v0.9.45: the racing async MouseLeave implementation is gone
+PASS: v0.9.45: Options has a dedicated visible Board Roles tab
+PASS: v0.9.45: both keyboard executor choices are explicit and readable
+PASS: v0.9.45: tab switching exposes the roles panel and the dialog is wide enough
+PASS: v0.9.45: a bare loop receives one immediate # Next closing row
+PASS: v0.9.45: loop-marker healing is idempotent
+PASS: v0.9.45: the owned # Next marker is structural/protected
+PASS: v0.9.45: nested loops receive their own Next recursively
+PASS: v0.9.45: add/edit/open/import/paste paths create or heal Next markers
+PASS: v0.9.45: the loop vein closes on its visible Next row
+PASS: v0.9.45: loop + Next are atomic for delete/cut/copy; Next cannot be orphaned
+PASS: v0.9.45: app version, banner and Pico bundle version match
+
+--- Step 46: v0.9.46 cursor geometry · per-step keyboard routing · Next inset ---
+PASS: v0.9.46: rail watcher compares the real cursor with host/popup screen rectangles
+PASS: v0.9.46: stale WPF IsMouseOver can no longer keep the popup open until click
+PASS: v0.9.46: disconnected popup visuals close safely through the single watcher
+PASS: v0.9.46: keystroke exposes default/pico/promicro keyboard executor
+PASS: v0.9.46: typeText exposes default/pico/promicro keyboard executor
+PASS: v0.9.46: keyDown exposes default/pico/promicro keyboard executor
+PASS: v0.9.46: keyUp exposes default/pico/promicro keyboard executor
+PASS: v0.9.46: a Pico-targeted step gets the KBDPICO envelope
+PASS: v0.9.46: an arm-targeted step is enveloped while PC-local pseudo commands stay local
+PASS: v0.9.46: Default preserves the global Options behavior and old plans
+PASS: v0.9.46: direct Pro Micro unwraps its route; connected Pico receives the envelope
+PASS: v0.9.46: a Pico-targeted step fails clearly when only a direct Pro Micro is connected
+PASS: v0.9.46: exported code.py consumes per-step route envelopes before keyboard handling
+PASS: v0.9.46→47→55: the summary inset is back, marker rows only (Step 55)
+PASS: v0.9.46: Next label leaves row depth/numbering and the red vein hierarchy unchanged
+PASS: v0.9.46: RunEngine routes per step using the live board identity
+PASS: v0.9.46: all four new step fields have Persian labels
+PASS: v0.9.46: app version, banner and Pico bundle version match
+
+--- Step 47: v0.9.47 Next label alignment with the scope head ---
+PASS: v0.9.47→55: FlatStepRow defines a marker-only summary inset again
+PASS: v0.9.47→55: the row template binds the per-row summary margin again
+PASS: v0.9.47: the 12px Next shift is fully retracted
+PASS: v0.9.47: row indent still derives only from Depth (22px per level)
+PASS: v0.9.47: the 14px toggle column is fixed, so every summary text starts at the same x
+PASS: v0.9.47: Next is still the loop's own sibling closing row, not a child
+PASS: v0.9.47: the red vein still closes on the visible Next row
+PASS: v0.9.47: row numbering and depth model are unchanged
+PASS: v0.9.47: app version, banner and Pico bundle version match
+
+--- Step 48: v0.9.48 Next everywhere, atomic drag unit, edge auto-scroll, collapsed Options tabs ---
+PASS: v0.9.48: a Parallel Group without a closing row receives its # Next
+PASS: v0.9.48: a Random Package without a closing row receives its # Next
+PASS: v0.9.48: healing stays idempotent — a block that already owns its # Next is untouched
+PASS: v0.9.48: the # Next of a parallel group / package is delete-protected like a loop's
+PASS: v0.9.48: the drop-target resolver knows which block owns a # Next row
+PASS: v0.9.48: End If / Else rows resolve to their owning If head and its Else branch
+PASS: v0.9.48: one helper names every condition-less child-capable container
+PASS: v0.9.48: the vein walk no longer treats a parallel group's # Next as a foreign row
+PASS: v0.9.48: a drag moves the container together with its # Next row — never left behind, never separated
+PASS: v0.9.48: drops onto marker rows resolve inside the block, so no marker can be detached by a drop
+PASS: v0.9.48: the list auto-scrolls near its edges during a drag, so a bottom row can reach the top
+PASS: v0.9.48: inactive Options tabs are Collapsed — Hidden kept reserving their height and stretched the dialog
+PASS: v0.9.48: app version, banner and Pico bundle version match
+
+--- Step 49: v0.9.49 direction-aware plain-row drops + docked Options dialog ---
+PASS: v0.9.49: the reported case — the row below dropped onto the middle of the row above inserts BEFORE it (no silent no-op)
+PASS: v0.9.49: dragging down onto the middle of the row below still lands after it (unchanged)
+PASS: v0.9.49: explicit before/after bands are respected verbatim
+PASS: v0.9.49: a cross-list middle drop keeps the previous after-behaviour
+PASS: v0.9.49: the view can ask the view model which rows are Else rows (for the three-band drop)
+PASS: v0.9.49: MoveNode decides a plain-row middle drop by drag direction
+PASS: v0.9.49: plain rows split the drop band 50/50 — only containers and Else rows keep the middle band
+PASS: v0.9.49: the Options dialog docks to the owner's right edge instead of floating
+PASS: v0.9.49: the Options layout pins the buttons to the bottom of the docked dialog
+PASS: v0.9.49: app version, banner and Pico bundle version match
+PASS: v0.9.50: bundled Caterina.hex parses to a 32 KB image carrying the stock AMS identity 0x1D50
+PASS: v0.9.50: patched HEX is byte-identical to the original tool (golden sha256, Microchip identity)
+PASS: v0.9.50: device descriptor carries VID 04D8 / PID 000A with CDC class and string indexes
+PASS: v0.9.50: the serial string descriptor lands at 0x7F00 with its length prefix
+PASS: v0.9.50: serial-only patch is byte-identical to the original tool (golden sha256)
+PASS: v0.9.50: serial-only patch keeps VID/PID untouched (0x1D50 / 0x615E)
+PASS: v0.9.50: all six invalid inputs are rejected with the original tool's messages
+PASS: v0.9.50: a valid VID parses and random serials match prefix-XXXXXXXX
+PASS: v0.9.50: boards.txt block is byte-identical to the original tool (golden sha256)
+PASS: v0.9.50: installing the board block twice is idempotent (exactly one managed block)
+PASS: v0.9.50: uninstall removes the block and leaves zero markers
+PASS: v0.9.50: checkup classifies bootloader/app identities and unknown pairs
+PASS: v0.9.50: Caterina.hex and isp_flash.py are bundled and locatable from the build output
+PASS: v0.9.50: the three board-preparation services exist with their core APIs
+PASS: v0.9.50: the board preparation window has the Persian tabs
+PASS: v0.9.50: the Tools menu opens the board preparation window
+PASS: v0.9.50→51: app version, banner and Pico bundle version match
+PASS: v0.9.51: PortNumber parses COM names case-insensitively
+PASS: v0.9.51: PortNumber rejects empty, zero and non-COM names
+PASS: v0.9.51: ComDB bit for COM17 cleared, COM1/COM2 untouched
+PASS: v0.9.51: ComDB cleanup ignores out-of-range port numbers
+PASS: v0.9.51: phantom = assigned port absent from the live set (case-insensitive)
+PASS: v0.9.51: cleanup candidates = phantom + known family + registry path
+PASS: v0.9.51: registry instance path parses VID/PID
+PASS: v0.9.51: cleanup honours only allow-listed Enum\USB instance paths
+PASS: v0.9.51: the cleanup request round-trips through JSON
+PASS: v0.9.51: history rows carry the visible marker, live rows do not
+PASS: v0.9.51: phantom programmer/boards are not reported online and are listed as history
+PASS: v0.9.51: every Persian instruction TextBlock in BoardPrepWindow is right-aligned
+PASS: v0.9.51: the cleanup service carries arbiter-bit, delete and backup logic
+PASS: v0.9.51: the checkup service carries phantom detection
+PASS: v0.9.51: the checkup tab has the cleanup button, the board-specs card, and the app has the elevated entry
+PASS: v0.9.52: hot-plug watcher reads COM numbers and ignores everything else
+PASS: v0.9.52: a board plugged in later shows up as a new port (case-insensitive)
+PASS: v0.9.52: nothing is reported as unplugged when the old ports are still there
+PASS: v0.9.52: the port diff tolerates shorter and null sets
+PASS: v0.9.52: the port-change log line names the ports and stays empty when nothing changed
+PASS: v0.9.52: auto-connect fires only when idle, disconnected and a port really arrived
+PASS: v0.9.52: the live port scan never throws and polls at a sane interval
+PASS: v0.9.52: the shell starts the watcher and connects itself when a board appears
+PASS: v0.9.52: the board window itself is right-to-left, not just per-label alignment
+PASS: v0.9.52: log, preview and technical fields stay left-to-right inside the RTL window
+PASS: v0.9.52: every step tab carries a drawing of what happens in that step
+PASS: v0.9.52: the wizard navigator moves the user forward and back through the steps
+PASS: v0.9.52: the step number is clamped to 1..4 and every  step explains itself
+PASS: v0.9.52: board specs are entered once in step 1 and mirrored into step 2
+PASS: v0.9.52: the identity list carries the six classroom devices schools hand to students
+PASS: v0.9.52: Pico, LEGO SPIKE and Circuit Playground use their real USB identities
+PASS: v0.9.52: checkup recognises the new devices in both bootloader and application mode
+PASS: v0.9.52: version pins for this release (csproj + banner + bundle)
+--- Step 53: PnP presence detection + COM-history deletion ladder ---
+PASS: v0.9.53: a scan row is turned into the PnP device instance id cfgmgr32 and pnputil expect
+PASS: v0.9.53: an incomplete row yields no instance id instead of a broken one
+PASS: v0.9.53: a port the PnP manager reports as attached is live even when SERIALCOMM omits it
+PASS: v0.9.53: a detached devnode is history even when a stale SERIALCOMM value remains
+PASS: v0.9.53: when cfgmgr32 cannot answer, the SERIALCOMM set is the fallback
+PASS: v0.9.53: the log states which source decided presence
+PASS: v0.9.53: presence uses cfgmgr32 like the reference tool, with the driver name list as backup
+PASS: v0.9.53: the reported case — a composite path with &MI_00 now parses instead of being rejected
+PASS: v0.9.53: the .reg backup exports the real parent key, function suffix included
+PASS: v0.9.53: the history entry yields the instance id pnputil removes
+PASS: v0.9.53: paths outside Enum-USB still parse to nothing (scope guard intact)
+PASS: v0.9.53: allowing a bootloader identity also allows its application PID (boot + 1)
+PASS: v0.9.53: the exact entry v0.9.52 refused (1D50:615F composite) is now in scope
+PASS: v0.9.53: unrelated families (the 3G modem ports) stay out of scope
+PASS: v0.9.53: removal tries pnputil first and only then registry surgery
+PASS: v0.9.53: the elevated run enables the disabled privileges that caused the unauthorized-operation failures
+PASS: v0.9.53: the last resort runs reg.exe as SYSTEM, the owner of the Enum-USB subtree
+PASS: v0.9.53: only ports that really went away get their arbiter bit freed
+PASS: v0.9.53: the dry-run list uses the same allow-list as the elevated run, so it cannot over-promise
+PASS: v0.9.53: hot-plug auto-connect uses the real busy flag (build fix)
+--- Step 54: device defaults + editable board specs + attached-only scan ---
+PASS: v0.9.55: micro:bit, Calliope, Adafruit, ESP32-S2 and Raspberry Pi are gone from the device list
+PASS: v0.9.55: checkup no longer classifies the removed families
+PASS: v0.9.55: the six board identities remain alongside the 20 keyboards
+PASS: v0.9.55: none ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: stm32 ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: xiao ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: microchip ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: legospike ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: m5stack ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: g413tklse ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: g413se ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: gproxtklrapid ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: blackwidowte ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: blackwidowxte ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: celeritas2 ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: mx83tkl ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: alloyorigins ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: alloyorigins60 ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: alloyorigins65 ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: duckyone2mini ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: duckyone2promini ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: apexprotkl ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: apexpromini ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: keychronk8 ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: das5qs2 ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: zmk650wp ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: vanguardpro96 ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: shikarik515 ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: gomk87rs ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: the Microchip defaults match the reference tool's board-spec card
+PASS: v0.9.55: the STM32 defaults are the real USB strings of that device
+PASS: v0.9.55: the AMS preset keeps the ams board id and Classroom Studio Board name
+PASS: v0.9.55: board ids are sanitised to lowercase Arduino ids
+PASS: v0.9.55: step 2 has the editable board-spec form back (id, name, VID, PIDs, product, maker)
+PASS: v0.9.55: editing a board-spec field refreshes the preview, and defaults can be restored
+PASS: v0.9.55: the form explains the auto-fill and the application-PID rule in Persian
+PASS: v0.9.55: selecting a device fills step 1 and step 2 with that device's defaults
+PASS: v0.9.55: the preview, the install and the uninstall all use the edited board specs
+PASS: v0.9.55: auto-fill never fights the user's own typing
+PASS: v0.9.55: the port scan lists attached ports only, like the reference tool
+PASS: v0.9.55: history rows are still available behind the switch
+PASS: v0.9.55: the scan log line counts attached ports and hidden history separately
+PASS: v0.9.55: the checkup tab has a history switch and re-renders without a new scan
+PASS: v0.9.55: version pins for this release (csproj + banner + bundle)
+PASS: v0.9.55: all twenty keyboard identities are selectable device modes
+PASS: v0.9.55: every keyboard preset keeps its researched VID/PID and stays CDC (class 0x02)
+PASS: v0.9.55: selecting a keyboard prefills the board-spec defaults (product + manufacturer)
+PASS: v0.9.55: the checkup tab recognises both the bootloader and the application PID
+PASS: v0.9.55: no duplicate device-mode keys after the twenty additions
+PASS: v0.9.55: the new identity tables are documented in place
+PASS: v0.9.55: scrolled panes keep a 14px inset so the scrollbar never sits on the text
+PASS: v0.9.55: the hover hint drops below the icon and switches off while its submenu is open
+PASS: v0.9.55: the settings tab and all its sections live inside the main window, not a separate one
+PASS: v0.9.55: forLoop can be renamed and owns a type icon
+PASS: v0.9.55: parallelGroup can be renamed and owns a type icon
+PASS: v0.9.55: randomPackage can be renamed and owns a type icon
+PASS: v0.9.55: waitForSound can be renamed and owns a type icon
+PASS: v0.9.55: waitForLight can be renamed and owns a type icon
+PASS: v0.9.55: findImage can be renamed and owns a type icon
+PASS: v0.9.55: a renamed head shows icon + custom title and keeps its informative tail
+PASS: v0.9.55: the group-title field has a Persian label
+PASS: v0.9.55: markers render as bare lowercase next/else while real comments keep the # prefix
+PASS: v0.9.55: marker rows reclaim the toggle gutter and sit tighter against the red vein
+PASS: v0.9.55: version pins for this release (csproj + banner + bundle)
+
+--- Step 56: v0.9.56 UART GP0/GP1 -> GP16/GP17 ---
+PASS: v0.9.56: firmware uses GP16/GP17 for UART arm
+PASS: v0.9.56: old GP0/GP1 UART pins are gone from firmware exporter
+PASS: v0.9.56: generated header comment mentions GP16 = TX and GP17 = RX
+PASS: v0.9.56: BH1750 I2C pins untouched (GP21/GP20)
+PASS: v0.9.56: BundleVersion is 0.9.56
+PASS: v0.9.56: exported code.py carries GP16/GP17
+PASS: v0.9.56: exported code.py does not contain board.GP0
+PASS: v0.9.56: boot.py still enables CDC console+data
+PASS: v0.9.56: csproj version is 0.9.56
+=== Results: 675 passed, 0 failed ===

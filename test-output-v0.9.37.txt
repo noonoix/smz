@@ -1,0 +1,16 @@
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.cs(1921,42): error CS1003: Syntax error, ',' expected [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.csproj]
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.cs(1921,57): error CS1003: Syntax error, ',' expected [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.csproj]
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.cs(1922,45): error CS1003: Syntax error, ',' expected [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.csproj]
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.cs(1922,61): error CS1003: Syntax error, ',' expected [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.csproj]
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.cs(1924,48): error CS1026: ) expected [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.csproj]
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.cs(1924,48): error CS1002: ; expected [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.csproj]
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.cs(1924,62): error CS1002: ; expected [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.csproj]
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.cs(1924,65): error CS1002: ; expected [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.csproj]
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.cs(1924,65): error CS1513: } expected [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.csproj]
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.cs(1924,66): error CS1525: Invalid expression term '&&' [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.csproj]
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.cs(1925,53): error CS1002: ; expected [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.csproj]
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.cs(1925,53): error CS1513: } expected [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.csproj]
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.cs(1926,74): error CS1002: ; expected [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.csproj]
+C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.cs(1926,74): error CS1513: } expected [C:\Users\wasteland\Documents\ams-wpf-shell-v0.6\tests\TestRunner.csproj]
+
+The build failed. Fix the build errors and run again.

@@ -1,0 +1,289 @@
+// v0.9.50 — Board preparation: faithful C# port of AMS USB Studio's Caterina.hex
+// patching (Intel HEX I/O + USB device/string descriptor patching). Golden-tested in
+// TestRunner step 50 against the original Python implementation: same inputs produce
+// byte-identical output (hashes recorded in docs/board-preparation-v0.9.50.md).
+using System;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
+
+namespace Ams.UI.Services;
+
+/// <summary>v0.9.50 — builds Caterina bootloader HEX files with a custom USB identity
+/// (VID/PID, unique serial number, product/manufacturer strings) for the Pro Micro arm
+/// board. Pure byte logic with no UI, so TestRunner covers it end to end.</summary>
+public static class BoardHexService
+{
+    // ─── HEX structure constants (unchanged from the proven tool) ───
+    public const int FlashSize = 0x8000;
+    public const int DeviceDescOffset = 0x7EE2;
+    public const int StringDescBase = 0x7F00;
+    public const int StringDescMax = 0x8000;
+
+    /// <summary>Ready-made device identities. Every preset is class 0x02 (CDC) so the
+    /// serial port and USB upload never drop — they ride the in-box Windows usbser driver.</summary>
+    public sealed record DeviceMode(string Key, string Name, int Vid, int Pid,
+                                    int ClassType, int Subclass, int Protocol,
+                                    string Product, string Manufacturer);
+
+    // v0.9.54 - list trimmed at the user's request (BBC micro:bit, Calliope mini, Adafruit,
+    // ESP32-S2 and Raspberry Pi removed) and every remaining identity carries its real,
+    // researched USB strings so selecting a device fills the board-spec form with defaults.
+    public static readonly DeviceMode[] DeviceModes =
+    {
+        new("none",      "پیش‌فرض AMS",     0x1D50, 0x615E, 0x02, 0x00, 0x00, "AMS Macro Studio",          "AMS"),
+        new("stm32",     "STM32 Virtual COM",    0x0483, 0x5740, 0x02, 0x00, 0x00, "STM32 Virtual COM Port",    "STMicroelectronics"),
+        new("xiao",      "Seeed XIAO",           0x2886, 0x802F, 0x02, 0x00, 0x00, "Seeed XIAO",                "Seeed"),
+        new("microchip", "Microchip CDC Demo",   0x04D8, 0x000A, 0x02, 0x00, 0x00, "CDC RS-232 Emulation Demo", "Microchip"),
+        new("legospike", "LEGO Education SPIKE", 0x0694, 0x0009, 0x02, 0x00, 0x00, "LEGO Technic Large Hub",    "LEGO Education"),
+        new("m5stack",   "M5Stack Core",         0x303A, 0x1001, 0x02, 0x00, 0x00, "M5Stack Core",              "M5Stack"),
+        // v0.9.55 - twenty researched macro-less keyboards (user list). VIDs are the real
+        // vendor ids; every preset stays class 0x02 (CDC) so the serial port and upload survive.
+        new("g413tklse", "Logitech G413 TKL SE", 0x046D, 0xC33A, 0x02, 0x00, 0x00, "G413 TKL SE Gaming Keyboard", "Logitech"),
+        new("g413se", "Logitech G413 SE", 0x046D, 0xC33C, 0x02, 0x00, 0x00, "G413 SE Gaming Keyboard", "Logitech"),
+        new("gproxtklrapid", "Logitech G PRO X TKL Rapid", 0x046D, 0xC35E, 0x02, 0x00, 0x00, "PRO X TKL RAPID", "Logitech"),
+        new("blackwidowte", "Razer BlackWidow TE", 0x1532, 0x011C, 0x02, 0x00, 0x00, "BlackWidow Tournament Ed.", "Razer"),
+        new("blackwidowxte", "Razer BlackWidow X TE", 0x1532, 0x021B, 0x02, 0x00, 0x00, "BlackWidow X Tournament Ed", "Razer"),
+        new("celeritas2", "ZOWIE Celeritas II", 0x1AF3, 0x0025, 0x02, 0x00, 0x00, "CELERITAS II", "ZOWIE"),
+        new("mx83tkl", "CHERRY XTRFY MX 8.3 TKL", 0x046A, 0x00B1, 0x02, 0x00, 0x00, "XTRFY MX 8.3 TKL", "CHERRY"),
+        new("alloyorigins", "HyperX Alloy Origins", 0x0951, 0x16E5, 0x02, 0x00, 0x00, "HyperX Alloy Origins", "HyperX"),
+        new("alloyorigins60", "HyperX Alloy Origins 60", 0x0951, 0x16E9, 0x02, 0x00, 0x00, "HyperX Alloy Origins 60", "HyperX"),
+        new("alloyorigins65", "HyperX Alloy Origins 65", 0x0951, 0x16EB, 0x02, 0x00, 0x00, "HyperX Alloy Origins 65", "HyperX"),
+        new("duckyone2mini", "Ducky One 2 Mini", 0x04D9, 0x0348, 0x02, 0x00, 0x00, "Ducky One 2 Mini", "DuckyChannel"),
+        new("duckyone2promini", "Ducky One 2 Pro Mini", 0x04D9, 0x0356, 0x02, 0x00, 0x00, "Ducky One 2 Pro Mini", "DuckyChannel"),
+        new("apexprotkl", "SteelSeries Apex Pro TKL", 0x1038, 0x1614, 0x02, 0x00, 0x00, "Apex Pro TKL", "SteelSeries"),
+        new("apexpromini", "SteelSeries Apex Pro Mini", 0x1038, 0x1646, 0x02, 0x00, 0x00, "Apex Pro Mini", "SteelSeries"),
+        new("keychronk8", "Keychron K8", 0x3434, 0x0180, 0x02, 0x00, 0x00, "Keychron K8", "Keychron"),
+        new("das5qs2", "Das Keyboard 5QS Mark II", 0x24F0, 0x2038, 0x02, 0x00, 0x00, "Das Keyboard 5QS Mark II", "Metadot"),
+        new("zmk650wp", "Zalman ZM-K650-WP", 0x258A, 0x0006, 0x02, 0x00, 0x00, "ZM-K650-WP", "Zalman"),
+        new("vanguardpro96", "Corsair Vanguard Pro 96", 0x1B1C, 0x1BC4, 0x02, 0x00, 0x00, "VANGUARD PRO 96", "Corsair"),
+        new("shikarik515", "Fantech Shikari K515", 0x0C45, 0x7A0C, 0x02, 0x00, 0x00, "Shikari K515", "Fantech"),
+        new("gomk87rs", "GAMEON KENORA GOMK87-RS", 0x258A, 0x010C, 0x02, 0x00, 0x00, "KENORA GOMK87-RS", "GAMEON"),
+    };
+
+    public static DeviceMode ModeFor(string? key)
+        => DeviceModes.FirstOrDefault(m => m.Key == key) ?? DeviceModes[0];
+
+    /// <summary>v0.9.54 - every board-spec field a device needs, so choosing an identity fills
+    /// the step-1 advanced boxes and the step-2 board form with that device's real defaults
+    /// instead of leaving them blank. The application PID is always the bootloader PID + 1 -
+    /// they must differ, the same rule the reference tool printed under its board form.</summary>
+    public sealed record BoardDefaults(string BoardId, string BoardName, string BootVid,
+                                       string BootPid, string AppPid, string Product, string Manufacturer);
+
+    public static BoardDefaults DefaultsFor(string? key)
+    {
+        var m = ModeFor(key);
+        var id = SanitizeBoardId(m.Key == "none" ? "ams" : m.Key);
+        var name = m.Key == "none" ? "Classroom Studio Board" : m.Product;
+        return new BoardDefaults(id, name, $"0x{m.Vid:X4}", $"0x{m.Pid:X4}",
+                                 $"0x{m.Pid + 1:X4}", m.Product, m.Manufacturer);
+    }
+
+    /// <summary>Arduino board ids are lowercase [a-z0-9_]; anything else is dropped.</summary>
+    public static string SanitizeBoardId(string? id)
+    {
+        var clean = Regex.Replace((id ?? "").ToLowerInvariant(), "[^a-z0-9_]", "");
+        return clean.Length > 0 ? clean : "ams";
+    }
+
+    // ════════════════════════════ Intel HEX I/O ════════════════════════════
+
+    /// <summary>Reads an Intel HEX file into a 32 KB flash image (0xFF-filled).
+    /// Throws InvalidDataException on a bad record checksum.</summary>
+    public static byte[] ParseHex(string path)
+    {
+        var flash = new byte[FlashSize];
+        Array.Fill(flash, (byte)0xFF);
+        int baseAddr = 0;
+        foreach (var raw in File.ReadLines(path))
+        {
+            var line = raw.Trim();
+            if (line.Length == 0 || line[0] != ':') continue;
+            var rec = Convert.FromHexString(line.Substring(1));
+            int sum = 0;
+            foreach (var b in rec) sum += b;
+            if ((sum & 0xFF) != 0)
+                throw new InvalidDataException($"Checksum نامعتبر در خط: {line}");
+            int count = rec[0], addr = (rec[1] << 8) | rec[2], rtype = rec[3];
+            if (rtype == 0x00) Array.Copy(rec, 4, flash, baseAddr + addr, count);
+            // Faithful quirk: the original keeps the type-04 base unshifted. A 32 KB image
+            // never carries extended-address records, so behaviour is identical either way.
+            else if (rtype == 0x04) baseAddr = (rec[4] << 8) | rec[5];
+            else if (rtype == 0x01) break;
+        }
+        return flash;
+    }
+
+    /// <summary>Serialises the flash image back to Intel HEX (all-0xFF 16-byte blocks are
+    /// dropped; LF line endings — byte-identical to the original tool's output).</summary>
+    public static string ToHex(byte[] flash)
+    {
+        var sb = new StringBuilder();
+        for (int addr = 0; addr < FlashSize; addr += 16)
+        {
+            bool allFF = true;
+            for (int i = 0; i < 16; i++)
+                if (flash[addr + i] != 0xFF) { allFF = false; break; }
+            if (allFF) continue;
+            var rec = new StringBuilder(":10").Append(addr.ToString("X4")).Append("00");
+            int s = 0x10 + (addr & 0xFF) + ((addr >> 8) & 0xFF);
+            for (int i = 0; i < 16; i++)
+            {
+                rec.Append(flash[addr + i].ToString("X2"));
+                s += flash[addr + i];
+            }
+            int checksum = (256 - (s % 256)) & 0xFF;
+            rec.Append(checksum.ToString("X2"));
+            sb.Append(rec).Append('\n');
+        }
+        sb.Append(":00000001FF\n");
+        return sb.ToString();
+    }
+
+    // ═══════════════════════ Serial & USB descriptors ═══════════════════════
+
+    /// <summary>"prefix-XXXXXXXX" with 8 random upper-hex characters.</summary>
+    public static string GenerateRandomSerial(string prefix = "AMS")
+    {
+        const string HexChars = "0123456789ABCDEF";
+        var chars = new char[8];
+        for (int i = 0; i < chars.Length; i++) chars[i] = HexChars[Random.Shared.Next(16)];
+        return prefix + "-" + new string(chars);
+    }
+
+    /// <summary>USB string descriptor: length byte, 0x03, then UTF-16-LE text (max 29 chars).</summary>
+    public static byte[] BuildStringDescriptor(string text)
+    {
+        var encoded = Encoding.Unicode.GetBytes(text);   // UTF-16-LE
+        int length = 2 + encoded.Length;
+        if (length > 60)
+            throw new InvalidDataException($"رشته طولانی است: {text.Length} کاراکتر (حداکثر ۲۹)");
+        var desc = new byte[length];
+        desc[0] = (byte)length;
+        desc[1] = 0x03;
+        Array.Copy(encoded, 0, desc, 2, encoded.Length);
+        return desc;
+    }
+
+    /// <summary>Patches VID/PID and the device class triple at the fixed descriptor offset.</summary>
+    public static void PatchDeviceDescriptor(byte[] flash, int vid, int pid,
+                                             int classType, int subclass, int protocol)
+    {
+        flash[DeviceDescOffset + 0x08] = (byte)(vid & 0xFF);
+        flash[DeviceDescOffset + 0x09] = (byte)((vid >> 8) & 0xFF);
+        flash[DeviceDescOffset + 0x0A] = (byte)(pid & 0xFF);
+        flash[DeviceDescOffset + 0x0B] = (byte)((pid >> 8) & 0xFF);
+        flash[DeviceDescOffset + 0x04] = (byte)classType;
+        flash[DeviceDescOffset + 0x05] = (byte)subclass;
+        flash[DeviceDescOffset + 0x06] = (byte)protocol;
+    }
+
+    /// <summary>Writes the serial (always) plus optional product/manufacturer string
+    /// descriptors into the free region at the top of flash. Faithful to the original:
+    /// the product write is skipped silently when its slot is not 0xFF-free, the offset
+    /// still advances, and the manufacturer write has no free-space check.</summary>
+    public static void PatchStringDescriptors(byte[] flash, string serialText,
+                                              string? productName = null, string? manufacturer = null,
+                                              int stringOffset = StringDescBase)
+    {
+        var serialDesc = BuildStringDescriptor(serialText);
+        if (stringOffset + serialDesc.Length > StringDescMax)
+        {
+            bool found = false;
+            for (int off = StringDescBase; off < StringDescMax - 60 && !found; off++)
+            {
+                bool free = true;
+                for (int i = 0; i < serialDesc.Length; i++)
+                    if (flash[off + i] != 0xFF) { free = false; break; }
+                if (free) { stringOffset = off; found = true; }
+            }
+            if (!found)
+                throw new InvalidDataException("فضای خالی برای string descriptor پیدا نشد");
+        }
+        Array.Copy(serialDesc, 0, flash, stringOffset, serialDesc.Length);
+
+        int nextOffset = stringOffset + serialDesc.Length;
+
+        if (!string.IsNullOrEmpty(productName))
+        {
+            var productDesc = BuildStringDescriptor(productName);
+            bool fits = nextOffset + productDesc.Length <= StringDescMax;
+            if (fits)
+                for (int i = 0; i < productDesc.Length; i++)
+                    if (flash[nextOffset + i] != 0xFF) { fits = false; break; }
+            if (fits)
+            {
+                Array.Copy(productDesc, 0, flash, nextOffset, productDesc.Length);
+                flash[DeviceDescOffset + 0x0F] = 1;   // iProduct
+            }
+            nextOffset += productDesc.Length;
+        }
+
+        if (!string.IsNullOrEmpty(manufacturer))
+        {
+            var manufacturerDesc = BuildStringDescriptor(manufacturer);
+            if (nextOffset + manufacturerDesc.Length <= StringDescMax)
+            {
+                Array.Copy(manufacturerDesc, 0, flash, nextOffset, manufacturerDesc.Length);
+                flash[DeviceDescOffset + 0x0E] = 2;   // iManufacturer
+            }
+        }
+
+        flash[DeviceDescOffset + 0x10] = 0x02;   // iSerial
+    }
+
+    /// <summary>Full patch: identity (when both VID and PID are given) + string descriptors.
+    /// Never mutates the caller's buffer — returns a patched copy.</summary>
+    public static byte[] PatchHex(byte[] flash, string serialText,
+                                  int? vid = null, int? pid = null,
+                                  int classType = 0x02, int subclass = 0x00, int protocol = 0x00,
+                                  string? product = null, string? manufacturer = null)
+    {
+        var copy = (byte[])flash.Clone();
+        if (vid is not null && pid is not null)
+            PatchDeviceDescriptor(copy, vid.Value, pid.Value, classType, subclass, protocol);
+        PatchStringDescriptors(copy, serialText, product, manufacturer);
+        return copy;
+    }
+
+    // ═══════════════════════ input validation ═══════════════════════
+
+    private static readonly Regex VidPidRe = new(@"^0[xX][0-9A-Fa-f]{1,4}$", RegexOptions.Compiled);
+
+    public static int ParseVidPid(string? text, string label = "VID")
+    {
+        text = (text ?? "").Trim();
+        if (!VidPidRe.IsMatch(text))
+            throw new ArgumentException($"{label} نامعتبر است: «{text}» — قالب درست مثل 0x1D50 است");
+        int value = Convert.ToInt32(text.Substring(2), 16);
+        if (value <= 0 || value > 0xFFFF)
+            throw new ArgumentException($"{label} باید بین 0x0001 تا 0xFFFF باشد");
+        return value;
+    }
+
+    // v0.9.50 — the original tool's message carried a corrupted character (U+FFFD);
+    // this port writes the intended word بنویسید (the project allows zero U+FFFD).
+    public static string ValidateSerial(string? serial)
+    {
+        serial = (serial ?? "").Trim();
+        if (serial.Length == 0)
+            throw new ArgumentException("سریال خالی است — دکمه 🎲 را بزنید یا دستی بنویسید");
+        if (serial.Length > 29)
+            throw new ArgumentException($"سریال «{serial}» طولانی است (حداکثر ۲۹ کاراکتر)");
+        if (serial.Any(c => c > 127))
+            throw new ArgumentException($"سریال «{serial}» باید فقط حروف/اعداد انگلیسی باشد");
+        return serial;
+    }
+
+    public static string ValidateUsbString(string? text, string label)
+    {
+        text = (text ?? "").Trim();
+        if (text.Length > 0 && text.Any(c => c > 127))
+            throw new ArgumentException($"{label} باید فقط حروف/اعداد انگلیسی باشد (توصیه USB)");
+        if (text.Length > 29)
+            throw new ArgumentException($"{label} طولانی است (حداکثر ۲۹ کاراکتر)");
+        return text;
+    }
+}

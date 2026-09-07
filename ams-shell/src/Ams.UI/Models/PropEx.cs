@@ -18,9 +18,27 @@ public static class PropEx
         {
             int i => i,
             long l => (int)l,
+            float f => (int)f,
+            double d => (int)d,
             JsonElement { ValueKind: JsonValueKind.Number } je => je.GetInt32(),
             JsonElement { ValueKind: JsonValueKind.String } js when int.TryParse(js.GetString(), out var n) => n,
             string s when int.TryParse(s, out var n2) => n2,
+            _ => fallback,
+        };
+    }
+
+    public static double GetDouble(IReadOnlyDictionary<string, object?> p, string key, double fallback = 0)
+    {
+        if (!p.TryGetValue(key, out var v)) return fallback;
+        return v switch
+        {
+            int i => (double)i,
+            long l => (double)l,
+            float f => (double)f,
+            double d => d,
+            JsonElement { ValueKind: JsonValueKind.Number } je => je.GetDouble(),
+            JsonElement { ValueKind: JsonValueKind.String } js when double.TryParse(js.GetString(), out var n) => n,
+            string s when double.TryParse(s, out var n2) => n2,
             _ => fallback,
         };
     }

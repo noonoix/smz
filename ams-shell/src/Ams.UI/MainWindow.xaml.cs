@@ -64,7 +64,6 @@ public partial class MainWindow : Window
         {
             vm.ReloadKeyBindings();
             vm.AutoConnectOnStartup();   // v0.9.5 — شناسایی و اتصال خودکار برد
-            InstallLogClipboardMenu(vm);   // v0.9.58d — selected/all serial log → Windows clipboard
             AttachScopeVeinEvents(vm);
             QueueScopeVeinUpdate();
         }
@@ -86,39 +85,21 @@ public partial class MainWindow : Window
         base.OnClosed(e);
     }
 
-    private void InstallLogClipboardMenu(MainViewModel vm)
+    // ── selection → view model (Extended mode gives Ctrl-toggle / Shift-range natively) ──
+    private void CopySelectedLog_Click(object sender, System.Windows.RoutedEventArgs e)
     {
-        var logList = FindLogListBox(this, vm.LogLines);
-        if (logList is null) return;
-        logList.SelectionMode = System.Windows.Controls.SelectionMode.Extended;
-        var menu = new ContextMenu();
-        var selected = new MenuItem { Header = "کپی خطوط انتخاب‌شده" };
-        selected.Click += (_, _) => CopyLog(logList.SelectedItems.Cast<string>());
-        var all = new MenuItem { Header = "کپی کل لاگ" };
-        all.Click += (_, _) => CopyLog(vm.LogLines);
-        menu.Items.Add(selected);
-        menu.Items.Add(all);
-        logList.ContextMenu = menu;
-    }
-
-    private static System.Windows.Controls.ListBox? FindLogListBox(DependencyObject root, object source)
-    {
-        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
-        {
-            var child = VisualTreeHelper.GetChild(root, i);
-            if (child is System.Windows.Controls.ListBox list && ReferenceEquals(list.ItemsSource, source)) return list;
-            if (FindLogListBox(child, source) is { } nested) return nested;
-        }
-        return null;
-    }
-
-    private static void CopyLog(IEnumerable<string> lines)
-    {
-        var text = string.Join(Environment.NewLine, lines);
+        if (SerialLogList is null || SerialLogList.SelectedItems.Count == 0) return;
+        var text = string.Join(Environment.NewLine, SerialLogList.SelectedItems.Cast<string>());
         if (text.Length > 0) System.Windows.Clipboard.SetText(text);
     }
 
-    // ── selection → view model (Extended mode gives Ctrl-toggle / Shift-range natively) ──
+    private void CopyAllLog_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        var text = string.Join(Environment.NewLine, vm.LogLines);
+        if (text.Length > 0) System.Windows.Clipboard.SetText(text);
+    }
+
     private void StepsList_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (DataContext is not MainViewModel vm) return;

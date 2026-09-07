@@ -76,6 +76,11 @@ public partial class StepDialog : Window
                     Text = PropAsString(cur),
                     FontFamily = new System.Windows.Media.FontFamily("Cascadia Code"),
                 },
+                FieldKind.Float => new Wpf.Ui.Controls.TextBox
+                {
+                    Text = PropAsString(cur),
+                    FontFamily = new System.Windows.Media.FontFamily("Cascadia Code"),
+                },
                 FieldKind.Combo => MakeCombo(f, cur),
                 FieldKind.EditableCombo => MakeCombo(f, cur, editable: true),
                 FieldKind.AudioDevice => MakeAudioDeviceCombo(cur),   // v0.9.43 — real device names, not an index
@@ -279,6 +284,13 @@ public partial class StepDialog : Window
                     "مقدار نامعتبر", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
+            if (f.Kind == FieldKind.Float &&
+                !double.TryParse(((Wpf.Ui.Controls.TextBox)_controls[f.Key]).Text, out _))
+            {
+                System.Windows.MessageBox.Show(this, $"'{StepTextsFa.Get(_stepType, f.Key, f.Label)}' باید عدد (می‌تواند اعشاری باشد) باشد.",
+                    "مقدار نامعتبر", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
         }
 
         var vals = new Dictionary<string, object?>();
@@ -291,6 +303,7 @@ public partial class StepDialog : Window
                 FieldKind.Combo => (string?)((System.Windows.Controls.ComboBox)_controls[f.Key]).SelectedItem ?? "",
                 FieldKind.EditableCombo => ((System.Windows.Controls.ComboBox)_controls[f.Key]).Text.Trim(),
                 FieldKind.AudioDevice => (int)((System.Windows.Controls.ComboBoxItem)((System.Windows.Controls.ComboBox)_controls[f.Key]).SelectedItem).Tag!,   // v0.9.43
+                FieldKind.Float => double.Parse(((Wpf.Ui.Controls.TextBox)_controls[f.Key]).Text),
                 _ => ((Wpf.Ui.Controls.TextBox)_controls[f.Key]).Text,
             };
         }

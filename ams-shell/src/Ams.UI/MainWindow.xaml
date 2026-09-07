@@ -664,10 +664,17 @@
                                 ToolTip="پاک‌کردن همه‌ی خطوط لاگ" />
                     </StackPanel>
                 </Expander.Header>
-                <ListBox ItemsSource="{Binding LogLines}" Height="160"
+                <ListBox x:Name="SerialLogList" ItemsSource="{Binding LogLines}" Height="160"
                          Background="Transparent" BorderThickness="0"
                          FontFamily="Cascadia Code" FontSize="12"
-                         Foreground="{StaticResource TextSecondaryBrush}" />
+                         Foreground="{StaticResource TextSecondaryBrush}">
+                    <ListBox.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="کپی خطوط انتخاب‌شده" Click="CopySelectedLog_Click" />
+                            <MenuItem Header="کپی کل لاگ" Click="CopyAllLog_Click" />
+                        </ContextMenu>
+                    </ListBox.ContextMenu>
+                </ListBox>
             </Expander>
         </Border>
 

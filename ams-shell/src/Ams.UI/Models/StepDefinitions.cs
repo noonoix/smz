@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace Ams.UI.Models;
 
-public enum FieldKind { Text, Multiline, Int, Combo, EditableCombo, Check, AudioDevice }   // v0.9.43 — AudioDevice: dropdown of the real output devices
+public enum FieldKind { Text, Multiline, Int, Combo, EditableCombo, Check, AudioDevice, Float }   // v0.9.59 — Float: decimal number (e.g. stableSec)
 
 /// <summary>One editable field of a step dialog (design doc §5.5.x dialog maps).</summary>
 /// <summary>v0.9.14 — HideWhenKey/HideWhenValue: the step dialog collapses this field while the
@@ -299,7 +299,7 @@ public static class StepDefinitions
                 new("title", "Group title (blank = default name)", FieldKind.Text, ""),
                 new("luxCenter", "Lux centre - press Calibrate while the real screen state is shown", FieldKind.Int, "1250"),
                 new("luxTolerance", "Lux tolerance +/- - keep 50 or more lux of dead zone between states", FieldKind.Int, "50"),
-                new("stableSec", "Stabilize for N second(s) inside the range before it counts", FieldKind.Int, "2"),
+                new("stableSec", "Stabilize for N second(s) — may be fractional (e.g. 0.5 = half a second)", FieldKind.Float, "2"),
                 new("sampleMode", "Sensor mode - hires: 1 lux / ~120ms per sample · lowres: 4 lux / ~16ms", FieldKind.Combo, "hires", new[] { "hires", "lowres" }),
                 new("timeoutMs", "Timeout (ms)", FieldKind.Int, "20000"),
                 new("insertIfElse", "Insert If-Else (children = Then - range matched · Else - not matched)", FieldKind.Check, "false"),
@@ -318,7 +318,7 @@ public static class StepDefinitions
             Commands = s =>
             {
                 int lo = LuxLow(s), hi = LuxHigh(s);
-                int stableMs = Math.Max(0, PropEx.GetInt(s.Props, "stableSec", 2)) * 1000;
+                int stableMs = Math.Max(0, (int)(PropEx.GetDouble(s.Props, "stableSec", 2) * 1000));
                 int timeout = PropEx.GetInt(s.Props, "timeoutMs", 20000);
                 int mode = PropEx.GetString(s.Props, "sampleMode", "hires") == "lowres" ? 1 : 0;
                 bool ifElse = PropEx.GetBool(s.Props, "insertIfElse");

@@ -2410,7 +2410,7 @@ class TestRunner
                && MainViewModel.PortDeviceFromText("") == "AUTO"
                && MainViewModel.PortDeviceFromText(null) == "AUTO",
             "v0.9.43: a picked port label parses to the bare device; empty means AUTO");
-        Assert(v43def.Contains("FieldKind { Text, Multiline, Int, Combo, EditableCombo, Check, AudioDevice }")
+        Assert(v43def.Contains("FieldKind { Text, Multiline, Int, Combo, EditableCombo, Check, AudioDevice, Float }")
                && v43def.Contains("new(\"outputDevice\", \"Output device — pick from the list (-1=auto)\", FieldKind.AudioDevice, \"-1\")")
                && v43dlg.Contains("MakeAudioDeviceCombo") && v43dlg.Contains("FieldKind.AudioDevice =>")
                && v43fa.Contains("-۱=خودکار"),
@@ -3459,8 +3459,10 @@ class TestRunner
         var p58hotkeys = V27ReadSrc(Path.Combine("Services", "GlobalHotkeyService.cs"));
         Assert(!p58hotkeys.Contains("hard_numlock") && !p58hotkeys.Contains("hard_scroll"),
             "v0.9.58d: fixed lock-key registrations and their startup warnings are gone");
-        var p58window = V27ReadSrc("MainWindow.xaml.cs");
-        Assert(p58window.Contains("کپی کل لاگ") && p58window.Contains("Clipboard.SetText"),
+        var p58xaml = V27ReadSrc("MainWindow.xaml");
+        var p58cs = V27ReadSrc("MainWindow.xaml.cs");
+        Assert(p58xaml.Contains("SerialLogList") && p58xaml.Contains("کپی کل لاگ")
+               && p58cs.Contains("CopyAllLog_Click") && p58cs.Contains("Clipboard.SetText"),
             "v0.9.58d: serial log has selected/all clipboard copy actions");
         // (c) meta guard: every version PIN in this file matches the current release.
         // Pin lines are the assertions that check the csproj Version tag, the app banner or

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -285,7 +286,7 @@ public partial class StepDialog : Window
                 return;
             }
             if (f.Kind == FieldKind.Float &&
-                !double.TryParse(((Wpf.Ui.Controls.TextBox)_controls[f.Key]).Text, out _))
+                !TryParseFloat(((Wpf.Ui.Controls.TextBox)_controls[f.Key]).Text, out _))
             {
                 System.Windows.MessageBox.Show(this, $"'{StepTextsFa.Get(_stepType, f.Key, f.Label)}' باید عدد (می‌تواند اعشاری باشد) باشد.",
                     "مقدار نامعتبر", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -303,13 +304,23 @@ public partial class StepDialog : Window
                 FieldKind.Combo => (string?)((System.Windows.Controls.ComboBox)_controls[f.Key]).SelectedItem ?? "",
                 FieldKind.EditableCombo => ((System.Windows.Controls.ComboBox)_controls[f.Key]).Text.Trim(),
                 FieldKind.AudioDevice => (int)((System.Windows.Controls.ComboBoxItem)((System.Windows.Controls.ComboBox)_controls[f.Key]).SelectedItem).Tag!,   // v0.9.43
-                FieldKind.Float => double.Parse(((Wpf.Ui.Controls.TextBox)_controls[f.Key]).Text),
+                FieldKind.Float => ParseFloat(((Wpf.Ui.Controls.TextBox)_controls[f.Key]).Text),
                 _ => ((Wpf.Ui.Controls.TextBox)_controls[f.Key]).Text,
             };
         }
         Values = vals;
         DialogResult = true;
     }
+
+    // v0.9.60 — fractional fields accept both "0.5" (invariant) and the local decimal
+    // separator, regardless of the Windows display language.
+    private static bool TryParseFloat(string s, out double v)
+        => double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out v)
+           || double.TryParse(s, NumberStyles.Float, CultureInfo.CurrentCulture, out v);
+
+    private static double ParseFloat(string s)
+        => double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v
+           : double.Parse(s, NumberStyles.Float, CultureInfo.CurrentCulture);
 
     private static string PropAsString(object? v) => v switch
     {

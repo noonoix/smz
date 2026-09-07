@@ -91,7 +91,12 @@ public sealed class PythonBoardBridge : IBoardBridge
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
+            // v0.9.60 — read the bridge as UTF-8 (Persian log/error lines arrive intact;
+            // pairs with bridge.py's stdout reconfigure + ensure_ascii fallback)
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8,
         };
+        psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";   // v0.9.60 — python's own stderr prints too
         psi.ArgumentList.Add(_bridgeScript);
         psi.ArgumentList.Add("--pydir");
         psi.ArgumentList.Add(_pythonDir);

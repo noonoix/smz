@@ -18,7 +18,7 @@ namespace Ams.UI.Services;
 /// </summary>
 public static class PicoFirmwareExporter
 {
-    public const string BundleVersion = "0.9.58";   // UART arm moved to GP16/GP17 (wiring v6)
+    public const string BundleVersion = "0.9.60";   // v0.9.60 — hardened consolidation: optional sensor, byte buffer, arm pump, fixed keypad, Pico-only keyboard
 
     /// <summary>One calibrated screen state taken from a Wait For Light step.</summary>
     public sealed record LightState(string Name, int LuxLow, int LuxHigh, int StableMs, int TimeoutMs, int Mode, int KeyVk, string KeyName, bool Armed);
@@ -147,10 +147,11 @@ public static class PicoFirmwareExporter
             .Replace("__STATE_COUNT__", states.Count.ToString(CultureInfo.InvariantCulture))
             .Replace("__LOOP_MODE__", loopMode)
             .Replace("__LOOP_COUNT__", loopCount.ToString(CultureInfo.InvariantCulture))
-            .Replace("__LOOP_SECONDS__", loopSeconds.ToString(CultureInfo.InvariantCulture))
-            .Replace("__KBD_ON_ARM__", keyboardOnArm ? "True" : "False")
-            .Replace("__RUNSTOP_HOTKEY__", HotkeyTuple(runStopHotkey))
-            .Replace("__PAUSERESUME_HOTKEY__", HotkeyTuple(pauseResumeHotkey));
+            .Replace("__LOOP_SECONDS__", loopSeconds.ToString(CultureInfo.InvariantCulture));
+        // v0.9.60 — final hardware contract: the keyboard always runs on the Pico and the
+        // keypad is fixed (GP4 = Num Lock start/stop, GP3 = Scroll Lock pause/resume), so
+        // keyboardOnArm and the Options gestures no longer reach the firmware. The
+        // parameters stay for call-site compatibility.
 
     /// <summary>boot.py: enables the second USB serial so HID and the command channel coexist.</summary>
     public static string BuildBootPy() => BootTemplate;
@@ -168,11 +169,27 @@ public static class PicoFirmwareExporter
         # Classroom Studio v__VERSION__ - Raspberry Pi Pico light-sensor firmware (CircuitPython)
         # System: __MACHINE__   generated: __GENERATED__   calibrated states: __STATE_COUNT__
         # Sensor: BH1750 (GY-302 / GY-30) on I2C0 - SDA=GP20, SCL=GP21, ADDR->GND => 0x23
-        # Board roles (v0.9.39): the Pico is the executive brain - keyboard (USB HID) + light sensor.
-        # Mouse and the sound sensor belong to the Arduino Pro Micro, which the Pico drives as its
-        # arm over UART0: GP16 = TX -> Pro Micro RX, GP17 = RX <- Pro Micro TX, common GND, 115200 8N1.
-        # v0.9.56 - moved from GP0/GP1 to GP16 (pin 21) / GP17 (pin 22) to match wiring v6 (BSS138 LV1/LV2).
-        # v0.9.58 - keypad buttons: BTN1=GP2 (Num Lock = Run/Stop), BTN2=GP3 (Scroll Lock = Pause/Resume)
+        # Board roles: the Pico is the executive brain - keyboard (USB HID) + light sensor + macro
+        # engine. Mouse and the sound sensor belong to the Arduino Pro Micro, which the Pico drives
+        # as its arm over UART0: GP16 = TX -> Pro Micro RX, GP17 = RX <- Pro Micro TX, common GND,
+        # 115200 8N1.
+        #
+        # v0.9.60 - hardened consolidation (bench-proven as the 0.9.59h/k/m/n line):
+        #   * BH1750 OPTIONAL: the brain boots and answers PING even with the sensor unplugged;
+        #     WLUX/TRGLUX/LCAL then answer ERR|NOSENSOR and armed light states stay silent.
+        #   * Serial RX is a bounded BYTE buffer - no per-read string concat, no heap churn.
+        #   * The Pro Micro arm is pumped EVERY loop iteration: its EVT| lines stream to the PC
+        #     live and its small TX buffer can never fill up and wedge the arm.
+        #   * Mouse commands are fire-and-ack (forwarded to the arm, OK answered at once) so dense
+        #     human paths stay smooth; sound/SETRES still wait for the arm's real reply.
+        #   * The keyboard ALWAYS runs on this Pico: KBDPICO| and the legacy arm keyboard envelope
+        #     are both consumed locally - the arm never types.
+        #   * Fixed keypad: GP4->GND = Num Lock = Start/Stop, GP3->GND = Scroll Lock = Pause/Resume.
+        #     Both drive the standalone engine AND send the HID key to the PC.
+        #   * Safe default: boot never starts the macro. The standalone engine waits for GP4
+        #     (Num Lock) unless AUTOSTART below is explicitly True, and stays silent for 3 s after
+        #     the last host command so host-driven runs never double-fire the armed states.
+        #
         # Copy code.py + boot.py + pico-calibration.json onto CIRCUITPY and put the
         # adafruit_hid package into /lib. Full instructions: README-FLASH.md
 
@@ -192,23 +209,21 @@ public static class PicoFirmwareExporter
         CONT_HIRES = 0x10   # 1 lux, ~120 ms per sample (max 180 ms)
         CONT_LORES = 0x13   # 4 lux, ~16 ms per sample
 
-        # v0.9.44 - Play Options baked at export time: how often the armed standalone states run.
+        # Play Options baked at export time: how often the armed standalone states run.
         LOOP_MODE = "__LOOP_MODE__"      # once | times | timed | forever
         LOOP_COUNT = __LOOP_COUNT__      # passes for "times"
         LOOP_SECONDS = __LOOP_SECONDS__  # seconds for "timed"
 
-        # v0.9.44 - Options: when set, the Pro Micro arm executes the keyboard instead of this Pico.
-        KBD_ON_ARM = __KBD_ON_ARM__
-        # v0.9.58d — BTN1/BTN2 emit the exact gestures saved in Classroom Studio Options.
-        RUNSTOP_HOTKEY = __RUNSTOP_HOTKEY__
-        PAUSERESUME_HOTKEY = __PAUSERESUME_HOTKEY__
+        # v0.9.60 - safe default: copying/booting code.py NEVER starts the macro by itself.
+        # Set True only for a deliberate power-on-autorun scenario.
+        AUTOSTART = False
 
         SPECIAL_VK = {
             0x0D: Keycode.ENTER, 0x1B: Keycode.ESCAPE, 0x20: Keycode.SPACE, 0x09: Keycode.TAB,
             0x08: Keycode.BACKSPACE, 0x25: Keycode.LEFT_ARROW, 0x27: Keycode.RIGHT_ARROW,
             0x26: Keycode.UP_ARROW, 0x28: Keycode.DOWN_ARROW,
         }
-        # v0.9.44 - modifiers too, so KCOMBO shortcuts (Ctrl/Shift/Alt/Win + key) work on the Pico
+        # modifiers too, so KCOMBO shortcuts (Ctrl/Shift/Alt/Win + key) work on the Pico
         MOD_VK = {
             0xA0: Keycode.LEFT_SHIFT, 0xA1: Keycode.RIGHT_SHIFT,
             0xA2: Keycode.LEFT_CONTROL, 0xA3: Keycode.RIGHT_CONTROL,
@@ -225,7 +240,7 @@ public static class PicoFirmwareExporter
                 return getattr(Keycode, DIGITS[vk - 0x30])
             if 0x70 <= vk <= 0x7B:
                 return getattr(Keycode, "F" + str(vk - 0x6F))
-            return SPECIAL_VK.get(vk, MOD_VK.get(vk, Keycode.E))   # v0.9.44 - modifiers included
+            return SPECIAL_VK.get(vk, MOD_VK.get(vk, Keycode.E))   # modifiers included
 
 
         class Bh1750:
@@ -276,25 +291,37 @@ public static class PicoFirmwareExporter
                 return []
 
 
-        i2c = busio.I2C(board.GP21, board.GP20)   # SCL, SDA
-        sensor = Bh1750(i2c)
         kbd = Keyboard(usb_hid.devices)
         serial = usb_cdc.data if usb_cdc.data is not None else usb_cdc.console
         states = load_states()
         window = []
 
-        # Commands that are not the brain's own job: forwarded verbatim to the Pro Micro arm.
+        # v0.9.60 - the light sensor is OPTIONAL. A loose SDA/SCL wire must never kill the brain
+        # before its command loop (that was the silent boot death): without the sensor the light
+        # commands answer ERR|NOSENSOR and everything else keeps working.
+        try:
+            i2c = busio.I2C(board.GP21, board.GP20)   # SCL, SDA
+            sensor = Bh1750(i2c)
+        except Exception:
+            sensor = None
+
+        # Commands that are not the brain's own job: forwarded to the Pro Micro arm.
         ARM_PREFIXES = ("MMOVE", "MCLICK", "MWHEEL", "MDOWN", "MUP", "SETRES", "WSND", "TRGSND", "SCAL")
-        # v0.9.44 - keyboard commands: typed locally here, or forwarded to the arm when Options says so
+        # v0.9.60 - mouse goes fire-and-ack (smooth dense paths); the rest waits for the arm reply.
+        MOUSE_PREFIXES = ("MMOVE", "MCLICK", "MWHEEL", "MDOWN", "MUP")
+        # Keyboard commands: ALWAYS typed locally by this Pico (final contract).
         KBD_PREFIXES = ("KTEXT", "KCOMBO", "KDOWN", "KUP")
+
         try:
             arm = busio.UART(board.GP16, board.GP17, baudrate=115200, timeout=0.2)
         except Exception:
             arm = None
-        # v0.9.58 — hardware keypad (BTN1=GP2, BTN2=GP3, active-low to GND, 40ms debounce)
+
+        # v0.9.60 - fixed keypad (contract): GP4->GND = Num Lock = Start/Stop,
+        # GP3->GND = Scroll Lock = Pause/Resume. Active-low with pull-ups, edge-detected.
         try:
             import digitalio
-            btn1 = digitalio.DigitalInOut(board.GP2)
+            btn1 = digitalio.DigitalInOut(board.GP4)
             btn1.direction = digitalio.Direction.INPUT
             btn1.pull = digitalio.Pull.UP
             btn2 = digitalio.DigitalInOut(board.GP3)
@@ -306,21 +333,90 @@ public static class PicoFirmwareExporter
             btn1 = btn2 = None
             _last_btn1 = _last_btn2 = True
 
+        engine_on = AUTOSTART        # GP4 toggles this (Num Lock = Start/Stop)
+        engine_paused = False        # GP3 toggles this (Scroll Lock = Pause/Resume)
+        last_host_cmd = time.monotonic()
+
+
+        def _serial_write_line(text):
+            try:
+                serial.write((text + "\n").encode("utf-8"))
+            except Exception:
+                pass
+
+
+        _arm_buf = bytearray()
+
+
+        def pump_arm():
+            # v0.9.60 - permanent arm pump. Called on EVERY loop iteration (and inside every
+            # blocking wait) so the Pro Micro's small TX buffer can never fill up and wedge it.
+            Arm EVT| lines stream to the PC live; fire-acked mouse OKs are discarded; every
+            other reply is returned for a waiting forward_to_arm.
+            if arm is None:
+                return []
+            try:
+                n = arm.in_waiting
+                if n:
+                    _arm_buf.extend(arm.read(n))
+                    if len(_arm_buf) > 1024:              # runaway-garbage guard
+                        del _arm_buf[:-256]
+            except Exception:
+                return []
+            ready = []
+            while True:
+                nl = _arm_buf.find(b"\n")
+                if nl < 0:
+                    break
+                raw = bytes(_arm_buf[:nl])
+                del _arm_buf[:nl + 1]
+                line = raw.decode("utf-8", "replace").strip()
+                if not line:
+                    continue
+                if line.startswith("EVT|"):
+                    _serial_write_line(line)              # arm events reach the PC live
+                    continue
+                parts = line.split("|")
+                if len(parts) > 1 and parts[0] == "OK" and parts[1] in MOUSE_PREFIXES:
+                    continue                              # the PC already got its fire-and-ack
+                ready.append(line)
+            return ready
+
+
+        def _arm_write(line):
+            if arm is None:
+                return False
+            try:
+                arm.write((line + "\n").encode("utf-8"))
+                return True
+            except Exception:
+                return False
+
+
+        def forward_fast(line):
+            # v0.9.60 - mouse fast path: forward to the arm and answer the PC at once; the
+            # pump later collects and discards the arm's own OK.
+            head = line.split("|")[0]
+            if not _arm_write(line):
+                return "ERR|NOARM|" + head
+            return "OK|" + head
+
 
         def forward_to_arm(line, timeout_s):
-            if arm is None:
-                return "ERR|NOARM|" + line.split("|")[0]
-            arm.write((line + "\n").encode("utf-8"))
+            # Blocking forward for commands whose reply the PC needs (sound, SETRES, HALT/BYE).
+            # Keeps pumping while waiting so arm EVT| lines still stream to the PC.
+            head = line.split("|")[0]
+            if not _arm_write(line):
+                return "ERR|NOARM|" + head
             end = time.monotonic() + timeout_s
-            pending = ""
             while time.monotonic() < end:
-                chunk = arm.read(64)
-                if chunk:
-                    pending += chunk.decode("utf-8")
-                    if "\n" in pending:
-                        return pending.split("\n")[0].strip()
+                for reply in pump_arm():
+                    # commands are strictly serialized and mouse OKs are already filtered:
+                    # the first non-mouse OK/ERR we see belongs to this command.
+                    if reply.split("|")[0] in ("OK", "ERR"):
+                        return reply
                 time.sleep(0.005)
-            return "ERR|TIMEOUT|" + line.split("|")[0]
+            return "ERR|TIMEOUT|" + head
 
 
         def sample():
@@ -337,47 +433,34 @@ public static class PicoFirmwareExporter
             kbd.release(code)
 
 
-        # Win32 VK -> USB HID usage. This covers every key Options currently accepts.
-        HOTKEY_VK_TO_HID = {
-            0x08: 0x2A, 0x09: 0x2B, 0x0C: 0x9C, 0x0D: 0x28,
-            0x13: 0x48, 0x14: 0x39, 0x1B: 0x29, 0x20: 0x2C,
-            0x21: 0x4B, 0x22: 0x4E, 0x23: 0x4D, 0x24: 0x4A,
-            0x25: 0x50, 0x26: 0x52, 0x27: 0x4F, 0x28: 0x51,
-            0x2C: 0x46, 0x2D: 0x49, 0x2E: 0x4C, 0x5B: 0xE3,
-            0x5C: 0xE7, 0x6A: 0x55, 0x6B: 0x57, 0x6D: 0x56,
-            0x6E: 0x63, 0x6F: 0x54, 0x91: 0x47,
-            0xA0: 0xE1, 0xA1: 0xE5, 0xA2: 0xE0, 0xA3: 0xE4,
-            0xA4: 0xE2, 0xA5: 0xE6,
-            0xBB: 0x2E, 0xBC: 0x36, 0xBD: 0x2D, 0xBE: 0x37,
-            0xBF: 0x38, 0xC0: 0x35, 0xDB: 0x2F, 0xDC: 0x31,
-            0xDD: 0x30, 0xDE: 0x34,
-        }
-
-        def hotkey_hid(vk):
-            if 0x41 <= vk <= 0x5A:
-                return 0x04 + vk - 0x41
-            if 0x31 <= vk <= 0x39:
-                return 0x1E + vk - 0x31
-            if vk == 0x30:
-                return 0x27
-            if 0x70 <= vk <= 0x7B:
-                return 0x3A + vk - 0x70
-            if 0x7C <= vk <= 0x87:
-                return 0x68 + vk - 0x7C
-            if 0x60 <= vk <= 0x69:
-                return 0x62 if vk == 0x60 else 0x59 + vk - 0x61
-            return HOTKEY_VK_TO_HID.get(vk)
-
-        def send_hotkey(vks):
-            codes = [hotkey_hid(vk) for vk in vks]
-            codes = [code for code in codes if code is not None]
-            if not codes:
-                return
-            for code in codes:
+        def tap_key(code):
+            # v0.9.60 - one fixed keypad tap (Num Lock / Scroll Lock) towards the PC.
+            try:
                 kbd.press(code)
-            time.sleep(0.04)
-            for code in reversed(codes):
+                time.sleep(0.04)
                 kbd.release(code)
+            except Exception:
+                pass
+
+
+        def poll_keypad():
+            # v0.9.60 - fixed mapping, independent of the app's Options: GP4 toggles the
+            # standalone engine (and sends Num Lock), GP3 toggles pause (and sends Scroll Lock).
+            global engine_on, engine_paused, _last_btn1, _last_btn2
+            if btn1 is None:
+                return
+            b1 = not btn1.value
+            b2 = not btn2.value
+            if b1 and not _last_btn1:
+                engine_on = not engine_on
+                if not engine_on:
+                    engine_paused = False
+                tap_key(Keycode.KEYPAD_NUMLOCK)
+            if b2 and not _last_btn2:
+                engine_paused = not engine_paused
+                tap_key(Keycode.SCROLL_LOCK)
+            _last_btn1 = b1
+            _last_btn2 = b2
 
 
         def wait_range(lo, hi, stable_ms, timeout_ms, mode):
@@ -385,6 +468,7 @@ public static class PicoFirmwareExporter
             deadline = time.monotonic() + timeout_ms / 1000
             inside_since = None
             while time.monotonic() < deadline:
+                pump_arm()                            # v0.9.60 - the arm is drained even mid-wait
                 value = sample()
                 if lo <= value <= hi:
                     if inside_since is None:
@@ -408,7 +492,7 @@ public static class PicoFirmwareExporter
 
 
         def handle_keyboard(line, head):
-            # v0.9.44 - local keyboard execution (when the arm does NOT own the keyboard)
+            # The Pico owns the keyboard (final contract) - always local execution.
             if head == "KDOWN":
                 kbd.press(keycode_for_vk(int(line.split("|")[1])))
                 return "OK|KDOWN"
@@ -436,7 +520,7 @@ public static class PicoFirmwareExporter
                     kbd.release(c)
                 return "OK|KCOMBO"
             if head == "KTEXT":
-                # KTEXT|hmin,hmax,text - ASCII only (the firmware 1.6 rule), per-key random delay
+                # KTEXT|hmin,hmax,text - ASCII only, per-key random delay
                 parts = line.split("|", 1)[1].split(",", 2)
                 try:
                     hmin, hmax = int(parts[0]), int(parts[1])
@@ -458,11 +542,14 @@ public static class PicoFirmwareExporter
             if line == "PING":
                 return "OK|PONG|pico-light __VERSION__|role=brain+keyboard+light|arm=promicro"
             if line.startswith("LCAL|"):
+                if sensor is None:
+                    return "ERR|NOSENSOR|LCAL"
                 ms = ints(line.split("|")[1].split(","), 1, 2000)[0] or 2000
                 sensor.set_mode(CONT_HIRES)
                 end = time.monotonic() + ms / 1000
                 readings = []
                 while time.monotonic() < end:
+                    pump_arm()                        # v0.9.60 - the arm is drained even mid-calibration
                     readings.append(sensor.lux())
                     time.sleep(0.02)
                 if not readings:
@@ -472,12 +559,16 @@ public static class PicoFirmwareExporter
                 avg = int(sum(readings) / len(readings))
                 return "OK|LCAL|min=%d|max=%d|avg=%d" % (lo, hi, avg)
             if line.startswith("WLUX|"):
+                if sensor is None:
+                    return "ERR|NOSENSOR|WLUX"
                 a = ints(line.split("|")[1].split(","), 5)
                 got = wait_range(a[0], a[1], a[2] or 2000, a[3] or 20000, a[4])
                 if got is None:
                     return "ERR|TIMEOUT|WLUX"
                 return "OK|WLUX|lux=%d" % int(got)
             if line.startswith("TRGLUX|"):
+                if sensor is None:
+                    return "ERR|NOSENSOR|TRGLUX"
                 a = ints(line.split("|")[1].split(","), 10)
                 got = wait_range(a[0], a[1], a[2] or 2000, a[3] or 20000, a[4])
                 if got is None:
@@ -489,30 +580,19 @@ public static class PicoFirmwareExporter
                 if arm is not None:
                     forward_to_arm(line, 2)          # stop the arm too
                 return "OK|" + line
-            # v0.9.46 - a keyboard step may override the global Options rule for THIS command.
-            # The envelope is consumed by the Pico brain and never forwarded to firmware 1.6.
-            forced_keyboard_arm = None
+            # v0.9.60 - final contract: the Pico ALWAYS owns the keyboard. Both envelopes are
+            # consumed locally; the legacy arm envelope is accepted for backward compatibility
+            # but is never forwarded (the Pro Micro never types).
             if line.startswith("KBDPICO|"):
-                forced_keyboard_arm = False
                 line = line.split("|", 1)[1]
             elif line.startswith("KBDARM|"):
-                forced_keyboard_arm = True
                 line = line.split("|", 1)[1]
             head = line.split("|")[0]
             if head in KBD_PREFIXES:
-                keyboard_on_arm = KBD_ON_ARM if forced_keyboard_arm is None else forced_keyboard_arm
-                if not keyboard_on_arm:
-                    return handle_keyboard(line, head)
-                tmo = 5
-                if head == "KTEXT":
-                    try:
-                        _p = line.split("|", 1)[1].split(",", 2)
-                        tmo = max(5.0, float(_p[1]) * len(_p[2]) / 1000 + 5)
-                    except Exception:
-                        tmo = 30
-                return forward_to_arm(line, tmo)
+                return handle_keyboard(line, head)
+            if head in MOUSE_PREFIXES:
+                return forward_fast(line)
             if head in ARM_PREFIXES:
-                # brain -> arm: mouse and sound always belong to the Pro Micro
                 tmo = 30 if head in ("WSND", "TRGSND", "SCAL") else 5
                 return forward_to_arm(line, tmo)
             return "ERR|UNKNOWN|" + line
@@ -520,6 +600,8 @@ public static class PicoFirmwareExporter
 
         def standalone_pass():
             # No host command pending: run the armed states of this system in order.
+            if sensor is None:
+                return                                # v0.9.60 - light states stay silent without a sensor
             for st in states:
                 if not st.get("armed"):
                     continue
@@ -531,43 +613,54 @@ public static class PicoFirmwareExporter
 
 
         def loop_due():
-            # v0.9.44 - Play Options baked at export: how often the armed states run standalone
+            # Play Options baked at export: how often the armed states run standalone
             if LOOP_MODE == "once":
                 return passes == 0
             if LOOP_MODE == "times":
                 return passes < LOOP_COUNT
             if LOOP_MODE == "timed":
                 return time.monotonic() - started < LOOP_SECONDS
-            return True                      # forever - the pre-v0.9.44 behavior
+            return True                      # forever
 
 
-        buffer = ""
+        buffer = bytearray()               # v0.9.60 - bounded byte buffer, not string concat
         passes = 0
         started = time.monotonic()
         while True:
-            if serial is not None and serial.in_waiting:
-                buffer += serial.read(serial.in_waiting).decode("utf-8")
-                while "\n" in buffer:
-                    line, buffer = buffer.split("\n", 1)
-                    line = line.strip()
-                    if not line:
-                        continue
-                    serial.write((handle(line) + "\n").encode("utf-8"))
-            else:
-                if states and loop_due():
-                    standalone_pass()
-                    passes += 1
-                # v0.9.58 — hardware keypad poll (BTN1=GP2→NumLock, BTN2=GP3→ScrollLock, 40ms debounce)
-                if btn1 is not None:
-                    b1 = not btn1.value
-                    b2 = not btn2.value
-                    if b1 and not _last_btn1:
-                        send_hotkey(RUNSTOP_HOTKEY)
-                    if b2 and not _last_btn2:
-                        send_hotkey(PAUSERESUME_HOTKEY)
-                    _last_btn1 = b1
-                    _last_btn2 = b2
-                time.sleep(0.05)
+            try:
+                pump_arm()                            # v0.9.60 - the arm is drained EVERY iteration
+                if serial is not None and serial.in_waiting:
+                    buffer.extend(serial.read(serial.in_waiting))
+                    if len(buffer) > 4096:            # runaway guard: keep the newest 1 KB
+                        del buffer[:-1024]
+                    while True:
+                        nl = buffer.find(b"\n")
+                        if nl < 0:
+                            break
+                        raw = bytes(buffer[:nl])
+                        del buffer[:nl + 1]
+                        line = raw.decode("utf-8", "replace").strip()
+                        if not line:
+                            continue
+                        last_host_cmd = time.monotonic()
+                        try:
+                            _serial_write_line(handle(line))
+                        except Exception:
+                            _serial_write_line("ERR|EXC|" + line.split("|")[0])
+                else:
+                    poll_keypad()
+                    host_quiet = time.monotonic() - last_host_cmd >= 3   # no double-fire after host runs
+                    if engine_on and not engine_paused and host_quiet and states and loop_due():
+                        standalone_pass()
+                        passes += 1
+                    time.sleep(0.02)
+            except Exception:
+                # v0.9.60 - never-die: a bad line or a transient USB hiccup must never kill
+                # code.py. (KeyboardInterrupt/Ctrl+C still stops it - it is not an Exception.)
+                try:
+                    time.sleep(0.05)
+                except Exception:
+                    pass
         """;
 
     /// <summary>Per-system flashing + calibration instructions (Persian, like the other docs).</summary>
@@ -579,7 +672,7 @@ public static class PicoFirmwareExporter
         sb.AppendLine();
         sb.AppendLine("Classroom Studio v" + BundleVersion + " - " + DateTime.Now.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture));
         sb.AppendLine();
-        sb.AppendLine("Play Options baked in (v0.9.44): loop=" + loopMode + (loopMode == "times" ? " x" + loopCount : loopMode == "timed" ? " " + loopSeconds + "s" : "") + " | keyboard=" + (keyboardOnArm ? "Pro Micro (arm)" : "Pico (brain)"));   // v0.9.44
+        sb.AppendLine("Play Options baked in: loop=" + loopMode + (loopMode == "times" ? " x" + loopCount : loopMode == "timed" ? " " + loopSeconds + "s" : "") + " | keyboard=Pico (fixed v0.9.60 contract) | keypad GP4=NumLock start/stop, GP3=ScrollLock pause/resume | AUTOSTART=False");
         sb.AppendLine();
         sb.AppendLine("\u0627\u06cc\u0646 \u062e\u0631\u0648\u062c\u06cc \u0645\u062e\u0635\u0648\u0635 \u0647\u0645\u06cc\u0646 \u0633\u06cc\u0633\u062a\u0645 \u0627\u0633\u062a\u061b \u0645\u0642\u062f\u0627\u0631 \u0644\u0648\u06a9\u0633 \u062f\u0631 \u0647\u0631 \u0645\u0627\u0646\u06cc\u062a\u0648\u0631 \u0648 \u0647\u0631 \u0627\u062a\u0627\u0642 \u0645\u062a\u0641\u0627\u0648\u062a \u0627\u0633\u062a\u060c \u067e\u0633 \u062f\u0631 \u0647\u0631 \u0633\u06cc\u0633\u062a\u0645 \u06cc\u06a9\u200c\u0628\u0627\u0631 \u0627\u06cc\u0646 \u062e\u0631\u0648\u062c\u06cc \u0631\u0627 \u0628\u0633\u0627\u0632 \u0648 \u0631\u0648\u06cc \u0628\u0631\u062f \u0628\u0631\u06cc\u0632.");
         sb.AppendLine();
@@ -622,6 +715,8 @@ public static class PicoFirmwareExporter
         sb.AppendLine("- `WLUX|luxLow,luxHigh,stableMs,timeoutMs,mode` -> `OK|WLUX|lux=..` \u06cc\u0627 `ERR|TIMEOUT|WLUX`");
         sb.AppendLine("- `TRGLUX|luxLow,luxHigh,stableMs,timeoutMs,mode,vk,reactMin,reactMax,holdMin,holdMax` -> `EVT|TRGLUX|...` (\u06a9\u0644\u06cc\u062f \u0631\u0627 \u062e\u0648\u062f \u0628\u0631\u062f \u0645\u06cc\u200c\u0632\u0646\u062f)");
         sb.AppendLine("- `HALT` / `BYE` -> `OK|...`");
+        sb.AppendLine("- v0.9.60: without the BH1750 wired, WLUX/TRGLUX/LCAL answer `ERR|NOSENSOR|...` and the brain stays alive (keyboard + arm keep working)");
+        sb.AppendLine("- v0.9.60: mouse commands are fire-and-ack for smooth dense paths; arm events (EVT|) stream to the PC live");
         return sb.ToString();
     }
 

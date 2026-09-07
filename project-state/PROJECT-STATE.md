@@ -1,117 +1,61 @@
-# Classroom Studio — تصویر کلی پروژه (PROJECT STATE)
+# Classroom Studio — وضعیت زنده‌ی پروژه
 
-> **این فایل مرجع زنده‌ی پروژه است. قانون: بعد از هر تغییر مهم، Notion AI این فایل را در همین ریپو به‌روز می‌کند.**
-> در جلسه‌ی جدید با Notion AI کافی است بگویید: «از ریپوی pedrampedi81-dotcom/smc فایل project-state/PROJECT-STATE.md را بخوان» تا تصویر کلی برگردد.
-> آخرین به‌روزرسانی: 2026-09-07 (به‌روزرسانی سوم) · نسخه‌ی در کار: **v0.9.58**
+> این سند، منبع حقیقت جاری پروژه است. بعد از هر نسخه به‌روز می‌شود.
+> برگه‌ی Notion («Classroom Studio — پروژه ۲») تاریخچه‌ی کامل جلسات را دارد؛ این فایل وضعیت لحظه‌ای است.
 
----
+## وضعیت لحظه‌ای — ۲۰۲۶-۰۹-۰۸ (به‌روزرسانی چهارم)
 
-## ۱) پروژه چیست
+**مبنای فعلی: `main` @ v0.9.60 — CI سبز (`ci-16`: ۶۷۶ پاس / ۰ فیل) + پچ تجمیع v0.9.60**
 
-**Classroom Studio** — اپ WPF (net8.0-windows، WPF-UI) برای اتوماسیون کلاس/امتحان: ساخت سناریوهای مرحله‌ای (موس، کیبورد، تصویر، صدا، نور) و اجرایشان روی سخت‌افزار.
+- ریپو: `pedrampedi81-dotcom/smc` (private) · هر push سبز ← Release خودکار (زیپ + sha256 + لاگ) · هر قرمز ← Issue با خطوط FAIL
+- آخرین Release قبل از این نسخه: **ci-16** (676/0) روی commit `a004df45` (دکمه‌ی کپی لاگ)
+- آخرین نسخه‌ی منسوج: **v0.9.60 — firmware consolidation + transport hardening**
 
-معماری سه‌لایه:
-1. **اپ دسکتاپ** `ClassroomStudio.exe` (سورس: `ams-shell/src/Ams.UI/`، تست‌ها: `tests/TestRunner.cs`)
-2. **پل پایتون** `bridge/bridge.py` + `ams_serial.py` + `ams_crypto.py` (کانال رمزنگاری‌شده AES-128، قاب E|n|hex، PSK از ams_key.json یا env AMS_PSK)
-3. **بردها**: Raspberry Pi Pico = مغز (کیبورد HID + سنسور نور BH1750 + هاب فرمان) · Arduino Pro Micro = بازو (موس + صدا) — Pico از طریق UART به Pro Micro فرمان پاس می‌دهد
+## v0.9.60 چه چیزی را یکجا می‌کند
 
-## ۲) وضعیت لحظه‌ای (2026-09-07 — به‌روزرسانی سوم)
+قرارداد نهایی سخت‌افزار (مصوب ۰۰:۱۷ بامداد ۰۹-۰۸) که قبلاً فقط به‌صورت فایل standalone دست‌آزمایی شده بود (0.9.59h/k/m/n)، حالا وارد سورس و ژنراتور شد:
 
-- **🎉 ران #10 سبز شد — اولین Release ساخته شد** (تگ `ci-10`): **673 passed / 0 failed** روی رانر · `Classroom-Studio-release.zip` (~3.2MB) + `sha256.txt` + `ci-test-output.txt` در Release ضمیمه‌اند · هر ۹ ایشوی قدیمی «CI failed» بسته شدند
-- **زنجیره‌ی فیکس‌ها (همین جلسه):** پچ v0.9.58b (Notion AI ← Claude Code؛ کامیت 14f9484): خطای کامپایل نگهبان مِتا + شمردن نسخه‌های داخل داده‌ی تست + اسکیپ CI-safe دارون → تست محلی 689/0 · CI v5.2 (پوش مستقیم Notion AI، کامیت a8831177): باگ مسیر `--project tests/TestRunner` + لاگ بدون stderr + پاک‌سازی bin/obj کامیت‌شده + paths-ignore برای سندها · پچ v0.9.58c (کامیت 00a8ef8): سقف‌های زمانی wall-clock روی CI تشخیصی شدند (کف‌ها و MaxInFlight سخت ماندند) + ایشوهای قرمز خطوط FAIL/SKIP را نشان می‌دهند → **ران #10 سبز**
-- اختلاف تعداد تست‌ها طبیعی و طراحی‌شده است: 689 روی ماشین توسعه (دارون هست) · 685 روی ماشین دوم · 673 روی CI (گام‌های دارون SKIP چاپ می‌کنند، اسرت نمی‌زنند)
-- **معمای «no test log» ران‌های ۶–۸:** قدم تست به‌جای `tests/TestRunner.csproj` مسیر ناموجود `tests/TestRunner` را می‌داد و MSBuild روی STDERR می‌مرد در حالی که Tee فقط STDOUT را می‌گرفت — با v5.2 حل شد
+1. **فرم‌ور پیکو (`PicoFirmwareExporter.CodeTemplate`)** — بازنویسی hardened:
+   - سنسور BH1750 **اختیاری** است؛ بدون سنسور بوت و `PING` کار می‌کند و `WLUX`/`TRGLUX`/`LCAL` ← `ERR|NOSENSOR` (رفع مرگ خاموش بوت با سیم شل‌شده)
+   - بافر سریال **بایتی و کران‌دار** به‌جای الحاق رشته‌ای (رفع خردشدن heap و MemoryError)
+   - **پمپ دائمی بازو** در هر تکرار حلقه و داخل انتظارها: EVTهای پرو میکرو زنده به PC می‌رسند و بافر TX کوچک بازو هرگز پر نمی‌شود (رفع زنجیره‌ی مرگ ۲۲:۲۲)
+   - فرمان‌های موس **fire-and-ack** (فوروارد + پاسخ فوری) تا مسیرهای متراکم انسانی نرم بمانند؛ صدا/SETRES همچنان پاسخ واقعی بازو را منتظر می‌مانند
+   - **کیبورد همیشه روی پیکو**: هر دو envelope ‏`KBDPICO|` و `KBDARM|` محلی مصرف می‌شوند؛ پرو میکرو هرگز تایپ نمی‌کند
+   - **کیپد ثابت** مستقل از Options: ‏GP4→GND = Num Lock = Start/Stop · ‏GP3→GND = Scroll Lock = Pause/Resume (هم موتور standalone و هم HID به PC)
+   - `AUTOSTART = False` پیش‌فرض: کپی/بوت code.py ماکرو را خودکار شروع نمی‌کند؛ موتور standalone تا ۳ ثانیه بعد از آخرین فرمان host ساکت است (ضد اجرای دوبل)
+   - نگهبان **never-die** دور هر خط و کل حلقه (Ctrl+C همچنان کار می‌کند — Exception نیست)
+2. **bridge.py** — خروجی never-die با UTF-8 اجباری (`reconfigure(encoding="utf-8", errors="replace")`) + فالبک `ensure_ascii=True` در emit؛ رفع کرش cp1252 هنگام **گزارش** خطا که خطای واقعی را پنهان می‌کرد
+3. **PythonBoardBridge.cs** — `StandardOutputEncoding`/`StandardErrorEncoding = UTF-8` + `PYTHONIOENCODING=utf-8`؛ لاگ فارسی دیگر mojibake نیست
+4. **UI** — `SelectionMode="Extended"` برای لاگ سریال (کپی خطوط انتخاب‌شده با Ctrl/Shift واقعاً کار می‌کند)
+5. **stableSec اعشاری end-to-end** — `0.5` → ‏`WLUX|...,500,...` · خلاصه‌ی ردیف `0.5s` را نشان می‌دهد (نه int گردشده) · پارس دیالوگ مستقل از locale ویندوز (InvariantCulture + فالبک محلی)
 
-## ۳) ریپو و چرخه‌ی CI
+نسخه‌ها: csproj + بنر + `BundleVersion` = **0.9.60** · نگهبان مِتای TestRunner: `curMinor = 60` · گام ۵۸ تست با ۱۵ assertion تازه
 
-- ریپو: `github.com/pedrampedi81-dotcom/smc` (private)
-- هر push به `main` → بیلد Release + py_compile پشته‌ی bridge + چک import + TestRunner
-- **سبز → Release با `Classroom-Studio-release.zip` + sha256 + لاگ تست · قرمز → Issue با نام قدم شکست‌خورده + خطوط FAIL/SKIP**
-- پوش‌های فقط-سندی (`project-state/**` و `**.md`) دیگر CI را اجرا نمی‌کنند (paths-ignore)
-- قانون طلایی: **publish فقط با `0 failed`** — بدون استثنا
-- نقشه‌ی کار: Claude Code فقط کد می‌نویسد و push می‌کند؛ Notion AI نتیجه را می‌خواند، بازرسی می‌کند، و برای باگ‌های کوچک مستقیم پچ push می‌کند
-- ⚠️ ران‌ها را در تب Actions دستی Cancel نکنید — گزارش‌دهی issue را قاتی می‌کند
+## معماری بردها (قرارداد قطعی)
 
-## ۴) سخت‌افزار — نقشه‌ی سیم‌کشی v6 (مرجع)
+| برد | نقش | پین‌ها |
+| --- | --- | --- |
+| Raspberry Pi Pico | مغز: کیبورد HID + سنسور نور BH1750 + موتور ماکرو standalone | UART0: GP16=TX ← GP17=RX (BSS138) · I2C: SDA=GP20 / SCL=GP21 (0x23) · کیپد: GP4=Start/Stop · GP3=Pause/Resume |
+| Arduino Pro Micro (fw 1.7) | بازو: فقط موس + سنسور صدا | A0 = سنسور صدا · رم ۸۸٪ / فلش ۸۱٪ — فلش ISP با `isp_flash_app.py` انجام شد |
 
-| سیگنال | Pico | از طریق | مقصد |
-|---|---|---|---|
-| UART TX | GP16 (پین 21) | BSS138 LV1/HV1 | Pro Micro D0/RXI (پین 23) |
-| UART RX | GP17 (پین 22) | BSS138 LV2/HV2 | Pro Micro D1/TXO (پین 24) |
-| I2C SDA | GP20 (پین 26) | مستقیم | BH1750 SDA |
-| I2C SCL | GP21 (پین 27) | مستقیم | BH1750 SCL |
-| 3V3 | پین 36 | — | LV شیفتر + VCC سنسور |
-| GND | پین 23/38 | — | مشترک همه‌جا |
-| BTN1 (key1 کیپد) | GP2 | خازن 100nF | GND (کامن کیپد) |
-| BTN2 (key2 کیپد) | GP3 | خازن 100nF | GND |
-| key3/key4 | GP4/GP5 | — | رزرو |
-| صدا (TIP جک) | — | 10µF + بایاس 10k/10k + 1k | Pro Micro A0/PF7 (پین 8) |
+- مسیر عملیاتی همیشه از پیکو می‌گذرد؛ اتصال مستقیم USB به بازو فقط برای سرویس/تشخیص است
+- `PING` روی پیکو: `OK|PONG|pico-light 0.9.60|role=brain+keyboard+light|arm=promicro`
+- پل bridge اول مغز پیکو را پروب می‌کند (متن‌باز، بدون ams_key.json)؛ نبود ← BoardLink رمزشده برای اتصال مستقیم به بازو
 
-- شیفتر: BSS138 چهارکاناله، LV=3.3V / HV=5V · Pro Micro: VCC=5V، RAW=NC
-- دو کابل USB: Pico و Pro Micro جداگانه به سیستم
-- پورت‌ها روی سیستم اصلی: **COM17 = Pro Micro** (04D8:000B) · **COM3 = کنسول Pico · COM5 = data پیکو** (برنامه باید به data وصل شود؛ bridge با PING خودش پیدایش می‌کند)
-- BH1750: ADDR→GND یعنی آدرس 0x23
+## CI/CD
 
-## ۵) پروتکل سریال (خطی، 115200 8N1)
+- ورک‌فلو v5.2: `py_compile` روی bridge.py + تست رفتاری `tools/test_bridge_pico.py` + build جداگانه‌ی TestRunner + تست‌ها با خروجی کامل (`2>&1`) · فقط ۰ فیل Release می‌سازد · push فقط-مستنداتی نادیده گرفته می‌شود
+- دارون‌وابسته‌ها روی CI تمیز SKIP می‌شوند (طراحی‌شده)
 
-- `PING` → `OK|PONG|pico-light <ver>|role=brain+keyboard+light|arm=promicro`
-- `LCAL|ms` → `OK|LCAL|min=..|max=..|avg=..` (دکمه‌ی Calibrate)
-- `WLUX|lo,hi,stableMs,timeoutMs,mode` → `OK|WLUX|lux=..` یا `ERR|TIMEOUT|WLUX`
-- `TRGLUX|...` → `EVT|TRGLUX|...` (کلید را خود برد می‌زند)
-- `WSND|thr,minMs,timeout` / `TRGSND|...` (روی Pro Micro)
-- `MMOVE|x,y,abs,human` · `MWHEEL|delta` · `MCLICK|...` · `HALT` / `BYE`
-- پیشوندهای پاس‌به‌بازو: MMOVE MCLICK MWHEEL MDOWN MUP SETRES WSND TRGSND SCAL
+## قدم بعدی
 
-## ۶) فرم‌ور پیکو (خروجی File → Export Pico Firmware)
+1. **تست سخت‌افزار v0.9.60:** Export Pico Firmware از اپ buildشده ← کپی روی CIRCUITPY ← `PING` باید `pico-light 0.9.60` بدهد ← تست موس از مسیر پیکو←بازو (باید نرم بماند — پمپ دائمی) ← تست کیپد GP4/GP3 ← تست بوت بدون سنسور
+2. تست صدا: یک‌بار سکوت + یک‌بار صدای بلند Calibrate ← «کپی کل لاگ» ← تفکیک ۱۱–۱۲
+3. بکلاگ: ایمپورتر AMK (دارون۱) · موارد بصری v0.9.46–52 · کاندیدای fw 1.8 بازو: رهاکردن پاسخ Serial1 وقتی TX پر است
 
-- چهار فایل روی درایو `CIRCUITPY`: `code.py` + `boot.py` + `pico-calibration.json` + `README-FLASH.md` و پوشه‌ی `lib/adafruit_hid`
-- CircuitPython 10.3.0 روی برد کاربر نصب است
-- **نام فایل حتماً باید `code.py` باشد** (داستان copy.py — CircuitPython فقط code.py/code.txt را اجرا می‌کند)
-- `boot.py` دو سریال می‌سازد: console (REPL/خطاها) + data (پروتکل) — دو COM دیدن یعنی سالم است
-- `lux-test-v2.py` (در همین پوشه‌ی project-state) = تست مستقل سنسور با کیپد: key1=توقف، key2=مکث/ادامه
-- توقف صحیح اسکریپت: جدا/وصل کردن برد یا Ctrl+C در کنسول — نه حذف فایل وسط اجرا
+## قواعد ثابت (خلاصه)
 
-## ۷) پروفایل نور اندازه‌گیری‌شده (اتاق کاربر، PC-13458)
-
-- محیط: 55–59 لوکس · روشن کامل (فلش/تست): پیک ۴۰۳۶ · پوشیده: ۲–۶ · jitter میان‌رده ۳۰–۹۵ (نشت نور اتاق → کلاهک تاریک لازم)
-- وضعیت‌های پیشنهادی: روشن مرکز ۴۰۰۰ تلورانس ۱۵۰۰ · تاریک مرکز ۵ تلورانس ۲۰ · dead zone ≥ ۵۰ لوکس
-- بازه‌ی پیش‌فرض ۱۲۰۰–۱۳۰۰ با این اتاق نمی‌خواند — همیشه Calibrate زنده بزنید
-
-## ۸) کیپد (تصمیم نهایی کاربر)
-
-- کیپد فلت ۱×۴ (۵ سیم: کامن + ۴ کلید) — کامن→GND، key1→GP2، key2→GP3، key3/4→GP4/GP5
-- **نگاشت نهایی: key1 → Num Lock = اجرا/توقف · key2 → Scroll Lock = مکث/ادامه**
-- فرم‌ور: digitalio + Pull.UP + دیبانس ۴۰ms، لبه‌ی فشردن، پول حتی داخل حلقه‌ی WLUX
-- اپ: GlobalHotkeyService علاوه بر هات‌کی‌های کاربر همیشه 0x90/0x91 را هم ثبت می‌کند؛ Options پیش‌فرض Num Lock/Scroll Lock (قابل تغییر)
-- پیاده‌سازی در DLL v0.9.58 تأیید شد (NUM_LOCK/SCROLL_LOCK/GP2/GP3 هست) و assertionهایش در TestRunner سبزند (روی CI هم)
-
-## ۹) اقلام باز (به ترتیب اولویت)
-
-1. ~~فیکس‌لیست v0.9.58~~ ✅ انجام شد — با پچ مستقیم v0.9.58b (سند CLAUDE-IMPLEMENT-v0.9.58.md تاریخی شد)
-2. ~~نتیجه‌ی ران CI~~ ✅ **ران #10 سبز — اولین Release (ci-10) ساخته شد** و ۹ ایشوی قدیمی بسته شدند
-3. روی سخت‌افزار: هود تاریک → Connect به پورت data پیکو → Calibrate → `test-light-sensor.amsj` → `test-board-v6.amsj` (تست ۲ «arm keyboard ok» تعیین‌کننده‌ی مسیر UART است)
-4. تست دستی روی ویندوز: auto-fill ۲۰ کیبورد، پنل تنظیمات داخلی، next/else چسبیده به رگ، tooltip زیر آیکون
-5. بکلاگ: ایمپورتر AMK (daroon1)، موارد بصری v0.9.46-52، زیرصفحه‌ی pin-dictionary v3→v5
-
-## ۱۰) قوانین طلایی (از درس‌های این جلسه)
-
-- **هیچ release با تست قرمز منتشر نمی‌شود** — هزینه‌اش را دیدیم
-- پین‌های نسخه در TestRunner هر ریلیز بامپ می‌شوند + تست مِتا جلوی فراموشی را می‌گیرد
-- bridge.py: py_compile + import-check در CI، چون NameError را کامپایلر نمی‌گیرد
-- رشته‌ی C# حاوی بک‌اسلش حتماً verbatim (`@"…"`)
-- سایه‌زدن `e` در foreach کنار RoutedEventArgs ممنوع
-- مسیرها همیشه نسبت به exe؛ تنظیماتِ ناموجود → خودکار AUTO/پیش‌فرض (self-healing)
-- اسکریپت‌های بزرگ با heredoc و بعد `ls -la` تأیید
-- پاکسازی تاریخچه COM فقط برای خانواده‌های مجاز و با بکاپ
-- CI: مسیر `--project` باید خودِ فایل csproj باشد و stderr حتماً با `2>&1` وارد لاگ شود — «لاگ خالی» یعنی مرگ قبل از اجرای تست، نه شکست تست
-- سقف‌های زمانی wall-clock (Stopwatch) روی رانرهای اشتراکی flake‌اند — کف‌ها (معنای join) همه‌جا سخت، سقف‌ها فقط روی CI تشخیصی
-
-## ۱۱) محیط کاربر
-
-- سیستم اصلی: PC-13458 · سیستم دوم (تست جابه‌جایی): پورت COM4
-- پوشه‌ی پایتون قدیمی: `C:\Users\wasteland\Documents\ams\pc` (از v0.9.57 دیگر لازم نیست — پشته bundled است)
-- Caterina.hex، Sketchbook و boards.txt در مسیرهای شناخته‌شده‌ی قبلی
-- Notion: صفحه‌ی پروژه «Classroom Studio — پروژه ۲» (id: 1268c638-fe00-44f8-a9c0-eda4124eae22)
-
----
-*این سند هر بار که تغییر معناداری رخ دهد (نسخه‌ی جدید، تصمیم سخت‌افزاری، باگ ریشه‌ای) به‌روزرسانی می‌شود.*
+- هرگز selective merge نه — کل درخت جایگزین می‌شود · بلوک build اجباری + خروجی تازه‌ی TestRunner
+- اول شبیه‌سازی Python، بعد C# · داده قبل از حدس
+- هر نسخه: بنر + csproj + سند docs + ورودی MEMORY.md + نگهبان نسخه در TestRunner
+- آینه‌ی گیت‌هاب برای هر مصنوع (sim/ · uploads/ · tools/)

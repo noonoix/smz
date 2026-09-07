@@ -485,3 +485,12 @@
 - سر مجموعه‌ها فیلد `title` گرفتند و نماد نوع، جلوی عنوان دلخواه می‌ماند تا خاصیت بلوک گم نشود.
 - نشانگرها: `next` / `else` / `end if` بدون `#` و ۱۲px نزدیک‌تر به رگ.
 - پین نسخه → 0.9.55؛ گام ۵۵.
+
+## ۲۰۲۶-۰۹-۰۸ — v0.9.60 (تجمیع فرم‌ور + هاردنینگ انتقال)
+
+- `code.py` (از طریق `PicoFirmwareExporter`): سنسور BH1750 اختیاری (`ERR|NOSENSOR`) · بافر بایتی کران‌دار · پمپ دائمی بازو در هر تکرار حلقه و داخل انتظارها (ضد back-pressure؛ زنجیره‌ی مرگ ۲۲:۲۲ مورخ ۰۹-۰۷) · موس fire-and-ack · کیبورد همیشه روی Pico و هر دو envelope قدیمی محلی مصرف می‌شوند · کیپد ثابت GP4=Num Lock (Start/Stop) و GP3=Scroll Lock (Pause/Resume) · `AUTOSTART=False` + سکوت ۳ ثانیه‌ای بعد از آخرین فرمان host (ضد اجرای دوبل) · نگهبان never-die.
+- `bridge.py`: خروجی UTF-8 never-die (`reconfigure` + فالبک `ensure_ascii=True`) — رفع کرش cp1252 هنگام گزارش خطای واقعی.
+- `PythonBoardBridge.cs`: خواندن UTF-8 + `PYTHONIOENCODING` — لاگ فارسی بدون mojibake.
+- UI: `SelectionMode="Extended"` برای لاگ سریال · `stableSec` اعشاری کامل (فرمان 500ms + خلاصه‌ی «0.5s» + پارس مستقل از locale).
+- تصمیم و ردشده: قالب Options-driven کیپد (v0.9.58d) نگه داشته نشد چون قرارداد سخت‌افزاری نهایی (۰۰:۱۷ بامداد ۰۹-۰۸) کنترل‌های ثابت GP4/GP3 را می‌خواهد؛ `HotkeyToVirtualKeys` به‌عنوان ابزار باقی ماند ولی دیگر در فرم‌ور bake نمی‌شود.
+- اعتبارسنجی این‌طرف: شبیه‌سازی سخت‌افزار ساختگی ۲۳/۰ سبز (sim60) + py_compile قالب پرشده + پچ idempotent.

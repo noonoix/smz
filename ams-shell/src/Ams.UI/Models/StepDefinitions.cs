@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace Ams.UI.Models;
@@ -47,6 +48,10 @@ public static class StepDefinitions
     private static int LuxLow(StepNode s) => Math.Max(0, PropEx.GetInt(s.Props, "luxCenter", 1250) - Math.Max(1, PropEx.GetInt(s.Props, "luxTolerance", 50)));
     private static int LuxHigh(StepNode s) => PropEx.GetInt(s.Props, "luxCenter", 1250) + Math.Max(1, PropEx.GetInt(s.Props, "luxTolerance", 50));
     private static int LuxVk(StepNode s) => KeyMap.VK.TryGetValue(PropEx.GetString(s.Props, "key", "E"), out int vk) ? vk : 69;
+    /// <summary>v0.9.60 — stableSec is fractional (FieldKind.Float): the summary must show
+    /// "0.5s", not a rounded-down integer. Invariant "0.#" keeps the dot in every locale.</summary>
+    private static string StableSecText(StepNode s)
+        => PropEx.GetDouble(s.Props, "stableSec", 2).ToString("0.#", CultureInfo.InvariantCulture);
 
     private static readonly Dictionary<string, StepDefinition> Defs = new()
     {
@@ -311,10 +316,10 @@ public static class StepDefinitions
                 new("holdMax", "Hold max (ms)", FieldKind.Int, "90", HideWhenKey: "insertIfElse", HideWhenValue: "true"),
             },
             Summarize = s => PropEx.GetBool(s.Props, "insertIfElse")
-                ? $"If Light {LuxLow(s)}-{LuxHigh(s)} lux for {PropEx.GetInt(s.Props, "stableSec", 2)}s · timeout {PropEx.GetInt(s.Props, "timeoutMs", 20000)}ms"
+                ? $"If Light {LuxLow(s)}-{LuxHigh(s)} lux for {StableSecText(s)}s · timeout {PropEx.GetInt(s.Props, "timeoutMs", 20000)}ms"
                 : PropEx.GetBool(s.Props, "armed")
                     ? $"Light trigger {LuxLow(s)}-{LuxHigh(s)} lux -> key {PropEx.GetString(s.Props, "key", "E")} (armed)"
-                    : $"Wait for light {LuxLow(s)}-{LuxHigh(s)} lux for {PropEx.GetInt(s.Props, "stableSec", 2)}s · timeout {PropEx.GetInt(s.Props, "timeoutMs", 20000)}ms",
+                    : $"Wait for light {LuxLow(s)}-{LuxHigh(s)} lux for {StableSecText(s)}s · timeout {PropEx.GetInt(s.Props, "timeoutMs", 20000)}ms",
             Commands = s =>
             {
                 int lo = LuxLow(s), hi = LuxHigh(s);

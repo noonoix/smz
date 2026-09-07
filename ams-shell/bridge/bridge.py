@@ -45,11 +45,33 @@ import time
 
 PRINT_LOCK = threading.Lock()
 
+# v0.9.60 — never-die emit: force UTF-8 on the stdio trio regardless of the Windows
+# console code page. Before this, REPORTING an error that contained non-cp1252 text
+# (Persian messages, Windows error strings) raised UnicodeEncodeError and killed the
+# whole bridge, hiding the real error behind a generic "connect failed: timed out".
+for _stream in (sys.stdout, sys.stderr, sys.stdin):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 
 def emit(obj):
+    try:
+        line = json.dumps(obj, ensure_ascii=False)
+    except Exception:
+        line = json.dumps(obj, ensure_ascii=True)
     with PRINT_LOCK:
-        sys.stdout.write(json.dumps(obj, ensure_ascii=False) + "\n")
-        sys.stdout.flush()
+        try:
+            sys.stdout.write(line + "\n")
+        except UnicodeEncodeError:
+            sys.stdout.write(json.dumps(obj, ensure_ascii=True) + "\n")
+        except Exception:
+            return
+        try:
+            sys.stdout.flush()
+        except Exception:
+            pass
 
 
 def detect_board_port():

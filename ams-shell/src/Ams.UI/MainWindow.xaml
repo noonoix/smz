@@ -668,6 +668,7 @@
                     </StackPanel>
                 </Expander.Header>
                 <ListBox x:Name="SerialLogList" ItemsSource="{Binding LogLines}" Height="160"
+                         SelectionMode="Extended"
                          Background="Transparent" BorderThickness="0"
                          FontFamily="Cascadia Code" FontSize="12"
                          Foreground="{StaticResource TextSecondaryBrush}">

@@ -30,9 +30,7 @@ public static class GlobalHotkeyService
     private const int MOD_ALT = 0x1, MOD_CTRL = 0x2, MOD_SHIFT = 0x4, MOD_WIN = 0x8;
     private const int MOD_NOREPEAT = 0x4000; // one action per press even when the keys are held
 
-    private const int HKID_RUNSTOP = 0x1001, HKID_PAUSERESUME = 0x1002;   // v0.9.43 — paired: 4 hotkeys → 2 (user request)
-    private const int HKID_HARD_NUMLOCK = 0x1003;   // v0.9.58 — hardware BTN1 on Pico (GP2) → Run/Stop
-    private const int HKID_HARD_SCROLL = 0x1004;    // v0.9.58 — hardware BTN2 on Pico (GP3) → Pause/Resume
+    private const int HKID_RUNSTOP = 0x1001, HKID_PAUSERESUME = 0x1002;   // paired playback hotkeys
 
     private static readonly Dictionary<int, string> _idToName = new();
     private static readonly List<string> _lastErrors = new();
@@ -92,11 +90,8 @@ public static class GlobalHotkeyService
 
         foreach (var (name, hk, id) in new[]
         {
-            ("runstop", settings.RunStopHotkey, HKID_RUNSTOP),           // v0.9.43 — one key toggles run/stop
-            ("pauseresume", settings.PauseResumeHotkey, HKID_PAUSERESUME),   // one key toggles pause/resume
-            // v0.9.58 — hardware keypad always registers NUM_LOCK and SCROLL_LOCK
-            ("hard_numlock", "Num Lock", HKID_HARD_NUMLOCK),
-            ("hard_scroll", "Scroll Lock", HKID_HARD_SCROLL),
+            ("runstop", settings.RunStopHotkey, HKID_RUNSTOP),
+            ("pauseresume", settings.PauseResumeHotkey, HKID_PAUSERESUME),
         })
         {
             if (string.IsNullOrWhiteSpace(hk)) continue;

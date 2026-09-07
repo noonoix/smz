@@ -3437,12 +3437,31 @@ class TestRunner
         // (a) csproj bundles the whole bridge/ folder with wildcard
         Assert(p57csp.Contains(@"bridge\**") && p57csp.Contains("CopyToOutputDirectory"),
             "v0.9.58: csproj uses bridge wildcard with CopyToOutputDirectory");
-        // (b) exporter wires NUM_LOCK / SCROLL_LOCK and polls buttons inside main loop
+        // (b) v0.9.58d: keypad emits the two gestures saved in Options (no fixed lock keys)
         var p58exp = V27ReadSrc(Path.Combine("Services", "PicoFirmwareExporter.cs"));
-        Assert(p58exp.Contains("Keycode.NUM_LOCK") && p58exp.Contains("Keycode.SCROLL_LOCK"),
-            "v0.9.58: Pico firmware sends NUM_LOCK (BTN1) and SCROLL_LOCK (BTN2)");
+        var p58keys = PicoFirmwareExporter.HotkeyToVirtualKeys("Ctrl+Add");
+        Assert(p58keys.SequenceEqual(new[] { 0xA2, 0x6B }),
+            "v0.9.58d: Pico exporter converts configured modifier + numpad key");
+        var p58code = PicoFirmwareExporter.BuildCodePy(new List<PicoFirmwareExporter.LightState>(), "M",
+            runStopHotkey: "Shift+F7", pauseResumeHotkey: "Ctrl+Add");
+        Assert(p58code.Contains("RUNSTOP_HOTKEY = (160, 118)")
+               && p58code.Contains("PAUSERESUME_HOTKEY = (162, 107)"),
+            "v0.9.58d: exported code.py bakes the actual Options gestures");
+        Assert(p58exp.Contains("send_hotkey(RUNSTOP_HOTKEY)")
+               && p58exp.Contains("send_hotkey(PAUSERESUME_HOTKEY)")
+               && !p58exp.Contains("kbd.send(Keycode.NUM_LOCK)"),
+            "v0.9.58d: Pico buttons no longer emit fixed Num/Scroll Lock keys");
         Assert(p58exp.Contains("btn1") && p58exp.Contains("digitalio.DigitalInOut(board.GP2)"),
             "v0.9.58: keypad button reader on GP2 with pull-up");
+        var p58bridge = V27ReadSrc(Path.Combine("..", "..", "bridge", "bridge.py"));
+        Assert(p58bridge.Contains(".split(\";\") if d.strip()"),
+            "v0.9.58d: send_path parses semicolon-delimited delays, not individual characters");
+        var p58hotkeys = V27ReadSrc(Path.Combine("Services", "GlobalHotkeyService.cs"));
+        Assert(!p58hotkeys.Contains("hard_numlock") && !p58hotkeys.Contains("hard_scroll"),
+            "v0.9.58d: fixed lock-key registrations and their startup warnings are gone");
+        var p58window = V27ReadSrc("MainWindow.xaml.cs");
+        Assert(p58window.Contains("کپی کل لاگ") && p58window.Contains("Clipboard.SetText"),
+            "v0.9.58d: serial log has selected/all clipboard copy actions");
         // (c) meta guard: every version PIN in this file matches the current release.
         // Pin lines are the assertions that check the csproj Version tag, the app banner or
         // the Pico bundle version. Version strings inside test DATA (PONG replies like

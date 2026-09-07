@@ -174,7 +174,7 @@ def main():
                         raise BoardError("not connected")
                     abort_flag.clear()
                     pts = [p for p in req.get("pts", "").split(";") if p]
-                    dlys = [int(d) for d in req.get("dlys", "") if d]
+                    dlys = [int(d) for d in req.get("dlys", "").split(";") if d.strip()]
                     if not pts:
                         raise BoardError("empty path")
                     send = getattr(link, "_send", None)

@@ -7,9 +7,9 @@ Runs WITHOUT hardware and WITHOUT pyserial: a fake `serial` module (and a stub
 PicoLink talks to a scripted fake Pico data port. CI runs this on every push.
 
 Scenarios:
- 1. brain-first connect: PING→role=brain picks PicoLink, BoardLink never built
- 2. keyboard command executes on the Pico (KTEXT → OK|KTEXT)
- 3. arm command flows through the brain (MMOVE → forwarded reply OK|MMOVE)
+ 1. brain-first connect: PING->role=brain picks PicoLink, BoardLink never built
+ 2. keyboard command executes on the Pico (KTEXT -> OK|KTEXT)
+ 3. arm command flows through the brain (MMOVE -> forwarded reply OK|MMOVE)
  4. an EVT line mid-command is queued to link.events, NOT mispaired as reply
  5. a reply split into tiny reads still parses (partial-line buffering)
  6. silence raises a timeout naming the command head (ERR|TIMEOUT|…)
@@ -152,7 +152,7 @@ reply = link.command("KTEXT|0,0,E", timeout=1.0)
 check("2: keyboard step executes on the Pico itself", reply == "OK|KTEXT")
 
 reply = link.command("MMOVE|100,200,abs,1", timeout=1.0)
-check("3: arm command flows PC→Pico→arm and its reply returns", reply == "OK|MMOVE")
+check("3: arm command flows PC->Pico->arm and its reply returns", reply == "OK|MMOVE")
 
 reply = link.command("WSND|500,100,2000", timeout=2.0)
 check("4a: real reply wins over an interleaved EVT", reply == "OK|WSND|fired")
@@ -167,7 +167,7 @@ link2, _ = br2.open_link("COM5")
 reply = link2.command("LCAL|3000", timeout=2.0)
 check("5: reply split into 3-byte reads still parses", reply == "OK|LCAL|min=55|max=59|avg=57")
 
-# ── scenario 6: silence → clean timeout ──────────────────────────────
+# ── scenario 6: silence -> clean timeout ──────────────────────────────
 pico3 = FakePort([("PING", [BRAIN_PONG])])               # answers PING only
 br3 = fresh_bridge(pico3)
 link3, _ = br3.open_link("COM5")
@@ -178,7 +178,7 @@ except Exception as e:
     check("6: silence raises a timeout naming the command head",
           "ERR|TIMEOUT|WLUX" in str(e))
 
-# ── scenario 7: plain arm board → encrypted fallback ─────────────────
+# ── scenario 7: plain arm board -> encrypted fallback ─────────────────
 arm = FakePort([("PING", ["OK|PONG|ams-board 1.6"])])    # no role=brain
 br4 = fresh_bridge(arm)
 link4, dev4 = br4.open_link("COM17")

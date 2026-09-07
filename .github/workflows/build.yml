@@ -1,0 +1,81 @@
+name: build-test-package
+
+# Classroom Studio CI — every push to main builds the WPF app on a free Windows
+# runner, runs TestRunner, and only packages when ALL tests are green.
+# Green -> a GitHub Release appears with the zip (visible via the releases API).
+# Red   -> an Issue opens with the tail of the test log (visible via issues API).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write   # publish the green-build release
+  issues: write     # open an issue when CI fails
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      # v0.9.58 lesson: NEVER ship a bridge.py that does not compile
+      - name: Compile-check bridge.py
+        run: python -m py_compile ams-shell/bridge/bridge.py
+
+      - name: Restore
+        run: dotnet restore ams-shell/AMS.sln
+
+      - name: Build (Release)
+        run: dotnet build ams-shell/AMS.sln -c Release --no-restore
+
+      # If the test project path differs, fix it here once.
+      - name: Run TestRunner
+        shell: pwsh
+        run: |
+          dotnet run --project tests/TestRunner -c Release | Tee-Object test-output.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (Select-String -Path test-output.txt -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
+
+      - name: Package release zip
+        if: success()
+        shell: pwsh
+        run: |
+          $out = "ams-shell/src/Ams.UI/bin/Release/net8.0-windows"
+          Remove-Item -Recurse -Force "$out/bridge/__pycache__" -ErrorAction SilentlyContinue
+          Compress-Archive -Path "$out/*" -DestinationPath "Classroom-Studio-release.zip" -Force
+          (Get-FileHash Classroom-Studio-release.zip -Algorithm SHA256).Hash | Out-File sha256.txt -Encoding ascii
+          $results = (Select-String -Path test-output.txt -Pattern '=== Results' | Select-Object -Last 1).Line
+          @("**Tests:** $results", "", "**SHA256:** $(Get-Content sha256.txt -Raw)") | Out-File release_body.md -Encoding utf8
+
+      - name: Publish green-build release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ci-${{ github.run_number }}
+          name: "CI green — run #${{ github.run_number }}"
+          body_path: release_body.md
+          files: |
+            Classroom-Studio-release.zip
+            sha256.txt
+            test-output.txt
+
+      - name: Open issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let tail = '(no test log)';
+            try { tail = fs.readFileSync('test-output.txt', 'utf8').split('\n').slice(-80).join('\n'); } catch (e) {}
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `CI failed — run #${context.runNumber}`,
+              body: '```\n' + tail + '\n```'
+            });

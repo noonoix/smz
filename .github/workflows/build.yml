@@ -3,7 +3,7 @@ name: build-test-package
 # Classroom Studio CI — every push to main builds the WPF app on a free Windows
 # runner, runs TestRunner, and only packages when ALL tests are green.
 # Green -> a GitHub Release appears with the zip (visible via the releases API).
-# Red   -> an Issue opens with the tail of the test log (visible via issues API).
+# Red   -> an Issue opens naming the failed step + the tail of the test log.
 
 on:
   workflow_dispatch:
@@ -13,6 +13,7 @@ on:
 permissions:
   contents: write   # publish the green-build release
   issues: write     # open an issue when CI fails
+  actions: read     # read job/step conclusions for the failure issue
 
 jobs:
   build:
@@ -25,8 +26,19 @@ jobs:
           dotnet-version: "8.0.x"
 
       # v0.9.58 lesson: NEVER ship a bridge.py that does not compile
-      - name: Compile-check bridge.py
-        run: python -m py_compile ams-shell/bridge/bridge.py
+      - name: Compile-check bridge stack
+        run: python -m py_compile ams-shell/bridge/bridge.py ams-shell/bridge/ams_serial.py ams-shell/bridge/ams_crypto.py
+
+      # deterministic: importing the modules proves every file exists and every
+      # import resolves — no subprocess, no stdin races, no hangs (bridge.main is
+      # __main__-guarded so importing it is safe and side-effect free)
+      - name: Verify bridge stack imports
+        run: python -c "import sys; sys.path.insert(0, 'ams-shell/bridge'); import ams_crypto, ams_serial, bridge; print('bridge stack imports OK')"
+
+      # the v0.9.57 regression: main() uses os.path but 'import os' was missing —
+      # py_compile cannot see that class of bug, so pin it statically forever
+      - name: Pin the import-os regression
+        run: python -c "import pathlib; s = pathlib.Path('ams-shell/bridge/bridge.py').read_text(encoding='utf-8'); assert '\nimport os\n' in s, 'bridge.py lost import os again'"
 
       - name: Restore
         run: dotnet restore ams-shell/AMS.sln
@@ -34,13 +46,14 @@ jobs:
       - name: Build (Release)
         run: dotnet build ams-shell/AMS.sln -c Release --no-restore
 
-      # If the test project path differs, fix it here once.
+      # fresh filename on purpose: the repo carries historical test-output.txt files
+      # and a stale one must never be mistaken for this run's log.
       - name: Run TestRunner
         shell: pwsh
         run: |
-          dotnet run --project tests/TestRunner -c Release | Tee-Object test-output.txt
+          dotnet run --project tests/TestRunner -c Release | Tee-Object ci-test-output.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if (Select-String -Path test-output.txt -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
+          if (Select-String -Path ci-test-output.txt -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
 
       - name: Package release zip
         if: success()
@@ -50,7 +63,7 @@ jobs:
           Remove-Item -Recurse -Force "$out/bridge/__pycache__" -ErrorAction SilentlyContinue
           Compress-Archive -Path "$out/*" -DestinationPath "Classroom-Studio-release.zip" -Force
           (Get-FileHash Classroom-Studio-release.zip -Algorithm SHA256).Hash | Out-File sha256.txt -Encoding ascii
-          $results = (Select-String -Path test-output.txt -Pattern '=== Results' | Select-Object -Last 1).Line
+          $results = (Select-String -Path ci-test-output.txt -Pattern '=== Results' | Select-Object -Last 1).Line
           @("**Tests:** $results", "", "**SHA256:** $(Get-Content sha256.txt -Raw)") | Out-File release_body.md -Encoding utf8
 
       - name: Publish green-build release
@@ -63,7 +76,7 @@ jobs:
           files: |
             Classroom-Studio-release.zip
             sha256.txt
-            test-output.txt
+            ci-test-output.txt
 
       - name: Open issue on failure
         if: failure()
@@ -71,11 +84,21 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            let tail = '(no test log)';
-            try { tail = fs.readFileSync('test-output.txt', 'utf8').split('\n').slice(-80).join('\n'); } catch (e) {}
+            const read = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (e) { return ''; } };
+            const tail = read('ci-test-output.txt').split('\n').slice(-60).join('\n');
+            const jobs = await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner, repo: context.repo.repo, run_id: context.runId
+            });
+            const jobLines = jobs.data.jobs.map(j => `job: ${j.conclusion || j.status} — ${j.name}`);
+            const stepLines = jobs.data.jobs.flatMap(j => (j.steps || []).map(s =>
+              `${s.conclusion || s.status} — ${s.name}`));
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `CI failed — run #${context.runNumber}`,
-              body: '```\n' + tail + '\n```'
+              body: '**Run:** ' + runUrl
+                + '\n\n**Jobs:**\n' + jobLines.join('\n')
+                + '\n\n**Steps:**\n' + stepLines.join('\n')
+                + '\n\n**Test log tail:**\n```\n' + (tail || '(no test log — failure before the test step)') + '\n```'
             });

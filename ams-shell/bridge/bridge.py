@@ -33,6 +33,7 @@ pyserial است.
 """
 import argparse
 import json
+import os
 import queue
 import sys
 import threading
@@ -51,8 +52,6 @@ def detect_board_port():
     """v0.9.57 — brain-first auto-detect: probes every port with PING, prefers
     the one answering role=brain/pico-light (the Pico DATA port), ignores console
     port (never says PONG), includes (0x2E8A, 0x0005), falls back to old behaviour."""
-    """v0.9.5 — شناسایی خودکار برد: اسکن پورت‌های سریال، امتیاز به چیپ‌های شناخته‌شده
-    (CH340/CP210x/FTDI/Arduino) و کاوش با PING؛ اولین پاسخ‌دهنده برمی‌گردد."""
     try:
         from serial.tools import list_ports
         import serial
@@ -101,7 +100,7 @@ def main():
     if args.pydir:
         sys.path.insert(0, args.pydir)
 
-    from ams_serial import BoardLink, BoardError  # noqa: F401  # noqa: F401
+    from ams_serial import BoardLink, BoardError  # noqa: F401
     emit({"event": "stage", "stage": "stack_imported"})
     state = {"link": None}
     ops = queue.Queue()
@@ -175,7 +174,7 @@ def main():
                         raise BoardError("not connected")
                     abort_flag.clear()
                     pts = [p for p in req.get("pts", "").split(";") if p]
-                    dlys = [int(d) for d in req.get("dlys", "").split(";") if d]
+                    dlys = [int(d) for d in req.get("dlys", "") if d]
                     if not pts:
                         raise BoardError("empty path")
                     send = getattr(link, "_send", None)

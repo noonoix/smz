@@ -13,7 +13,7 @@ on:
 permissions:
   contents: write   # publish the green-build release
   issues: write     # open an issue when CI fails
-  actions: read     # read step conclusions for the failure issue
+  actions: read     # read job/step conclusions for the failure issue
 
 jobs:
   build:
@@ -29,15 +29,9 @@ jobs:
       - name: Compile-check bridge.py
         run: python -m py_compile ams-shell/bridge/bridge.py
 
-      # stronger: the bridge must actually START and answer (catches missing imports).
-      # The pipe is HELD OPEN for 1.5s after the ping: the bridge's worker thread needs
-      # a beat to print pong before stdin EOF would shut the process down.
+      # stronger: the bridge must actually START and answer ping (deterministic harness)
       - name: Smoke-run bridge.py (ping_bridge)
-        shell: pwsh
-        run: |
-          $out = ('{"op":"ping_bridge"}'; Start-Sleep -Milliseconds 1500) | python ams-shell/bridge/bridge.py 2>&1 | Out-String
-          $out | Out-File smoke-output.txt -Encoding utf8
-          if ($out -notmatch '"pong"') { Write-Host $out; exit 1 }
+        run: python tools/ci_smoke.py
 
       - name: Restore
         run: dotnet restore ams-shell/AMS.sln
@@ -89,13 +83,17 @@ jobs:
             const jobs = await github.rest.actions.listJobsForWorkflowRun({
               owner: context.repo.owner, repo: context.repo.repo, run_id: context.runId
             });
-            const steps = jobs.data.jobs.flatMap(j => (j.steps || []).map(s =>
-              `${s.conclusion === 'success' ? 'PASS' : (s.conclusion === 'failure' ? 'FAIL' : 'skip')} — ${s.name}`)).join('\n');
+            const jobLines = jobs.data.jobs.map(j => `job: ${j.conclusion || j.status} — ${j.name}`);
+            const stepLines = jobs.data.jobs.flatMap(j => (j.steps || []).map(s =>
+              `${s.conclusion || s.status} — ${s.name}`));
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `CI failed — run #${context.runNumber}`,
-              body: '**Steps:**\n' + steps
+              body: '**Run:** ' + runUrl
+                + '\n\n**Jobs:**\n' + jobLines.join('\n')
+                + '\n\n**Steps:**\n' + stepLines.join('\n')
                 + '\n\n**Bridge smoke output:**\n```\n' + (smoke || '(no smoke output)') + '\n```'
                 + '\n\n**Test log tail:**\n```\n' + (tail || '(no test log — failure before the test step)') + '\n```'
             });

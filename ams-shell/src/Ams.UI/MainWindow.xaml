@@ -658,10 +658,13 @@
                 <Expander.Header>
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="لاگ سریال" />
-                        <!-- v0.9.43 — the serial log is clearable (user request) -->
+                        <!-- v0.9.58d — the serial log is clearable (user request) -->
                         <Button Content="🧹 پاک‌سازی" Command="{Binding ClearLogCommand}"
                                 FontSize="11" Padding="8,1" Margin="12,0,0,0" Cursor="Hand"
                                 ToolTip="پاک‌کردن همه‌ی خطوط لاگ" />
+                        <Button Content="📋 کپی" Click="CopyAllLog_Click"
+                                FontSize="11" Padding="8,1" Margin="6,0,0,0" Cursor="Hand"
+                                ToolTip="کپی همه‌ی خطوط لاگ به کلیپبورد" />
                     </StackPanel>
                 </Expander.Header>
                 <ListBox x:Name="SerialLogList" ItemsSource="{Binding LogLines}" Height="160"

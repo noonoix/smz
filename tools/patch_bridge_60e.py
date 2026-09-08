@@ -26,6 +26,13 @@
 #     fire-and-forget (no reply ever comes), so it would wait 5 s and die (latent 60c
 #     regression hit by single moves: findImage approach, parallel-group waypoints).
 #  5) send_path hardware-cadence thinning (the choppy-mouse fix, ~25 ms/point).
+#  6) one retry on ERR|UNKNOWN: a UART-garbled command is never executed by the board
+#     (ERR|UNKNOWN is only answered to unrecognized lines), so resending once is always
+#     safe (hardware log 2026-09-09: SETRES <- ERR|UNKNOWN once in ~25 repeats).
+#  7) send_path streams points as MMOVE abs,2: arm fw 1.9 subdivides each fed segment
+#     into <=8 px micro-steps at native HID pace -> hand-smooth (~100 reports/sec; the
+#     user's own hand recording measures ~3 px steps at ~390 samples/sec, ~530 px/s
+#     median). Older arm firmware reads hm==2 as a plain per-point jump - graceful.
 #
 # Usage:  python patch_bridge_60e.py "C:\...\ClassroomStudio\bridge\bridge.py"
 import shutil
@@ -190,6 +197,35 @@ EDITS = [
     ("MIN_STEP_MS = 25",
      [(PATH_V1V2_OLD, PATH_V1V2_NEW),        # v1/v2-patched -> v3 (delta only)
       (PATH_CLEAN_OLD, PATH_FULL_NEW)]),     # clean -> v3
+    # 5) one-shot retry flag for the ERR|UNKNOWN retry (lives in command()'s frame)
+    ("retried = False",
+     [("        want = \"PONG\" if expect == \"PING\" else expect\n        while True:\n",
+       "        want = \"PONG\" if expect == \"PING\" else expect\n"
+       "        retried = False                  # v0.9.60g - one retry on ERR|UNKNOWN (UART glitch)\n"
+       "        while True:\n")]),
+    # 6) retry-on-UNKNOWN right before the reply is returned (post-1b text)
+    ('if line == "ERR|UNKNOWN" and not retried:',
+     [("            if len(parts) >= 3 and parts[0] == \"ERR\" and parts[2] and parts[2] != expect:\n"
+       "                continue                 # v0.9.60e - stale ERR of an older command\n"
+       "            return line\n",
+       "            if len(parts) >= 3 and parts[0] == \"ERR\" and parts[2] and parts[2] != expect:\n"
+       "                continue                 # v0.9.60e - stale ERR of an older command\n"
+       "            if line == \"ERR|UNKNOWN\" and not retried:\n"
+       "                # v0.9.60g - UART noise garbled that command; the board answers\n"
+       "                # ERR|UNKNOWN only for lines it did NOT execute -> one resend is safe.\n"
+       "                retried = True\n"
+       "                self._send(cmd)\n"
+       "                deadline = time.monotonic() + timeout\n"
+       "                continue\n"
+       "            return line\n")]),
+    # 7) stream path points as abs,2 (arm fw 1.9 interpolates; older arms degrade to jumps)
+    ('",abs,2"',
+     [("                        send(\"MMOVE|\" + p + \",abs,0\")\n",
+       "                        # v0.9.60g - abs,2 = interpolated path point (arm fw 1.9 splits each\n"
+       "                        # segment into <=8 px native-paced micro-steps -> hand-smooth). An\n"
+       "                        # older arm reads hm==2 as non-human and jumps per point (the v3.1\n"
+       "                        # behaviour) - safe either way; flash fw 1.9 for the smoothness.\n"
+       "                        send(\"MMOVE|\" + p + \",abs,2\")\n")]),
 ]
 
 
@@ -215,7 +251,7 @@ def main():
             print("send me your bridge.py and I will re-aim the patch.")
             return 1
     if applied == 0:
-        print("already patched (v0.9.60e+f) - nothing to do")
+        print("already patched (v0.9.60g) - nothing to do")
         return 0
     shutil.copy2(path, path + ".bak-60e")
     open(path, "w", encoding="utf-8", newline="\n").write(out)

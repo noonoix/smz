@@ -13,6 +13,9 @@
 #     (PicoLink only; the encrypted BoardLink already resyncs). Zero cost on a quiet pipe.
 #  3) KTEXT gets a payload-sized timeout (len x hmax + margin) - humanized typing of a long
 #     text legitimately takes minutes; the flat 5 s default killed it.
+#  4) a lone MMOVE sent as a "send" op is acked locally: firmware 60c made MMOVE
+#     fire-and-forget (no reply ever comes), so it would wait 5 s and die (latent 60c
+#     regression hit by single moves: findImage approach, parallel-group waypoints).
 #
 # Usage:  python patch_bridge_60e.py "C:\...\ClassroomStudio\bridge\bridge.py"
 import shutil
@@ -93,14 +96,20 @@ def main():
          "        return default\n"
          "\n\n"
          "def open_link(port):\n"),
-        # 3) drain + sized timeout on the send op
+        # 3) drain + MMOVE local-ack + sized KTEXT timeout on the send op
         ("                    cmd = req[\"cmd\"]\n"
          "                    abort_flag.clear()\n"
          "                    reply = link.command(cmd, timeout=req.get(\"timeout\", 5.0))\n",
          "                    cmd = req[\"cmd\"]\n"
          "                    abort_flag.clear()\n"
          "                    _drain_stale(link)         # v0.9.60e - eat leftovers of write-only aborts\n"
-         "                    reply = link.command(cmd, timeout=_ktext_timeout(cmd, req.get(\"timeout\", 5.0)))\n"),
+         "                    if cmd.split(\"|\", 1)[0] == \"MMOVE\":\n"
+         "                        # v0.9.60e - firmware 60c made MMOVE fire-and-forget (no reply is\n"
+         "                        # ever sent): a lone MMOVE via a \"send\" op would wait 5 s and die.\n"
+         "                        link._send(cmd)\n"
+         "                        reply = \"OK|MMOVE\"      # local ack, same contract as send_path\n"
+         "                    else:\n"
+         "                        reply = link.command(cmd, timeout=_ktext_timeout(cmd, req.get(\"timeout\", 5.0)))\n"),
         # 4) drain before streaming a dense path
         ("                    aborted = False\n"
          "                    t0 = time.monotonic()\n",

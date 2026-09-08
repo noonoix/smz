@@ -1,5 +1,7 @@
-# patch_bridge_60e.py - patch the release's bridge.py in place (per-edit idempotent,
-# safe to re-run over any older state: v1/v2-patched, or a clean bridge.py).
+# patch_bridge_60e.py - patch the release's bridge.py in place.
+# Variant-aware + per-edit idempotent: understands a CLEAN bridge.py, a v1-patched one
+# (stale-skip + drain + KTEXT timeout), a v2 one (adds the MMOVE local-ack), and a full
+# v3 one - and applies only the missing deltas. Safe to re-run any number of times.
 #
 # ROOT CAUSES (hardware logs 2026-09-08):
 #  A) reply mis-pairing (runs of 16:53-16:55): PicoLink.command() returned the FIRST
@@ -29,111 +31,165 @@
 import shutil
 import sys
 
+# -- shared text blocks --
 
+HELPERS = (
+    "def _drain_stale(link):\n"
+    "    \"\"\"v0.9.60e - eat stale PicoLink lines (write-only abort HALT answers, late\n"
+    "    PONGs) before a new op pairs them with its own reply. Zero cost on a quiet pipe.\n"
+    "    BoardLink (encrypted, direct arm) already resyncs - left untouched.\"\"\"\n"
+    "    if not isinstance(link, PicoLink):\n"
+    "        return\n"
+    "    try:\n"
+    "        ser = getattr(link, \"ser\", None)\n"
+    "        if ser is None or (not getattr(ser, \"in_waiting\", 0) and not getattr(link, \"_rxbuf\", None)):\n"
+    "            return\n"
+    "        while True:\n"
+    "            line = link._read_line(0.1)\n"
+    "            if line is None:\n"
+    "                return\n"
+    "            if line.startswith(\"EVT|\"):\n"
+    "                link.events.append(line)\n"
+    "    except Exception:\n"
+    "        return\n"
+    "\n\n"
+    "def _ktext_timeout(cmd, default):\n"
+    "    \"\"\"v0.9.60e - humanized typing is deliberately slow: size the wait from the\n"
+    "    payload (len x hmax + margin) so a long Type Text never dies at 5 s.\"\"\"\n"
+    "    inner = cmd\n"
+    "    for env in (\"KBDPICO|\", \"KBDARM|\"):\n"
+    "        if inner.startswith(env):\n"
+    "            inner = inner[len(env):]\n"
+    "    if not inner.startswith(\"KTEXT|\"):\n"
+    "        return default\n"
+    "    try:\n"
+    "        p = inner[6:].split(\",\", 2)\n"
+    "        per_ms = max(int(p[0]), int(p[1]))\n"
+    "        return max(default, 5.0 + len(p[2]) * per_ms / 1000.0 + 5.0)\n"
+    "    except Exception:\n"
+    "        return default\n"
+    "\n\n"
+)
+
+# edit 3 (send op) - three known states
+SEND_CLEAN_OLD = (
+    "                    cmd = req[\"cmd\"]\n"
+    "                    abort_flag.clear()\n"
+    "                    reply = link.command(cmd, timeout=req.get(\"timeout\", 5.0))\n"
+)
+SEND_V1_OLD = (   # v1-patched: drain present, KTEXT timeout present, NO MMOVE ack
+    "                    _drain_stale(link)         # v0.9.60e - eat leftovers of write-only aborts\n"
+    "                    reply = link.command(cmd, timeout=_ktext_timeout(cmd, req.get(\"timeout\", 5.0)))\n"
+)
+SEND_V1_NEW = (   # insert only the MMOVE-ack delta
+    "                    _drain_stale(link)         # v0.9.60e - eat leftovers of write-only aborts\n"
+    "                    if cmd.split(\"|\", 1)[0] == \"MMOVE\":\n"
+    "                        # v0.9.60e - firmware 60c made MMOVE fire-and-forget (no reply is\n"
+    "                        # ever sent): a lone MMOVE via a \"send\" op would wait 5 s and die.\n"
+    "                        link._send(cmd)\n"
+    "                        reply = \"OK|MMOVE\"      # local ack, same contract as send_path\n"
+    "                    else:\n"
+    "                        reply = link.command(cmd, timeout=_ktext_timeout(cmd, req.get(\"timeout\", 5.0)))\n"
+)
+SEND_FULL_NEW = (   # clean -> v3 in one go
+    "                    cmd = req[\"cmd\"]\n"
+    "                    abort_flag.clear()\n"
+    "                    _drain_stale(link)         # v0.9.60e - eat leftovers of write-only aborts\n"
+    "                    if cmd.split(\"|\", 1)[0] == \"MMOVE\":\n"
+    "                        # v0.9.60e - firmware 60c made MMOVE fire-and-forget (no reply is\n"
+    "                        # ever sent): a lone MMOVE via a \"send\" op would wait 5 s and die.\n"
+    "                        link._send(cmd)\n"
+    "                        reply = \"OK|MMOVE\"      # local ack, same contract as send_path\n"
+    "                    else:\n"
+    "                        reply = link.command(cmd, timeout=_ktext_timeout(cmd, req.get(\"timeout\", 5.0)))\n"
+)
+
+# edit 4 (send_path) - three known states
+PATH_CLEAN_OLD = (
+    "                    aborted = False\n"
+    "                    t0 = time.monotonic()\n"
+)
+PATH_V1V2_OLD = (   # v1/v2-patched: drain line present, NO thinning
+    "                    _drain_stale(link)         # v0.9.60e - clean pipe before streaming\n"
+    "                    aborted = False\n"
+    "                    t0 = time.monotonic()\n"
+)
+THINNING = (
+    "                    # v0.9.60f - hardware-cadence thinning (the choppy-mouse fix). The arm\n"
+    "                    # executes ~50 moves/sec (~20 ms each, measured 2026-09-08), but dense\n"
+    "                    # WindMouse trails arrive at ~4 ms/point: oversubscribed 4-5x, the\n"
+    "                    # firmware's coalescing dropped points and the cursor visibly jumped.\n"
+    "                    # Merge micro-steps so every emitted point gets >= MIN_STEP_MS: same\n"
+    "                    # total time, same curve shape, and every point actually executes.\n"
+    "                    MIN_STEP_MS = 25\n"
+    "                    if len(pts) > 1 and dlys:\n"
+    "                        tp, td = [pts[0]], []\n"
+    "                        acc = 0\n"
+    "                        for i in range(1, len(pts)):\n"
+    "                            acc += dlys[i - 1] if i - 1 < len(dlys) else 0\n"
+    "                            if acc >= MIN_STEP_MS:\n"
+    "                                tp.append(pts[i])\n"
+    "                                td.append(acc)\n"
+    "                                acc = 0\n"
+    "                        if tp[-1] != pts[-1]:\n"
+    "                            tp.append(pts[-1])     # the final target ALWAYS lands\n"
+    "                            td.append(acc)\n"
+    "                        pts, dlys = tp, td\n"
+)
+PATH_V1V2_NEW = (   # insert only the thinning delta after the existing drain line
+    "                    _drain_stale(link)         # v0.9.60e - clean pipe before streaming\n"
+    + THINNING +
+    "                    aborted = False\n"
+    "                    t0 = time.monotonic()\n"
+)
+PATH_FULL_NEW = (   # clean -> v3 in one go
+    "                    _drain_stale(link)         # v0.9.60e - clean pipe before streaming\n"
+    + THINNING +
+    "                    aborted = False\n"
+    "                    t0 = time.monotonic()\n"
+)
+
+# (idempotency marker, [(old, new) variants ordered most-patched -> cleanest])
 EDITS = [
     # 1a) compute the expected reply head before the read loop
-    ("        self._send(cmd)\n"
-     "        deadline = time.monotonic() + timeout\n"
-     "        while True:\n",
-     "        self._send(cmd)\n"
-     "        deadline = time.monotonic() + timeout\n"
-     "        # v0.9.60e - never mis-pair a stale reply with this command: a write-only\n"
-     "        # abort HALT answer or a late PONG used to be returned as the NEXT command's\n"
-     "        # reply (hardware log: SETRES <- OK|HALT / OK|PONG). Skip OK|X / ERR|?|X\n"
-     "        # whose X is not this command's head (PING's answer is PONG).\n"
-     "        expect = cmd.split(\"|\")[0]\n"
-     "        if expect in (\"KBDPICO\", \"KBDARM\") and \"|\" in cmd:\n"
-     "            expect = cmd.split(\"|\", 2)[1]\n"
-     "        want = \"PONG\" if expect == \"PING\" else expect\n"
-     "        while True:\n"),
+    ("want = \"PONG\" if expect == \"PING\" else expect",
+     [("        self._send(cmd)\n"
+       "        deadline = time.monotonic() + timeout\n"
+       "        while True:\n",
+       "        self._send(cmd)\n"
+       "        deadline = time.monotonic() + timeout\n"
+       "        # v0.9.60e - never mis-pair a stale reply with this command: a write-only\n"
+       "        # abort HALT answer or a late PONG used to be returned as the NEXT command's\n"
+       "        # reply (hardware log: SETRES <- OK|HALT / OK|PONG). Skip OK|X / ERR|?|X\n"
+       "        # whose X is not this command's head (PING's answer is PONG).\n"
+       "        expect = cmd.split(\"|\")[0]\n"
+       "        if expect in (\"KBDPICO\", \"KBDARM\") and \"|\" in cmd:\n"
+       "            expect = cmd.split(\"|\", 2)[1]\n"
+       "        want = \"PONG\" if expect == \"PING\" else expect\n"
+       "        while True:\n")]),
     # 1b) the stale skip right before the reply is returned
-    ("                continue\n"
-     "            return line\n",
-     "                continue\n"
-     "            parts = line.split(\"|\")\n"
-     "            if len(parts) >= 2 and parts[0] == \"OK\" and parts[1] and parts[1] != want:\n"
-     "                continue                 # v0.9.60e - stale OK of an older command\n"
-     "            if len(parts) >= 3 and parts[0] == \"ERR\" and parts[2] and parts[2] != expect:\n"
-     "                continue                 # v0.9.60e - stale ERR of an older command\n"
-     "            return line\n"),
+    ("stale ERR of an older command",
+     [("                continue\n"
+       "            return line\n",
+       "                continue\n"
+       "            parts = line.split(\"|\")\n"
+       "            if len(parts) >= 2 and parts[0] == \"OK\" and parts[1] and parts[1] != want:\n"
+       "                continue                 # v0.9.60e - stale OK of an older command\n"
+       "            if len(parts) >= 3 and parts[0] == \"ERR\" and parts[2] and parts[2] != expect:\n"
+       "                continue                 # v0.9.60e - stale ERR of an older command\n"
+       "            return line\n")]),
     # 2) the two helpers, right before open_link
-    ("def open_link(port):\n",
-     "def _drain_stale(link):\n"
-     "    \"\"\"v0.9.60e - eat stale PicoLink lines (write-only abort HALT answers, late\n"
-     "    PONGs) before a new op pairs them with its own reply. Zero cost on a quiet pipe.\n"
-     "    BoardLink (encrypted, direct arm) already resyncs - left untouched.\"\"\"\n"
-     "    if not isinstance(link, PicoLink):\n"
-     "        return\n"
-     "    try:\n"
-     "        ser = getattr(link, \"ser\", None)\n"
-     "        if ser is None or (not getattr(ser, \"in_waiting\", 0) and not getattr(link, \"_rxbuf\", None)):\n"
-     "            return\n"
-     "        while True:\n"
-     "            line = link._read_line(0.1)\n"
-     "            if line is None:\n"
-     "                return\n"
-     "            if line.startswith(\"EVT|\"):\n"
-     "                link.events.append(line)\n"
-     "    except Exception:\n"
-     "        return\n"
-     "\n\n"
-     "def _ktext_timeout(cmd, default):\n"
-     "    \"\"\"v0.9.60e - humanized typing is deliberately slow: size the wait from the\n"
-     "    payload (len x hmax + margin) so a long Type Text never dies at 5 s.\"\"\"\n"
-     "    inner = cmd\n"
-     "    for env in (\"KBDPICO|\", \"KBDARM|\"):\n"
-     "        if inner.startswith(env):\n"
-     "            inner = inner[len(env):]\n"
-     "    if not inner.startswith(\"KTEXT|\"):\n"
-     "        return default\n"
-     "    try:\n"
-     "        p = inner[6:].split(\",\", 2)\n"
-     "        per_ms = max(int(p[0]), int(p[1]))\n"
-     "        return max(default, 5.0 + len(p[2]) * per_ms / 1000.0 + 5.0)\n"
-     "    except Exception:\n"
-     "        return default\n"
-     "\n\n"
-     "def open_link(port):\n"),
-    # 3) drain + MMOVE local-ack + sized KTEXT timeout on the send op
-    ("                    cmd = req[\"cmd\"]\n"
-     "                    abort_flag.clear()\n"
-     "                    reply = link.command(cmd, timeout=req.get(\"timeout\", 5.0))\n",
-     "                    cmd = req[\"cmd\"]\n"
-     "                    abort_flag.clear()\n"
-     "                    _drain_stale(link)         # v0.9.60e - eat leftovers of write-only aborts\n"
-     "                    if cmd.split(\"|\", 1)[0] == \"MMOVE\":\n"
-     "                        # v0.9.60e - firmware 60c made MMOVE fire-and-forget (no reply is\n"
-     "                        # ever sent): a lone MMOVE via a \"send\" op would wait 5 s and die.\n"
-     "                        link._send(cmd)\n"
-     "                        reply = \"OK|MMOVE\"      # local ack, same contract as send_path\n"
-     "                    else:\n"
-     "                        reply = link.command(cmd, timeout=_ktext_timeout(cmd, req.get(\"timeout\", 5.0)))\n"),
-    # 4) drain + hardware-cadence thinning before streaming a dense path
-    ("                    aborted = False\n"
-     "                    t0 = time.monotonic()\n",
-     "                    _drain_stale(link)         # v0.9.60e - clean pipe before streaming\n"
-     "                    # v0.9.60f - hardware-cadence thinning (the choppy-mouse fix). The arm\n"
-     "                    # executes ~50 moves/sec (~20 ms each, measured 2026-09-08), but dense\n"
-     "                    # WindMouse trails arrive at ~4 ms/point: oversubscribed 4-5x, the\n"
-     "                    # firmware's coalescing dropped points and the cursor visibly jumped.\n"
-     "                    # Merge micro-steps so every emitted point gets >= MIN_STEP_MS: same\n"
-     "                    # total time, same curve shape, and every point actually executes.\n"
-     "                    MIN_STEP_MS = 25\n"
-     "                    if len(pts) > 1 and dlys:\n"
-     "                        tp, td = [pts[0]], []\n"
-     "                        acc = 0\n"
-     "                        for i in range(1, len(pts)):\n"
-     "                            acc += dlys[i - 1] if i - 1 < len(dlys) else 0\n"
-     "                            if acc >= MIN_STEP_MS:\n"
-     "                                tp.append(pts[i])\n"
-     "                                td.append(acc)\n"
-     "                                acc = 0\n"
-     "                        if tp[-1] != pts[-1]:\n"
-     "                            tp.append(pts[-1])     # the final target ALWAYS lands\n"
-     "                            td.append(acc)\n"
-     "                        pts, dlys = tp, td\n"
-     "                    aborted = False\n"
-     "                    t0 = time.monotonic()\n"),
+    ("def _ktext_timeout(cmd, default):",
+     [("def open_link(port):\n",
+       HELPERS + "def open_link(port):\n")]),
+    # 3) send op: drain + MMOVE local-ack + sized KTEXT timeout
+    ("reply = \"OK|MMOVE\"",
+     [(SEND_V1_OLD, SEND_V1_NEW),        # v1-patched -> v3 (delta only)
+      (SEND_CLEAN_OLD, SEND_FULL_NEW)]), # clean -> v3
+    # 4) send_path: drain + hardware-cadence thinning
+    ("MIN_STEP_MS = 25",
+     [(PATH_V1V2_OLD, PATH_V1V2_NEW),        # v1/v2-patched -> v3 (delta only)
+      (PATH_CLEAN_OLD, PATH_FULL_NEW)]),     # clean -> v3
 ]
 
 
@@ -145,17 +201,19 @@ def main():
     src = open(path, encoding="utf-8").read()
     applied = already = 0
     out = src
-    for i, (a, b) in enumerate(EDITS):
-        if b in out:
+    for i, (marker, variants) in enumerate(EDITS):
+        if marker in out:
             already += 1
             continue
-        n = out.count(a)
-        if n != 1:
-            print("PATCH FAILED: anchor %d not unique (count=%d) - file NOT patched." % (i, n))
+        for a, b in variants:
+            if out.count(a) == 1:
+                out = out.replace(a, b, 1)
+                applied += 1
+                break
+        else:
+            print("PATCH FAILED: edit %d found no known state - file NOT patched." % i)
             print("send me your bridge.py and I will re-aim the patch.")
             return 1
-        out = out.replace(a, b, 1)
-        applied += 1
     if applied == 0:
         print("already patched (v0.9.60e+f) - nothing to do")
         return 0

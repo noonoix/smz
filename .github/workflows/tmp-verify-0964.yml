@@ -1,0 +1,106 @@
+name: tmp-verify-0964
+
+# TEMPORARY. Applies the 0.9.64 version-pin bump on this branch and proves the
+# full Windows build + TestRunner green BEFORE anything touches main (CI run #19
+# went red because PR #13 bumped only the Pico bundle version). The Windows job
+# commits a short reports/verify-0964.txt so the result is readable without the
+# Actions log. Delete this workflow before merging.
+
+on:
+  push:
+    branches: [fix/version-pins-0964]
+    paths-ignore:
+      - 'reports/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/version-pins-0964
+
+      - name: Apply the version-pin bump
+        run: python3 tools/patch_version_pins_0964.py
+
+      - name: Commit the patched pins
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "nothing to commit - already patched"
+          else
+            git add -A
+            git commit -m "fix: bump release pins to 0.9.64 (bundle 0.9.64b) [skip-tmp]"
+            git push origin HEAD:fix/version-pins-0964
+          fi
+
+  verify:
+    needs: patch
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/version-pins-0964
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Compile-check the bridge stack
+        run: python -m py_compile ams-shell/bridge/bridge.py ams-shell/bridge/ams_serial.py ams-shell/bridge/ams_crypto.py
+
+      - name: Behaviour-test the Pico brain transport
+        run: python tools/test_bridge_pico.py
+
+      - name: Restore
+        run: dotnet restore ams-shell/AMS.sln
+
+      - name: Build (Release)
+        run: dotnet build ams-shell/AMS.sln -c Release --no-restore
+
+      - name: Build TestRunner
+        run: dotnet build tests/TestRunner.csproj -c Release
+
+      - name: Run TestRunner
+        id: tests
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object ci-test-output.txt
+          exit $LASTEXITCODE
+
+      - name: Commit the verify report
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path reports | Out-Null
+          $out = @()
+          $out += "run=$env:GITHUB_RUN_NUMBER"
+          $out += "commit=$env:GITHUB_SHA"
+          $out += "test_step=${{ steps.tests.outcome }}"
+          if (Test-Path ci-test-output.txt) {
+            $lines = Get-Content ci-test-output.txt
+            $res = ($lines | Select-String -Pattern '=== Results' | Select-Object -Last 1).Line
+            $out += "results=$res"
+            $fails = @($lines | Select-String -Pattern '^FAIL:' | ForEach-Object { $_.Line })
+            $out += "fail_count=$($fails.Count)"
+            $out += '--- FAIL lines (max 60) ---'
+            $out += ($fails | Select-Object -First 60)
+            $skips = @($lines | Select-String -Pattern '^SKIP:' | ForEach-Object { $_.Line })
+            $out += '--- SKIP lines ---'
+            $out += $skips
+          } else {
+            $out += 'results=NO TEST LOG - the build failed before the test step'
+          }
+          Set-Content -Path reports/verify-0964.txt -Value $out -Encoding utf8
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/verify-0964.txt
+          git commit -m "chore(tmp): windows verify report [skip-tmp]"
+          git pull --rebase origin fix/version-pins-0964
+          git push origin HEAD:fix/version-pins-0964

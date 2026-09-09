@@ -1840,7 +1840,7 @@ class TestRunner
         Assert(v32dlg.Contains("نمونه‌برداری از سنسور صدا"),
             "v0.9.32: measuring label no longer promises a 2-second window");
         var v32csp = V27ReadSrc("Ams.UI.csproj");
-        Assert(v32csp.Contains("<Version>0.9.60</Version>"),
+        Assert(v32csp.Contains("<Version>0.9.64</Version>"),
             "v0.9.32: assembly version bumped (the v0.9.31 build had shipped with 0.9.29)");
         Console.WriteLine();
         // ── Step 33: v0.9.33 — loop replay fix + marker guard for sound If/Else ────────────
@@ -1883,7 +1883,7 @@ class TestRunner
         Assert(v34vm.Contains("Classroom Studio v0.9."),
             "v0.9.34+: the startup banner carries the current version");
         var v34csp = V27ReadSrc("Ams.UI.csproj");
-        Assert(v34csp.Contains("<Version>0.9.60</Version>"),
+        Assert(v34csp.Contains("<Version>0.9.64</Version>"),
             "v0.9.34: assembly version bumped (current build shipped as 0.9.35)");
         Console.WriteLine();
         // ── Step 35: v0.9.35 — Else/End If marker cluster fixes ──────────────────────────────
@@ -1973,8 +1973,8 @@ class TestRunner
             "v0.9.36: paste keeps sibling order and unsafe partial block moves are blocked");
 
         // 12) version/banner
-        Assert(v34csp.Contains("<Version>0.9.60</Version>")
-               && v34vm.Contains("Classroom Studio v0.9.60"),
+        Assert(v34csp.Contains("<Version>0.9.64</Version>")
+               && v34vm.Contains("Classroom Studio v0.9.64"),
             "v0.9.36: version and banner match");
         Console.WriteLine();
         // ── Step 37: v0.9.37 — mandatory If/Else structure + white step rows ────────
@@ -2031,8 +2031,8 @@ class TestRunner
             "v0.9.37: pastel scope tints removed — rows keep the white list background");
         Assert(v37mw.Contains("double left = double.NaN;") && v37mw.Contains("candidate < left"),
             "v0.9.37: the scope bracket anchors at the leftmost row, so it spans the Else row");
-        Assert(v37csp.Contains("<Version>0.9.60</Version>")
-               && v37vm.Contains("Classroom Studio v0.9.60"),
+        Assert(v37csp.Contains("<Version>0.9.64</Version>")
+               && v37vm.Contains("Classroom Studio v0.9.64"),
             "v0.9.37: version and banner match");
         // ── Step 38: v0.9.38 — accordion toggle beside the text + Else bend on the bracket ──
         Console.WriteLine();
@@ -2077,8 +2077,8 @@ class TestRunner
             "v0.9.38: the bracket anchors on the text cell (toggle included), left of the toggle");
 
         // 11) version/banner
-        Assert(v38csp.Contains("<Version>0.9.60</Version>")
-               && v38vm.Contains("Classroom Studio v0.9.60"),
+        Assert(v38csp.Contains("<Version>0.9.64</Version>")
+               && v38vm.Contains("Classroom Studio v0.9.64"),
             "v0.9.38: version and banner match");
         Console.WriteLine();
         Console.WriteLine();
@@ -2149,8 +2149,8 @@ class TestRunner
             "v0.9.39: the light fields have Persian labels in the step dialog");
 
         // 15) version/banner
-        Assert(v39csp.Contains("<Version>0.9.60</Version>")
-               && v39vm.Contains("Classroom Studio v0.9.60"),
+        Assert(v39csp.Contains("<Version>0.9.64</Version>")
+               && v39vm.Contains("Classroom Studio v0.9.64"),
             "v0.9.39: version and banner match");
 
         // ── Step 40: v0.9.40 — the accordion toggle reveals the scope vein ──
@@ -2194,8 +2194,8 @@ class TestRunner
             "v0.9.40: the v0.9.38 Else bend and the v0.9.39 light step are preserved");
 
         // 11) version/banner
-        Assert(v40csp.Contains("<Version>0.9.60</Version>")
-               && v40vm.Contains("Classroom Studio v0.9.60"),
+        Assert(v40csp.Contains("<Version>0.9.64</Version>")
+               && v40vm.Contains("Classroom Studio v0.9.64"),
             "v0.9.40: version and banner match");
 
         // ── Step 41: v0.9.41 — spelling, marker veins, rail submenus, restart removal ──
@@ -2266,7 +2266,7 @@ class TestRunner
             "v0.9.41: clicking a rail caret opens that section's submenu");
 
         // 15) version/banner
-        Assert(v41csp.Contains("<Version>0.9.60</Version>") && v41vm.Contains("Classroom Studio v0.9.60"),
+        Assert(v41csp.Contains("<Version>0.9.64</Version>") && v41vm.Contains("Classroom Studio v0.9.64"),
             "v0.9.41: version and banner match");
 
         // ── Step 42: v0.9.42 — a step without a condition adopts nothing ──
@@ -2341,7 +2341,7 @@ class TestRunner
             "v0.9.42: opening, importing and editing run the release migration");
 
         // 15) version/banner
-        Assert(v42csp.Contains("<Version>0.9.60</Version>") && v42vm.Contains("Classroom Studio v0.9.60"),
+        Assert(v42csp.Contains("<Version>0.9.64</Version>") && v42vm.Contains("Classroom Studio v0.9.64"),
             "v0.9.42: version and banner match");
 
         // ── Step 43: v0.9.43 — seven user-reported UI items ─────────────────────
@@ -2415,7 +2415,7 @@ class TestRunner
                && v43dlg.Contains("MakeAudioDeviceCombo") && v43dlg.Contains("FieldKind.AudioDevice =>")
                && v43fa.Contains("-۱=خودکار"),
             "v0.9.43: the audio output device is a dropdown of real NAudio devices, not a bare number");
-        Assert(v43csp.Contains("<Version>0.9.60</Version>") && v43vm.Contains("Classroom Studio v0.9.60"),
+        Assert(v43csp.Contains("<Version>0.9.64</Version>") && v43vm.Contains("Classroom Studio v0.9.64"),
             "v0.9.43: version and banner match");
 
         // ── Step 44: v0.9.44 — rail-leave close · parallel-group vein · Pico play options ·
@@ -2490,7 +2490,7 @@ class TestRunner
             "v0.9.60: code.py always types locally on the Pico, whatever the legacy keyboard-board option says");
 
         // 16) version/banner
-        Assert(v44csp.Contains("<Version>0.9.60</Version>") && v44vm.Contains("Classroom Studio v0.9.60"),
+        Assert(v44csp.Contains("<Version>0.9.64</Version>") && v44vm.Contains("Classroom Studio v0.9.64"),
             "v0.9.44: version and banner match");
 
         // ── Step 45: v0.9.45 — stable rail popup · visible board roles · structural Next ──
@@ -2556,9 +2556,9 @@ class TestRunner
             "v0.9.45: loop + Next are atomic for delete/cut/copy; Next cannot be orphaned");
 
         // 15) version family
-        Assert(v45csp.Contains("<Version>0.9.60</Version>")
-               && v45vm.Contains("Classroom Studio v0.9.60")
-               && v45exp.Contains("BundleVersion = \"0.9.60\""),
+        Assert(v45csp.Contains("<Version>0.9.64</Version>")
+               && v45vm.Contains("Classroom Studio v0.9.64")
+               && v45exp.Contains("BundleVersion = \"0.9.64b\""),
             "v0.9.45: app version, banner and Pico bundle version match");
 
         // ── Step 46: v0.9.46 — real cursor popup close · per-step keyboard board · Next inset ──
@@ -2630,9 +2630,9 @@ class TestRunner
         Assert(v46fa.Contains("keystroke:keyboardBoard") && v46fa.Contains("typeText:keyboardBoard")
                && v46fa.Contains("keyDown:keyboardBoard") && v46fa.Contains("keyUp:keyboardBoard"),
             "v0.9.46: all four new step fields have Persian labels");
-        Assert(v46csp.Contains("<Version>0.9.60</Version>")
-               && v46vm.Contains("Classroom Studio v0.9.60")
-               && v46exp.Contains("BundleVersion = \"0.9.60\""),
+        Assert(v46csp.Contains("<Version>0.9.64</Version>")
+               && v46vm.Contains("Classroom Studio v0.9.64")
+               && v46exp.Contains("BundleVersion = \"0.9.64b\""),
             "v0.9.46: app version, banner and Pico bundle version match");
 
         // ── Step 47: v0.9.47 — the structural Next label aligns with its loop head ──
@@ -2667,9 +2667,9 @@ class TestRunner
             "v0.9.47: the red vein still closes on the visible Next row");
         Assert(v47row.Contains("public string Number") && v47row.Contains("public int Depth"),
             "v0.9.47: row numbering and depth model are unchanged");
-        Assert(v47csp.Contains("<Version>0.9.60</Version>")
-               && v47vm.Contains("Classroom Studio v0.9.60")
-               && v47exp.Contains("BundleVersion = \"0.9.60\""),
+        Assert(v47csp.Contains("<Version>0.9.64</Version>")
+               && v47vm.Contains("Classroom Studio v0.9.64")
+               && v47exp.Contains("BundleVersion = \"0.9.64b\""),
             "v0.9.47: app version, banner and Pico bundle version match");
 
         Console.WriteLine();
@@ -2725,9 +2725,9 @@ class TestRunner
             "v0.9.48: inactive Options tabs are Collapsed — Hidden kept reserving their height and stretched the dialog");
 
         // 13) version family
-        Assert(v48csp.Contains("<Version>0.9.60</Version>")
-               && v48vm.Contains("Classroom Studio v0.9.60")
-               && v48exp.Contains("BundleVersion = \"0.9.60\""),
+        Assert(v48csp.Contains("<Version>0.9.64</Version>")
+               && v48vm.Contains("Classroom Studio v0.9.64")
+               && v48exp.Contains("BundleVersion = \"0.9.64b\""),
             "v0.9.48: app version, banner and Pico bundle version match");
 
         Console.WriteLine();
@@ -2766,9 +2766,9 @@ class TestRunner
             "v0.9.49: the Options layout pins the buttons to the bottom of the docked dialog");
 
         // 10) version family
-        Assert(v49csp.Contains("<Version>0.9.60</Version>")
-               && v49vm.Contains("Classroom Studio v0.9.60")
-               && v49exp.Contains("BundleVersion = \"0.9.60\""),
+        Assert(v49csp.Contains("<Version>0.9.64</Version>")
+               && v49vm.Contains("Classroom Studio v0.9.64")
+               && v49exp.Contains("BundleVersion = \"0.9.64b\""),
             "v0.9.49: app version, banner and Pico bundle version match");
 
 
@@ -2881,9 +2881,9 @@ class TestRunner
         Assert(v50mw2.Contains("BoardPrepCommand") && v50vm2.Contains("BoardPrepWindow"),
             "v0.9.50: the Tools menu opens the board preparation window");
         // v0.9.51 — version pins move with the release (were v0.9.50)
-        Assert(v50csp2.Contains("<Version>0.9.60</Version>")
-               && v50vm2.Contains("Classroom Studio v0.9.60")
-               && v50exp2.Contains("BundleVersion = \"0.9.60\""),
+        Assert(v50csp2.Contains("<Version>0.9.64</Version>")
+               && v50vm2.Contains("Classroom Studio v0.9.64")
+               && v50exp2.Contains("BundleVersion = \"0.9.64b\""),
             "v0.9.50→51: app version, banner and Pico bundle version match");
 
         // ── v0.9.51: COM-history cleanup (phantom detection + elevated delete with backup) ──
@@ -3063,9 +3063,9 @@ class TestRunner
                    && ck52.Contains("(0x303A, 0x1001)") && ck52.Contains("(0x303A, 0x1002)"),
                 "v0.9.52: checkup recognises the new devices in both bootloader and application mode");
         }
-        Assert(v51csp.Contains("<Version>0.9.60</Version>")
-               && v51vm3.Contains("Classroom Studio v0.9.60")
-               && v51exp.Contains("BundleVersion = \"0.9.60\""),
+        Assert(v51csp.Contains("<Version>0.9.64</Version>")
+               && v51vm3.Contains("Classroom Studio v0.9.64")
+               && v51exp.Contains("BundleVersion = \"0.9.64b\""),
             "v0.9.52: version pins for this release (csproj + banner + bundle)");
 
 
@@ -3224,9 +3224,9 @@ class TestRunner
             var csp54 = V27ReadSrc("Ams.UI.csproj");
             var vm54 = V27ReadSrc(Path.Combine("ViewModels", "MainViewModel.cs"));
             var exp54 = V27ReadSrc(Path.Combine("Services", "PicoFirmwareExporter.cs"));
-            Assert(csp54.Contains("<Version>0.9.60</Version>")
-                   && vm54.Contains("Classroom Studio v0.9.60")
-                   && exp54.Contains("BundleVersion = \"0.9.60\""),
+            Assert(csp54.Contains("<Version>0.9.64</Version>")
+                   && vm54.Contains("Classroom Studio v0.9.64")
+                   && exp54.Contains("BundleVersion = \"0.9.64b\""),
                 "v0.9.55: version pins for this release (csproj + banner + bundle)");
         }
 
@@ -3353,9 +3353,9 @@ class TestRunner
             var csp55 = V27ReadSrc("Ams.UI.csproj");
             var vmb55 = V27ReadSrc(Path.Combine("ViewModels", "MainViewModel.cs"));
             var exp55 = V27ReadSrc(Path.Combine("Services", "PicoFirmwareExporter.cs"));
-            Assert(csp55.Contains("<Version>0.9.60</Version>")
-                   && vmb55.Contains("Classroom Studio v0.9.60")
-                   && exp55.Contains("BundleVersion = \"0.9.60\""),
+            Assert(csp55.Contains("<Version>0.9.64</Version>")
+                   && vmb55.Contains("Classroom Studio v0.9.64")
+                   && exp55.Contains("BundleVersion = \"0.9.64b\""),
                 "v0.9.55: version pins for this release (csproj + banner + bundle)");
         }
 
@@ -3373,8 +3373,8 @@ class TestRunner
             "v0.9.56: generated header comment mentions GP16 = TX and GP17 = RX");
         Assert(pfe56.Contains("busio.I2C(board.GP21, board.GP20)"),
             "v0.9.56: BH1750 I2C pins untouched (GP21/GP20)");
-        Assert(PicoFirmwareExporter.BundleVersion == "0.9.60",
-            "v0.9.56: BundleVersion is 0.9.60");
+        Assert(PicoFirmwareExporter.BundleVersion == "0.9.64b",
+            "v0.9.56: BundleVersion is 0.9.64b");
         var tmp56 = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "pfe56_" + Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(tmp56);
         try {
@@ -3390,8 +3390,8 @@ class TestRunner
         } finally {
             if (System.IO.Directory.Exists(tmp56)) System.IO.Directory.Delete(tmp56, true);
         }
-        Assert(csproj56.Contains("<Version>0.9.60</Version>"),
-            "v0.9.56: csproj version is 0.9.60");
+        Assert(csproj56.Contains("<Version>0.9.64</Version>"),
+            "v0.9.56: csproj version is 0.9.64");
 
 
         // ── Step 57: v0.9.57 — portable / self-contained build ──
@@ -3433,8 +3433,8 @@ class TestRunner
             "v0.9.58: PythonBoardBridge uses PortablePaths.FindPython()");
         Assert(p57pbb.Contains("TimeSpan.FromSeconds(15)"),
             "v0.9.58: ConnectAsync has 15s timeout");
-        Assert(p57csp.Contains("<Version>0.9.60</Version>"),
-            "v0.9.58: csproj version is 0.9.60");
+        Assert(p57csp.Contains("<Version>0.9.64</Version>"),
+            "v0.9.58: csproj version is 0.9.64");
         // (a) csproj bundles the whole bridge/ folder with wildcard
         Assert(p57csp.Contains(@"bridge\**") && p57csp.Contains("CopyToOutputDirectory"),
             "v0.9.58: csproj uses bridge wildcard with CopyToOutputDirectory");
@@ -3486,7 +3486,7 @@ class TestRunner
                 if (!isLabel) pinned.Add(int.Parse(metaMatch.Groups[1].Value));
             }
         }
-        var curMinor = 60;
+        var curMinor = 64;
         var pinnedText = string.Join(", ", pinned.Distinct().OrderBy(n => n));
         Assert(pinned.Count > 0 && pinned.Distinct().All(n => n == curMinor),
             $"v0.9.58: all version pins match current release 0.9.{curMinor} (found: {pinnedText})");
@@ -3502,10 +3502,10 @@ class TestRunner
         var vm60 = V27ReadSrc(Path.Combine("ViewModels", "MainViewModel.cs"));
         var csp60 = V27ReadSrc("Ams.UI.csproj");
 
-        Assert(PicoFirmwareExporter.BundleVersion == "0.9.60"
-               && csp60.Contains("<Version>0.9.60</Version>")
-               && vm60.Contains("Classroom Studio v0.9.60")
-               && exp60.Contains("BundleVersion = \"0.9.60\""),
+        Assert(PicoFirmwareExporter.BundleVersion == "0.9.64b"
+               && csp60.Contains("<Version>0.9.64</Version>")
+               && vm60.Contains("Classroom Studio v0.9.64")
+               && exp60.Contains("BundleVersion = \"0.9.64b\""),
             "v0.9.60: version pins (firmware bundle, csproj, app banner)");
 
         // firmware contract: optional sensor / never-die / byte buffer / arm pump / fixed keypad
@@ -3528,7 +3528,7 @@ class TestRunner
             "v0.9.60: keyboard always on the Pico; both legacy envelopes are consumed locally");
 
         var code60 = PicoFirmwareExporter.BuildCodePy(new List<PicoFirmwareExporter.LightState>(), "M");
-        Assert(code60.Contains("AUTOSTART = False") && code60.Contains("pico-light 0.9.60")
+        Assert(code60.Contains("AUTOSTART = False") && code60.Contains("pico-light 0.9.64b")
                && !code60.Contains("__KBD_ON_ARM__") && !code60.Contains("__RUNSTOP_HOTKEY__")
                && !code60.Contains("__PAUSERESUME_HOTKEY__") && !code60.Contains("__LOOP_MODE__"),
             "v0.9.60: exported code.py is fully baked with the fixed control contract");

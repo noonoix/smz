@@ -41,6 +41,14 @@ keypress millisecond. When the mouse had not moved, tracked == actual and the sn
 - Classroom-Studio-code64b.zip: 74fc438970f067365102356fa66e4097a177a55020fe98fd1e0e0d5d56f7daab
 - originals (user zip): code64.py 7560b0021716..., plan_engine.py 187e8d1c1c..., plan.txt bd549f13...
 
+## Mirror fidelity
+Every mirrored file was verified byte-identical to the sandbox original via git blob sha + size,
+with ONE exception: the repo copy of plan_engine.py differs from the golden file only by a
+header-comment word ("TypeScript" instead of "TypeTextCommands") plus <=2 whitespace bytes
+(repo blob 32,294 B vs golden 32,298 B). It is functionally identical — code64b_check.py (34/34)
+executes it (T9/T10/S14/S15). Byte-perfect golden copies: the user's original code64 zip and the
+delivered Classroom-Studio-code64b.zip in this session's chat attachments.
+
 ## Known limit (unchanged)
 HID has no position feedback: after a manual move + Start, the plan's first move (~0.5 s later)
 still re-homes the cursor into the plan region — that is the plan doing its job, not a keypress

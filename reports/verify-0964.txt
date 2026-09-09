@@ -1,0 +1,12 @@
+run=1
+commit=ba5e74604e364fd3d1fa95af2540929c49317215
+test_step=failure
+results==== Results: 688 passed, 2 failed ===
+fail_count=2
+--- FAIL lines (max 60) ---
+FAIL: v0.9.58d: send_path parses semicolon-delimited delays, not individual characters
+FAIL: v0.9.60: bridge stdio is forced to UTF-8 with an ASCII-safe emit fallback
+--- SKIP lines ---
+SKIP: daroon1.amk not present on this machine — daroon import test skipped (CI-safe)
+SKIP: daroon1.amk not present on this machine — PNG extraction test skipped (CI-safe)
+SKIP: daroon1.amk not present on this machine — native image extraction test skipped (CI-safe)

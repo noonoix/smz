@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  probe:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,16 +19,27 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Run plan-engine probe
+      - name: Verify the diagnostic patcher
         run: |
           mkdir -p reports
-          python tools/_plan_probe.py > reports/plan-diag.txt 2>&1 || true
-          wc -l reports/plan-diag.txt
+          R=reports/plan-diag-verify.txt
+          cp firmware/code64b/code64b.py /tmp/code.py
+          echo "=== run 1 ===" > $R
+          python tools/patch_plan_diag.py /tmp/code.py >> $R 2>&1 || echo "EXIT=$?" >> $R
+          echo "=== run 2 (idempotency) ===" >> $R
+          python tools/patch_plan_diag.py /tmp/code.py >> $R 2>&1 || echo "EXIT=$?" >> $R
+          echo "=== py_compile patched ===" >> $R
+          if python -m py_compile /tmp/code.py 2>>$R; then echo "py_compile OK" >> $R; else echo "py_compile FAILED" >> $R; fi
+          echo "=== code64b_check on the ORIGINAL file ===" >> $R
+          (cd firmware/code64b && python code64b_check.py | tail -2) >> $R 2>&1 || true
+          echo "=== diff (original -> patched) ===" >> $R
+          diff -u firmware/code64b/code64b.py /tmp/code.py | head -140 >> $R || true
+          wc -l $R
 
       - name: Commit report
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -f reports/plan-diag.txt
-          git commit -m "chore(diag): plan-engine probe report [skip-tmp]" || echo "no changes"
+          git add -f reports/plan-diag-verify.txt
+          git commit -m "chore(diag): patcher verification report [skip-tmp]" || echo "no changes"
           git push

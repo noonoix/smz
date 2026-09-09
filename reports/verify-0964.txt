@@ -1,12 +1,28 @@
-run=1
-commit=ba5e74604e364fd3d1fa95af2540929c49317215
-test_step=failure
-results==== Results: 688 passed, 2 failed ===
-fail_count=2
+run=2
+head=2944b43c31bb1e4df749b43ff60d1b2634c52911
+test_step=success
+results==== Results: 692 passed, 0 failed ===
+fail_count=0
 --- FAIL lines (max 60) ---
-FAIL: v0.9.58d: send_path parses semicolon-delimited delays, not individual characters
-FAIL: v0.9.60: bridge stdio is forced to UTF-8 with an ASCII-safe emit fallback
---- SKIP lines ---
-SKIP: daroon1.amk not present on this machine — daroon import test skipped (CI-safe)
-SKIP: daroon1.amk not present on this machine — PNG extraction test skipped (CI-safe)
-SKIP: daroon1.amk not present on this machine — native image extraction test skipped (CI-safe)
+--- bridge.py diagnostics ---
+sha256=380BA3B24504CC87B16E1EC7A19336E0D1A4C6B765BEE1C94C5DEFC2C0F6E421
+bytes=25114
+54: _stream.reconfigure(encoding="utf-8", errors="replace")
+61: line = json.dumps(obj, ensure_ascii=False)
+63: line = json.dumps(obj, ensure_ascii=True)
+68: sys.stdout.write(json.dumps(obj, ensure_ascii=True) + "\n")
+--- every bridge.py in the tree ---
+\ams-shell\bridge\bridge.py
+\ams-shell\src\Ams.UI\bin\Release\net8.0-windows\bridge\bridge.py
+\artifacts\publish-v0.9.46\bridge\bridge.py
+\artifacts\publish-v0.9.47\bridge\bridge.py
+\artifacts\publish-v0.9.48\bridge\bridge.py
+\artifacts\publish-v0.9.50\bridge\bridge.py
+\artifacts\publish-v0.9.51\bridge\bridge.py
+\artifacts\publish-v0.9.52\bridge\bridge.py
+\artifacts\publish-v0.9.53\bridge\bridge.py
+\artifacts\publish-v0.9.54\bridge\bridge.py
+\artifacts\publish-v0.9.56\bridge\bridge.py
+\artifacts\publish-v0.9.57\bridge\bridge.py
+\artifacts\publish-v0.9.58\bridge\bridge.py
+\tests\bin\Release\net8.0-windows\bridge\bridge.py

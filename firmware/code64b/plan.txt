@@ -1,0 +1,9 @@
+# Classroom Studio portable plan - generated from mouse.amsj (app 0.8.2)
+# steps: 1 converted, 0 skipped
+PLAN|1
+SCREEN|1920,1080
+SPEED|0,2000
+LOOP|0
+RMOUSE|region=1301,0,378,1049|before=120,450|after=150,600|mid=12:100,500|idle=5,12:800,3000|over=25|curve=22,155|mt=0,333
+DELAY|55,55
+ENDLOOP

@@ -1,10 +1,12 @@
 name: tmp-verify-0964
 
-# TEMPORARY. Applies the 0.9.64 version-pin bump on this branch and proves the
-# full Windows build + TestRunner green BEFORE anything touches main (CI run #19
-# went red because PR #13 bumped only the Pico bundle version). The Windows job
-# commits a short reports/verify-0964.txt so the result is readable without the
-# Actions log. Delete this workflow before merging.
+# TEMPORARY. Proves the 0.9.64 version-pin bump green on a Windows runner BEFORE
+# anything touches main (CI run #19 went red because PR #13 bumped only the Pico
+# bundle version). The verify job now mirrors .github/workflows/build.yml step by
+# step - including the tests/bin + tests/obj wipe - so a difference here is a real
+# difference and not a runner artefact. The result is committed to
+# reports/verify-0964.txt so it is readable without the Actions log.
+# Delete this workflow before merging.
 
 on:
   push:
@@ -24,7 +26,7 @@ jobs:
         with:
           ref: fix/version-pins-0964
 
-      - name: Apply the version-pin bump
+      - name: Apply the version-pin bump (idempotent)
         run: python3 tools/patch_version_pins_0964.py
 
       - name: Commit the patched pins
@@ -49,12 +51,18 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: "8.0.x"
 
-      - name: Compile-check the bridge stack
+      - name: Compile-check bridge stack
         run: python -m py_compile ams-shell/bridge/bridge.py ams-shell/bridge/ams_serial.py ams-shell/bridge/ams_crypto.py
 
-      - name: Behaviour-test the Pico brain transport
+      - name: Verify bridge stack imports
+        run: python -c "import sys; sys.path.insert(0, 'ams-shell/bridge'); import ams_crypto, ams_serial, bridge; print('bridge stack imports OK')"
+
+      - name: Pin the import-os regression
+        run: python -c "import pathlib; s = pathlib.Path('ams-shell/bridge/bridge.py').read_text(encoding='utf-8'); assert '\nimport os\n' in s, 'bridge.py lost import os again'"
+
+      - name: Behavior-test Pico brain transport
         run: python tools/test_bridge_pico.py
 
       - name: Restore
@@ -64,7 +72,10 @@ jobs:
         run: dotnet build ams-shell/AMS.sln -c Release --no-restore
 
       - name: Build TestRunner
-        run: dotnet build tests/TestRunner.csproj -c Release
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force tests/bin, tests/obj -ErrorAction SilentlyContinue
+          dotnet build tests/TestRunner.csproj -c Release
 
       - name: Run TestRunner
         id: tests
@@ -72,7 +83,8 @@ jobs:
         shell: pwsh
         run: |
           dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object ci-test-output.txt
-          exit $LASTEXITCODE
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (Select-String -Path ci-test-output.txt -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
 
       - name: Commit the verify report
         if: always()
@@ -81,7 +93,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path reports | Out-Null
           $out = @()
           $out += "run=$env:GITHUB_RUN_NUMBER"
-          $out += "commit=$env:GITHUB_SHA"
+          $out += "head=$(git rev-parse HEAD)"
           $out += "test_step=${{ steps.tests.outcome }}"
           if (Test-Path ci-test-output.txt) {
             $lines = Get-Content ci-test-output.txt
@@ -91,12 +103,15 @@ jobs:
             $out += "fail_count=$($fails.Count)"
             $out += '--- FAIL lines (max 60) ---'
             $out += ($fails | Select-Object -First 60)
-            $skips = @($lines | Select-String -Pattern '^SKIP:' | ForEach-Object { $_.Line })
-            $out += '--- SKIP lines ---'
-            $out += $skips
           } else {
             $out += 'results=NO TEST LOG - the build failed before the test step'
           }
+          $out += '--- bridge.py diagnostics ---'
+          $out += "sha256=$((Get-FileHash ams-shell/bridge/bridge.py -Algorithm SHA256).Hash)"
+          $out += "bytes=$((Get-Item ams-shell/bridge/bridge.py).Length)"
+          $out += @(Select-String -Path ams-shell/bridge/bridge.py -Pattern 'reconfigure|ensure_ascii|def send_path' | ForEach-Object { "$($_.LineNumber): $($_.Line.Trim())" })
+          $out += '--- every bridge.py in the tree ---'
+          $out += @(Get-ChildItem -Recurse -Filter bridge.py -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName.Replace($PWD.Path, '') })
           Set-Content -Path reports/verify-0964.txt -Value $out -Encoding utf8
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

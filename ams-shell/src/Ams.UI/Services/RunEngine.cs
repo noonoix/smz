@@ -519,6 +519,20 @@ public sealed class RunEngine
                         }
                         else
                         {
+                            // v0.9.61 — sync the board's tracked cursor to the REAL cursor before
+                            // button/wheel actions: HID-Project's AbsoluteMouse resends its stored
+                            // axes on every button/wheel report, and those axes boot to (0,0) =
+                            // screen centre, so a click/scroll without a prior board-driven move
+                            // landed in the middle of the monitor. The board cannot read the cursor
+                            // back; only the app knows it. Instant abs move = invisible (the cursor
+                            // is already there). Arm fw 1.8 carries the same fix board-side.
+                            if (cmd.StartsWith("MCLICK|") || cmd.StartsWith("MWHEEL|")
+                                || cmd.StartsWith("MDOWN|") || cmd.StartsWith("MUP|"))
+                            {
+                                var cur = System.Windows.Forms.Cursor.Position;
+                                await Send($"MMOVE|{cur.X},{cur.Y},abs,0", ct, quiet: true);
+                                _mouseAnchor = cur;
+                            }
                             await Send(wireCmd, ct,
                                 logAs: secret && cmd.StartsWith("KTEXT|") ? MaskKtext(cmd) : null);
                         }

@@ -1,0 +1,58 @@
+name: Apply code64b app port
+
+on:
+  push:
+    branches: [fix/code64b-startstop-teleport]
+    paths:
+      - tools/patch-v0.9.61.py
+      - tools/patch_bridge_60e.py
+      - tools/make_fw_template_0.9.64b.py
+      - .github/workflows/apply-code64b-port.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    if: ${{ !contains(github.event.head_commit.message, '[generated code64b port]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/code64b-startstop-teleport
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore verified patch sources
+        run: |
+          git fetch --no-tags origin diag/code-probe2
+          git show FETCH_HEAD:tools/patch-v0.9.61.py > tools/patch-v0.9.61.py
+          git show FETCH_HEAD:tools/patch_bridge_60e.py > tools/patch_bridge_60e.py
+      - name: Apply source patches
+        run: |
+          python tools/patch-v0.9.61.py .
+          python tools/make_fw_template_0.9.64b.py .
+      - name: Verify Python transport and golden firmware
+        run: |
+          python -m py_compile ams-shell/bridge/bridge.py
+          python tools/test_bridge_pico.py
+          python firmware/code64b/code64b_check.py firmware/code64b/code64b.py
+          python tools/make_fw_template_0.9.64b.py .
+          git diff --check
+      - name: Save generated source changes
+        shell: bash
+        run: |
+          git add ams-shell/bridge/bridge.py \
+                  ams-shell/src/Ams.UI/Services/RunEngine.cs \
+                  ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs \
+                  tools/patch-v0.9.61.py \
+                  tools/patch_bridge_60e.py
+          if git diff --cached --quiet; then
+            echo 'Source files already match; nothing to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix: apply verified code64b app port [generated code64b port]'
+          git push origin HEAD:fix/code64b-startstop-teleport

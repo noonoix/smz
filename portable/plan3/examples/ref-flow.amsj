@@ -1,0 +1,67 @@
+{
+  "app": "AMS",
+  "version": "0.8.2",
+  "steps": [
+    { "Type": "label", "Name": "", "Delay": 0, "IsDisabled": false,
+      "Props": { "label": "start" }, "Children": [] },
+    { "Type": "waitForSound", "Name": "", "Delay": 0, "IsDisabled": false,
+      "Props": { "insertIfElse": true, "threshold": 90, "minDurationMs": 60, "timeoutMs": 20000 },
+      "Children": [
+        { "Type": "keystroke", "Name": "", "Delay": 0, "IsDisabled": false,
+          "Props": { "modCtrl": false, "modShift": false, "modAlt": false, "modWin": false,
+                     "key": "E", "holdMin": 0, "holdMax": 0, "keyboardBoard": "default" }, "Children": [] }
+      ] },
+    { "Type": "comment", "Name": "", "Delay": 0, "IsDisabled": false,
+      "Props": { "text": "Else - reaction if nothing was heard" },
+      "Children": [
+        { "Type": "delay", "Name": "", "Delay": 0, "IsDisabled": false,
+          "Props": { "minMs": 250, "maxMs": 250 }, "Children": [] }
+      ] },
+    { "Type": "comment", "Name": "", "Delay": 0, "IsDisabled": false,
+      "Props": { "text": "End If" }, "Children": [] },
+    { "Type": "waitForLight", "Name": "", "Delay": 0, "IsDisabled": false,
+      "Props": { "luxCenter": 100, "luxTolerance": 20, "stableSec": 1, "timeoutMs": 20000,
+                 "sampleMode": "hires", "armed": true, "key": "E", "holdMin": 30, "holdMax": 90,
+                 "reactMin": 80, "reactMax": 180 }, "Children": [] },
+    { "Type": "randomPackage", "Name": "", "Delay": 100, "DelayMax": 200, "IsDisabled": false,
+      "Props": { "title": "", "mode": "shuffleAll", "minCount": 1, "maxCount": 10 },
+      "Children": [
+        { "Type": "keystroke", "Name": "", "Delay": 0, "IsDisabled": false,
+          "Props": { "modCtrl": false, "modShift": false, "modAlt": false, "modWin": false,
+                     "key": "C", "holdMin": 88, "holdMax": 180, "keyboardBoard": "default" }, "Children": [] },
+        { "Type": "keystroke", "Name": "", "Delay": 0, "IsDisabled": false,
+          "Props": { "modCtrl": false, "modShift": false, "modAlt": false, "modWin": false,
+                     "key": "V", "holdMin": 88, "holdMax": 180, "keyboardBoard": "default" }, "Children": [] }
+      ] },
+    { "Type": "randomPackage", "Name": "", "Delay": 0, "IsDisabled": false,
+      "Props": { "title": "", "mode": "randomSubset", "minCount": 1, "maxCount": 2 },
+      "Children": [
+        { "Type": "mouseScroll", "Name": "", "Delay": 0, "IsDisabled": false,
+          "Props": { "delta": -1 }, "Children": [] },
+        { "Type": "mouseScroll", "Name": "", "Delay": 0, "IsDisabled": false,
+          "Props": { "delta": 1 }, "Children": [] }
+      ] },
+    { "Type": "parallelGroup", "Name": "", "Delay": 0, "IsDisabled": false,
+      "Props": { "title": "" },
+      "Children": [
+        { "Type": "typeText", "Name": "", "Delay": 0, "IsDisabled": false,
+          "Props": { "text": "ab", "mode": "keystrokes", "keyboardBoard": "default", "secret": false,
+                     "hmin": 80, "hmax": 120, "wmin": 0, "wmax": 0, "pmin": 0, "pmax": 0,
+                     "thinkChance": 0, "thinkMin": 800, "thinkMax": 2200,
+                     "typoEveryMin": 0, "typoEveryMax": 0 }, "Children": [] },
+        { "Type": "mouseClick", "Name": "", "Delay": 0, "IsDisabled": false,
+          "Props": { "button": "left", "action": "single", "holdMin": 0, "holdMax": 0 }, "Children": [] }
+      ] },
+    { "Type": "comment", "Name": "", "Delay": 0, "IsDisabled": false,
+      "Props": { "text": "Next" }, "Children": [] },
+    { "Type": "playAudio", "Name": "", "Delay": 0, "IsDisabled": false,
+      "Props": { "path": "C:\\\\snd\\\\ok.wav", "mode": "playerMacro", "outputDevice": -1, "loop": false }, "Children": [] },
+    { "Type": "runExe", "Name": "", "Delay": 0, "IsDisabled": false,
+      "Props": { "path": "C:\\\\tools\\\\app.exe", "args": "--fast", "windowState": "minimized",
+                 "admin": false, "wait": false }, "Children": [] },
+    { "Type": "openFile", "Name": "", "Delay": 0, "IsDisabled": false,
+      "Props": { "path": "C:\\\\docs\\\\readme.txt", "windowState": "normal", "admin": false }, "Children": [] },
+    { "Type": "gotoLabel", "Name": "", "Delay": 0, "IsDisabled": false,
+      "Props": { "label": "start" }, "Children": [] }
+  ]
+}

@@ -168,12 +168,33 @@ class PicoLink:
             raise PicoError("not connected")
         self._send(cmd)
         deadline = time.monotonic() + timeout
+        # v0.9.60e - never mis-pair a stale reply with this command: a write-only
+        # abort HALT answer or a late PONG used to be returned as the NEXT command's
+        # reply (hardware log: SETRES <- OK|HALT / OK|PONG). Skip OK|X / ERR|?|X
+        # whose X is not this command's head (PING's answer is PONG).
+        expect = cmd.split("|")[0]
+        if expect in ("KBDPICO", "KBDARM") and "|" in cmd:
+            expect = cmd.split("|", 2)[1]
+        want = "PONG" if expect == "PING" else expect
+        retried = False                  # v0.9.60g - one retry on ERR|UNKNOWN (UART glitch)
         while True:
             line = self._read_line(max(0.05, deadline - time.monotonic()))
             if line is None:
                 raise PicoError("ERR|TIMEOUT|" + cmd.split("|")[0])
             if line.startswith("EVT|"):
                 self.events.append(line)   # رویداد مسلح، جایگزین پاسخ نمی‌شود
+                continue
+            parts = line.split("|")
+            if len(parts) >= 2 and parts[0] == "OK" and parts[1] and parts[1] != want:
+                continue                 # v0.9.60e - stale OK of an older command
+            if len(parts) >= 3 and parts[0] == "ERR" and parts[2] and parts[2] != expect:
+                continue                 # v0.9.60e - stale ERR of an older command
+            if line == "ERR|UNKNOWN" and not retried:
+                # v0.9.60g - UART noise garbled that command; the board answers
+                # ERR|UNKNOWN only for lines it did NOT execute -> one resend is safe.
+                retried = True
+                self._send(cmd)
+                deadline = time.monotonic() + timeout
                 continue
             return line
 
@@ -221,6 +242,43 @@ class PicoLink:
         except Exception:
             pass
         self.ser = None
+
+
+def _drain_stale(link):
+    """v0.9.60e - eat stale PicoLink lines (write-only abort HALT answers, late
+    PONGs) before a new op pairs them with its own reply. Zero cost on a quiet pipe.
+    BoardLink (encrypted, direct arm) already resyncs - left untouched."""
+    if not isinstance(link, PicoLink):
+        return
+    try:
+        ser = getattr(link, "ser", None)
+        if ser is None or (not getattr(ser, "in_waiting", 0) and not getattr(link, "_rxbuf", None)):
+            return
+        while True:
+            line = link._read_line(0.1)
+            if line is None:
+                return
+            if line.startswith("EVT|"):
+                link.events.append(line)
+    except Exception:
+        return
+
+
+def _ktext_timeout(cmd, default):
+    """v0.9.60e - humanized typing is deliberately slow: size the wait from the
+    payload (len x hmax + margin) so a long Type Text never dies at 5 s."""
+    inner = cmd
+    for env in ("KBDPICO|", "KBDARM|"):
+        if inner.startswith(env):
+            inner = inner[len(env):]
+    if not inner.startswith("KTEXT|"):
+        return default
+    try:
+        p = inner[6:].split(",", 2)
+        per_ms = max(int(p[0]), int(p[1]))
+        return max(default, 5.0 + len(p[2]) * per_ms / 1000.0 + 5.0)
+    except Exception:
+        return default
 
 
 def open_link(port):
@@ -313,7 +371,14 @@ def main():
                         raise BoardError("not connected")
                     cmd = req["cmd"]
                     abort_flag.clear()
-                    reply = link.command(cmd, timeout=req.get("timeout", 5.0))
+                    _drain_stale(link)         # v0.9.60e - eat leftovers of write-only aborts
+                    if cmd.split("|", 1)[0] == "MMOVE":
+                        # v0.9.60e - firmware 60c made MMOVE fire-and-forget (no reply is
+                        # ever sent): a lone MMOVE via a "send" op would wait 5 s and die.
+                        link._send(cmd)
+                        reply = "OK|MMOVE"      # local ack, same contract as send_path
+                    else:
+                        reply = link.command(cmd, timeout=_ktext_timeout(cmd, req.get("timeout", 5.0)))
                     if abort_flag.is_set():
                         # پاسخِ فرمانِ متوقف‌شده reply نمی‌شود تا جفت‌کردن
                         # پاسخ‌ها در سمت WPF به‌هم نریزد (انتظار قبلی cancel شده).
@@ -336,6 +401,27 @@ def main():
                     send = getattr(link, "_send", None)
                     if send is None:
                         raise BoardError("bridge: _send unavailable")
+                    _drain_stale(link)         # v0.9.60e - clean pipe before streaming
+                    # v0.9.60f - hardware-cadence thinning (the choppy-mouse fix). The arm
+                    # executes ~50 moves/sec (~20 ms each, measured 2026-09-08), but dense
+                    # WindMouse trails arrive at ~4 ms/point: oversubscribed 4-5x, the
+                    # firmware's coalescing dropped points and the cursor visibly jumped.
+                    # Merge micro-steps so every emitted point gets >= MIN_STEP_MS: same
+                    # total time, same curve shape, and every point actually executes.
+                    MIN_STEP_MS = 25
+                    if len(pts) > 1 and dlys:
+                        tp, td = [pts[0]], []
+                        acc = 0
+                        for i in range(1, len(pts)):
+                            acc += dlys[i - 1] if i - 1 < len(dlys) else 0
+                            if acc >= MIN_STEP_MS:
+                                tp.append(pts[i])
+                                td.append(acc)
+                                acc = 0
+                        if tp[-1] != pts[-1]:
+                            tp.append(pts[-1])     # the final target ALWAYS lands
+                            td.append(acc)
+                        pts, dlys = tp, td
                     aborted = False
                     t0 = time.monotonic()
                     budget = 0.0   # pacing تطبیقی: زمان هدف انباشته می‌شود، خواب فقط به اندازهٔ عقب‌ماندگی
@@ -343,7 +429,11 @@ def main():
                         if abort_flag.is_set():
                             aborted = True
                             break
-                        send("MMOVE|" + p + ",abs,0")
+                        # v0.9.60g - abs,2 = interpolated path point (arm fw 1.9 splits each
+                        # segment into <=8 px native-paced micro-steps -> hand-smooth). An
+                        # older arm reads hm==2 as non-human and jumps per point (the v3.1
+                        # behaviour) - safe either way; flash fw 1.9 for the smoothness.
+                        send("MMOVE|" + p + ",abs,2")
                         if i % 12 == 11:
                             try:
                                 link.command("PING", timeout=2.0)   # تخلیهٔ OK|MMOVEهای انباشته

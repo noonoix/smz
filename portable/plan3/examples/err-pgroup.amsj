@@ -1,0 +1,20 @@
+{
+  "app": "AMS",
+  "version": "0.8.2",
+  "steps": [
+    { "Type": "parallelGroup", "Name": "", "Delay": 0, "IsDisabled": false,
+      "Props": { "title": "" },
+      "Children": [
+        { "Type": "forLoop", "Name": "", "Delay": 0, "IsDisabled": false,
+          "Props": { "title": "", "mode": "count", "count": 2, "timeValue": 10, "timeUnit": "minute" },
+          "Children": [
+            { "Type": "delay", "Name": "", "Delay": 0, "IsDisabled": false,
+              "Props": { "minMs": 10, "maxMs": 10 }, "Children": [] }
+          ] },
+        { "Type": "mouseClick", "Name": "", "Delay": 0, "IsDisabled": false,
+          "Props": { "button": "left", "action": "single", "holdMin": 0, "holdMax": 0 }, "Children": [] }
+      ] },
+    { "Type": "comment", "Name": "", "Delay": 0, "IsDisabled": false,
+      "Props": { "text": "Next" }, "Children": [] }
+  ]
+}

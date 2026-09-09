@@ -1,0 +1,1202 @@
+=== 1. PYTHON INVENTORY (firmware/, portable/, tools/, ams-shell/bridge/) ===
+ams-shell/bridge/ams_crypto.py                         6343  D574C19283FE9810  vers=-
+ams-shell/bridge/ams_serial.py                        10771  C8CF3733DBB9BF73  vers=-
+ams-shell/bridge/bridge.py                            24592  F8501AF51EA99C2F  vers=0.9.2,0.9.43,0.9.5,0.9.57,0.9.59,0.9.60,0.9.60e,0.9.60f,0.9.60g
+ams-shell/bridge/serial/__init__.py                    3212  5DEC897FDEF45A0E  vers=-
+ams-shell/bridge/serial/__main__.py                      45  A12A559270D2D98A  vers=-
+ams-shell/bridge/serial/rfc2217.py                    59700  9DC1BFE53B38D8CF  vers=-
+ams-shell/bridge/serial/rs485.py                       3305  F6DEB2B8672D7B7E  vers=-
+ams-shell/bridge/serial/serialcli.py                   9190  BB94271BDD14C6DB  vers=-
+ams-shell/bridge/serial/serialjava.py                  8480  01C1CBA760FFB008  vers=-
+ams-shell/bridge/serial/serialposix.py                35127  5D56F98513391E17  vers=-
+ams-shell/bridge/serial/serialutil.py                 21797  3C84F8C7C319F161  vers=-
+ams-shell/bridge/serial/serialwin32.py                20284  17681EA9A650120C  vers=-
+ams-shell/bridge/serial/threaded/__init__.py           9319  8A45E52987A3465C  vers=-
+ams-shell/bridge/serial/tools/__init__.py                 0  E3B0C44298FC1C14  vers=-
+ams-shell/bridge/serial/tools/hexlify_codec.py         3677  1512523BCA5F8CCE  vers=-
+ams-shell/bridge/serial/tools/list_ports.py            3389  7830E8C888684B77  vers=-
+ams-shell/bridge/serial/tools/list_ports_common.py     3736  C791C88211B8348C  vers=-
+ams-shell/bridge/serial/tools/list_ports_linux.py      4503  5275355583F53492  vers=-
+ams-shell/bridge/serial/tools/list_ports_osx.py       11178  7A879F3068AE26A0  vers=-
+ams-shell/bridge/serial/tools/list_ports_posix.py      4535  118A83E6445B9347  vers=-
+ams-shell/bridge/serial/tools/list_ports_windows.py    16021  53813370E02253AE  vers=-
+ams-shell/bridge/serial/tools/miniterm.py             37840  7D7BE4114F451325  vers=-
+ams-shell/bridge/serial/urlhandler/__init__.py            0  E3B0C44298FC1C14  vers=-
+ams-shell/bridge/serial/urlhandler/protocol_alt.py     2033  FA46280A0CBD1B23  vers=-
+ams-shell/bridge/serial/urlhandler/protocol_cp2110.py     8540  8942CE4F855DC36D  vers=-
+ams-shell/bridge/serial/urlhandler/protocol_hwgrep.py     3159  19D29D43DB44C4A4  vers=-
+ams-shell/bridge/serial/urlhandler/protocol_loop.py    10623  E5B6ABAEEFE17F03  vers=-
+ams-shell/bridge/serial/urlhandler/protocol_rfc2217.py      317  20F3BCAF7A4537AC  vers=-
+ams-shell/bridge/serial/urlhandler/protocol_socket.py    14299  428B5A1C23DDEADF  vers=-
+ams-shell/bridge/serial/urlhandler/protocol_spy.py     9130  15D51A538DFE6E5D  vers=-
+ams-shell/bridge/serial/win32.py                      11138  964EABA1DF661E4A  vers=-
+firmware/code64b/code64b.py                           35974  124EAE5296D82616  vers=0.9.59h,0.9.60,0.9.60b,0.9.60c,0.9.60d,0.9.60e,0.9.61,0.9.62,0.9.63,0.9.64
+firmware/code64b/code64b_check.py                     12583  A99B23D682301793  vers=0.9.63,0.9.64b
+firmware/code64b/plan_engine.py                       32294  CA90A7126B93A95C  vers=0.9.15,0.9.24,0.9.7,0.9.8
+firmware/pico-light-0.9.60-template.py                18096  B45159C1F4470F66  vers=0.9.59h,0.9.60
+portable/plan3/sim/test_plan_gen.py                   12987  83538F818671E9BD  vers=-
+portable/plan3/tools/plan_check.py                     2033  B3A2D86FA0B2D210  vers=-
+portable/plan3/tools/plan_gen.py                      42958  AC980A7AB1263D1A  vers=0.9.23,0.9.48,0.9.66
+tools/_plan_probe.py                                   5048  ED3154289F66887A  vers=0.9.66
+tools/ci_smoke.py                                      1171  3CAE27DD9E3DF843  vers=0.9.57
+tools/make_code64b.py                                  9330  AD05C05485C299C6  vers=0.9.60c,0.9.63,0.9.64,0.9.64b
+tools/make_fw_template_0.9.64b.py                      7926  B867D5952A82C816  vers=0.9.60,0.9.64b
+tools/patch-v0.9.58b.py                               11296  1EED7B7C88B09DD4  vers=0.9.44,0.9.50,0.9.58,0.9.58b
+tools/patch-v0.9.58c.py                                7288  B30958E3DA99C610  vers=0.9.58c
+tools/patch-v0.9.58d.py                               19483  0300149A95AD5C68  vers=0.9.43,0.9.44,0.9.5,0.9.58,0.9.58d
+tools/patch-v0.9.59.py                                19432  28086AA22AEDFB14  vers=0.9.58,0.9.59
+tools/patch-v0.9.60.py                                90370  EE37BA408B2B21AD  vers=0.9.44,0.9.46,0.9.58,0.9.58d,0.9.59h,0.9.60
+tools/patch-v0.9.61.py                                 5517  932F1C1AA0DB0C25  vers=0.9.60e,0.9.61
+tools/patch_bridge_60e.py                             14494  62785873D894B547  vers=0.9.60e,0.9.60f,0.9.60g
+tools/patch_version_pins_0964.py                       4376  68507C1578B5E8BA  vers=0.9.60,0.9.64,0.9.64b
+tools/test_bridge_pico.py                              7330  D969762147258C9E  vers=0.9.58,0.9.59
+
+=== 2. HEAD OF EACH FIRMWARE FILE (first 24 lines) ===
+--- firmware/code64b/code64b.py ---
+    1| # Classroom Studio v0.9.64b - Raspberry Pi Pico light-sensor + portable-plan firmware (CircuitPython)
+    2| # System: sim   generated: 2026-09-09   calibrated states: 0
+    3| # Sensor: BH1750 (GY-302 / GY-30) on I2C0 - SDA=GP20, SCL=GP21, ADDR->GND => 0x23
+    4| # Board roles: the Pico is the executive brain - keyboard (USB HID) + light sensor + macro
+    5| # engine. Mouse and the sound sensor belong to the Arduino Pro Micro, which the Pico drives
+    6| # as its arm over UART0: GP16 = TX -> Pro Micro RX, GP17 = RX <- Pro Micro TX, common GND,
+    7| # 115200 8N1.
+    8| #
+    9| # v0.9.60 - hardened consolidation (bench-proven as the 0.9.59h/k/m/n line):
+   10| #   * BH1750 OPTIONAL: the brain boots and answers PING even with the sensor unplugged;
+   11| #     WLUX/TRGLUX/LCAL then answer ERR|NOSENSOR and armed light states stay silent.
+   12| #   * Serial RX is a bounded BYTE buffer - no per-read string concat, no heap churn.
+   13| #   * The Pro Micro arm is pumped EVERY loop iteration: its EVT| lines stream to the PC
+   14| #     live and its small TX buffer can never fill up and wedge the arm.
+   15| #   * Mouse commands are fire-and-ack (forwarded to the arm, OK answered at once) so dense
+   16| #     human paths stay smooth; sound/SETRES still wait for the arm's real reply.
+   17| #   * The keyboard ALWAYS runs on this Pico: KBDPICO| and the legacy arm keyboard envelope
+   18| #     are both consumed locally - the arm never types.
+   19| #   * Fixed keypad: GP4->GND = Num Lock = Start/Stop, GP3->GND = Scroll Lock = Pause/Resume.
+   20| #     Both drive the standalone engine AND send the HID key to the PC.
+   21| #   * Safe default: boot never starts the macro. The standalone engine waits for GP4
+   22| #     (Num Lock) unless AUTOSTART below is explicitly True, and stays silent for 3 s after
+   23| #     the last host command so host-driven runs never double-fire the armed states.
+   24| #
+
+--- firmware/code64b/code64b_check.py ---
+    1| #!/usr/bin/env python3
+    2| # code64b_check.py - integrity + behaviour checks for code64b.py (real code slices
+    3| # exec'd against fake hardware). Runs on PC: python code64b_check.py
+    4| # v0.9.64b - updated for CONDITIONAL button release (the stop/start teleport fix):
+    5| # routine GP4 start/stop with no held button must write ZERO MUPs (arm fw>=1.8 syncs
+    6| # its tracked axes into every button report, so each pointless MUP teleported the
+    7| # cursor to the last plan point - record 2026-09-09: 5 snaps of 964-1216 px).
+    8| # Retractions vs code64_check: old T1c/T2 asserted unconditional MUP x3 on every
+    9| # start/stop; that behaviour was the bug and is now inverted by design. The full
+   10| # three-button shield survives on the abnormal paths (force=True) and via the panic
+   11| # gesture (GP4 held >= 1 s).
+   12| import ast, os, sys
+   13| 
+   14| SRC = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "code64b.py"), encoding="utf-8").read()
+   15| 
+   16| results = []
+   17| def check(name, cond):
+   18|     results.append((name, bool(cond)))
+   19|     print(("PASS " if cond else "FAIL ") + name)
+   20| 
+   21| def extract(src, name):
+   22|     lines = src.splitlines(True)
+   23|     for node in ast.parse(src).body:
+   24|         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
+
+--- firmware/code64b/plan_engine.py ---
+    1| # plan_engine.py - Classroom Studio portable plan engine (code64)
+    2| # Runs on the Pico (CircuitPython) and on CPython (the sim). Exact port of the app's
+    3| # humanization layers: WindMouse (HumanMouse.cs v0.9.24) and the typing planner
+    4| # (StepDefinitions.TypeScript v0.9.15). Fresh randomness is rolled for every pass,
+    5| # so repeated loops never replay an identical path - exactly like the PC app.
+    6| #
+    7| # plan.txt - one op per line, pipe-separated, key=value args, %-encoding inside text:
+    8| #   PLAN|1                                header (format version, must be first)
+    9| #   SCREEN|1920,1080                      clamp bounds for all moves
+   10| #   SPEED|0,2000                          app mouse speed px/s (max 0 = shape-only pacing)
+   11| #   RMOUSE|region=x,y,w,h|mt=mn,mx|curve=mn,mx|before=mn,mx|after=mn,mx|
+   12| #         mid=chance:mn,mx|idle=everyMn,everyMx:pauseMn,pauseMx|over=pct
+   13| #   CLICK|btn=left|n=1|hold=mn,mx
+   14| #   TYPE|h=mn,mx|w=mn,mx|wp=pct|p=mn,mx|think=chance:mn,mx|typo=mn,mx|text=<encoded>
+   15| #   DELAY|mn,mx
+   16| #   LOOP|n  ... ENDLOOP                   n = pass count, 0 = forever
+   17| #   LOOPTIME|sec ... ENDLOOP              repeats until the deadline passes
+   18| #   WLIGHT|lo,hi,stable_ms,timeout_ms,mode[|key=vk,hmn,hmx|react=mn,mx]
+   19| # Blank lines and lines starting with # are ignored. Unknown ops fail the whole file.
+   20| 
+   21| import time
+   22| import math
+   23| import random
+   24| 
+
+--- firmware/pico-light-0.9.60-template.py ---
+    1| # Classroom Studio v__VERSION__ - Raspberry Pi Pico light-sensor firmware (CircuitPython)
+    2| # System: __MACHINE__   generated: __GENERATED__   calibrated states: __STATE_COUNT__
+    3| # Sensor: BH1750 (GY-302 / GY-30) on I2C0 - SDA=GP20, SCL=GP21, ADDR->GND => 0x23
+    4| # Board roles: the Pico is the executive brain - keyboard (USB HID) + light sensor + macro
+    5| # engine. Mouse and the sound sensor belong to the Arduino Pro Micro, which the Pico drives
+    6| # as its arm over UART0: GP16 = TX -> Pro Micro RX, GP17 = RX <- Pro Micro TX, common GND,
+    7| # 115200 8N1.
+    8| #
+    9| # v0.9.60 - hardened consolidation (bench-proven as the 0.9.59h/k/m/n line):
+   10| #   * BH1750 OPTIONAL: the brain boots and answers PING even with the sensor unplugged;
+   11| #     WLUX/TRGLUX/LCAL then answer ERR|NOSENSOR and armed light states stay silent.
+   12| #   * Serial RX is a bounded BYTE buffer - no per-read string concat, no heap churn.
+   13| #   * The Pro Micro arm is pumped EVERY loop iteration: its EVT| lines stream to the PC
+   14| #     live and its small TX buffer can never fill up and wedge the arm.
+   15| #   * Mouse commands are fire-and-ack (forwarded to the arm, OK answered at once) so dense
+   16| #     human paths stay smooth; sound/SETRES still wait for the arm's real reply.
+   17| #   * The keyboard ALWAYS runs on this Pico: KBDPICO| and the legacy arm keyboard envelope
+   18| #     are both consumed locally - the arm never types.
+   19| #   * Fixed keypad: GP4->GND = Num Lock = Start/Stop, GP3->GND = Scroll Lock = Pause/Resume.
+   20| #     Both drive the standalone engine AND send the HID key to the PC.
+   21| #   * Safe default: boot never starts the macro. The standalone engine waits for GP4
+   22| #     (Num Lock) unless AUTOSTART below is explicitly True, and stays silent for 3 s after
+   23| #     the last host command so host-driven runs never double-fire the armed states.
+   24| #
+
+--- portable/plan3/sim/test_plan_gen.py ---
+    1| #!/usr/bin/env python3
+    2| # -*- coding: utf-8 -*-
+    3| """Behavioural tests for tools/plan_gen.py (the .amsj -> plan.txt compiler).
+    4| 
+    5| Golden tests: the generator is deterministic (randomness lives in the engine at
+    6| run time), so the emitted plan is compared BYTE-EXACT against the frozen files
+    7| in examples/*.plan.txt. Negative tests prove the hard rule: no unsupported step
+    8| is ever silently skipped - the build blocks and names every offending step.
+    9| End-to-end: the generated reference plan is also EXECUTED on a fake ctx.
+   10| """
+   11| import json
+   12| import os
+   13| import sys
+   14| import tempfile
+   15| 
+   16| try:
+   17|     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+   18| except Exception:
+   19|     pass
+   20| 
+   21| _HERE = os.path.dirname(os.path.abspath(__file__))
+   22| _ROOT = os.path.dirname(_HERE)
+   23| for _cand in (_HERE, _ROOT, os.path.join(_ROOT, "CIRCUITPY"), os.path.join(_ROOT, "tools"), os.getcwd()):
+   24|     if os.path.exists(os.path.join(_cand, "plan_engine.py")):
+
+--- portable/plan3/tools/plan_check.py ---
+    1| #!/usr/bin/env python3
+    2| # -*- coding: utf-8 -*-
+    3| """plan_check.py - validate a plan.txt against the REAL plan engine (dogfood).
+    4| 
+    5| Usage:  python3 tools/plan_check.py CIRCUITPY/plan.txt [more.txt ...]
+    6| Exit:   0 = every file parsed by the engine, 1 = at least one failed.
+    7| The parser IS the board's parser (CIRCUITPY/plan_engine.py), so "plan ok" here
+    8| means the Pico will accept the file too. '# FLAG' lines are surfaced as warnings.
+    9| """
+   10| import os
+   11| import sys
+   12| 
+   13| try:
+   14|     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+   15| except Exception:
+   16|     pass
+   17| 
+   18| _HERE = os.path.dirname(os.path.abspath(__file__))
+   19| for _cand in (_HERE, os.path.dirname(_HERE), os.path.join(os.path.dirname(_HERE), "CIRCUITPY"),
+   20|               os.path.join(_HERE, "CIRCUITPY"), os.getcwd()):
+   21|     if os.path.exists(os.path.join(_cand, "plan_engine.py")):
+   22|         sys.path.insert(0, _cand)
+   23|         break
+   24| 
+
+--- portable/plan3/tools/plan_gen.py ---
+    1| #!/usr/bin/env python3
+    2| # -*- coding: utf-8 -*-
+    3| r"""plan_gen.py - compile a Classroom Studio .amsj document (+ the app's
+    4| ams-settings.json Play Options) into a portable plan.txt for the Pico
+    5| (plan engine v3, firmware pico-light 0.9.66+ / plan_api 3).
+    6| 
+    7| Hard rules (project page, 2026-09-09):
+    8|   * Play Options: once = no wrapper, times N = LOOP|N wrapper,
+    9|     timed = LOOPTIME|seconds wrapper around the WHOLE plan.
+   10|   * Step order and the per-step delay-after (Delay / DelayMax) match the app:
+   11|     for a container the delay lands AFTER the whole block, exactly where the
+   12|     app's runner applies it.
+   13|   * Disabled steps are counted and skipped - never silently dropped.
+   14|   * NO unsupported step is silently skipped. Blocking errors stop the build:
+   15|     findImage (needs machine vision), clipboard/secret typing (no OS clipboard
+   16|     on a bare Pico), non-ASCII text/paths, non-parallel steps inside a
+   17|     parallelGroup, If/Else inside a Random Package, missing/cyclic playScript
+   18|     children, broken If/Else markers, duplicate labels.
+   19|   * Anything compiled with a caveat gets a '# FLAG' line in the plan AND a line
+   20|     in the report (plan_check.py surfaces them).
+   21| 
+   22| Exit codes: 0 = plan written (flags may exist), 1 = blocked (nothing written),
+   23| 2 = usage / IO error.
+   24| """
+
+=== 3. GREP ===
+--- pattern: plan_engine ---
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:20: /// press/release KTEXT typing, conditional start/stop button release + GP4 panic hold. plan_engine.py
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:384: import plan_engine as _pe
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:868: """v0.9.61 - adapter from plan_engine ops to this firmware's drivers."""
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:875: # None only on a fresh Pico boot; plan_engine then uses screen centre once.
+docs/session-2026-09-09-code64b.md:34: - plan_engine.py and plan.txt byte-identical to code64; arm fw 2.2 untouched.
+docs/session-2026-09-09-code64b.md:42: - originals (user zip): code64.py 7560b0021716..., plan_engine.py 187e8d1c1c..., plan.txt bd549f13...
+docs/session-2026-09-09-code64b.md:46: with ONE exception: the repo copy of plan_engine.py differs from the golden file only by a
+docs/session-2026-09-09-v3.1.md:9: - `CIRCUITPY/plan_engine.py` (v3, UNCHANGED from the v3 bundle, sha256 `b94b4e8ba364…`)
+docs/session-2026-09-09-v3.1.md:12: - Recovery: re-upload the zip from the thread. `plan_engine.py` is identical to the v3
+firmware/code64b/README-FA.txt:22: اصلاح code64b (فقط سمت Pico؛ بازو و plan_engine.py و plan.txt دست‌نخورده):
+firmware/code64b/README-FA.txt:39: کنید (plan_engine.py و plan.txt عوض نشده‌اند و می‌توانند روی برد بمانند).
+firmware/code64b/code64b.py:211: import plan_engine as _pe
+firmware/code64b/code64b.py:695: """v0.9.61 - adapter from plan_engine ops to this firmware's drivers."""
+firmware/code64b/code64b.py:702: # None only on a fresh Pico boot; plan_engine then uses screen centre once.
+firmware/code64b/code64b_check.py:62: PE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "plan_engine.py")
+firmware/code64b/code64b_check.py:211: # T9/T10 - real plan_engine position persistence across restart and mid-path Stop
+firmware/code64b/plan_engine.py:1: # plan_engine.py - Classroom Studio portable plan engine (code64)
+portable/plan3/sim/test_plan_gen.py:24: if os.path.exists(os.path.join(_cand, "plan_engine.py")):
+portable/plan3/sim/test_plan_gen.py:30: import plan_engine as pe                     # noqa: E402
+portable/plan3/tools/plan_check.py:7: The parser IS the board's parser (CIRCUITPY/plan_engine.py), so "plan ok" here
+portable/plan3/tools/plan_check.py:21: if os.path.exists(os.path.join(_cand, "plan_engine.py")):
+portable/plan3/tools/plan_check.py:25: import plan_engine as pe                                        # noqa: E402
+portable/plan3/tools/plan_gen.py:40: if os.path.exists(os.path.join(_cand, "plan_engine.py")):
+portable/plan3/tools/plan_gen.py:48: import plan_engine as pe                                        # noqa: E402  (self-check with the real engine)
+reports/plan-diag.txt:35: firmware/code64b/plan_engine.py                       32294  CA90A7126B93A95C  vers=0.9.15,0.9.24,0.9.7,0.9.8
+reports/plan-diag.txt:107: --- firmware/code64b/plan_engine.py ---
+reports/plan-diag.txt:108: 1| # plan_engine.py - Classroom Studio portable plan engine (code64)
+reports/plan-diag.txt:183: 24|     if os.path.exists(os.path.join(_cand, "plan_engine.py")):
+reports/plan-diag.txt:192: 7| The parser IS the board's parser (CIRCUITPY/plan_engine.py), so "plan ok" here
+reports/plan-diag.txt:206: 21|     if os.path.exists(os.path.join(_cand, "plan_engine.py")):
+reports/plan-diag.txt:238: --- pattern: plan_engine ---
+reports/plan-diag.txt:239: ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:20: /// press/release KTEXT typing, conditional start/stop button release + GP4 panic hold. plan_engine.py
+reports/plan-diag.txt:240: ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:384: import plan_engine as _pe
+reports/plan-diag.txt:241: ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:868: """v0.9.61 - adapter from plan_engine ops to this firmware's drivers."""
+reports/plan-diag.txt:242: ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:875: # None only on a fresh Pico boot; plan_engine then uses screen centre once.
+reports/plan-diag.txt:243: docs/session-2026-09-09-code64b.md:34: - plan_engine.py and plan.txt byte-identical to code64; arm fw 2.2 untouched.
+reports/plan-diag.txt:244: docs/session-2026-09-09-code64b.md:42: - originals (user zip): code64.py 7560b0021716..., plan_engine.py 187e8d1c1c..., plan.txt bd549f13...
+tools/_plan_probe.py:74: ("plan_engine", re.compile(r"plan_engine")),
+tools/_plan_probe.py:98: CTX_RE = re.compile(r"(plan_engine|(?<![A-Za-z0-9_])_pe(?![A-Za-z0-9_])|run_plan|plan_pass|plan\.txt|PLAN\|)")
+tools/_plan_probe.py:107: if "plan_engine" not in body and "run_plan" not in body:
+tools/_plan_probe.py:134: print("=== 5. plan_engine.py PUBLIC API ===")
+tools/_plan_probe.py:135: PE = os.path.join(ROOT, "firmware", "code64b", "plan_engine.py")
+tools/_plan_probe.py:141: print("firmware/code64b/plan_engine.py: MISSING")
+tools/make_code64b.py:141: # plan_engine.py + plan.txt ship byte-identical
+tools/make_code64b.py:143: shutil.copyfile("/data/code64/plan_engine.py", os.path.join(OUT_DIR, "plan_engine.py"))
+tools/make_code64b.py:145: shutil.copyfile("/data/code64/plan_engine.py", os.path.join(OUT_DIR, "CIRCUITPY-ready", "plan_engine.py"))
+tools/make_code64b.py:154: print("plan_engine unchanged:", sha(os.path.join(OUT_DIR, "plan_engine.py")) == sha("/data/code64/plan_engine.py"))
+tools/make_fw_template_0.9.64b.py:157: "/// continuous H-resolution (0x10, ~120 ms/sample), lux = raw / 1.2.\n/// v0.9.64b - template body resynced to the golden standalone firmware (code64b): portable plan.txt\n/// engine + persistent cur
+(total hits: 48)
+
+--- pattern: run_plan ---
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:938: _pe.run_plan(_plan_cache, _PlanCtx())
+docs/session-2026-09-09-v3.1.md:19: - The default `plan.txt` uses `BEEP` (a v3 op). `run_plan` rejects v2+ ops when
+firmware/code64b/code64b.py:765: _pe.run_plan(_plan_cache, _PlanCtx())
+firmware/code64b/code64b_check.py:240: PE.run_plan(ops,pc)
+firmware/code64b/code64b_check.py:242: PE.run_plan(ops,pc)
+firmware/code64b/code64b_check.py:253: try: PE.run_plan(ops,pc2)
+firmware/code64b/code64b_check.py:257: PE.run_plan(ops,pc2)
+firmware/code64b/plan_engine.py:31: # coordinate so Start/Stop does not reset every new run_plan() call to screen centre.
+firmware/code64b/plan_engine.py:683: def run_plan(ops, ctx):
+portable/plan3/sim/test_plan_gen.py:301: pe.run_plan(ops, ctx)
+tools/_plan_probe.py:75: ("run_plan", re.compile(r"run_plan")),
+tools/_plan_probe.py:98: CTX_RE = re.compile(r"(plan_engine|(?<![A-Za-z0-9_])_pe(?![A-Za-z0-9_])|run_plan|plan_pass|plan\.txt|PLAN\|)")
+tools/_plan_probe.py:107: if "plan_engine" not in body and "run_plan" not in body:
+(total hits: 13)
+
+--- pattern: plan_pass ---
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:916: def plan_pass():
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:1009: if plan_pass():            # v0.9.61 - a portable plan takes precedence
+firmware/code64b/code64b.py:743: def plan_pass():
+firmware/code64b/code64b.py:836: if plan_pass():            # v0.9.61 - a portable plan takes precedence
+tools/_plan_probe.py:76: ("plan_pass", re.compile(r"plan_pass")),
+tools/_plan_probe.py:98: CTX_RE = re.compile(r"(plan_engine|(?<![A-Za-z0-9_])_pe(?![A-Za-z0-9_])|run_plan|plan_pass|plan\.txt|PLAN\|)")
+(total hits: 6)
+
+--- pattern: _pe token ---
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:384: import plan_engine as _pe
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:386: _pe = None
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:920: if _pe is None:
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:926: _plan_cache = _pe.parse_plan(text)
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:938: _pe.run_plan(_plan_cache, _PlanCtx())
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:939: except _pe.PlanAbort:
+firmware/code64b/code64b.py:211: import plan_engine as _pe
+firmware/code64b/code64b.py:213: _pe = None
+firmware/code64b/code64b.py:747: if _pe is None:
+firmware/code64b/code64b.py:753: _plan_cache = _pe.parse_plan(text)
+firmware/code64b/code64b.py:765: _pe.run_plan(_plan_cache, _PlanCtx())
+firmware/code64b/code64b.py:766: except _pe.PlanAbort:
+reports/plan-diag.txt:240: ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:384: import plan_engine as _pe
+tools/_plan_probe.py:77: ("_pe token", re.compile(r"(?<![A-Za-z0-9_])_pe(?![A-Za-z0-9_])")),
+tools/_plan_probe.py:98: CTX_RE = re.compile(r"(plan_engine|(?<![A-Za-z0-9_])_pe(?![A-Za-z0-9_])|run_plan|plan_pass|plan\.txt|PLAN\|)")
+(total hits: 15)
+
+--- pattern: 0.9.66 ---
+docs/session-2026-09-09-code64b.md:59: cursor must not snap; the boot banner must read pico-light 0.9.64b. The 0.9.66 portable
+docs/session-2026-09-09-v3.1.md:4: - **Fixed firmware**: `CIRCUITPY/code.py` = pico-light **0.9.66** with the PONG string
+docs/session-2026-09-09-v3.1.md:8: - `CIRCUITPY/code.py` (0.9.66, plan_api=3)
+docs/session-2026-09-09-v3.1.md:18: - The drive had `code.py` = **0.9.65** (sha `9c98b171…`, from the mousefix bundle), not 0.9.66.
+docs/session-2026-09-09-v3.1.md:26: - **Fix**: copy the v3.1 `CIRCUITPY/code.py` (0.9.66) onto CIRCUITPY, replacing the old one.
+docs/session-2026-09-09-v3.1.md:27: Console banner must read `pico-light 0.9.66`. First run starts the mouse path from screen
+portable/plan3/tools/plan_gen.py:5: (plan engine v3, firmware pico-light 0.9.66+ / plan_api 3).
+reports/plan-diag.txt:39: portable/plan3/tools/plan_gen.py                      42958  AC980A7AB1263D1A  vers=0.9.23,0.9.48,0.9.66
+reports/plan-diag.txt:40: tools/_plan_probe.py                                   5048  ED3154289F66887A  vers=0.9.66
+reports/plan-diag.txt:216: 5| (plan engine v3, firmware pico-light 0.9.66+ / plan_api 3).
+reports/plan-diag.txt:332: --- pattern: 0.9.66 ---
+reports/plan-diag.txt:333: docs/session-2026-09-09-code64b.md:59: cursor must not snap; the boot banner must read pico-light 0.9.64b. The 0.9.66 portable
+reports/plan-diag.txt:334: docs/session-2026-09-09-v3.1.md:4: - **Fixed firmware**: `CIRCUITPY/code.py` = pico-light **0.9.66** with the PONG string
+reports/plan-diag.txt:335: docs/session-2026-09-09-v3.1.md:8: - `CIRCUITPY/code.py` (0.9.66, plan_api=3)
+reports/plan-diag.txt:336: docs/session-2026-09-09-v3.1.md:18: - The drive had `code.py` = **0.9.65** (sha `9c98b171…`, from the mousefix bundle), not 0.9.66.
+tools/_plan_probe.py:78: ("0.9.66", re.compile(r"0\.9\.66")),
+(total hits: 16)
+
+--- pattern: plan.txt ---
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:18: /// v0.9.64b - template body resynced to the golden standalone firmware (code64b): portable plan.txt
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:21: /// and plan.txt are NOT part of this bundle - the firmware boots bridge-only without them; the
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:226: # v0.9.61-plan1 - portable plan: when /plan.txt exists and no host is driving, the
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:231: PLAN_PATH = "/plan.txt"
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:917: """v0.9.61 - run one pass of /plan.txt. Returns True when a plan exists and ran
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:930: pass                                 # no plan.txt - normal bridge-only mode
+analysis/analyze_record.py:32: # region from plan.txt: RMOUSE region=1301,0,378,1049 -> x in [1301,1679], y in [0,1049]
+docs/session-2026-09-09-code64b.md:34: - plan_engine.py and plan.txt byte-identical to code64; arm fw 2.2 untouched.
+docs/session-2026-09-09-code64b.md:42: - originals (user zip): code64.py 7560b0021716..., plan_engine.py 187e8d1c1c..., plan.txt bd549f13...
+docs/session-2026-09-09-v3.1.md:19: - The default `plan.txt` uses `BEEP` (a v3 op). `run_plan` rejects v2+ ops when
+docs/session-2026-09-09-v3.1.md:36: ## plan_gen.py (phase-1 deliverable: the .amsj → plan.txt compiler)
+firmware/code64b/README-FA.txt:22: اصلاح code64b (فقط سمت Pico؛ بازو و plan_engine.py و plan.txt دست‌نخورده):
+firmware/code64b/README-FA.txt:39: کنید (plan_engine.py و plan.txt عوض نشده‌اند و می‌توانند روی برد بمانند).
+firmware/code64b/code64b.py:53: # v0.9.61-plan1 - portable plan: when /plan.txt exists and no host is driving, the
+firmware/code64b/code64b.py:58: PLAN_PATH = "/plan.txt"
+firmware/code64b/code64b.py:744: """v0.9.61 - run one pass of /plan.txt. Returns True when a plan exists and ran
+firmware/code64b/code64b.py:757: pass                                 # no plan.txt - normal bridge-only mode
+firmware/code64b/plan_engine.py:7: # plan.txt - one op per line, pipe-separated, key=value args, %-encoding inside text:
+firmware/code64b/plan_engine.py:79: # ── %-codec for TYPE text (|, %, newline are structural in plan.txt) ─────────────────────
+portable/plan3/sim/test_plan_gen.py:3: """Behavioural tests for tools/plan_gen.py (the .amsj -> plan.txt compiler).
+portable/plan3/sim/test_plan_gen.py:7: in examples/*.plan.txt. Negative tests prove the hard rule: no unsupported step
+portable/plan3/sim/test_plan_gen.py:59: "type_key_min": 80, "type_key_max": 220, "out_name": "plan.txt"}
+portable/plan3/sim/test_plan_gen.py:68: golden = open(os.path.join(EXAMPLES, "ref-mouse-keys.plan.txt"), encoding="utf-8").read()
+portable/plan3/sim/test_plan_gen.py:77: golden = open(os.path.join(EXAMPLES, "ref-flow.plan.txt"), encoding="utf-8").read()
+portable/plan3/sim/test_plan_gen.py:86: check("blocked build writes NO plan file", not os.path.exists(os.path.join(td, "plan.txt")))
+portable/plan3/sim/test_plan_gen.py:91: check("daroon1 blocked => nothing written", not os.path.exists(os.path.join(td, "plan.txt")))
+portable/plan3/sim/test_plan_gen.py:154: ptxt = open(os.path.join(td, "plan.txt"), encoding="utf-8").read()
+portable/plan3/sim/test_plan_gen.py:156: check("parent plan has INCLUDE|file=child-plan.txt", "INCLUDE|file=child-plan.txt" in ptxt)
+portable/plan3/sim/test_plan_gen.py:157: check("child plan file written next to it", os.path.exists(os.path.join(td, "child-plan.txt")))
+portable/plan3/sim/test_plan_gen.py:158: if os.path.exists(os.path.join(td, "child-plan.txt")):
+portable/plan3/sim/test_plan_gen.py:159: ctxt_ = open(os.path.join(td, "child-plan.txt"), encoding="utf-8").read()
+portable/plan3/sim/test_plan_gen.py:222: txt = files["plan.txt"]
+portable/plan3/sim/test_plan_gen.py:299: ops = pe.parse_plan(files["plan.txt"])
+portable/plan3/tools/plan_check.py:3: """plan_check.py - validate a plan.txt against the REAL plan engine (dogfood).
+portable/plan3/tools/plan_check.py:5: Usage:  python3 tools/plan_check.py CIRCUITPY/plan.txt [more.txt ...]
+portable/plan3/tools/plan_gen.py:4: ams-settings.json Play Options) into a portable plan.txt for the Pico
+portable/plan3/tools/plan_gen.py:119: """TYPE text encoder: '|', '%' and newline are structural in plan.txt.
+portable/plan3/tools/plan_gen.py:896: description="compile a Classroom Studio .amsj into a portable plan.txt for the Pico")
+portable/plan3/tools/plan_gen.py:898: ap.add_argument("-o", "--out", default="plan.txt",
+portable/plan3/tools/plan_gen.py:899: help="output plan file name (default: plan.txt in --out-dir)")
+portable/plan3/tools/plan_gen.py:900: ap.add_argument("--out-dir", default=".", help="where plan.txt and child includes are written")
+reports/plan-diag.txt:114: 7| # plan.txt - one op per line, pipe-separated, key=value args, %-encoding inside text:
+reports/plan-diag.txt:162: 3| """Behavioural tests for tools/plan_gen.py (the .amsj -> plan.txt compiler).
+reports/plan-diag.txt:166: 7| in examples/*.plan.txt. Negative tests prove the hard rule: no unsupported step
+reports/plan-diag.txt:188: 3| """plan_check.py - validate a plan.txt against the REAL plan engine (dogfood).
+reports/plan-diag.txt:190: 5| Usage:  python3 tools/plan_check.py CIRCUITPY/plan.txt [more.txt ...]
+reports/plan-diag.txt:215: 4| ams-settings.json Play Options) into a portable plan.txt for the Pico
+reports/plan-diag.txt:243: docs/session-2026-09-09-code64b.md:34: - plan_engine.py and plan.txt byte-identical to code64; arm fw 2.2 untouched.
+reports/plan-diag.txt:244: docs/session-2026-09-09-code64b.md:42: - originals (user zip): code64.py 7560b0021716..., plan_engine.py 187e8d1c1c..., plan.txt bd549f13...
+reports/plan-diag.txt:248: firmware/code64b/README-FA.txt:22: اصلاح code64b (فقط سمت Pico؛ بازو و plan_engine.py و plan.txt دست‌نخورده):
+reports/plan-diag.txt:249: firmware/code64b/README-FA.txt:39: کنید (plan_engine.py و plan.txt عوض نشده‌اند و می‌توانند روی برد بمانند).
+reports/plan-diag.txt:274: reports/plan-diag.txt:243: docs/session-2026-09-09-code64b.md:34: - plan_engine.py and plan.txt byte-identical to code64; arm fw 2.2 untouched.
+reports/plan-diag.txt:275: reports/plan-diag.txt:244: docs/session-2026-09-09-code64b.md:42: - originals (user zip): code64.py 7560b0021716..., plan_engine.py 187e8d1c1c..., plan.txt bd549f13...
+reports/plan-diag.txt:282: tools/make_code64b.py:141: # plan_engine.py + plan.txt ship byte-identical
+reports/plan-diag.txt:286: tools/make_fw_template_0.9.64b.py:157: "/// continuous H-resolution (0x10, ~120 ms/sample), lux = raw / 1.2.\n/// v0.9.64b - template body resynced to the golden standalone firmware (code64b): portabl
+reports/plan-diag.txt:291: docs/session-2026-09-09-v3.1.md:19: - The default `plan.txt` uses `BEEP` (a v3 op). `run_plan` rejects v2+ ops when
+tools/_plan_probe.py:79: ("plan.txt", re.compile(r"plan\.txt")),
+tools/make_code64b.py:141: # plan_engine.py + plan.txt ship byte-identical
+tools/make_code64b.py:144: shutil.copyfile("/data/code64/CIRCUITPY-ready/plan.txt", os.path.join(OUT_DIR, "plan.txt"))
+tools/make_code64b.py:146: shutil.copyfile("/data/code64/CIRCUITPY-ready/plan.txt", os.path.join(OUT_DIR, "CIRCUITPY-ready", "plan.txt"))
+(total hits: 62)
+
+--- pattern: except Exception ---
+ams-shell/bridge/ams_crypto.py:91: except Exception:
+ams-shell/bridge/ams_serial.py:64: except Exception as e:
+ams-shell/bridge/ams_serial.py:69: except Exception:
+ams-shell/bridge/ams_serial.py:133: except Exception:
+ams-shell/bridge/ams_serial.py:144: except Exception:
+ams-shell/bridge/ams_serial.py:203: except Exception:
+ams-shell/bridge/ams_serial.py:231: except Exception:
+ams-shell/bridge/ams_serial.py:238: except Exception:
+ams-shell/bridge/ams_serial.py:245: except Exception:
+ams-shell/bridge/bridge.py:55: except Exception:
+ams-shell/bridge/bridge.py:62: except Exception:
+ams-shell/bridge/bridge.py:69: except Exception:
+ams-shell/bridge/bridge.py:73: except Exception:
+ams-shell/bridge/bridge.py:84: except Exception:
+ams-shell/bridge/bridge.py:113: except Exception:
+ams-shell/bridge/bridge.py:152: except Exception:
+ams-shell/bridge/bridge.py:158: except Exception:
+ams-shell/bridge/bridge.py:229: except Exception:
+ams-shell/bridge/bridge.py:237: except Exception:
+ams-shell/bridge/bridge.py:242: except Exception:
+ams-shell/bridge/bridge.py:263: except Exception:
+ams-shell/bridge/bridge.py:280: except Exception:
+ams-shell/bridge/bridge.py:294: except Exception:
+ams-shell/bridge/bridge.py:297: except Exception:
+ams-shell/bridge/bridge.py:365: except Exception as ex:
+ams-shell/bridge/bridge.py:440: except Exception:
+ams-shell/bridge/bridge.py:449: except Exception:
+ams-shell/bridge/bridge.py:468: except Exception as e:
+ams-shell/bridge/bridge.py:514: except Exception:
+ams-shell/bridge/serial/rfc2217.py:418: except Exception as msg:
+ams-shell/bridge/serial/serialcli.py:42: except Exception as msg:
+ams-shell/bridge/serial/serialjava.py:76: except Exception as msg:
+ams-shell/bridge/serial/serialposix.py:353: except Exception:
+ams-shell/bridge/serial/threaded/__init__.py:188: except Exception as e:
+ams-shell/bridge/serial/threaded/__init__.py:209: except Exception as e:
+ams-shell/bridge/serial/tools/miniterm.py:728: except Exception as e:
+ams-shell/bridge/serial/tools/miniterm.py:760: except Exception as e:
+ams-shell/bridge/serial/urlhandler/protocol_socket.py:64: except Exception as msg:
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:373: except Exception:
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:385: except Exception:
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:394: except Exception:
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:406: except Exception:
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:421: except Exception:
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:431: except Exception:
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:443: except Exception:
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:470: except Exception:
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:518: except Exception:
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:631: except Exception:
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:717: except Exception:
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:741: except Exception:
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:756: except Exception:
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:928: except Exception as exc:
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:941: except Exception as exc:
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:1003: except Exception:
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:1015: except Exception:
+ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs:1020: except Exception:
+ams-shell/tools/isp_flash.py:109: except Exception:
+firmware/code64b/code64b.py:200: except Exception:
+firmware/code64b/code64b.py:212: except Exception:
+firmware/code64b/code64b.py:221: except Exception:
+(total hits: 132)
+
+=== 4. CONTEXT DUMPS (firmware/ and portable/ python files) ===
+--- firmware/code64b/code64b.py (848 lines, 14 marks, 5 ranges) ---
+  @@ 45-66
+     45| LOOP_MODE = "once"      # once | times | timed | forever
+     46| LOOP_COUNT = 0      # passes for "times"
+     47| LOOP_SECONDS = 0  # seconds for "timed"
+     48| 
+     49| # v0.9.60 - safe default: copying/booting code.py NEVER starts the macro by itself.
+     50| # Set True only for a deliberate power-on-autorun scenario.
+     51| AUTOSTART = False
+     52| 
+     53| # v0.9.61-plan1 - portable plan: when /plan.txt exists and no host is driving, the
+     54| # standalone engine runs the plan (random mouse / click / type / delay / loop /
+     55| # wait-for-light) with the SAME humanization as the PC app and fresh randomness
+     56| # every pass. PLAN_DEBUG=True prints step lines on the USB console.
+     57| PLAN_DEBUG = False
+     58| PLAN_PATH = "/plan.txt"
+     59| 
+     60| # v0.9.62 - death-of-motion fixes (field evidence: 2026-09-09 record, 53.4 s run):
+     61| #   * GP4 start RE-ARMS the engine (start_engine): passes reset + flow ledger wiped.
+     62| #     The v0.9.61 LOOP_MODE="once" trap (passes never reset, so one early pass end -
+     63| #     a stray USB byte's PlanAbort or a swallowed error - silenced Num Lock until the
+     64| #     next power-cycle) is gone: every start revives the run.
+     65| #   * Arm-ack watchdog in pump_arm: the unframed pico<->arm UART could lose OK|MMOVE
+     66| #     acks and permanently skew _arm_lag; ARM_LAG_MAX lost acks meant eternal
+
+  @@ 203-221
+    203| 
+    204| kbd = Keyboard(usb_hid.devices)
+    205| serial = usb_cdc.data if usb_cdc.data is not None else usb_cdc.console
+    206| states = load_states()
+    207| window = []
+    208| 
+    209| # v0.9.61-plan1 - optional plan engine module (absent file = bridge-only firmware)
+    210| try:
+    211|     import plan_engine as _pe
+    212| except Exception:
+    213|     _pe = None
+    214| 
+    215| # v0.9.60 - the light sensor is OPTIONAL. A loose SDA/SCL wire must never kill the brain
+    216| # before its command loop (that was the silent boot death): without the sensor the light
+    217| # commands answer ERR|NOSENSOR and everything else keeps working.
+    218| try:
+    219|     i2c = busio.I2C(board.GP21, board.GP20)   # SCL, SDA
+    220|     sensor = Bh1750(i2c)
+    221| except Exception:
+
+  @@ 687-710
+    687|             last_host_cmd = time.monotonic()   # host is back - bridge mode wins
+    688|             return False
+    689|         if not engine_paused and time.monotonic() >= end:
+    690|             return True
+    691|         time.sleep(0.01)
+    692| 
+    693| 
+    694| class _PlanCtx:
+    695|     """v0.9.61 - adapter from plan_engine ops to this firmware's drivers."""
+    696|     screen_w = 1920
+    697|     screen_h = 1080
+    698|     speed_min = 0
+    699|     speed_max = 2000
+    700| 
+    701|     def get_mouse_pos(self):
+    702|         # None only on a fresh Pico boot; plan_engine then uses screen centre once.
+    703|         return _plan_mouse_pos
+    704| 
+    705|     def set_mouse_pos(self, x, y):
+    706|         global _plan_mouse_pos
+    707|         _plan_mouse_pos = (int(x), int(y))
+    708| 
+    709|     def now(self):
+    710|         return time.monotonic()
+
+  @@ 735-774
+    735|         if sensor is None:
+    736|             return False
+    737|         return wait_range(lo, hi, stable_ms, timeout_ms, mode) is not None
+    738| 
+    739|     def key(self, vk, hold_ms):
+    740|         press(vk, hold_ms)
+    741| 
+    742| 
+    743| def plan_pass():
+    744|     """v0.9.61 - run one pass of /plan.txt. Returns True when a plan exists and ran
+    745|     (even if it aborted early), False when there is no plan to run."""
+    746|     global _plan_cache
+    747|     if _pe is None:
+    748|         return False
+    749|     if _plan_cache is None:
+    750|         try:
+    751|             with open(PLAN_PATH, "r") as fh:
+    752|                 text = fh.read()
+    753|             _plan_cache = _pe.parse_plan(text)
+    754|             print("plan: loaded", len(_plan_cache), "ops")   # v0.9.62 - confirm a good parse once per boot
+    755|         except Exception as exc:
+    756|             if isinstance(exc, OSError):
+    757|                 pass                                 # no plan.txt - normal bridge-only mode
+    758|             else:
+    759|                 print("plan: load failed:", exc)    # v0.9.62 - parse errors ALWAYS visible
+    760|                 led_fault(4)                         # 4 flashes = plan parse fault
+    761|             _plan_cache = False
+    762|     if not _plan_cache:
+    763|         return False
+    764|     try:
+    765|         _pe.run_plan(_plan_cache, _PlanCtx())
+    766|     except _pe.PlanAbort:
+    767|         release_all_buttons(force=True)   # v0.9.64b - full shield on the abort path
+    768|     except Exception as exc:
+    769|         # v0.9.62 - ALWAYS reported (was PLAN_DEBUG-only: a swallowed error read as a
+    770|         # silent death). 3 LED flashes = run fault, visible with no PC attached.
+    771|         print("plan: run error:", exc)
+    772|         led_fault(3)
+    773|         release_all_buttons(force=True)   # v0.9.64b - full shield on the error path
+    774|     return True
+
+  @@ 828-844
+    828|                     if _reply is not None:        # v0.9.60c - MMOVE is fire-and-forget (None)
+    829|                         _serial_write_line(_reply)
+    830|                 except Exception:
+    831|                     _serial_write_line("ERR|EXC|" + line.split("|")[0])
+    832|         else:
+    833|             poll_keypad()
+    834|             host_quiet = time.monotonic() - last_host_cmd >= 3   # no double-fire after host runs
+    835|             if engine_on and not engine_paused and host_quiet and loop_due():
+    836|                 if plan_pass():            # v0.9.61 - a portable plan takes precedence
+    837|                     passes += 1
+    838|                 elif states:
+    839|                     standalone_pass()
+    840|                     passes += 1
+    841|             time.sleep(0.02)
+    842|     except Exception:
+    843|         # v0.9.60 - never-die: a bad line or a transient USB hiccup must never kill
+    844|         # code.py. (KeyboardInterrupt/Ctrl+C still stops it - it is not an Exception.)
+
+
+--- firmware/code64b/code64b_check.py (262 lines, 6 marks, 3 ranges) ---
+  @@ 54-70
+     54|       "def get_mouse_pos(self):" in SRC and "def set_mouse_pos(self, x, y):" in SRC
+     55|       and "_plan_mouse_pos = None" in SRC)
+     56| check("S13 start_engine preserves saved mouse position", "_plan_mouse_pos =" not in se)
+     57| check("S16 held-button tracking lives in forward_fast (MDOWN add / MUP discard)",
+     58|       '_held_buttons.add(' in ff and '_held_buttons.discard(' in ff and 'head == "MDOWN"' in ff and 'head == "MUP"' in ff)
+     59| check("S17 panic gesture: GP4 hold >= 1 s force-releases + 5 flashes",
+     60|       "_btn1_since = time.monotonic()" in pk and ">= 1.0" in pk and "led_fault(5)" in pk and "_btn1_since" in pk)
+     61| 
+     62| PE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "plan_engine.py")
+     63| PE_SRC = open(PE_PATH, encoding="utf-8").read()
+     64| check("S14 plan engine loads and saves cursor state",
+     65|       "_load_mouse_pos(ctx, ops)" in PE_SRC and "_save_mouse_pos(ctx, pos)" in PE_SRC)
+     66| check("S15 every sent MMOVE persists before abortable delay",
+     67|       PE_SRC.index("_save_mouse_pos(ctx, pos)", PE_SRC.index("for pt in plan"))
+     68|       < PE_SRC.index("if not ctx.sleep_ms(pt[2])", PE_SRC.index("for pt in plan")))
+     69| 
+     70| # ---------- behavioural tests (real code slices, fake hardware) ----------
+
+  @@ 203-219
+    203| # T8 - GP3 toggles pause + Scroll Lock echo, with zero arm traffic (no panic side effects)
+    204| ns["engine_paused"] = False
+    205| tx0 = len(ns["arm"].tx)
+    206| ns["btn2"].value = False; FT.t += 1.5; ns["poll_keypad"]()
+    207| ns["btn2"].value = True;  ns["poll_keypad"]()
+    208| check("T8 GP3 pause toggle + Scroll Lock echo, no MUP/panic side effects",
+    209|       ns["engine_paused"] is True and TAPS[-1] == "SCR" and len(ns["arm"].tx) == tx0)
+    210| 
+    211| # T9/T10 - real plan_engine position persistence across restart and mid-path Stop
+    212| import importlib.util
+    213| spec = importlib.util.spec_from_file_location("pe64bcheck", PE_PATH)
+    214| PE = importlib.util.module_from_spec(spec); spec.loader.exec_module(PE)
+    215| 
+    216| class PlanCtx:
+    217|     screen_w=1920; screen_h=1080; speed_min=0; speed_max=2000
+    218|     def __init__(self, saved=None, sleeps=None):
+    219|         self.saved=saved; self.sent=[]; self.sleeps=list(sleeps or [])
+
+  @@ 232-262
+    232| rmouse=("RMOUSE", {"region":(1301,0,5,5)})
+    233| ops=[("SCREEN", {"v":(1920,1080)}), rmouse]
+    234| calls=[]
+    235| def fake_plan(sx,sy,tx,ty,c,pauses,sw,sh):
+    236|     calls.append((sx,sy,tx,ty))
+    237|     return {"pts":[(tx,ty,0)], "target":(tx,ty), "before":0, "after":0, "long":0}
+    238| PE.plan_move=fake_plan
+    239| pc=PlanCtx()
+    240| PE.run_plan(ops,pc)
+    241| saved1=pc.saved
+    242| PE.run_plan(ops,pc)
+    243| check("T9 restart begins at previous target, not screen centre",
+    244|       calls[0][:2] == (960,540) and calls[1][:2] == saved1 and saved1 != (960,540))
+    245| 
+    246| abort_calls=[]
+    247| def abort_plan(sx,sy,tx,ty,c,pauses,sw,sh):
+    248|     abort_calls.append((sx,sy))
+    249|     return {"pts":[(410,310,1),(420,320,1)], "target":(420,320),
+    250|             "before":0, "after":0, "long":0}
+    251| PE.plan_move=abort_plan
+    252| pc2=PlanCtx(saved=(400,300), sleeps=[True,False])
+    253| try: PE.run_plan(ops,pc2)
+    254| except PE.PlanAbort: pass
+    255| check("T10a Stop mid-path saves last MMOVE before abort", pc2.saved==(410,310) and pc2.sent==[(410,310)])
+    256| pc2.sleeps=[]; pc2.sent=[]
+    257| PE.run_plan(ops,pc2)
+    258| check("T10b next Start resumes from last MMOVE", abort_calls[-1]==(410,310))
+    259| 
+    260| failed = [n for n, ok in results if not ok]
+    261| print("\ncode64b_check: %d/%d pass" % (len(results) - len(failed), len(results)))
+    262| sys.exit(1 if failed else 0)
+
+
+--- firmware/code64b/plan_engine.py (792 lines, 7 marks, 5 ranges) ---
+  @@ 1-16
+      1| # plan_engine.py - Classroom Studio portable plan engine (code64)
+      2| # Runs on the Pico (CircuitPython) and on CPython (the sim). Exact port of the app's
+      3| # humanization layers: WindMouse (HumanMouse.cs v0.9.24) and the typing planner
+      4| # (StepDefinitions.TypeScript v0.9.15). Fresh randomness is rolled for every pass,
+      5| # so repeated loops never replay an identical path - exactly like the PC app.
+      6| #
+      7| # plan.txt - one op per line, pipe-separated, key=value args, %-encoding inside text:
+      8| #   PLAN|1                                header (format version, must be first)
+      9| #   SCREEN|1920,1080                      clamp bounds for all moves
+     10| #   SPEED|0,2000                          app mouse speed px/s (max 0 = shape-only pacing)
+     11| #   RMOUSE|region=x,y,w,h|mt=mn,mx|curve=mn,mx|before=mn,mx|after=mn,mx|
+     12| #         mid=chance:mn,mx|idle=everyMn,everyMx:pauseMn,pauseMx|over=pct
+     13| #   CLICK|btn=left|n=1|hold=mn,mx
+     14| #   TYPE|h=mn,mx|w=mn,mx|wp=pct|p=mn,mx|think=chance:mn,mx|typo=mn,mx|text=<encoded>
+     15| #   DELAY|mn,mx
+     16| #   LOOP|n  ... ENDLOOP                   n = pass count, 0 = forever
+
+  @@ 23-39
+     23| import random
+     24| 
+     25| 
+     26| class PlanAbort(Exception):
+     27|     """Raised inside a step when the host took over or the keypad stopped the run."""
+     28| 
+     29| 
+     30| # code64: optional persistent cursor contract. The Pico context owns the saved
+     31| # coordinate so Start/Stop does not reset every new run_plan() call to screen centre.
+     32| def _load_mouse_pos(ctx, ops):
+     33|     sw, sh = ctx.screen_w, ctx.screen_h
+     34|     for op, prm in ops:
+     35|         if op == "SCREEN":
+     36|             sw, sh = prm["v"]
+     37|             break
+     38|     saved = None
+     39|     getter = getattr(ctx, "get_mouse_pos", None)
+
+  @@ 71-87
+     71|         return 0
+     72|     return mn if mx <= mn else random.randint(mn, mx)
+     73| 
+     74| 
+     75| def _clamp(v, lo, hi):
+     76|     return lo if v < lo else hi if v > hi else v
+     77| 
+     78| 
+     79| # ── %-codec for TYPE text (|, %, newline are structural in plan.txt) ─────────────────────
+     80| 
+     81| def pct_dec(s):
+     82|     out = []
+     83|     i = 0
+     84|     while i < len(s):
+     85|         if s[i] == "%" and i + 2 < len(s) + 1 and i + 2 <= len(s) - 1:
+     86|             try:
+     87|                 out.append(chr(int(s[i + 1:i + 3], 16)))
+
+  @@ 221-237
+    221|                     c, _, r = prm["think"].partition(":")
+    222|                     prm["think"] = (int(c), _pair(r, "think", line_no))
+    223|                 if "wp" in prm:
+    224|                     prm["wp"] = int(prm["wp"])
+    225|         ops.append((op, prm))
+    226|     if loop_stack:
+    227|         raise ValueError("line %d: LOOP without ENDLOOP" % loop_stack[-1][1])
+    228|     if not ops or ops[0][0] != "PLAN":
+    229|         raise ValueError("plan must start with PLAN|1")
+    230|     return ops
+    231| 
+    232| 
+    233| # ── HumanMouse port (C# v0.9.24 → Python; banker-rounding matches Math.Round) ───────────
+    234| 
+    235| def tuned_wind(dist, curve):
+    236|     cv = 0.30 if curve < 0 else _clamp(curve, 0.0, 2.0)
+    237|     base = 0.3 + cv * 3.0 if cv < 1.0 else 3.3 + (cv - 1.0) * 4.7
+
+  @@ 675-691
+    675|                 cmds.append(("KTEXT", hmin, hmax, line[i:i + 60]))
+    676|         if li < len(lines) - 1:
+    677|             cmds.append(("KCOMBO", 13))                  # Enter between lines
+    678|     return cmds
+    679| 
+    680| 
+    681| # ── executor ─────────────────────────────────────────────────────────────────────────────
+    682| 
+    683| def run_plan(ops, ctx):
+    684|     """Executes parsed ops against ctx. ctx provides:
+    685|     now()->float seconds, sleep_ms(ms)->bool(False=abort), mmove(x,y),
+    686|     mclick(btn,n,hmin,hmax), ktext(hmin,hmax,text), kcombo(vk),
+    687|     wait_light(lo,hi,stable,to,mode)->bool, key(vk,hold_ms), log(msg),
+    688|     screen_w, screen_h, speed_min, speed_max."""
+    689|     pauses = PausePlanner()
+    690|     pos = _load_mouse_pos(ctx, ops)
+    691|     i = 0
+
+
+--- portable/plan3/sim/test_plan_gen.py (317 lines, 17 marks, 5 ranges) ---
+  @@ 1-38
+      1| #!/usr/bin/env python3
+      2| # -*- coding: utf-8 -*-
+      3| """Behavioural tests for tools/plan_gen.py (the .amsj -> plan.txt compiler).
+      4| 
+      5| Golden tests: the generator is deterministic (randomness lives in the engine at
+      6| run time), so the emitted plan is compared BYTE-EXACT against the frozen files
+      7| in examples/*.plan.txt. Negative tests prove the hard rule: no unsupported step
+      8| is ever silently skipped - the build blocks and names every offending step.
+      9| End-to-end: the generated reference plan is also EXECUTED on a fake ctx.
+     10| """
+     11| import json
+     12| import os
+     13| import sys
+     14| import tempfile
+     15| 
+     16| try:
+     17|     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+     18| except Exception:
+     19|     pass
+     20| 
+     21| _HERE = os.path.dirname(os.path.abspath(__file__))
+     22| _ROOT = os.path.dirname(_HERE)
+     23| for _cand in (_HERE, _ROOT, os.path.join(_ROOT, "CIRCUITPY"), os.path.join(_ROOT, "tools"), os.getcwd()):
+     24|     if os.path.exists(os.path.join(_cand, "plan_engine.py")):
+     25|         sys.path.insert(0, _cand)
+     26| for _cand in (os.path.join(_ROOT, "tools"), _HERE, os.getcwd()):
+     27|     if os.path.exists(os.path.join(_cand, "winr.py")):
+     28|         sys.path.insert(0, _cand)
+     29|         break
+     30| import plan_engine as pe                     # noqa: E402
+     31| import plan_gen as pg                        # noqa: E402
+     32| 
+     33| PASS = FAIL = 0
+     34| 
+     35| 
+     36| def check(name, cond):
+     37|     global PASS, FAIL
+     38|     if cond:
+
+  @@ 51-99
+     51| 
+     52| 
+     53| def build_opts(**over):
+     54|     settings = {"PlayRepeatMode": "once", "PlayRepeatTimes": 10, "PlayRepeatValue": 1,
+     55|                 "PlayRepeatUnit": "minute", "MouseMoveSpeedMin": 300, "MouseMoveSpeedMax": 2000,
+     56|                 "TypeKeyMinMs": 80, "TypeKeyMaxMs": 220, "KeyboardBoard": "pico"}
+     57|     settings.update(over.pop("settings", {}))
+     58|     opts = {"screen_w": 1920, "screen_h": 1080, "settings": settings,
+     59|             "type_key_min": 80, "type_key_max": 220, "out_name": "plan.txt"}
+     60|     opts.update(over)
+     61|     return opts
+     62| 
+     63| 
+     64| # -- 1. golden: ref-mouse-keys --------------------------------------------------
+     65| with tempfile.TemporaryDirectory() as td:
+     66|     rc = cli([os.path.join(EXAMPLES, "ref-mouse-keys.amsj"), "-o", "out.txt", "--out-dir", td])
+     67|     got = open(os.path.join(td, "out.txt"), encoding="utf-8").read()
+     68|     golden = open(os.path.join(EXAMPLES, "ref-mouse-keys.plan.txt"), encoding="utf-8").read()
+     69|     check("golden ref-mouse-keys compiles (rc=0)", rc == 0)
+     70|     check("golden ref-mouse-keys is byte-exact", got == golden)
+     71|     check("golden ref-mouse-keys parses with the real engine", bool(pe.parse_plan(got)))
+     72| 
+     73| # -- 2. golden: ref-flow --------------------------------------------------------
+     74| with tempfile.TemporaryDirectory() as td:
+     75|     rc = cli([os.path.join(EXAMPLES, "ref-flow.amsj"), "-o", "out.txt", "--out-dir", td])
+     76|     got = open(os.path.join(td, "out.txt"), encoding="utf-8").read()
+     77|     golden = open(os.path.join(EXAMPLES, "ref-flow.plan.txt"), encoding="utf-8").read()
+     78|     check("golden ref-flow compiles (rc=0)", rc == 0)
+     79|     check("golden ref-flow is byte-exact", got == golden)
+     80|     check("golden ref-flow parses with the real engine", bool(pe.parse_plan(got)))
+     81| 
+     82| # -- 3. blocking paths ----------------------------------------------------------
+     83| with tempfile.TemporaryDirectory() as td:
+     84|     rc = cli([os.path.join(EXAMPLES, "err-pgroup.amsj"), "--out-dir", td])
+     85|     check("pgroup with a loop blocks (rc=1)", rc == 1)
+     86|     check("blocked build writes NO plan file", not os.path.exists(os.path.join(td, "plan.txt")))
+     87| 
+     88| with tempfile.TemporaryDirectory() as td:
+     89|     rc = cli([os.path.join(EXAMPLES, "daroon1.amsj"), "--out-dir", td])
+     90|     check("daroon1 blocks on findImage (rc=1)", rc == 1)
+     91|     check("daroon1 blocked => nothing written", not os.path.exists(os.path.join(td, "plan.txt")))
+     92| 
+     93| try:
+     94|     pg.build(os.path.join(EXAMPLES, "daroon1.amsj"), build_opts())
+     95|     check("daroon1 raises _Blocked", False)
+     96| except pg._Blocked as b:
+     97|     joined = "\n".join(b.errors)
+     98|     check("daroon1 names all 8 findImage steps",
+     99|           joined.count("findImage needs machine vision") == 8)
+
+  @@ 146-167
+    146|     cpath = os.path.join(td, "child-plan.amsj")
+    147|     with open(cpath, "w", encoding="utf-8") as fh:
+    148|         json.dump(child, fh)
+    149|     parent = doc([step("playScript", {"path": cpath})])
+    150|     ppath = os.path.join(td, "parent.amsj")
+    151|     with open(ppath, "w", encoding="utf-8") as fh:
+    152|         json.dump(parent, fh)
+    153|     rc = cli([ppath, "--out-dir", td])
+    154|     ptxt = open(os.path.join(td, "plan.txt"), encoding="utf-8").read()
+    155|     check("playScript compiles (rc=0)", rc == 0)
+    156|     check("parent plan has INCLUDE|file=child-plan.txt", "INCLUDE|file=child-plan.txt" in ptxt)
+    157|     check("child plan file written next to it", os.path.exists(os.path.join(td, "child-plan.txt")))
+    158|     if os.path.exists(os.path.join(td, "child-plan.txt")):
+    159|         ctxt_ = open(os.path.join(td, "child-plan.txt"), encoding="utf-8").read()
+    160|         check("child plan parses", bool(pe.parse_plan(ctxt_)))
+    161|         check("child plan carries the step", "DELAY|5" in ctxt_)
+    162| 
+    163| # include cycle: a includes b, b includes a -> blocked
+    164| with tempfile.TemporaryDirectory() as td:
+    165|     pa = os.path.join(td, "a.amsj")
+    166|     pb = os.path.join(td, "b.amsj")
+    167|     with open(pa, "w", encoding="utf-8") as fh:
+
+  @@ 214-230
+    214|     rc = cli([os.path.join(EXAMPLES, "ref-mouse-keys.amsj"), "-o", "o.txt", "--out-dir", td,
+    215|               "--settings", s])
+    216|     txt = open(os.path.join(td, "o.txt"), encoding="utf-8").read()
+    217|     check("0/2300 migrates to 300/2000 (app rule)", "SPEED|300,2000" in txt)
+    218| 
+    219| # -- 6. disabled steps are counted, never emitted -------------------------------
+    220| try:
+    221|     files, gen, _c = pg.build(os.path.join(EXAMPLES, "ref-mouse-keys.amsj"), build_opts())
+    222|     txt = files["plan.txt"]
+    223|     check("disabled step counted", len(gen.disabled) == 1 and "disabled probe" in gen.disabled[0])
+    224|     check("disabled step emits nothing (no KDOWN|81 anywhere)", "KDOWN|81" not in txt and "combo=81" not in txt)
+    225| except pg._Blocked:
+    226|     check("disabled-count build works", False)
+    227| 
+    228| # -- 7. end-to-end: the generated reference plan RUNS on a fake ctx -------------
+    229| class Ctx:
+    230|     plan_api = 3
+
+  @@ 291-309
+    291|     def read_plan_file(self, name):
+    292|         raise OSError(name)
+    293| 
+    294|     def beep(self, f, ms):
+    295|         self.ev.append(("beep", f, ms))
+    296| 
+    297| 
+    298| files, _g, _c = pg.build(os.path.join(EXAMPLES, "ref-mouse-keys.amsj"), build_opts())
+    299| ops = pe.parse_plan(files["plan.txt"])
+    300| ctx = Ctx()
+    301| pe.run_plan(ops, ctx)
+    302| 
+    303| def ev_count(kind, val=None):
+    304|     return sum(1 for e in ctx.ev if e[0] == kind and (val is None or e[1] == val))
+    305| 
+    306| check("e2e: SETRES fired once with the screen", ctx.ev.count(("setres", 1920, 1080)) == 1)
+    307| check("e2e: forLoop ran its keystroke exactly 3 times", ev_count("keyc", (70,)) == 3)
+    308| check("e2e: Ctrl+E combo fired once", ev_count("keyc", (162, 69)) == 1)
+    309| check("e2e: KDOWN/KUP of SHIFT fired once each", ev_count("down", 160) == 1 and ev_count("up", 160) == 1)
+
+
+--- portable/plan3/tools/plan_check.py (65 lines, 5 marks, 1 ranges) ---
+  @@ 1-33
+      1| #!/usr/bin/env python3
+      2| # -*- coding: utf-8 -*-
+      3| """plan_check.py - validate a plan.txt against the REAL plan engine (dogfood).
+      4| 
+      5| Usage:  python3 tools/plan_check.py CIRCUITPY/plan.txt [more.txt ...]
+      6| Exit:   0 = every file parsed by the engine, 1 = at least one failed.
+      7| The parser IS the board's parser (CIRCUITPY/plan_engine.py), so "plan ok" here
+      8| means the Pico will accept the file too. '# FLAG' lines are surfaced as warnings.
+      9| """
+     10| import os
+     11| import sys
+     12| 
+     13| try:
+     14|     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+     15| except Exception:
+     16|     pass
+     17| 
+     18| _HERE = os.path.dirname(os.path.abspath(__file__))
+     19| for _cand in (_HERE, os.path.dirname(_HERE), os.path.join(os.path.dirname(_HERE), "CIRCUITPY"),
+     20|               os.path.join(_HERE, "CIRCUITPY"), os.getcwd()):
+     21|     if os.path.exists(os.path.join(_cand, "plan_engine.py")):
+     22|         sys.path.insert(0, _cand)
+     23|         break
+     24| 
+     25| import plan_engine as pe                                        # noqa: E402
+     26| 
+     27| 
+     28| def check(path):
+     29|     try:
+     30|         with open(path, "r", encoding="utf-8") as fh:
+     31|             text = fh.read()
+     32|     except Exception as exc:
+     33|         print("error: cannot read %s: %s" % (path, exc))
+
+
+--- portable/plan3/tools/plan_gen.py (954 lines, 10 marks, 6 ranges) ---
+  @@ 1-12
+      1| #!/usr/bin/env python3
+      2| # -*- coding: utf-8 -*-
+      3| r"""plan_gen.py - compile a Classroom Studio .amsj document (+ the app's
+      4| ams-settings.json Play Options) into a portable plan.txt for the Pico
+      5| (plan engine v3, firmware pico-light 0.9.66+ / plan_api 3).
+      6| 
+      7| Hard rules (project page, 2026-09-09):
+      8|   * Play Options: once = no wrapper, times N = LOOP|N wrapper,
+      9|     timed = LOOPTIME|seconds wrapper around the WHOLE plan.
+     10|   * Step order and the per-step delay-after (Delay / DelayMax) match the app:
+     11|     for a container the delay lands AFTER the whole block, exactly where the
+     12|     app's runner applies it.
+
+  @@ 32-56
+     32|     sys.stdout.reconfigure(encoding="utf-8", errors="replace")   # cp1252-safe console
+     33|     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+     34| except Exception:
+     35|     pass
+     36| 
+     37| _HERE = os.path.dirname(os.path.abspath(__file__))
+     38| for _cand in (_HERE, os.path.dirname(_HERE), os.path.join(os.path.dirname(_HERE), "CIRCUITPY"),
+     39|               os.path.join(_HERE, "CIRCUITPY"), os.getcwd()):
+     40|     if os.path.exists(os.path.join(_cand, "plan_engine.py")):
+     41|         sys.path.insert(0, _cand)
+     42| for _cand in (_HERE, os.path.dirname(_HERE), os.path.join(os.path.dirname(_HERE), "tools"), os.getcwd()):
+     43|     if os.path.exists(os.path.join(_cand, "winr.py")):
+     44|         sys.path.insert(0, _cand)
+     45|         break
+     46| 
+     47| import winr                                                     # noqa: E402
+     48| import plan_engine as pe                                        # noqa: E402  (self-check with the real engine)
+     49| 
+     50| APP_ID = "AMS"
+     51| MAX_INCLUDE_DEPTH = 4   # the engine logs-and-skips includes past depth 4 - plan_gen blocks instead
+     52| 
+     53| # -- KeyMap.cs (ams-shell main) -- decimal VK codes the firmware expects (vk_to_hid) --
+     54| MOD_VK = {"Ctrl": 162, "Shift": 160, "Alt": 164, "Win": 91}
+     55| VK = {}
+     56| for _c in range(ord("A"), ord("Z") + 1):
+
+  @@ 111-127
+    111|         return v.strip().lower() in ("true", "1", "yes")
+    112|     return bool(v)
+    113| 
+    114| def _pair(mn, mx):
+    115|     """Engine/app ranges are swap-tolerant."""
+    116|     return (mx, mn) if mx < mn else (mn, mx)
+    117| 
+    118| def pct_type(text):
+    119|     """TYPE text encoder: '|', '%' and newline are structural in plan.txt.
+    120|     The board types ASCII 0x20-0x7E only; anything else is a blocking error
+    121|     (the 2026-09-04 decision: non-Latin typing is out of scope for the port)."""
+    122|     out = []
+    123|     for ch in text.replace("\r\n", "\n").replace("\r", "\n"):
+    124|         o = ord(ch)
+    125|         if ch == "\n":
+    126|             out.append("%0A")
+    127|         elif ch == "%":
+
+  @@ 824-840
+    824|         else:
+    825|             body = ["LOOPTIME|%d" % sec] + body + ["ENDLOOP"]
+    826|     elif mode != "once":
+    827|         gen.errors.append("settings: unknown PlayRepeatMode '%s' (once|times|timed)" % mode)
+    828|     if settings.get("KeyboardBoard", "pico") == "promicro":
+    829|         gen.flags.append("settings: KeyboardBoard=promicro is bridge-mode only; on the portable plan "
+    830|                          "the Pico types every keyboard step (keyboard=Pico contract)")
+    831|         body.insert(0, "# FLAG " + gen.flags[-1])
+    832|     text = "\n".join(["PLAN|2",
+    833|                       "# generated by tools/plan_gen.py from %s" % os.path.basename(source_path),
+    834|                       "# source sha256: %s" % sha,
+    835|                       "SCREEN|%d,%d" % (opts["screen_w"], opts["screen_h"]),
+    836|                       "SPEED|%d,%d" % (settings["MouseMoveSpeedMin"], settings["MouseMoveSpeedMax"]),
+    837|                       ""] + body) + "\n"
+    838|     files = {opts["out_name"]: text}
+    839|     # children (playScript) compile after the parent; their own errors block the
+    840|     # whole bundle - a half-written set must never reach a drive.
+
+  @@ 851-867
+    851|         pending.extend(child.children_files)
+    852|     all_errors = list(gen.errors)
+    853|     for fname, canon, child in child_gens:
+    854|         for e in child.errors:
+    855|             all_errors.append("[%s] %s" % (fname, e))
+    856|     if all_errors:
+    857|         raise _Blocked(all_errors)
+    858|     for fname, canon, child in child_gens:
+    859|         files[fname] = "\n".join(["PLAN|2",
+    860|                                   "# include plan for %s (generated)" % os.path.basename(canon),
+    861|                                   "SCREEN|%d,%d" % (opts["screen_w"], opts["screen_h"]),
+    862|                                   "SPEED|%d,%d" % (settings["MouseMoveSpeedMin"], settings["MouseMoveSpeedMax"]),
+    863|                                   ""] + child.lines) + "\n"
+    864|     # dogfood: validate every emitted file with the REAL engine before anything ships
+    865|     for name, ftext in files.items():
+    866|         try:
+    867|             pe.parse_plan(ftext)
+
+  @@ 888-908
+    888|         flags.extend(child.flags)
+    889|     if flags:
+    890|         print("  %d flag(s) - honored with a caveat (never silently):" % len(flags))
+    891|         for f in flags:
+    892|             print("    # FLAG " + f)
+    893| 
+    894| def main(argv=None):
+    895|     ap = argparse.ArgumentParser(
+    896|         description="compile a Classroom Studio .amsj into a portable plan.txt for the Pico")
+    897|     ap.add_argument("input", help="the .amsj document")
+    898|     ap.add_argument("-o", "--out", default="plan.txt",
+    899|                     help="output plan file name (default: plan.txt in --out-dir)")
+    900|     ap.add_argument("--out-dir", default=".", help="where plan.txt and child includes are written")
+    901|     ap.add_argument("--settings", default=None,
+    902|                     help="ams-settings.json (Play Options + mouse speed + typing cadence); "
+    903|                          "defaults to the app's factory values")
+    904|     ap.add_argument("--screen", default="1920x1080",
+    905|                     help="TARGET machine resolution for SCREEN (the arm's absolute mapping); "
+    906|                          "default 1920x1080")
+    907|     ap.add_argument("--speed", default=None, help="override mouse speed range: min,max (px/s)")
+    908|     args = ap.parse_args(argv)
+
+
+=== 5. plan_engine.py PUBLIC API ===
+   26| class PlanAbort(Exception):
+   32| def _load_mouse_pos(ctx, ops):
+   51| def _save_mouse_pos(ctx, pos):
+   59| def _rf():
+   63| def _below(n):            # C# Random.Next(n): 0..n-1
+   67| def rand_range(mn, mx):   # C# Rand: inclusive, swap-tolerant, 0 when max <= 0
+   75| def _clamp(v, lo, hi):
+   81| def pct_dec(s):
+   99| _OPS = ("PLAN", "SCREEN", "SPEED", "RMOUSE", "CLICK", "TYPE",
+  103| def _pair(s, what, line_no):
+  112| def _quad(s, what, line_no):
+  122| def parse_plan(text):
+  235| def tuned_wind(dist, curve):
+  241| def build_range_profile(mn, mx, knot_count, low_ends=False):
+  258| def sample_profile(knots, t):
+  270| def _poly_len(pts):
+  277| def windmouse(sx, sy, tx, ty, wind, gravity, curve, profile):
+  318| def resample_variable(spine, mn_sp, mx_sp):
+  352| def assign_dynamic_delays(pts, sx, sy, smin, smax, target_ms=0):
+  391| def curve_height_ratio(pct):
+  398| def _ray_to_edge(x, y, dx, dy, w, h, margin):
+  409| def build_arc(sx, sy, tx, ty, total_ms, cmin, cmax, w, h):
+  429|     def fit_for_side(side):
+  475| class PausePlanner:
+  478|     def __init__(self):
+  482|     def mid_pause(self, c):
+  487|     def roll_long(self, c):
+  500| _DEFAULT_CFG = dict(before_min=120, before_max=450, after_min=150, after_max=600,
+  507| def plan_move(sx, sy, tx, ty, c, pauses, w, h):
+  567| def _build_leg(sx, sy, tx, ty, total_ms, curve, cmin, cmax):
+  580| _QWERTY_ROWS = ("1234567890", "qwertyuiop", "asdfghjkl", "zxcvbnm")
+  581| _PUNCT = ".,!?;:"
+  584| def _qwerty_neighbor(ch):
+  598| def _split_punct(s):
+  613| def plan_typing(text, p):
+  634|     def flush():
+  683| def run_plan(ops, ctx):
+  753| def _exec_rmouse(prm, ctx, pauses, pos):
+
+=== 6. code64b_check.py ASSERT LABELS ===
+   17| def check(name, cond):
+   21| def extract(src, name):
+   29| check("S1 banner v0.9.64b", "# Classroom Studio v0.9.64b" in SRC)
+   30| check("S2 PONG reports 0.9.64b", "OK|PONG|pico-light 0.9.64b|" in SRC)
+   31| check("S3 watchdog constant", "ARM_ACK_TIMEOUT = 1.0" in SRC and "ARM_LAG_MAX = 8" in SRC)
+   37| check("S4 start_engine resets passes + ledger", "passes = 0" in se and "_flow_reset()" in se and "global passes" in se)
+   38| check("S5 GP4 start edge calls start_engine before NumLock echo",
+   40| check("S6 pump_arm has watchdog feeding + self-heal",
+   42| check("S7 run errors ALWAYS printed", '        print("plan: run error:", exc)' in SRC)
+   43| check("S8 boot banner 0.9.64b + fault flashes", 'print("pico-light 0.9.64b' in SRC and "led_fault(2)" in SRC and "led_fault(3)" in SRC)
+   44| check("S9 conditional release: force param + tracked targets",
+   45| "def release_all_buttons(force=False):" in rb
+   48| check("S10 routine start/stop stay conditional (exactly 2 bare call sites, comments excluded)",
+   51| check("S11 full shield on abnormal paths (abort + error + HALT/BYE + panic)",
+   53| check("S12 code64 context exposes persistent mouse position",
+   54| "def get_mouse_pos(self):" in SRC and "def set_mouse_pos(self, x, y):" in SRC
+   56| check("S13 start_engine preserves saved mouse position", "_plan_mouse_pos =" not in se)
+   57| check("S16 held-button tracking lives in forward_fast (MDOWN add / MUP discard)",
+   59| check("S17 panic gesture: GP4 hold >= 1 s force-releases + 5 flashes",
+   64| check("S14 plan engine loads and saves cursor state",
+   66| check("S15 every sent MMOVE persists before abortable delay",
+   72| def __init__(self): self.t = 100.0
+   73| def monotonic(self): return self.t
+   74| def sleep(self, s): self.t += s
+   77| def __init__(self): self.value = True        # active-low wiring: True = released
+   80| def __init__(self): self.value = False
+   83| def __init__(self): self.rx = bytearray(); self.tx = []
+   85| def in_waiting(self): return len(self.rx)
+   86| def read(self, n):
+   88| def write(self, b): self.tx.append(b.decode()); return len(b)
+  115| def press_btn1(hold_s=0.0):
+  126| check("T1 stale once-pass blocks a run before the fix (loop_due False)", ns["loop_due"]() is False)
+  129| check("T1b GP4 start re-arms: engine on, passes=0, ledger wiped, loop_due True, NumLock echoed",
+  132| check("T1c v0.9.64b - start with NO held button writes ZERO MUPs (no cursor_sync teleport) + LED solid",
+  137| check("T2 v0.9.64b - GP4 stop: engine off, pause cleared, echo, LED off, ZERO MUPs",
+  145| check("T2b held MDOWN|left is tracked and released on start (exactly one MUP|left)",
+  151| check("T2c force=True keeps the full v0.9.63 shield (MUP x3)", ns["arm"].tx == MUPS)
+  157| check("T2d panic hold (>=1 s): full MUP x3 fired on the release edge",
+  165| check("T3a at lag=8 an MMOVE coalesces (no write, newest kept)",
+  169| check("T3b one ack flushes the coalesced target (tx + lag restored to 8)",
+  177| check("T4 ack watchdog fires: prints, flushes newest target, ledger re-synced to 1",
+  185| check("T5 fresh acks: watchdog stays quiet, lag untouched",
+  191| check("T6 OK|MMOVE: lag 3->2 and _arm_last_ack refreshed",
+  200| check("T7 watchdog while paused: pending dropped, nothing written, lag zeroed",
+  208| check("T8 GP3 pause toggle + Scroll Lock echo, no MUP/panic side effects",
+  218| def __init__(self, saved=None, sleeps=None):
+  220| def get_mouse_pos(self): return self.saved
+  221| def set_mouse_pos(self,x,y): self.saved=(x,y)
+  222| def now(self): return 0.0
+  223| def log(self,msg): pass
+  224| def sleep_ms(self,ms): return self.sleeps.pop(0) if self.sleeps else True
+  225| def mmove(self,x,y): self.sent.append((x,y))
+  226| def mclick(self,*a): pass
+  227| def ktext(self,*a): pass
+  228| def kcombo(self,*a): pass
+  229| def wait_light(self,*a): return False
+  230| def key(self,*a): pass
+  235| def fake_plan(sx,sy,tx,ty,c,pauses,sw,sh):
+  243| check("T9 restart begins at previous target, not screen centre",
+  247| def abort_plan(sx,sy,tx,ty,c,pauses,sw,sh):
+  255| check("T10a Stop mid-path saves last MMOVE before abort", pc2.saved==(410,310) and pc2.sent==[(410,310)])
+  258| check("T10b next Start resumes from last MMOVE", abort_calls[-1]==(410,310))
+
+=== END OF PROBE ===

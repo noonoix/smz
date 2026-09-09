@@ -1,0 +1,34 @@
+name: tmp-plan-diag
+
+on:
+  push:
+    branches: [diag/plan-engine-0966]
+    paths-ignore:
+      - 'reports/**'
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run plan-engine probe
+        run: |
+          mkdir -p reports
+          python tools/_plan_probe.py > reports/plan-diag.txt 2>&1 || true
+          wc -l reports/plan-diag.txt
+
+      - name: Commit report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f reports/plan-diag.txt
+          git commit -m "chore(diag): plan-engine probe report [skip-tmp]" || echo "no changes"
+          git push

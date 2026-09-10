@@ -313,7 +313,10 @@ class Gen:
             return
         i0, i1 = _pair(_pi(p, "idleEveryMin", 5), _pi(p, "idleEveryMax", 12))
         p0, p1 = _pair(_pi(p, "idlePauseMin", 800), _pi(p, "idlePauseMax", 3000))
-        idle = (i0, i1, p0, p1) if p1 > 0 else (1, 1, 0, 0)   # explicit-off, not engine-default
+        # explicit-off is read from the RAW idlePauseMax (max pause = 0 => no idle breaks),
+        # BEFORE _pair swaps the bounds - otherwise (min=800, max=0) would swap to (0,800) and
+        # the off-intent would be lost (CI run #2 caught exactly this).
+        idle = (i0, i1, p0, p1) if _pi(p, "idlePauseMax", 3000) > 0 else (1, 1, 0, 0)
         self.emit(n, ["RMOUSE|region=%d,%d,%d,%d%s" % (x, y, w, h, self._tuning(p, idle))], "RMOUSE")
 
     def _st_mouseMove(self, n, p):

@@ -56,36 +56,35 @@ RESULT 18 passed 0 failed
 ## App build tail
 ```
   Determining projects to restore...
-  Restored D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj (in 6.76 sec).
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_j5jfv324_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_j5jfv324_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_j5jfv324_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_j5jfv324_wpftmp.csproj]
+  Restored D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj (in 4.37 sec).
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_sh44zpbb_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_sh44zpbb_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_sh44zpbb_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_sh44zpbb_wpftmp.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
   Ams.UI -> D:\a\smc\smc\ams-shell\src\Ams.UI\bin\Release\net8.0-windows\ClassroomStudio.dll
 
 Build succeeded.
 
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_j5jfv324_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_j5jfv324_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_j5jfv324_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_j5jfv324_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_sh44zpbb_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_sh44zpbb_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_sh44zpbb_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_sh44zpbb_wpftmp.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
     8 Warning(s)
     0 Error(s)
 
-Time Elapsed 00:00:24.84
+Time Elapsed 00:00:43.55
 ```
 
 ## Test tail
 ```
-PASS: v0.9.55: the AMS preset keeps the ams board id and Classroom Studio Board name
 PASS: v0.9.55: board ids are sanitised to lowercase Arduino ids
 PASS: v0.9.55: step 2 has the editable board-spec form back (id, name, VID, PIDs, product, maker)
 PASS: v0.9.55: editing a board-spec field refreshes the preview, and defaults can be restored
@@ -169,6 +168,7 @@ PASS: v0.9.60: stableSec 0.5 becomes 500ms on the wire (got: WLUX|1200,1300,500,
 PASS: v0.9.60: the row summary shows the fractional stabilize time (got: Wait for light 1200-1300 lux for 0.5s · timeout 20000ms)
 PASS: v0.9.60: legacy integer stableSec plans still produce the same wire command
 PASS: v0.9.60: the step dialog accepts 0.5 regardless of the Windows display language
+
 
 
 

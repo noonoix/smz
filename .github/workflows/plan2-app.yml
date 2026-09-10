@@ -21,8 +21,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Generate exporter and synchronize Step 59
+      - name: Apply PLAN2 parity, generate exporter and synchronize Step 59
         run: |
+          python tools/upgrade_plan_exporter_plan2.py .
           python tools/make_plan_exporter.py .
           python tools/sync_plan_exporter_tests.py .
       - name: Compile-check bridge stack
@@ -50,9 +51,9 @@ jobs:
         shell: pwsh
         run: |
           $result = (Select-String -Path ci-plan2-test-output.txt -Pattern '=== Results' | Select-Object -Last 1).Line
-          @('# PLAN2 Windows gate report','', '- generation: success','- bridge compile: success','- bridge test: success','- restore: success','- app build: success','- TestRunner build: success','- TestRunner run: success','',"- result: $result") | Set-Content docs/PLAN2-WINDOWS-GATE.md -Encoding utf8
+          @('# PLAN2 Windows gate report','', '- generation: success','- C# PLAN2 parity migration: applied','- bridge compile: success','- bridge test: success','- restore: success','- app build: success','- TestRunner build: success','- TestRunner run: success','',"- result: $result") | Set-Content docs/PLAN2-WINDOWS-GATE.md -Encoding utf8
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add ams-shell/src/Ams.UI/Services/PlanExporter.cs tools/plan_exporter_test_step.cs.inc tests/TestRunner.cs docs/PLAN2-WINDOWS-GATE.md
-          git commit -m "test(plan2): synchronize generated exporter and Windows gate" || echo "no generated change"
+          git add tools/PlanExporter.cs.tpl ams-shell/src/Ams.UI/Services/PlanExporter.cs tools/plan_exporter_test_step.cs.inc tests/TestRunner.cs docs/PLAN2-WINDOWS-GATE.md
+          git commit -m "feat(plan2): migrate C# exporter emitters and validator" || echo "no generated change"
           git push

@@ -3,13 +3,14 @@
 - migration: success
 - bridge: success
 - app build: success
-- TestRunner: failure
+- TestRunner: success
 
-- result: === Results: 724 passed, 18 failed ===
+- result: === Results: 745 passed, 0 failed ===
 
 ## Migration tail
 ```
-PLAN2 parity migration applied
+PLAN2 parity migration already applied
+PLAN2 parity tests applied
 wrote ams-shell\src\Ams.UI\Services\PlanExporter.cs (89168 chars)
 engine sha256: b94b4e8ba3647851814e0a7ea6a1ceb9d92c033a3ad8cc7058a0143853ed3674
 round trip: byte-identical to portable/plan3/CIRCUITPY/plan_engine.py
@@ -20,11 +21,11 @@ SYNC OK: Step 59 now comes from tools/plan_exporter_test_step.cs.inc
 ## App build tail
 ```
   Determining projects to restore...
-  Restored D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj (in 4.12 sec).
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_onnpnmpa_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_onnpnmpa_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_onnpnmpa_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_onnpnmpa_wpftmp.csproj]
+  Restored D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj (in 3.88 sec).
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_av4gjs4u_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_av4gjs4u_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_av4gjs4u_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_av4gjs4u_wpftmp.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
@@ -33,10 +34,10 @@ D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning 
 
 Build succeeded.
 
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_onnpnmpa_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_onnpnmpa_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_onnpnmpa_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_onnpnmpa_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_av4gjs4u_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_av4gjs4u_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_av4gjs4u_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_av4gjs4u_wpftmp.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
@@ -44,11 +45,55 @@ D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning 
     8 Warning(s)
     0 Error(s)
 
-Time Elapsed 00:00:15.92
+Time Elapsed 00:00:17.08
 ```
 
 ## Test tail
 ```
+PASS: v0.9.55: blackwidowte ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: blackwidowxte ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: celeritas2 ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: mx83tkl ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: alloyorigins ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: alloyorigins60 ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: alloyorigins65 ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: duckyone2mini ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: duckyone2promini ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: apexprotkl ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: apexpromini ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: keychronk8 ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: das5qs2 ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: zmk650wp ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: vanguardpro96 ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: shikarik515 ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: gomk87rs ships a complete default board spec (nothing left blank)
+PASS: v0.9.55: the Microchip defaults match the reference tool's board-spec card
+PASS: v0.9.55: the STM32 defaults are the real USB strings of that device
+PASS: v0.9.55: the AMS preset keeps the ams board id and Classroom Studio Board name
+PASS: v0.9.55: board ids are sanitised to lowercase Arduino ids
+PASS: v0.9.55: step 2 has the editable board-spec form back (id, name, VID, PIDs, product, maker)
+PASS: v0.9.55: editing a board-spec field refreshes the preview, and defaults can be restored
+PASS: v0.9.55: the form explains the auto-fill and the application-PID rule in Persian
+PASS: v0.9.55: selecting a device fills step 1 and step 2 with that device's defaults
+PASS: v0.9.55: the preview, the install and the uninstall all use the edited board specs
+PASS: v0.9.55: auto-fill never fights the user's own typing
+PASS: v0.9.55: the port scan lists attached ports only, like the reference tool
+PASS: v0.9.55: history rows are still available behind the switch
+PASS: v0.9.55: the scan log line counts attached ports and hidden history separately
+PASS: v0.9.55: the checkup tab has a history switch and re-renders without a new scan
+PASS: v0.9.55: version pins for this release (csproj + banner + bundle)
+PASS: v0.9.55: all twenty keyboard identities are selectable device modes
+PASS: v0.9.55: every keyboard preset keeps its researched VID/PID and stays CDC (class 0x02)
+PASS: v0.9.55: selecting a keyboard prefills the board-spec defaults (product + manufacturer)
+PASS: v0.9.55: the checkup tab recognises both the bootloader and the application PID
+PASS: v0.9.55: no duplicate device-mode keys after the twenty additions
+PASS: v0.9.55: the new identity tables are documented in place
+PASS: v0.9.55: scrolled panes keep a 14px inset so the scrollbar never sits on the text
+PASS: v0.9.55: the hover hint drops below the icon and switches off while its submenu is open
+PASS: v0.9.55: the settings tab and all its sections live inside the main window, not a separate one
+PASS: v0.9.55: forLoop can be renamed and owns a type icon
+PASS: v0.9.55: parallelGroup can be renamed and owns a type icon
+PASS: v0.9.55: randomPackage can be renamed and owns a type icon
 PASS: v0.9.55: waitForSound can be renamed and owns a type icon
 PASS: v0.9.55: waitForLight can be renamed and owns a type icon
 PASS: v0.9.55: findImage can be renamed and owns a type icon
@@ -111,43 +156,39 @@ PASS: v0.9.60: the step dialog accepts 0.5 regardless of the Windows display lan
 
 
 
+
 --- Step 59: v0.9.65 plan exporter (PLAN|2) ---
 PASS: v0.9.65: plan header is PLAN|2 with SCREEN and SPEED from settings
 PASS: v0.9.65: randomMousePosition emits the exact golden RMOUSE line
 PASS: v0.9.65: per-step delay-after lands after the op
 PASS: v0.9.65: emission counts are reported
-FAIL: v0.9.65: mouseMove compiles to the deterministic 1x1 region with idle explicitly off
+PASS: v0.9.66: mouseMove emits native PLAN|2 MOVETO
 PASS: v0.9.65: the engine's built-in idle default never leaks into a point move
-FAIL: v0.9.65: human=false is flagged, never silent
+PASS: v0.9.66: human=false emits native non-human MOVETO
 PASS: v0.9.65: click line with swap-normalized hold
 PASS: v0.9.65: TYPE percent-encoding (% -> %25, | -> %7C, newline -> %0A)
 PASS: v0.9.65: word pauses + typing cadence defaults from settings
-PASS: v0.9.65: findImage blocked with a named reason
-FAIL: v0.9.65: waitForSound must be blocked on PLAN|2
-FAIL: v0.9.65: keystroke must be blocked on PLAN|2
-FAIL: v0.9.65: keyDown must be blocked on PLAN|2
-FAIL: v0.9.65: keyUp must be blocked on PLAN|2
-FAIL: v0.9.65: mouseScroll must be blocked on PLAN|2
-FAIL: v0.9.65: label must be blocked on PLAN|2
-FAIL: v0.9.65: gotoLabel blocked with a named reason
-FAIL: v0.9.65: rawCommand must be blocked on PLAN|2
-FAIL: v0.9.65: randomPackage blocked with a named reason
-FAIL: v0.9.65: parallelGroup blocked with a named reason
-FAIL: v0.9.65: playAudio blocked with a named reason
-FAIL: v0.9.65: playScript blocked with a named reason
-FAIL: v0.9.65: runExe blocked with a named reason
-FAIL: v0.9.65: openFile blocked with a named reason
-PASS: v0.9.65: randomMousePosition compiles on PLAN|2
-PASS: v0.9.65: mouseMove compiles on PLAN|2
-PASS: v0.9.65: mouseClick compiles on PLAN|2
-PASS: v0.9.65: delay compiles on PLAN|2
-PASS: v0.9.65: waitForLight compiles on PLAN|2
-PASS: v0.9.65: comment compiles on PLAN|2
-PASS: v0.9.65: forLoop compiles on PLAN|2
+PASS: v0.9.66: C# parity emits WSND|91,70,8000
+PASS: v0.9.66: C# parity emits KEY|combo=162+65
+PASS: v0.9.66: C# parity emits KDOWN|160
+PASS: v0.9.66: C# parity emits KUP|160
+PASS: v0.9.66: C# parity emits WHEEL|-3
+PASS: v0.9.66: C# parity emits LABEL|again
+PASS: v0.9.66: C# parity emits GOTO|again
+PASS: v0.9.66: C# parity emits RAW|PING
+PASS: v0.9.66: C# parity emits RPKG|all,1,2
+PASS: v0.9.66: C# parity emits PKGITEM
+PASS: v0.9.66: C# parity emits ENDPKG
+PASS: v0.9.66: C# parity emits PGROUP
+PASS: v0.9.66: C# parity emits PARITEM
+PASS: v0.9.66: C# parity emits ENDPAR
+PASS: v0.9.66: runExe/openFile/playAudio emit Win+R macros
+PASS: v0.9.66: findImage blocks explicitly
 PASS: v0.9.65: non-ASCII typing blocked with the ASCII rule
 PASS: v0.9.65: secret typing blocked (no PC clipboard on the Pico)
 PASS: v0.9.65: clipboard mode blocked
-FAIL: v0.9.65: insertIfElse must be blocked on PLAN|2
+PASS: v0.9.66: waitForLight If/Else emits IFLUX/ELSE/ENDIF
+PASS: v0.9.66: waitForSound If emits IFSND/ENDIF
 PASS: v0.9.65: nested findImage + secret typing are NAMED inside a blocked head (3 errors)
 PASS: v0.9.65: stray marker error
 PASS: v0.9.65: unknown step type error
@@ -168,5 +209,5 @@ PASS: v0.9.65: the embedded plan engine is byte-identical to firmware/code64b/pl
 PASS: v0.9.65: the plan exporter targets the current firmware bundle line (PLAN|2)
 PASS: v0.9.65: Export writes plan.txt + plan_engine.py + README-PLAN.md
 PASS: v0.9.65: the written bundle carries the plan and the real engine
-=== Results: 724 passed, 18 failed ===
+=== Results: 745 passed, 0 failed ===
 ```

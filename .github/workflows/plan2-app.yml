@@ -34,13 +34,27 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/upgrade_plan_exporter_bundle_tests.py . 2>&1 | Tee-Object -Append ci-migrate.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/upgrade_plan_exporter_split_runtime.py . 2>&1 | Tee-Object -Append ci-migrate.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/make_plan_exporter.py . 2>&1 | Tee-Object -Append ci-migrate.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/sync_plan_exporter_tests.py . 2>&1 | Tee-Object -Append ci-migrate.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - id: split
+        name: Split runtime parity and size gate
+        if: steps.migrate.outcome == 'success'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          python -m py_compile portable/plan3/CIRCUITPY-SPLIT/*.py 2>&1 | Tee-Object ci-split.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python portable/plan3/sim/test_split_engine.py 2>&1 | Tee-Object -Append ci-split.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -c "from pathlib import Path; p=Path('portable/plan3/CIRCUITPY-SPLIT'); sizes={f.name:f.stat().st_size for f in p.glob('*.py')}; print(sizes); assert sizes['plan_engine.py'] <= 26000; assert sizes['plan_motion.py'] <= 15000; assert sizes['plan_typing.py'] <= 5000" 2>&1 | Tee-Object -Append ci-split.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - id: bridge
         name: Bridge checks
-        if: steps.migrate.outcome == 'success'
+        if: steps.split.outcome == 'success'
         continue-on-error: true
         shell: pwsh
         run: |
@@ -50,7 +64,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - id: app
         name: Restore and build app
-        if: steps.migrate.outcome == 'success'
+        if: steps.split.outcome == 'success'
         continue-on-error: true
         shell: pwsh
         run: |
@@ -75,8 +89,10 @@ jobs:
         shell: pwsh
         run: |
           $result = if (Test-Path ci-tests.txt) { (Select-String -Path ci-tests.txt -Pattern '=== Results' | Select-Object -Last 1).Line } else { '' }
-          $lines = @('# PLAN2 Windows gate report','', '- migration: ${{ steps.migrate.outcome }}','- bridge: ${{ steps.bridge.outcome }}','- app build: ${{ steps.app.outcome }}','- TestRunner: ${{ steps.tests.outcome }}','',"- result: $result",'', '## Migration tail','```')
-          if (Test-Path ci-migrate.txt) { $lines += Get-Content ci-migrate.txt -Tail 80 }
+          $lines = @('# PLAN2 Windows gate report','', '- migration: ${{ steps.migrate.outcome }}','- split runtime: ${{ steps.split.outcome }}','- bridge: ${{ steps.bridge.outcome }}','- app build: ${{ steps.app.outcome }}','- TestRunner: ${{ steps.tests.outcome }}','',"- result: $result",'', '## Migration tail','```')
+          if (Test-Path ci-migrate.txt) { $lines += Get-Content ci-migrate.txt -Tail 100 }
+          $lines += @('```','', '## Split-runtime tail','```')
+          if (Test-Path ci-split.txt) { $lines += Get-Content ci-split.txt -Tail 100 }
           $lines += @('```','', '## App build tail','```')
           if (Test-Path ci-app.txt) { $lines += Get-Content ci-app.txt -Tail 120 }
           $lines += @('```','', '## Test tail','```')
@@ -85,12 +101,12 @@ jobs:
           $lines | Set-Content docs/PLAN2-WINDOWS-GATE.md -Encoding utf8
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          $persist = @('tools/upgrade_plan_exporter_bundle.py','tools/upgrade_plan_exporter_bundle_tests.py','tools/PlanExporter.cs.tpl','ams-shell/src/Ams.UI/Services/PlanExporter.cs','tools/plan_exporter_test_step.cs.inc','tests/TestRunner.cs','tools/plan_exporter_vm_command.cs.inc','tools/patch_plan_exporter_ui.py','ams-shell/src/Ams.UI/ViewModels/MainViewModel.cs','ams-shell/src/Ams.UI/MainWindow.xaml','docs/PLAN2-WINDOWS-GATE.md')
+          $persist = @('tools/split_plan_engine.py','tools/upgrade_plan_exporter_split_runtime.py','portable/plan3/CIRCUITPY-SPLIT/plan_engine.py','portable/plan3/CIRCUITPY-SPLIT/plan_motion.py','portable/plan3/CIRCUITPY-SPLIT/plan_typing.py','portable/plan3/sim/test_split_engine.py','tools/make_plan_exporter.py','tools/PlanExporter.cs.tpl','ams-shell/src/Ams.UI/Services/PlanExporter.cs','tools/plan_exporter_test_step.cs.inc','tests/TestRunner.cs','tools/plan_exporter_vm_command.cs.inc','tools/patch_plan_exporter_ui.py','ams-shell/src/Ams.UI/ViewModels/MainViewModel.cs','ams-shell/src/Ams.UI/MainWindow.xaml','docs/PLAN2-WINDOWS-GATE.md')
           foreach ($path in $persist) { if (Test-Path $path) { git add -- $path } }
-          git commit -m "ci(plan2): record C# parity gate result" || echo "no change"
+          git commit -m "ci(plan2): validate split runtime bundle" || echo "no change"
           git push
       - name: Enforce zero failures
         if: always()
         shell: pwsh
         run: |
-          if ('${{ steps.migrate.outcome }}' -ne 'success' -or '${{ steps.bridge.outcome }}' -ne 'success' -or '${{ steps.app.outcome }}' -ne 'success' -or '${{ steps.tests.outcome }}' -ne 'success') { exit 1 }
+          if ('${{ steps.migrate.outcome }}' -ne 'success' -or '${{ steps.split.outcome }}' -ne 'success' -or '${{ steps.bridge.outcome }}' -ne 'success' -or '${{ steps.app.outcome }}' -ne 'success' -or '${{ steps.tests.outcome }}' -ne 'success') { exit 1 }

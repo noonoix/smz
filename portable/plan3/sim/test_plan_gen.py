@@ -61,7 +61,7 @@ def build_opts(**over):
     return opts
 
 
-# -- 1. golden: ref-mouse-keys --------------------------------------------------
+# ── 1. golden: ref-mouse-keys ─────────────────────────────────────────────────
 with tempfile.TemporaryDirectory() as td:
     rc = cli([os.path.join(EXAMPLES, "ref-mouse-keys.amsj"), "-o", "out.txt", "--out-dir", td])
     got = open(os.path.join(td, "out.txt"), encoding="utf-8").read()
@@ -70,7 +70,7 @@ with tempfile.TemporaryDirectory() as td:
     check("golden ref-mouse-keys is byte-exact", got == golden)
     check("golden ref-mouse-keys parses with the real engine", bool(pe.parse_plan(got)))
 
-# -- 2. golden: ref-flow --------------------------------------------------------
+# ── 2. golden: ref-flow ───────────────────────────────────────────────────────
 with tempfile.TemporaryDirectory() as td:
     rc = cli([os.path.join(EXAMPLES, "ref-flow.amsj"), "-o", "out.txt", "--out-dir", td])
     got = open(os.path.join(td, "out.txt"), encoding="utf-8").read()
@@ -79,7 +79,7 @@ with tempfile.TemporaryDirectory() as td:
     check("golden ref-flow is byte-exact", got == golden)
     check("golden ref-flow parses with the real engine", bool(pe.parse_plan(got)))
 
-# -- 3. blocking paths ----------------------------------------------------------
+# ── 3. blocking paths ─────────────────────────────────────────────────────────
 with tempfile.TemporaryDirectory() as td:
     rc = cli([os.path.join(EXAMPLES, "err-pgroup.amsj"), "--out-dir", td])
     check("pgroup with a loop blocks (rc=1)", rc == 1)
@@ -140,7 +140,7 @@ check("goto to a missing label blocks", errs is not None and len(errs) >= 1)
 errs = blocked_with(doc([step("playScript", {"path": "C:\\no\\such\\file.amsj"})]))
 check("missing playScript child blocks", errs and "not found" in errs[0])
 
-# -- 4. playScript include: child compiles, INCLUDE line emitted ----------------
+# ── 4. playScript include: child compiles, INCLUDE line emitted ───────────────
 with tempfile.TemporaryDirectory() as td:
     child = doc([step("delay", {"minMs": 5, "maxMs": 5})])
     cpath = os.path.join(td, "child-plan.amsj")
@@ -174,7 +174,7 @@ with tempfile.TemporaryDirectory() as td:
     except pg._Blocked as b:
         check("include cycle blocks", any("cycle" in e for e in b.errors))
 
-# -- 5. Play Options wrapper from ams-settings.json ----------------------------
+# ── 5. Play Options wrapper from ams-settings.json ───────────────────────────
 def settings_file(td, **kw):
     p = os.path.join(td, "ams-settings.json")
     base = {"PlayRepeatMode": "once", "PlayRepeatTimes": 10, "PlayRepeatValue": 1,
@@ -216,7 +216,7 @@ with tempfile.TemporaryDirectory() as td:
     txt = open(os.path.join(td, "o.txt"), encoding="utf-8").read()
     check("0/2300 migrates to 300/2000 (app rule)", "SPEED|300,2000" in txt)
 
-# -- 6. disabled steps are counted, never emitted -------------------------------
+# ── 6. disabled steps are counted, never emitted ──────────────────────────────
 try:
     files, gen, _c = pg.build(os.path.join(EXAMPLES, "ref-mouse-keys.amsj"), build_opts())
     txt = files["plan.txt"]
@@ -225,7 +225,7 @@ try:
 except pg._Blocked:
     check("disabled-count build works", False)
 
-# -- 7. end-to-end: the generated reference plan RUNS on a fake ctx -------------
+# ── 7. end-to-end: the generated reference plan RUNS on a fake ctx ────────────
 class Ctx:
     plan_api = 3
     screen_w, screen_h = 1920, 1080

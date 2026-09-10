@@ -1,0 +1,35 @@
+name: Wire PLAN2 exporter stage 1
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/portable-plan2-app-0966]
+    paths:
+      - tools/wire_plan2_stage1.py
+permissions:
+  contents: write
+jobs:
+  wire:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/portable-plan2-app-0966
+          fetch-depth: 0
+      - name: Apply guarded PLAN2 wiring
+        run: |
+          set -euo pipefail
+          python tools/wire_plan2_stage1.py
+          python tools/make_plan_exporter.py
+          python -m py_compile tools/make_plan_exporter.py tools/wire_plan2_stage1.py
+          grep -q 'public const int PlanFormatVersion = 2;' ams-shell/src/Ams.UI/Services/PlanExporter.cs
+          grep -q 'sb.Append("PLAN|2\\n");' ams-shell/src/Ams.UI/Services/PlanExporter.cs
+          grep -q 'portable/plan3/CIRCUITPY/plan_engine.py' tools/make_plan_exporter.py
+          rm tools/wire_plan2_stage1.py .github/workflows/wire-plan2-stage1.yml
+      - name: Commit generated stage
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m 'feat(plan2): wire verified engine and atomic export stage'
+          git push origin HEAD:feat/portable-plan2-app-0966

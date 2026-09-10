@@ -4,7 +4,8 @@ name: apply-plan-exporter (temporary)
 # build.yml only triggers on main, so this mirrors it on windows-latest to apply
 # tools/patch_plan_exporter_ui.py to the real tree, prove build + TestRunner + the twin sim
 # green, and commit the patched files back to the branch (github-actions[bot]).
-# On failure it opens an issue with the log tail (same shape as build.yml).
+# Every step tees into ci-progress.txt so a failure issue shows the REAL error (the build/test
+# logs live in ci-test-output.txt). On failure an issue opens with both logs.
 
 on:
   workflow_dispatch:
@@ -27,17 +28,25 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
-      - name: Generate PlanExporter.cs (template + on-drive engine)
-        run: python tools/make_plan_exporter.py .
-
-      - name: Apply the plan-exporter wiring patch
-        run: python tools/patch_plan_exporter_ui.py .
-
-      - name: Twin sim against the real gen-1 engine
-        run: python sim/sim_plan_export.py
-
-      - name: Compile-check the twin and the patchers
-        run: python -m py_compile tools/plan_export_twin.py tools/make_plan_exporter.py tools/patch_plan_exporter_ui.py sim/sim_plan_export.py
+      # all four python steps in one, each teed into ci-progress.txt with an explicit exit check
+      # (pwsh does not fail a step on a native non-zero exit unless we check $LASTEXITCODE)
+      - name: Generate + patch + sim + compile-check
+        shell: pwsh
+        run: |
+          "=== python $(python --version 2>&1) ===" | Tee-Object ci-progress.txt
+          "--- make_plan_exporter ---" | Tee-Object ci-progress.txt -Append
+          python tools/make_plan_exporter.py . *>&1 | Tee-Object ci-progress.txt -Append
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "--- patch_plan_exporter_ui ---" | Tee-Object ci-progress.txt -Append
+          python tools/patch_plan_exporter_ui.py . *>&1 | Tee-Object ci-progress.txt -Append
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "--- sim_plan_export ---" | Tee-Object ci-progress.txt -Append
+          python sim/sim_plan_export.py *>&1 | Tee-Object ci-progress.txt -Append
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "--- py_compile ---" | Tee-Object ci-progress.txt -Append
+          python -m py_compile tools/plan_export_twin.py tools/make_plan_exporter.py tools/patch_plan_exporter_ui.py sim/sim_plan_export.py *>&1 | Tee-Object ci-progress.txt -Append
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "--- python pipeline OK ---" | Tee-Object ci-progress.txt -Append
 
       - name: Restore
         run: dotnet restore ams-shell/AMS.sln
@@ -51,7 +60,8 @@ jobs:
         shell: pwsh
         run: |
           Remove-Item -Recurse -Force tests/bin, tests/obj -ErrorAction SilentlyContinue
-          dotnet build tests/TestRunner.csproj -c Release
+          dotnet build tests/TestRunner.csproj -c Release *>&1 | Tee-Object ci-progress.txt -Append
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Run TestRunner
         shell: pwsh
@@ -82,15 +92,17 @@ jobs:
           script: |
             const fs = require('fs');
             const read = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (e) { return ''; } };
-            const allLines = read('ci-test-output.txt').split('\n');
-            const failLines = allLines.filter(l => /^(FAIL:)|error CS|error MSB|Build FAILED/i.test(l)).slice(-40);
-            const tail = allLines.slice(-60).join('\n');
+            const progress = read('ci-progress.txt').trim();
+            const testLog = read('ci-test-output.txt');
+            const failLines = testLog.split('\n').filter(l => /^(FAIL:)|error CS|error MSB|Build FAILED/i.test(l)).slice(-40);
+            const tail = testLog.split('\n').slice(-40).join('\n');
             const runUrl = 'https://github.com/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + context.runId;
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `plan-exporter apply failed — run #${context.runNumber}`,
               body: '**Run:** ' + runUrl
-                + '\n\n**Failure lines:**\n```\n' + (failLines.join('\n') || '(none matched)') + '\n```'
-                + '\n\n**Test log tail:**\n```\n' + (tail || '(no test log — failure before the test step)') + '\n```'
+                + '\n\n**Progress log (generator/patcher/sim/build):**\n```\n' + (progress.slice(-3500) || '(empty)') + '\n```'
+                + '\n\n**Failure lines (test log):**\n```\n' + (failLines.join('\n') || '(none matched)') + '\n```'
+                + '\n\n**Test log tail:**\n```\n' + (tail || '(no test log)') + '\n```'
             });

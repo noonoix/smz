@@ -154,11 +154,13 @@ check(ctx.moves[-1] == (700, 400), "mouseMove lands exactly on (700,400) on the 
 text, gen = build([step("mouseMove", {"x": 5, "y": 6, "human": False})])
 check(any("instant (non-human) move" in f for f in gen.flags), "human=false is flagged, not silent")
 
+# idle breaks OFF when the raw idlePauseMax is 0 (read BEFORE the min/max swap - the
+# off-intent must survive even when only the max is zeroed)
 text, gen = build([step("randomMousePosition",
                         {"x": 10, "y": 10, "w": 50, "h": 50, "midPauseChance": 0, "idlePauseMax": 0})])
 line = [l for l in text.split("\n") if l.startswith("RMOUSE|")][0]
 check("mid=0:80,250" in line and "idle=1,1:0,0" in line,
-      "explicit-off beats the engine's built-in 12%%/1000-5000 defaults (got: " + line + ")")
+      "explicit-off beats the engine's built-in 12%/1000-5000 defaults (got: " + line + ")")
 
 # ── 4) CLICK ───────────────────────────────────────────────────────────────────
 text, gen = build([step("mouseClick", {"button": "right", "action": "double",
@@ -176,7 +178,7 @@ check(line == "TYPE|text=Hello 50%25%7Cworld%0Aline2|h=90,180",
 ctx = run(text)
 typed = "".join(t[2] for t in ctx.texts)
 check("Hello 50%|world" in typed and ctx.combos == [13],
-      "engine decodes %25/%7C and presses Enter between lines (typed %r, combos %r)" % (typed, ctx.combos))
+      f"engine decodes %25/%7C and presses Enter between lines (typed {typed!r}, combos {ctx.combos!r})")
 check(all(t[0] == 90 and t[1] == 180 for t in ctx.texts), "typing cadence range reaches the engine")
 
 text, gen = build([step("typeText", {"text": "hi there you", "wmin": 100, "wmax": 180, "wordPauseChance": 100})])

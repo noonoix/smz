@@ -297,7 +297,7 @@
                 "v0.9.65: firmware/code64b/plan_engine.py found next to the repo for the golden compare");
             Assert(pexEngineOnDisk is not null && PexNormEol(pexEngineOnDisk!) == PexNormEol(PlanExporter.BuildEnginePy()),
                 "v0.9.65: the embedded plan engine is byte-identical to firmware/code64b/plan_engine.py");
-            Assert(PlanExporter.PlanFormatVersion == 1 && PlanExporter.EngineVersion == "0.9.66",
+            Assert(PlanExporter.PlanFormatVersion == 2 && PlanExporter.EngineVersion == "0.9.66",
                 "v0.9.65: the plan exporter targets the current firmware bundle line (PLAN|2)");
 
             // Export() writes the whole bundle

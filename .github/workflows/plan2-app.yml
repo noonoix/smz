@@ -1,0 +1,50 @@
+name: PLAN2 app validation
+
+on:
+  push:
+    branches: [feat/portable-plan2-app-0966]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-exporter:
+    name: plan2-app / build-test
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify exporter generation is idempotent
+        shell: pwsh
+        run: |
+          $before = (Get-FileHash ams-shell/src/Ams.UI/Services/PlanExporter.cs -Algorithm SHA256).Hash
+          python tools/make_plan_exporter.py .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $after = (Get-FileHash ams-shell/src/Ams.UI/Services/PlanExporter.cs -Algorithm SHA256).Hash
+          if ($before -ne $after) { throw "PlanExporter.cs is not generated from the committed template/engine" }
+      - name: Compile-check bridge stack
+        run: python -m py_compile ams-shell/bridge/bridge.py ams-shell/bridge/ams_serial.py ams-shell/bridge/ams_crypto.py
+      - name: Behavior-test Pico brain transport
+        run: python tools/test_bridge_pico.py
+      - name: Restore
+        run: dotnet restore ams-shell/AMS.sln
+      - name: Build app
+        run: dotnet build ams-shell/AMS.sln -c Release --no-restore
+      - name: Build TestRunner
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force tests/bin, tests/obj -ErrorAction SilentlyContinue
+          dotnet build tests/TestRunner.csproj -c Release
+      - name: Run TestRunner
+        shell: pwsh
+        run: |
+          dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object ci-plan2-test-output.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (Select-String -Path ci-plan2-test-output.txt -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }

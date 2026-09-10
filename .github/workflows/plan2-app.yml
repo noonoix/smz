@@ -85,8 +85,9 @@ jobs:
           $lines | Set-Content docs/PLAN2-WINDOWS-GATE.md -Encoding utf8
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add .github/workflows/plan2-app.yml tools/upgrade_plan_exporter_bundle.py tools/upgrade_plan_exporter_bundle_tests.py tools/PlanExporter.cs.tpl ams-shell/src/Ams.UI/Services/PlanExporter.cs tools/plan_exporter_test_step.cs.inc tests/TestRunner.cs tools/plan_exporter_vm_command.cs.inc tools/patch_plan_exporter_ui.py ams-shell/src/Ams.UI/ViewModels/MainViewModel.cs ams-shell/src/Ams.UI/MainWindow.xaml docs/PLAN2-WINDOWS-GATE.md
-          git add -A tools/plan2_bundle_source_bootstrap.py tools/plan2_bundle_tests_bootstrap.py
+          $persist = @('.github/workflows/plan2-app.yml','tools/upgrade_plan_exporter_bundle.py','tools/upgrade_plan_exporter_bundle_tests.py','tools/PlanExporter.cs.tpl','ams-shell/src/Ams.UI/Services/PlanExporter.cs','tools/plan_exporter_test_step.cs.inc','tests/TestRunner.cs','tools/plan_exporter_vm_command.cs.inc','tools/patch_plan_exporter_ui.py','ams-shell/src/Ams.UI/ViewModels/MainViewModel.cs','ams-shell/src/Ams.UI/MainWindow.xaml','docs/PLAN2-WINDOWS-GATE.md')
+          foreach ($path in $persist) { if (Test-Path $path) { git add -- $path } }
+          git add -u -- tools/plan2_bundle_source_bootstrap.py tools/plan2_bundle_tests_bootstrap.py
           git commit -m "ci(plan2): record C# parity gate result" || echo "no change"
           git push
       - name: Enforce zero failures

@@ -382,7 +382,10 @@ public static class PlanExporter
             }
             var (i0, i1) = Pair(PropEx.GetInt(p, "idleEveryMin", 5), PropEx.GetInt(p, "idleEveryMax", 12));
             var (p0, p1) = Pair(PropEx.GetInt(p, "idlePauseMin", 800), PropEx.GetInt(p, "idlePauseMax", 3000));
-            var idle = p1 > 0 ? (i0, i1, p0, p1) : (1, 1, 0, 0);   // explicit-off, not the engine default
+            // explicit-off is read from the RAW idlePauseMax (max pause = 0 => no idle breaks),
+            // BEFORE Pair swaps the bounds - otherwise (min=800, max=0) swaps to (0,800) and the
+            // off-intent is lost.
+            var idle = PropEx.GetInt(p, "idlePauseMax", 3000) > 0 ? (i0, i1, p0, p1) : (1, 1, 0, 0);
             Emit(n, new[] { "RMOUSE|region=" + x + "," + y + "," + w + "," + h + Tuning(n, idle) }, "RMOUSE");
         }
 

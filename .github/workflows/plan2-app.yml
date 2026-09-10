@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   windows-exporter:
@@ -22,6 +22,8 @@ jobs:
         with:
           python-version: "3.12"
       - name: Verify exporter generation is idempotent
+        id: generation
+        continue-on-error: true
         shell: pwsh
         run: |
           $before = (Get-FileHash ams-shell/src/Ams.UI/Services/PlanExporter.cs -Algorithm SHA256).Hash
@@ -30,21 +32,91 @@ jobs:
           $after = (Get-FileHash ams-shell/src/Ams.UI/Services/PlanExporter.cs -Algorithm SHA256).Hash
           if ($before -ne $after) { throw "PlanExporter.cs is not generated from the committed template/engine" }
       - name: Compile-check bridge stack
+        id: bridge_compile
+        continue-on-error: true
         run: python -m py_compile ams-shell/bridge/bridge.py ams-shell/bridge/ams_serial.py ams-shell/bridge/ams_crypto.py
       - name: Behavior-test Pico brain transport
+        id: bridge_test
+        continue-on-error: true
         run: python tools/test_bridge_pico.py
       - name: Restore
+        id: restore
+        continue-on-error: true
         run: dotnet restore ams-shell/AMS.sln
       - name: Build app
+        id: app_build
+        continue-on-error: true
         run: dotnet build ams-shell/AMS.sln -c Release --no-restore
       - name: Build TestRunner
+        id: test_build
+        continue-on-error: true
         shell: pwsh
         run: |
           Remove-Item -Recurse -Force tests/bin, tests/obj -ErrorAction SilentlyContinue
-          dotnet build tests/TestRunner.csproj -c Release
+          dotnet build tests/TestRunner.csproj -c Release 2>&1 | Tee-Object ci-plan2-build-output.txt
+          exit $LASTEXITCODE
       - name: Run TestRunner
+        id: test_run
+        if: steps.test_build.outcome == 'success'
+        continue-on-error: true
         shell: pwsh
         run: |
           dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object ci-plan2-test-output.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (Select-String -Path ci-plan2-test-output.txt -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
+      - name: Persist diagnostic report
+        if: always()
+        shell: pwsh
+        env:
+          GENERATION: ${{ steps.generation.outcome }}
+          BRIDGE_COMPILE: ${{ steps.bridge_compile.outcome }}
+          BRIDGE_TEST: ${{ steps.bridge_test.outcome }}
+          RESTORE: ${{ steps.restore.outcome }}
+          APP_BUILD: ${{ steps.app_build.outcome }}
+          TEST_BUILD: ${{ steps.test_build.outcome }}
+          TEST_RUN: ${{ steps.test_run.outcome }}
+        run: |
+          $report = @(
+            '# PLAN2 Windows gate report',
+            '',
+            "- generation: $env:GENERATION",
+            "- bridge compile: $env:BRIDGE_COMPILE",
+            "- bridge test: $env:BRIDGE_TEST",
+            "- restore: $env:RESTORE",
+            "- app build: $env:APP_BUILD",
+            "- TestRunner build: $env:TEST_BUILD",
+            "- TestRunner run: $env:TEST_RUN",
+            ''
+          )
+          if (Test-Path ci-plan2-build-output.txt) {
+            $report += '## Build tail'
+            $report += '```'
+            $report += (Get-Content ci-plan2-build-output.txt | Select-Object -Last 80)
+            $report += '```'
+          }
+          if (Test-Path ci-plan2-test-output.txt) {
+            $report += '## Test failures/results'
+            $report += '```'
+            $report += (Select-String -Path ci-plan2-test-output.txt -Pattern '^(FAIL:|SKIP:)|=== Results' | ForEach-Object { $_.Line })
+            $report += '```'
+          }
+          $report | Set-Content docs/PLAN2-WINDOWS-GATE.md -Encoding utf8
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add docs/PLAN2-WINDOWS-GATE.md
+          git commit -m "ci(plan2): record Windows gate result" || echo "no report change"
+          git push
+      - name: Enforce zero failures
+        if: always()
+        shell: pwsh
+        env:
+          GENERATION: ${{ steps.generation.outcome }}
+          BRIDGE_COMPILE: ${{ steps.bridge_compile.outcome }}
+          BRIDGE_TEST: ${{ steps.bridge_test.outcome }}
+          RESTORE: ${{ steps.restore.outcome }}
+          APP_BUILD: ${{ steps.app_build.outcome }}
+          TEST_BUILD: ${{ steps.test_build.outcome }}
+          TEST_RUN: ${{ steps.test_run.outcome }}
+        run: |
+          $states = @($env:GENERATION,$env:BRIDGE_COMPILE,$env:BRIDGE_TEST,$env:RESTORE,$env:APP_BUILD,$env:TEST_BUILD,$env:TEST_RUN)
+          if ($states -contains 'failure' -or $states -contains 'cancelled') { exit 1 }

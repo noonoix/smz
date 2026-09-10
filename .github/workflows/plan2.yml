@@ -52,4 +52,4 @@ jobs:
           python portable/plan3/tools/plan_check.py portable/plan3/examples/ref-flow.plan.txt
           python portable/plan3/tools/plan_check.py portable/plan3/examples/ref-mouse-keys.plan.txt
 
-# Clean-branch validation trigger.
+# Exporter wiring validation trigger.

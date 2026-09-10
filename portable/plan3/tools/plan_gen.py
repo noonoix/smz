@@ -50,7 +50,7 @@ import plan_engine as pe                                        # noqa: E402  (s
 APP_ID = "AMS"
 MAX_INCLUDE_DEPTH = 4   # the engine logs-and-skips includes past depth 4 - plan_gen blocks instead
 
-# -- KeyMap.cs (ams-shell main) -- decimal VK codes the firmware expects (vk_to_hid) --
+# ── KeyMap.cs (ams-shell main) — decimal VK codes the firmware expects (vk_to_hid) ──
 MOD_VK = {"Ctrl": 162, "Shift": 160, "Alt": 164, "Win": 91}
 VK = {}
 for _c in range(ord("A"), ord("Z") + 1):
@@ -81,7 +81,7 @@ LOOP_OWNERS = ("forLoop", "randomPackage", "parallelGroup")    # v0.9.48 - they 
 PGROUP_OK = {"mouseMove", "mouseClick", "mouseScroll", "keystroke", "keyDown", "keyUp",
              "typeText", "delay", "rawCommand", "comment"}
 
-# -- prop helpers (mirror PropEx: missing key -> StepDefinitions default) -----
+# ── prop helpers (mirror PropEx: missing key -> StepDefinitions default) ─────
 def _pi(p, key, default=0):
     v = p.get(key, default)
     if isinstance(v, bool):
@@ -182,14 +182,14 @@ class Gen:
         self.labels = {}          # label name -> node number (duplicate detection)
         self._numbering = {}
 
-    # -- reporting -------------------------------------------------------------
+    # ── reporting ─────────────────────────────────────────────────────────────
     def _num(self, node):
         return node.get("_num", self._numbering.get(id(node), "?"))
 
     def _title(self, node):
         name = (node.get("Name") or "").strip()
         return "step %s (%s)%s" % (self._num(node), node.get("Type"),
-                                   " - «%s»" % name if name else "")
+                                   " — «%s»" % name if name else "")
 
     def error(self, node, msg):
         self.errors.append("%s: %s" % (self._title(node), msg))
@@ -219,7 +219,7 @@ class Gen:
     def count(self, node, key):
         self.counts[key] = self.counts.get(key, 0) + 1
 
-    # -- main walk -------------------------------------------------------------
+    # ── main walk ─────────────────────────────────────────────────────────────
     def walk(self, nodes, in_pgroup=False):
         i = 0
         while i < len(nodes):
@@ -308,7 +308,7 @@ class Gen:
         mode = 1 if _ps(p, "sampleMode", "hires") == "lowres" else 0
         return max(0, center - tol), center + tol, stable, to, mode
 
-    # -- per-step emitters -----------------------------------------------------
+    # ── per-step emitters ─────────────────────────────────────────────────────
     def _emit_step(self, nodes, i, in_pgroup):
         n = nodes[i]
         p = n.get("Props") or {}
@@ -754,7 +754,7 @@ class Gen:
         self.children_files.append((fname, canon, chain, self.depth + 1))
         self.emit(n, ["INCLUDE|file=%s" % fname], "INCLUDE")
 
-# -- settings / wrapper --------------------------------------------------------
+# ── settings / wrapper ────────────────────────────────────────────────────────
 def load_settings(path):
     """AppSettings (ams-settings.json). Missing file = app defaults."""
     s = {"PlayRepeatMode": "once", "PlayRepeatTimes": 10, "PlayRepeatValue": 1,

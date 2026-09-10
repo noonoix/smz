@@ -30,6 +30,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/upgrade_plan_exporter_tests_plan2.py . 2>&1 | Tee-Object -Append ci-migrate.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/plan2_bundle_source_bootstrap.py . 2>&1 | Tee-Object -Append ci-migrate.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/plan2_bundle_tests_bootstrap.py . 2>&1 | Tee-Object -Append ci-migrate.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/make_plan_exporter.py . 2>&1 | Tee-Object -Append ci-migrate.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/sync_plan_exporter_tests.py . 2>&1 | Tee-Object -Append ci-migrate.txt
@@ -81,7 +85,8 @@ jobs:
           $lines | Set-Content docs/PLAN2-WINDOWS-GATE.md -Encoding utf8
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add tools/PlanExporter.cs.tpl ams-shell/src/Ams.UI/Services/PlanExporter.cs tools/plan_exporter_test_step.cs.inc tests/TestRunner.cs docs/PLAN2-WINDOWS-GATE.md
+          git add .github/workflows/plan2-app.yml tools/upgrade_plan_exporter_bundle.py tools/upgrade_plan_exporter_bundle_tests.py tools/PlanExporter.cs.tpl ams-shell/src/Ams.UI/Services/PlanExporter.cs tools/plan_exporter_test_step.cs.inc tests/TestRunner.cs tools/plan_exporter_vm_command.cs.inc tools/patch_plan_exporter_ui.py ams-shell/src/Ams.UI/ViewModels/MainViewModel.cs ams-shell/src/Ams.UI/MainWindow.xaml docs/PLAN2-WINDOWS-GATE.md
+          git add -A tools/plan2_bundle_source_bootstrap.py tools/plan2_bundle_tests_bootstrap.py
           git commit -m "ci(plan2): record C# parity gate result" || echo "no change"
           git push
       - name: Enforce zero failures

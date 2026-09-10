@@ -5,13 +5,15 @@
 - app build: success
 - TestRunner: success
 
-- result: === Results: 742 passed, 0 failed ===
+- result: === Results: 751 passed, 0 failed ===
 
 ## Migration tail
 ```
 PLAN2 parity migration already applied
 PLAN2 parity tests already applied
-wrote ams-shell\src\Ams.UI\Services\PlanExporter.cs (89168 chars)
+PLAN2 recursive-bundle migration applied
+PLAN2 recursive-bundle tests applied
+wrote ams-shell\src\Ams.UI\Services\PlanExporter.cs (96290 chars)
 engine sha256: b94b4e8ba3647851814e0a7ea6a1ceb9d92c033a3ad8cc7058a0143853ed3674
 round trip: byte-identical to portable/plan3/CIRCUITPY/plan_engine.py
 MAKE OK
@@ -21,50 +23,35 @@ SYNC OK: Step 59 now comes from tools/plan_exporter_test_step.cs.inc
 ## App build tail
 ```
   Determining projects to restore...
-  Restored D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj (in 4.84 sec).
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_kcam0lv3_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_kcam0lv3_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_kcam0lv3_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_kcam0lv3_wpftmp.csproj]
+  Restored D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj (in 3.77 sec).
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_q34q5bre_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_q34q5bre_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_q34q5bre_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_q34q5bre_wpftmp.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
   Ams.UI -> D:\a\smc\smc\ams-shell\src\Ams.UI\bin\Release\net8.0-windows\ClassroomStudio.dll
 
 Build succeeded.
 
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_kcam0lv3_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_kcam0lv3_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_kcam0lv3_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_kcam0lv3_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_q34q5bre_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_q34q5bre_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_q34q5bre_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_q34q5bre_wpftmp.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
     8 Warning(s)
     0 Error(s)
 
-Time Elapsed 00:00:20.48
+Time Elapsed 00:00:20.61
 ```
 
 ## Test tail
 ```
-PASS: v0.9.55: blackwidowxte ships a complete default board spec (nothing left blank)
-PASS: v0.9.55: celeritas2 ships a complete default board spec (nothing left blank)
-PASS: v0.9.55: mx83tkl ships a complete default board spec (nothing left blank)
-PASS: v0.9.55: alloyorigins ships a complete default board spec (nothing left blank)
-PASS: v0.9.55: alloyorigins60 ships a complete default board spec (nothing left blank)
-PASS: v0.9.55: alloyorigins65 ships a complete default board spec (nothing left blank)
-PASS: v0.9.55: duckyone2mini ships a complete default board spec (nothing left blank)
-PASS: v0.9.55: duckyone2promini ships a complete default board spec (nothing left blank)
-PASS: v0.9.55: apexprotkl ships a complete default board spec (nothing left blank)
-PASS: v0.9.55: apexpromini ships a complete default board spec (nothing left blank)
-PASS: v0.9.55: keychronk8 ships a complete default board spec (nothing left blank)
-PASS: v0.9.55: das5qs2 ships a complete default board spec (nothing left blank)
-PASS: v0.9.55: zmk650wp ships a complete default board spec (nothing left blank)
-PASS: v0.9.55: vanguardpro96 ships a complete default board spec (nothing left blank)
-PASS: v0.9.55: shikarik515 ships a complete default board spec (nothing left blank)
 PASS: v0.9.55: gomk87rs ships a complete default board spec (nothing left blank)
 PASS: v0.9.55: the Microchip defaults match the reference tool's board-spec card
 PASS: v0.9.55: the STM32 defaults are the real USB strings of that device
@@ -157,6 +144,7 @@ PASS: v0.9.60: the step dialog accepts 0.5 regardless of the Windows display lan
 
 
 
+
 --- Step 59: v0.9.65 plan exporter (PLAN|2) ---
 PASS: v0.9.65: plan header is PLAN|2 with SCREEN and SPEED from settings
 PASS: v0.9.65: randomMousePosition emits the exact golden RMOUSE line
@@ -204,10 +192,24 @@ PASS: v0.9.65: disabled steps are counted and skipped; comments become # lines
 PASS: v0.9.65: KeyboardBoard=promicro is a documented FLAG, not silent
 PASS: v0.9.65: delay step is swap-normalized
 PASS: v0.9.65: a container's delay-after lands AFTER its ENDLOOP (app semantics)
+PASS: v0.9.66: recursive playScript exports root + every child + engine/readme
+PASS: v0.9.66: duplicate reference to one child source emits one plan file
+PASS: v0.9.66: child plans keep recursive INCLUDE links
+PASS: v0.9.66: duplicate output-name guard is explicit
+PASS: v0.9.66: nested missing-file guard fires in preflight
+PASS: v0.9.66: failed include preflight writes zero files
+PASS: v0.9.66: include cycle guard reports the chain
+PASS: v0.9.66: recursive include depth cap is four
+PASS: v0.9.66: forced child-plan publish failure surfaced
+PASS: v0.9.66: multi-file rollback restores the complete old bundle
+PASS: v0.9.66: rollback removes all transaction artifacts
+PASS: v0.9.66: typed stack rejects cross-nested ENDLOOP
+PASS: v0.9.66: typed stack rejects duplicate ELSE
+PASS: v0.9.66: typed stack rejects package/group cross nesting
 PASS: v0.9.65: firmware/code64b/plan_engine.py found next to the repo for the golden compare
 PASS: v0.9.65: the embedded plan engine is byte-identical to firmware/code64b/plan_engine.py
 PASS: v0.9.65: the plan exporter targets the current firmware bundle line (PLAN|2)
 PASS: v0.9.65: Export writes plan.txt + plan_engine.py + README-PLAN.md
 PASS: v0.9.65: the written bundle carries the plan and the real engine
-=== Results: 742 passed, 0 failed ===
+=== Results: 751 passed, 0 failed ===
 ```

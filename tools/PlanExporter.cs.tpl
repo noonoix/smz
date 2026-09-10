@@ -10,6 +10,7 @@ namespace Ams.UI.Services;
 
 // PLAN2_PARITY_MIGRATION
 // PLAN2_BUNDLE_MIGRATION
+// PLAN2_SPLIT_RUNTIME_MIGRATION
 
 /// <summary>
 /// v0.9.65 - File → Export Pico Plan… (phase 2 of the portable line): compiles the open step
@@ -509,7 +510,7 @@ public static class PlanExporter
                               gen.Counts.OrderBy(kv => kv.Key).Select(kv => kv.Key + " x" + kv.Value).ToList());
     }
 
-    /// <summary>Writes plan.txt, every recursively compiled child plan, plan_engine.py (the PLAN|2 engine) and
+    /// <summary>Writes plan.txt, every recursively compiled child plan, plan_engine.py + plan_motion.py + plan_typing.py (the split PLAN|2 runtime) and
     /// README-PLAN.md next to <paramref name="planPath"/>. Returns the written paths.</summary>
     private sealed record CompiledBundle(PlanResult Root, IReadOnlyList<(string FileName, string Text)> Children);
 
@@ -609,10 +610,14 @@ public static class PlanExporter
         if (string.IsNullOrEmpty(dir)) throw new IOException("cannot resolve the folder of " + planPath);
         var bundle = CompileBundle(steps, settings, screenW, screenH, sourceName, machine, Path.GetFileName(full));
         var enginePath = Path.Combine(dir, "plan_engine.py");
+        var motionPath = Path.Combine(dir, "plan_motion.py");
+        var typingPath = Path.Combine(dir, "plan_typing.py");
         var readmePath = Path.Combine(dir, "README-PLAN.md");
         var payloads = new List<(string Path, string Text)> { (full, bundle.Root.Text) };
         payloads.AddRange(bundle.Children.Select(c => (Path.Combine(dir, c.FileName), c.Text)));
         payloads.Add((enginePath, BuildEnginePy()));
+        payloads.Add((motionPath, BuildMotionPy()));
+        payloads.Add((typingPath, BuildTypingPy()));
         payloads.Add((readmePath, BuildReadme(bundle.Root, Path.GetFileName(sourceName), machine)));
 
         var tx = Guid.NewGuid().ToString("N");
@@ -621,7 +626,7 @@ public static class PlanExporter
         var published = new List<int>();
         try
         {
-            // No destination is touched until every root/child/engine/readme payload is staged.
+            // No destination is touched until every root/child/runtime/readme payload is staged.
             for (int i = 0; i < payloads.Count; i++)
                 File.WriteAllText(temps[i], payloads[i].Text, new UTF8Encoding(false));
             for (int i = 0; i < payloads.Count; i++)
@@ -652,6 +657,8 @@ public static class PlanExporter
     /// <summary>The PLAN|2 plan engine, embedded verbatim (portable/plan3/CIRCUITPY/plan_engine.py).
     /// Normalized to LF so the written file is byte-stable regardless of the .cs line endings.</summary>
     public static string BuildEnginePy() => EngineTemplate.Replace("\r\n", "\n");
+    public static string BuildMotionPy() => MotionTemplate.Replace("\r\n", "\n");
+    public static string BuildTypingPy() => TypingTemplate.Replace("\r\n", "\n");
 
     private static string BuildReadme(PlanResult result, string sourceName, string machine)
     {
@@ -659,7 +666,7 @@ public static class PlanExporter
         sb.Append("# راهنمای پلن پرتابل پیکو (PLAN|2 - فریم‌ور 0.9.66)\n\n");
         sb.Append("همه‌ی فایل‌های این bundle را روی درایو CIRCUITPY کپی کن (کنار code.py از «Export Pico Firmware»):\n");
         sb.Append("- plan.txt ← پلن اصلی؛ فایل‌های *.txt دیگر ← playScriptهای کامپایل‌شده\n");
-        sb.Append("- plan_engine.py ← موتور PLAN|2 (فقط وقتی نسخه‌ی فریم‌ور عوض شود دوباره لازم است)\n\n");
+        sb.Append("- plan_engine.py + plan_motion.py + plan_typing.py ← runtime کامل کم‌حافظه‌ی PLAN|2\n\n");
         sb.Append("- منبع: " + sourceName + " · سیستم: " + machine + "\n");
         sb.Append("- استپ‌های کامپایل‌شده: " + (result.Counts.Count > 0 ? string.Join(" · ", result.Counts) : "-") + "\n");
         if (result.Disabled.Count > 0)
@@ -775,9 +782,8 @@ public static class PlanExporter
         return false;
     }
 
-    // The PLAN|2 engine (portable/plan3/CIRCUITPY/plan_engine.py) is spliced in here by
-    // tools/make_plan_exporter.py as a 4-quote raw string (the engine holds docstrings).
-    // TestRunner compares the embedded copy byte-for-byte against the repo golden
-    // (modulo line endings), so the template can never drift from the firmware line it targets.
-    private const string EngineTemplate = __ENGINE_TEMPLATE__;
+    // Hardware-proven split runtime. Generated from the canonical engine; do not hand-edit.
+    private const string EngineTemplate = __ENGINE_CORE_TEMPLATE__;
+    private const string MotionTemplate = __ENGINE_MOTION_TEMPLATE__;
+    private const string TypingTemplate = __ENGINE_TYPING_TEMPLATE__;
 }

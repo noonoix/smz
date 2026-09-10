@@ -273,7 +273,8 @@
             Assert(pexLoopDOps[^1] == "DELAY|250" && pexLoopDOps[^2] == "ENDLOOP",
                 "v0.9.65: a container's delay-after lands AFTER its ENDLOOP (app semantics)");
 
-            // PLAN2_BUNDLE_TESTS — recursive compile is a preflighted, all-or-nothing bundle.
+            // PLAN2_BUNDLE_TESTS
+            // PLAN2_SPLIT_RUNTIME_MIGRATION — recursive compile is a preflighted, all-or-nothing bundle.
             var pexBundleTmp = Path.Combine(Path.GetTempPath(), "pex_bundle_" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(pexBundleTmp);
             try
@@ -296,7 +297,7 @@
                 DocumentService.Save(rootPath, rootBundle);
                 var bundleWritten = PlanExporter.Export(Path.Combine(outDir, "plan.txt"), rootBundle,
                     pexSettings, 1920, 1080, rootPath, "TESTPC");
-                Assert(bundleWritten.Count == 6 && new[] { "plan.txt", "child1.txt", "child2.txt", "grand.txt", "plan_engine.py", "README-PLAN.md" }.All(n => File.Exists(Path.Combine(outDir, n))),
+                Assert(bundleWritten.Count == 8 && new[] { "plan.txt", "child1.txt", "child2.txt", "grand.txt", "plan_engine.py", "plan_motion.py", "plan_typing.py", "README-PLAN.md" }.All(n => File.Exists(Path.Combine(outDir, n))),
                     "v0.9.66: recursive playScript exports root + every child + engine/readme");
                 Assert(bundleWritten.Count(f => Path.GetFileName(f).Equals("grand.txt", StringComparison.OrdinalIgnoreCase)) == 1,
                     "v0.9.66: duplicate reference to one child source emits one plan file");
@@ -348,12 +349,16 @@
                 DocumentService.Save(rollbackChild, new[] { PexStep("mouseClick") });
                 File.WriteAllText(Path.Combine(rollbackOut, "plan.txt"), "OLD PLAN");
                 File.WriteAllText(Path.Combine(rollbackOut, "plan_engine.py"), "OLD ENGINE");
+                File.WriteAllText(Path.Combine(rollbackOut, "plan_motion.py"), "OLD MOTION");
+                File.WriteAllText(Path.Combine(rollbackOut, "plan_typing.py"), "OLD TYPING");
                 File.WriteAllText(Path.Combine(rollbackOut, "README-PLAN.md"), "OLD README");
                 Directory.CreateDirectory(Path.Combine(rollbackOut, "rollback-child.txt"));
                 try { PlanExporter.Export(Path.Combine(rollbackOut, "plan.txt"), new[] { PexStep("playScript", new Dictionary<string, object?> { ["path"] = "rollback-child.amsj" }) }, pexSettings, 1920, 1080, rootPath, "TESTPC"); Assert(false, "v0.9.66: forced multi-file publish failure must throw"); }
                 catch (IOException) { Assert(true, "v0.9.66: forced child-plan publish failure surfaced"); }
                 Assert(File.ReadAllText(Path.Combine(rollbackOut, "plan.txt")) == "OLD PLAN" &&
                        File.ReadAllText(Path.Combine(rollbackOut, "plan_engine.py")) == "OLD ENGINE" &&
+                       File.ReadAllText(Path.Combine(rollbackOut, "plan_motion.py")) == "OLD MOTION" &&
+                       File.ReadAllText(Path.Combine(rollbackOut, "plan_typing.py")) == "OLD TYPING" &&
                        File.ReadAllText(Path.Combine(rollbackOut, "README-PLAN.md")) == "OLD README",
                     "v0.9.66: multi-file rollback restores the complete old bundle");
                 Assert(!Directory.GetFiles(rollbackOut).Any(f => f.EndsWith(".tmp") || f.EndsWith(".bak")),
@@ -382,12 +387,16 @@
             Assert(PexValidatorRejects("PLAN|2\nRPKG|all,1,1\nPGROUP\nENDPKG\nENDPAR\n", "cannot close PGROUP"),
                 "v0.9.66: typed stack rejects package/group cross nesting");
 
-            // the embedded engine is the on-drive gen-1 engine, byte for byte
-            var pexEngineOnDisk = PexReadRepo(Path.Combine("portable", "plan3", "CIRCUITPY", "plan_engine.py"));
-            Assert(pexEngineOnDisk is not null,
-                "v0.9.65: firmware/code64b/plan_engine.py found next to the repo for the golden compare");
-            Assert(pexEngineOnDisk is not null && PexNormEol(pexEngineOnDisk!) == PexNormEol(PlanExporter.BuildEnginePy()),
-                "v0.9.65: the embedded plan engine is byte-identical to firmware/code64b/plan_engine.py");
+            // all three embedded runtime modules are byte-identical to generated split goldens
+            var pexEngineOnDisk = PexReadRepo(Path.Combine("portable", "plan3", "CIRCUITPY-SPLIT", "plan_engine.py"));
+            var pexMotionOnDisk = PexReadRepo(Path.Combine("portable", "plan3", "CIRCUITPY-SPLIT", "plan_motion.py"));
+            var pexTypingOnDisk = PexReadRepo(Path.Combine("portable", "plan3", "CIRCUITPY-SPLIT", "plan_typing.py"));
+            Assert(pexEngineOnDisk is not null && pexMotionOnDisk is not null && pexTypingOnDisk is not null,
+                "v0.9.66: all generated split runtime modules found for golden compare");
+            Assert(PexNormEol(pexEngineOnDisk!) == PexNormEol(PlanExporter.BuildEnginePy()) &&
+                   PexNormEol(pexMotionOnDisk!) == PexNormEol(PlanExporter.BuildMotionPy()) &&
+                   PexNormEol(pexTypingOnDisk!) == PexNormEol(PlanExporter.BuildTypingPy()),
+                "v0.9.66: all embedded split runtime modules are byte-identical to generated goldens");
             Assert(PlanExporter.PlanFormatVersion == 2 && PlanExporter.EngineVersion == "0.9.66",
                 "v0.9.65: the plan exporter targets the current firmware bundle line (PLAN|2)");
 
@@ -399,11 +408,16 @@
                 var pexWritten = PlanExporter.Export(Path.Combine(pexTmp, "plan.txt"),
                     new List<StepNode> { PexStep("randomMousePosition", new Dictionary<string, object?> { ["x"] = 100, ["y"] = 100, ["w"] = 200, ["h"] = 200 }) },
                     pexSettings, 1920, 1080, "fixture.amsj", "TESTPC");
-                Assert(pexWritten.Count == 3 && File.Exists(Path.Combine(pexTmp, "plan.txt"))
-                       && File.Exists(Path.Combine(pexTmp, "plan_engine.py")) && File.Exists(Path.Combine(pexTmp, "README-PLAN.md")),
+                Assert(pexWritten.Count == 5 && File.Exists(Path.Combine(pexTmp, "plan.txt"))
+                       && File.Exists(Path.Combine(pexTmp, "plan_engine.py"))
+                       && File.Exists(Path.Combine(pexTmp, "plan_motion.py"))
+                       && File.Exists(Path.Combine(pexTmp, "plan_typing.py"))
+                       && File.Exists(Path.Combine(pexTmp, "README-PLAN.md")),
                     "v0.9.65: Export writes plan.txt + plan_engine.py + README-PLAN.md");
                 Assert(File.ReadAllText(Path.Combine(pexTmp, "plan.txt")).StartsWith("PLAN|2\n")
-                       && File.ReadAllText(Path.Combine(pexTmp, "plan_engine.py")).Contains("def parse_plan"),
+                       && File.ReadAllText(Path.Combine(pexTmp, "plan_engine.py")).Contains("def parse_plan")
+                       && File.ReadAllText(Path.Combine(pexTmp, "plan_motion.py")).Contains("def _exec_rmouse")
+                       && File.ReadAllText(Path.Combine(pexTmp, "plan_typing.py")).Contains("def plan_typing"),
                     "v0.9.65: the written bundle carries the plan and the real engine");
             }
             finally { if (Directory.Exists(pexTmp)) Directory.Delete(pexTmp, true); }

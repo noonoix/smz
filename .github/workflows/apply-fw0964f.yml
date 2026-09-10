@@ -1,11 +1,11 @@
-name: Diagnose remaining firmware test mismatch
+name: Finalize accepted firmware 0.9.64f
 on:
   push:
     branches: [fix/exported-firmware-0964f]
 permissions:
   contents: write
 jobs:
-  diagnose:
+  verify-commit:
     if: github.actor != 'github-actions[bot]'
     runs-on: windows-latest
     steps:
@@ -13,25 +13,36 @@ jobs:
         with: {fetch-depth: 0}
       - uses: actions/setup-dotnet@v4
         with: {dotnet-version: 8.0.x}
-      - name: Reconstruct and capture failures
-        continue-on-error: true
+      - name: Reconstruct exact accepted tree
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force project-state | Out-Null
           $b64=((Get-ChildItem .github/fwparts/part*|Sort-Object Name|ForEach-Object {Get-Content $_.FullName -Raw})-join '')
-          [IO.File]::WriteAllBytes('fw.tgz',[Convert]::FromBase64String($b64)); tar -xzf fw.tgz
+          [IO.File]::WriteAllBytes('fw.tgz',[Convert]::FromBase64String($b64))
+          tar -xzf fw.tgz
+          if($LASTEXITCODE -ne 0){throw 'payload extraction failed'}
+          Remove-Item fw.tgz
           python tools/make_fw_template_0.9.64f.py .
           python tools/prepare_release_patch_0965.py
           python -c "from pathlib import Path; p=Path('tests/TestRunner.cs'); s=p.read_text(encoding='utf-8'); s=s.replace('0.9.64b','0.9.64f').replace('busio.UART(board.GP16, board.GP17, baudrate=115200, timeout=0.2)','busio.UART(board.GP16, board.GP17, baudrate=ARM_BAUD, timeout=0.2)'); p.write_text(s,encoding='utf-8',newline='')"
-          Remove-Item -Recurse -Force tests/bin,tests/obj -ErrorAction SilentlyContinue
-          dotnet run --project tests/TestRunner.csproj -c Release 2>&1 | Tee-Object project-state/fw0964f-full-test.txt
-          Select-String -Path project-state/fw0964f-full-test.txt -Pattern '^FAIL:|^=== Results:' | ForEach-Object {$_.Line} | Set-Content project-state/fw0964f-failures.txt
-      - name: Commit failure report
-        if: always()
+          python -m py_compile firmware/code64f/code.py firmware/code64f/plan_engine.py
+          $codeHash=(Get-FileHash firmware/code64f/code.py -Algorithm SHA256).Hash.ToLower()
+          $armHash=(Get-FileHash firmware/arm25/ams_board25.ino -Algorithm SHA256).Hash.ToLower()
+          if($codeHash -ne '1d1afe089f938968f71e1f67ea4ea6495c072756d3214b7c24e1830a269a565a'){throw "code hash mismatch $codeHash"}
+          if($armHash -ne '4b54d04b328ea7a375daa82786fab733d9ae2055a21f6f72cc1a42164266c16c'){throw "arm hash mismatch $armHash"}
+          if(Test-Path firmware/arm25/ams_key.h){throw 'real secret header present'}
+      - name: Full TestRunner
         shell: pwsh
         run: |
+          Remove-Item -Recurse -Force tests/bin,tests/obj -ErrorAction SilentlyContinue
+          dotnet run --project tests/TestRunner.csproj -c Release
+      - name: Commit tested source tree
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force .github/fwparts
+          Remove-Item .github/workflows/apply-fw0964f.yml
+          Remove-Item project-state/fw0964f-diagnostic.txt,project-state/fw0964f-failures.txt -ErrorAction SilentlyContinue
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add project-state/fw0964f-failures.txt
-          git commit -m 'ci: record remaining firmware test mismatch'
+          git add -A
+          git commit -m 'fix(firmware): port hardware-accepted Pico 0.9.64f and arm 2.5'
           git push

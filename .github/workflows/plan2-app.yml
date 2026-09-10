@@ -30,9 +30,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/upgrade_plan_exporter_tests_plan2.py . 2>&1 | Tee-Object -Append ci-migrate.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python tools/plan2_bundle_source_bootstrap.py . 2>&1 | Tee-Object -Append ci-migrate.txt
+          python tools/upgrade_plan_exporter_bundle.py . 2>&1 | Tee-Object -Append ci-migrate.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python tools/plan2_bundle_tests_bootstrap.py . 2>&1 | Tee-Object -Append ci-migrate.txt
+          python tools/upgrade_plan_exporter_bundle_tests.py . 2>&1 | Tee-Object -Append ci-migrate.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/make_plan_exporter.py . 2>&1 | Tee-Object -Append ci-migrate.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

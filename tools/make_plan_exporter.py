@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """make_plan_exporter.py - generate ams-shell/src/Ams.UI/Services/PlanExporter.cs from
-tools/PlanExporter.cs.tpl + firmware/code64b/plan_engine.py (the gen-1 plan engine,
+tools/PlanExporter.cs.tpl + portable/plan3/CIRCUITPY/plan_engine.py (the PLAN|2 engine,
 embedded verbatim so an export is self-contained on any machine).
 
 Same anchored-generator pattern as tools/make_fw_template_0.9.64b.py: the engine text is
@@ -18,7 +18,7 @@ import sys
 
 ROOT = pathlib.Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else pathlib.Path(__file__).resolve().parent.parent
 TPL = ROOT / "tools" / "PlanExporter.cs.tpl"
-ENGINE = ROOT / "firmware" / "code64b" / "plan_engine.py"
+ENGINE = ROOT / "portable" / "plan3" / "CIRCUITPY" / "plan_engine.py"
 OUT = ROOT / "ams-shell" / "src" / "Ams.UI" / "Services" / "PlanExporter.cs"
 MARKER = "__ENGINE_TEMPLATE__"
 
@@ -33,7 +33,7 @@ if '\ufffd' in tpl or '\ufffd' in engine:
 if '""""' in engine:
     problems.append("the 4-quote delimiter appears inside the engine - bump the delimiter width")
 if not engine.startswith("# plan_engine.py"):
-    problems.append("firmware/code64b/plan_engine.py lost its header - wrong file?")
+    problems.append("portable/plan3/CIRCUITPY/plan_engine.py lost its header - wrong file?")
 if problems:
     print("ABORTING:")
     for p in problems:
@@ -58,5 +58,5 @@ if embedded != engine:
 OUT.write_text(out, encoding="utf-8", newline="\n")
 print("wrote", OUT.relative_to(ROOT), "(%d chars)" % len(out))
 print("engine sha256:", hashlib.sha256(engine.encode("utf-8")).hexdigest())
-print("round trip: byte-identical to firmware/code64b/plan_engine.py")
+print("round trip: byte-identical to portable/plan3/CIRCUITPY/plan_engine.py")
 print("MAKE OK")

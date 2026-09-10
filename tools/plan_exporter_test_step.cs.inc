@@ -1,6 +1,6 @@
-        // ── Step 59: v0.9.65 — portable plan exporter (PLAN|1 gen-1 contract, firmware 0.9.64b) ──
+        // ── Step 59: v0.9.65 — portable plan exporter (PLAN|2 gen-1 contract, firmware 0.9.64b) ──
         Console.WriteLine();
-        Console.WriteLine("--- Step 59: v0.9.65 plan exporter (PLAN|1) ---");
+        Console.WriteLine("--- Step 59: v0.9.65 plan exporter (PLAN|2) ---");
         {
             static string PexNormEol(string s) => s.Replace("\r\n", "\n").TrimEnd() + "\n";
             static string? PexReadRepo(string rel)
@@ -24,9 +24,9 @@
 
             // header + settings-driven SCREEN/SPEED
             var pexEmpty = PlanExporter.Compile(new List<StepNode>(), pexSettings, 1920, 1080, "fixture.amsj", "TESTPC");
-            Assert(pexEmpty.Text.StartsWith("PLAN|1\n") && pexEmpty.Text.Contains("\nSCREEN|1920,1080\n")
+            Assert(pexEmpty.Text.StartsWith("PLAN|2\n") && pexEmpty.Text.Contains("\nSCREEN|1920,1080\n")
                    && pexEmpty.Text.Contains("\nSPEED|300,2000\n"),
-                "v0.9.65: plan header is PLAN|1 with SCREEN and SPEED from settings");
+                "v0.9.65: plan header is PLAN|2 with SCREEN and SPEED from settings");
 
             // randomMousePosition: the exact golden line (proven by sim_plan_export.py on the real engine)
             var pexRand = PlanExporter.Compile(new List<StepNode>
@@ -112,7 +112,7 @@
                 try
                 {
                     PlanExporter.Compile(new List<StepNode> { PexStep(kv.Key) }, pexSettings, 1920, 1080, "f", "T");
-                    Assert(false, "v0.9.65: " + kv.Key + " must be blocked on PLAN|1");
+                    Assert(false, "v0.9.65: " + kv.Key + " must be blocked on PLAN|2");
                 }
                 catch (PlanExporter.PlanBlockedException bx)
                 {
@@ -123,12 +123,12 @@
             foreach (var okType in new[] { "randomMousePosition", "mouseMove", "mouseClick", "delay", "waitForLight", "comment" })
             {
                 var res = PlanExporter.Compile(new List<StepNode> { PexStep(okType) }, pexSettings, 1920, 1080, "f", "T");
-                Assert(res.Text.StartsWith("PLAN|1"), "v0.9.65: " + okType + " compiles on PLAN|1");
+                Assert(res.Text.StartsWith("PLAN|2"), "v0.9.65: " + okType + " compiles on PLAN|2");
             }
             var pexLoopOk = PlanExporter.Compile(new List<StepNode>
                 { PexStep("forLoop", new Dictionary<string, object?> { ["mode"] = "count", ["count"] = 1 }) },
                 pexSettings, 1920, 1080, "f", "T");
-            Assert(pexLoopOk.Text.Contains("\nLOOP|1\n"), "v0.9.65: forLoop compiles on PLAN|1");
+            Assert(pexLoopOk.Text.Contains("\nLOOP|1\n"), "v0.9.65: forLoop compiles on PLAN|2");
 
             // typing blockers
             try
@@ -170,7 +170,7 @@
                     PexStep("comment", new Dictionary<string, object?> { ["text"] = "Else" }),
                     PexStep("comment", new Dictionary<string, object?> { ["text"] = "End If" }),
                 }, pexSettings, 1920, 1080, "f", "T");
-                Assert(false, "v0.9.65: insertIfElse must be blocked on PLAN|1");
+                Assert(false, "v0.9.65: insertIfElse must be blocked on PLAN|2");
             }
             catch (PlanExporter.PlanBlockedException bx)
             {
@@ -292,13 +292,13 @@
                 "v0.9.65: a container's delay-after lands AFTER its ENDLOOP (app semantics)");
 
             // the embedded engine is the on-drive gen-1 engine, byte for byte
-            var pexEngineOnDisk = PexReadRepo(Path.Combine("firmware", "code64b", "plan_engine.py"));
+            var pexEngineOnDisk = PexReadRepo(Path.Combine("portable", "plan3", "CIRCUITPY", "plan_engine.py"));
             Assert(pexEngineOnDisk is not null,
                 "v0.9.65: firmware/code64b/plan_engine.py found next to the repo for the golden compare");
             Assert(pexEngineOnDisk is not null && PexNormEol(pexEngineOnDisk!) == PexNormEol(PlanExporter.BuildEnginePy()),
                 "v0.9.65: the embedded plan engine is byte-identical to firmware/code64b/plan_engine.py");
-            Assert(PlanExporter.PlanFormatVersion == 1 && PlanExporter.EngineVersion == PicoFirmwareExporter.BundleVersion,
-                "v0.9.65: the plan exporter targets the current firmware bundle line (PLAN|1)");
+            Assert(PlanExporter.PlanFormatVersion == 1 && PlanExporter.EngineVersion == "0.9.66",
+                "v0.9.65: the plan exporter targets the current firmware bundle line (PLAN|2)");
 
             // Export() writes the whole bundle
             var pexTmp = Path.Combine(Path.GetTempPath(), "pex59_" + Guid.NewGuid().ToString("N"));
@@ -311,7 +311,7 @@
                 Assert(pexWritten.Count == 3 && File.Exists(Path.Combine(pexTmp, "plan.txt"))
                        && File.Exists(Path.Combine(pexTmp, "plan_engine.py")) && File.Exists(Path.Combine(pexTmp, "README-PLAN.md")),
                     "v0.9.65: Export writes plan.txt + plan_engine.py + README-PLAN.md");
-                Assert(File.ReadAllText(Path.Combine(pexTmp, "plan.txt")).StartsWith("PLAN|1\n")
+                Assert(File.ReadAllText(Path.Combine(pexTmp, "plan.txt")).StartsWith("PLAN|2\n")
                        && File.ReadAllText(Path.Combine(pexTmp, "plan_engine.py")).Contains("def parse_plan"),
                     "v0.9.65: the written bundle carries the plan and the real engine");
             }

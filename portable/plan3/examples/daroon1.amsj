@@ -1,0 +1,788 @@
+{
+  "app": "AMS",
+  "version": "0.8.2",
+  "steps": [
+    {
+      "Type": "label",
+      "Props": {
+        "label": "\u062A\u0627\u06CC\u06CC\u062F \u0645\u062D\u06CC\u0637 \u0628\u0627\u0632\u06CC"
+      },
+      "Children": [],
+      "Name": "",
+      "Delay": 0,
+      "IsDisabled": false
+    },
+    {
+      "Type": "findImage",
+      "Props": {
+        "pictures": "C:\\Users\\wasteland\\Downloads\\New folder\\captures\\cut_20260903_065251.bmp",
+        "similarity": 85,
+        "searchScope": "entireScreen",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1,
+        "neverTimeout": true,
+        "timeoutValue": 3,
+        "timeoutUnit": "ms",
+        "onFound": "clickRestoreCursor",
+        "onTimeout": "continue",
+        "insertIfElse": false,
+        "parkCursor": false
+      },
+      "Children": [],
+      "Name": "\u0646\u0648\u0627\u0631 \u0633\u0628\u0632 \u0628\u062F\u0648\u0646 \u062A\u0627\u06CC\u0645 \u0627\u0648\u062A",
+      "Delay": 333,
+      "IsDisabled": false
+    },
+    {
+      "Type": "findImage",
+      "Props": {
+        "pictures": "C:\\Users\\wasteland\\Desktop\\shb\\daroon1_images\\img_001_12x16.png",
+        "similarity": 75,
+        "searchScope": "entireScreen",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1,
+        "neverTimeout": false,
+        "timeoutValue": 0,
+        "timeoutUnit": "ms",
+        "onFound": "clickRestoreCursor",
+        "onTimeout": "continue",
+        "insertIfElse": true,
+        "parkCursor": false
+      },
+      "Children": [
+        {
+          "Type": "keyDown",
+          "Props": {
+            "key": "ENTER"
+          },
+          "Children": [],
+          "Name": "",
+          "Delay": 88,
+          "DelayMax": 140,
+          "IsDisabled": false
+        },
+        {
+          "Type": "keyUp",
+          "Props": {
+            "key": "ENTER"
+          },
+          "Children": [],
+          "Name": "",
+          "Delay": 90,
+          "DelayMax": 160,
+          "IsDisabled": false
+        }
+      ],
+      "Name": "\u067E\u0627\u067E \u0627\u067E \u0645\u0632\u0627\u062D\u0645 \u0627\u0648\u0644 \u06A9\u0627\u0631",
+      "Delay": 0,
+      "IsDisabled": false
+    },
+    {
+      "Type": "comment",
+      "Props": {
+        "text": "Else"
+      },
+      "Children": [],
+      "Name": "",
+      "Delay": 0,
+      "IsDisabled": false
+    },
+    {
+      "Type": "comment",
+      "Props": {
+        "text": "End If"
+      },
+      "Children": [],
+      "Name": "",
+      "Delay": 0,
+      "IsDisabled": false
+    },
+    {
+      "Type": "findImage",
+      "Props": {
+        "pictures": "C:\\Users\\wasteland\\Downloads\\New folder\\captures\\cut_20260903_065400.bmp",
+        "similarity": 75,
+        "searchScope": "entireScreen",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1,
+        "neverTimeout": false,
+        "timeoutValue": 0,
+        "timeoutUnit": "ms",
+        "onFound": "clickRestoreCursor",
+        "onTimeout": "continue",
+        "insertIfElse": true,
+        "parkCursor": false
+      },
+      "Children": [
+        {
+          "Type": "label",
+          "Props": {
+            "label": "\u062A\u0644\u0627\u0634 \u0648\u0631\u0648\u062F \u0628\u0647 \u062F\u0646\u06CC\u0627\u06CC \u0628\u0627\u0632\u06CC \u0628\u0639\u062F \u0627\u0632 \u062F\u06CC \u0633\u06CC"
+          },
+          "Children": [],
+          "Name": "",
+          "Delay": 0,
+          "IsDisabled": false
+        },
+        {
+          "Type": "keyDown",
+          "Props": {
+            "key": "ENTER"
+          },
+          "Children": [],
+          "Name": "",
+          "Delay": 88,
+          "DelayMax": 140,
+          "IsDisabled": false
+        },
+        {
+          "Type": "keyUp",
+          "Props": {
+            "key": "ENTER"
+          },
+          "Children": [],
+          "Name": "",
+          "Delay": 90,
+          "DelayMax": 160,
+          "IsDisabled": false
+        },
+        {
+          "Type": "findImage",
+          "Props": {
+            "pictures": "C:\\Users\\wasteland\\Downloads\\New folder\\captures\\cut_20260903_065513.bmp",
+            "similarity": 75,
+            "searchScope": "entireScreen",
+            "x": 0,
+            "y": 0,
+            "w": 400,
+            "h": 300,
+            "neverTimeout": false,
+            "timeoutValue": 3,
+            "timeoutUnit": "second",
+            "onFound": "moveAndClick",
+            "onTimeout": "continue",
+            "insertIfElse": true,
+            "parkCursor": false
+          },
+          "Children": [
+            {
+              "Type": "keyDown",
+              "Props": {
+                "key": "ESC"
+              },
+              "Children": [],
+              "Name": "",
+              "Delay": 88,
+              "DelayMax": 120,
+              "IsDisabled": false
+            },
+            {
+              "Type": "keyUp",
+              "Props": {
+                "key": "ESC"
+              },
+              "Children": [],
+              "Name": "",
+              "Delay": 95,
+              "DelayMax": 170,
+              "IsDisabled": false
+            },
+            {
+              "Type": "gotoLabel",
+              "Props": {
+                "label": "\u062A\u0644\u0627\u0634 \u0648\u0631\u0648\u062F \u0628\u0647 \u062F\u0646\u06CC\u0627\u06CC \u0628\u0627\u0632\u06CC \u0628\u0639\u062F \u0627\u0632 \u062F\u06CC \u0633\u06CC"
+              },
+              "Children": [],
+              "Name": "",
+              "Delay": 0,
+              "IsDisabled": false
+            }
+          ],
+          "Name": "",
+          "Delay": 55,
+          "IsDisabled": false
+        },
+        {
+          "Type": "comment",
+          "Props": {
+            "text": "Else"
+          },
+          "Children": [
+            {
+              "Type": "findImage",
+              "Props": {
+                "pictures": "C:\\Users\\wasteland\\Downloads\\New folder\\captures\\cut_20260903_103142.bmp",
+                "similarity": 75,
+                "searchScope": "entireScreen",
+                "x": 0,
+                "y": 0,
+                "w": 400,
+                "h": 300,
+                "neverTimeout": true,
+                "timeoutValue": 3,
+                "timeoutUnit": "second",
+                "onFound": "moveAndClick",
+                "onTimeout": "continue",
+                "insertIfElse": false,
+                "parkCursor": false
+              },
+              "Children": [
+                {
+                  "Type": "keyDown",
+                  "Props": {
+                    "key": "ENTER"
+                  },
+                  "Children": [],
+                  "Name": "",
+                  "Delay": 88,
+                  "DelayMax": 140,
+                  "IsDisabled": false
+                },
+                {
+                  "Type": "keyUp",
+                  "Props": {
+                    "key": "ENTER"
+                  },
+                  "Children": [],
+                  "Name": "",
+                  "Delay": 90,
+                  "DelayMax": 160,
+                  "IsDisabled": false
+                },
+                {
+                  "Type": "gotoLabel",
+                  "Props": {
+                    "label": "\u062A\u0627\u06CC\u06CC\u062F \u0645\u062D\u06CC\u0637 \u0628\u0627\u0632\u06CC"
+                  },
+                  "Children": [],
+                  "Name": "",
+                  "Delay": 0,
+                  "IsDisabled": false
+                }
+              ],
+              "Name": "\u062F\u0627\u0634\u0628\u0648\u0631\u062F \u06A9\u0631\u06A9\u062A\u0631 \u0647\u0627",
+              "Delay": 55,
+              "IsDisabled": false
+            }
+          ],
+          "Name": "",
+          "Delay": 0,
+          "IsDisabled": false
+        },
+        {
+          "Type": "comment",
+          "Props": {
+            "text": "End If"
+          },
+          "Children": [],
+          "Name": "",
+          "Delay": 0,
+          "IsDisabled": false
+        }
+      ],
+      "Name": "\u062A\u0635\u0648\u06CC\u0631 \u062F\u06CC\u0633\u06A9\u0627\u0646\u06A9\u062A \u0634\u062F\u0646",
+      "Delay": 0,
+      "IsDisabled": false
+    },
+    {
+      "Type": "comment",
+      "Props": {
+        "text": "Else"
+      },
+      "Children": [
+        {
+          "Type": "gotoLabel",
+          "Props": {
+            "label": "\u062E\u0648\u0631\u062F\u0646 \u0628\u0627\u0641 \u0647\u0627\u06CC \u0627\u0648\u0644\u06CC\u0647"
+          },
+          "Children": [],
+          "Name": "",
+          "Delay": 0,
+          "IsDisabled": false
+        }
+      ],
+      "Name": "",
+      "Delay": 0,
+      "IsDisabled": false
+    },
+    {
+      "Type": "comment",
+      "Props": {
+        "text": "End If"
+      },
+      "Children": [],
+      "Name": "",
+      "Delay": 0,
+      "IsDisabled": false
+    },
+    {
+      "Type": "label",
+      "Props": {
+        "label": "\u062E\u0648\u0631\u062F\u0646 \u0628\u0627\u0641 \u0647\u0627\u06CC \u0627\u0648\u0644\u06CC\u0647"
+      },
+      "Children": [],
+      "Name": "",
+      "Delay": 0,
+      "IsDisabled": false
+    },
+    {
+      "Type": "randomPackage",
+      "Props": {
+        "mode": "shuffleAll",
+        "minCount": 1,
+        "maxCount": 10
+      },
+      "Children": [
+        {
+          "Type": "keystroke",
+          "Props": {
+            "modCtrl": false,
+            "modShift": false,
+            "modAlt": false,
+            "modWin": false,
+            "key": "E",
+            "holdMin": 88,
+            "holdMax": 180
+          },
+          "Children": [],
+          "Name": "\u0628\u0627\u0641 \u06AF\u0648\u0644\u0641\u06CC\u0634 \u0647\u0631 55 \u062F\u0642\u06CC\u0642\u0647",
+          "Delay": 10000,
+          "DelayMax": 15000,
+          "IsDisabled": false
+        },
+        {
+          "Type": "keystroke",
+          "Props": {
+            "modCtrl": false,
+            "modShift": false,
+            "modAlt": false,
+            "modWin": false,
+            "key": "F",
+            "holdMin": 88,
+            "holdMax": 180
+          },
+          "Children": [],
+          "Name": "\u0628\u0627\u0641 \u0686\u0627\u06CC\u06CC \u0647\u0631 55 \u062F\u0642\u06CC\u0642\u0647",
+          "Delay": 100,
+          "DelayMax": 250,
+          "IsDisabled": false
+        },
+        {
+          "Type": "keystroke",
+          "Props": {
+            "modCtrl": false,
+            "modShift": false,
+            "modAlt": false,
+            "modWin": false,
+            "key": "T",
+            "holdMin": 88,
+            "holdMax": 180
+          },
+          "Children": [],
+          "Name": "\u0628\u0627\u0641 \u0641\u06CC\u0627\u0644 \u00D72 \u0647\u0631 55 \u062F\u0642\u06CC\u0642\u0647",
+          "Delay": 55,
+          "DelayMax": 177,
+          "IsDisabled": false
+        },
+        {
+          "Type": "keystroke",
+          "Props": {
+            "modCtrl": false,
+            "modShift": false,
+            "modAlt": false,
+            "modWin": false,
+            "key": "Y",
+            "holdMin": 88,
+            "holdMax": 180
+          },
+          "Children": [],
+          "Name": "\u0628\u0627\u0641 \u0622\u0645\u0627\u0646\u06CC \u00D71 \u0647\u0631 28 \u062F\u0642\u06CC\u0642\u0647",
+          "Delay": 111,
+          "DelayMax": 189,
+          "IsDisabled": false
+        },
+        {
+          "Type": "keystroke",
+          "Props": {
+            "modCtrl": false,
+            "modShift": false,
+            "modAlt": false,
+            "modWin": false,
+            "key": "X",
+            "holdMin": 88,
+            "holdMax": 180
+          },
+          "Children": [],
+          "Name": "\u0628\u0627\u0641 \u06A9\u0644\u0648 \u0647\u0631 9 \u062F\u0642\u06CC\u0642\u0647",
+          "Delay": 33,
+          "DelayMax": 112,
+          "IsDisabled": false
+        },
+        {
+          "Type": "keystroke",
+          "Props": {
+            "modCtrl": false,
+            "modShift": false,
+            "modAlt": false,
+            "modWin": false,
+            "key": "Q",
+            "holdMin": 88,
+            "holdMax": 180
+          },
+          "Children": [],
+          "Name": "\u0628\u0627\u0641 \u0647\u06CC\u062A \u0647\u0631 9 \u062F\u0642\u06CC\u0642\u0647",
+          "Delay": 77,
+          "DelayMax": 166,
+          "IsDisabled": false
+        }
+      ],
+      "Name": "\u067E\u06A9\u06CC\u062C \u0627\u0646\u062A\u062E\u0627\u0628 \u0631\u0646\u062F\u0645 \u0628\u0627\u0641",
+      "Delay": 100,
+      "DelayMax": 200,
+      "IsDisabled": false
+    },
+    {
+      "Type": "randomMousePosition",
+      "Props": {
+        "x": 1301,
+        "y": 0,
+        "w": 378,
+        "h": 1049,
+        "pauseBeforeMin": 120,
+        "pauseBeforeMax": 450,
+        "pauseAfterMin": 150,
+        "pauseAfterMax": 600,
+        "midPauseChance": 12,
+        "midPauseMin": 100,
+        "midPauseMax": 500,
+        "idleEveryMin": 5,
+        "idleEveryMax": 12,
+        "idlePauseMin": 800,
+        "idlePauseMax": 3000,
+        "overshootChance": 25,
+        "curveMinPct": 15,
+        "curveMaxPct": 45,
+        "moveTimeMin": 150,
+        "moveTimeMax": 2200
+      },
+      "Children": [],
+      "Name": "\u062D\u0631\u06A9\u062A \u0631\u0646\u062F\u0645 \u0645\u0648\u0633",
+      "Delay": 55,
+      "DelayMax": 180,
+      "IsDisabled": false
+    },
+    {
+      "Type": "label",
+      "Props": {
+        "label": "\u0634\u0631\u0648\u0639 \u0645\u0627\u0647\u06CC\u06AF\u06CC\u0631\u06CC"
+      },
+      "Children": [],
+      "Name": "",
+      "Delay": 0,
+      "IsDisabled": false
+    },
+    {
+      "Type": "forLoop",
+      "Props": {
+        "mode": "time",
+        "count": 10,
+        "timeValue": 10,
+        "timeUnit": "minute"
+      },
+      "Children": [
+        {
+          "Type": "label",
+          "Props": {
+            "label": "\u0627\u0632 \u0633\u0631\u06AF\u06CC\u0631\u06CC"
+          },
+          "Children": [],
+          "Name": "",
+          "Delay": 0,
+          "IsDisabled": false
+        },
+        {
+          "Type": "keystroke",
+          "Props": {
+            "modCtrl": false,
+            "modShift": false,
+            "modAlt": false,
+            "modWin": false,
+            "key": "V",
+            "holdMin": 85,
+            "holdMax": 180
+          },
+          "Children": [],
+          "Name": " \u0628\u0646\u062F\u0627\u0632 \u0642\u0644\u0627\u0628",
+          "Delay": 300,
+          "DelayMax": 700,
+          "IsDisabled": false
+        },
+        {
+          "Type": "waitForSound",
+          "Props": {
+            "threshold": 90,
+            "minDurationMs": 60,
+            "timeoutMs": 22000,
+            "insertIfElse": true,
+            "armed": false,
+            "act": "left",
+            "reactMin": 80,
+            "reactMax": 180,
+            "holdMin": 30,
+            "holdMax": 90
+          },
+          "Children": [
+            {
+              "Type": "keystroke",
+              "Props": {
+                "modCtrl": false,
+                "modShift": false,
+                "modAlt": false,
+                "modWin": false,
+                "key": "C",
+                "holdMin": 85,
+                "holdMax": 180
+              },
+              "Children": [],
+              "Name": "\u0628\u06A9\u0634 \u0628\u0627\u0644\u0627 \u0645\u0627\u0647\u06CC \u0631\u0648",
+              "Delay": 300,
+              "DelayMax": 700,
+              "IsDisabled": false
+            }
+          ],
+          "Name": "\u0627\u06AF\u0631 \u0635\u062F\u0627\u06CC \u0686\u0644\u067E \u0634\u0646\u06CC\u062F\u06CC",
+          "Delay": 0,
+          "IsDisabled": false
+        },
+        {
+          "Type": "comment",
+          "Props": {
+            "text": "Else"
+          },
+          "Children": [],
+          "Name": "",
+          "Delay": 0,
+          "IsDisabled": false
+        },
+        {
+          "Type": "comment",
+          "Props": {
+            "text": "End If"
+          },
+          "Children": [],
+          "Name": "",
+          "Delay": 0,
+          "IsDisabled": false
+        },
+        {
+          "Type": "findImage",
+          "Props": {
+            "pictures": "C:\\Users\\wasteland\\Downloads\\New folder\\captures\\cut_20260903_065400.bmp",
+            "similarity": 75,
+            "searchScope": "entireScreen",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "neverTimeout": false,
+            "timeoutValue": 0,
+            "timeoutUnit": "ms",
+            "onFound": "clickRestoreCursor",
+            "onTimeout": "continue",
+            "insertIfElse": true,
+            "parkCursor": false
+          },
+          "Children": [
+            {
+              "Type": "label",
+              "Props": {
+                "label": "\u062A\u0644\u0627\u0634 \u0648\u0631\u0648\u062F \u0628\u0647 \u062F\u0646\u06CC\u0627\u06CC \u0628\u0627\u0632\u06CC \u0628\u0639\u062F \u0627\u0632 \u062F\u06CC \u0633\u06CC"
+              },
+              "Children": [],
+              "Name": "",
+              "Delay": 0,
+              "IsDisabled": false
+            },
+            {
+              "Type": "keyDown",
+              "Props": {
+                "key": "ENTER"
+              },
+              "Children": [],
+              "Name": "",
+              "Delay": 88,
+              "DelayMax": 140,
+              "IsDisabled": false
+            },
+            {
+              "Type": "keyUp",
+              "Props": {
+                "key": "ENTER"
+              },
+              "Children": [],
+              "Name": "",
+              "Delay": 90,
+              "DelayMax": 160,
+              "IsDisabled": false
+            },
+            {
+              "Type": "findImage",
+              "Props": {
+                "pictures": "C:\\Users\\wasteland\\Downloads\\New folder\\captures\\cut_20260903_065513.bmp",
+                "similarity": 75,
+                "searchScope": "entireScreen",
+                "x": 0,
+                "y": 0,
+                "w": 400,
+                "h": 300,
+                "neverTimeout": false,
+                "timeoutValue": 3,
+                "timeoutUnit": "second",
+                "onFound": "moveAndClick",
+                "onTimeout": "continue",
+                "insertIfElse": true,
+                "parkCursor": false
+              },
+              "Children": [
+                {
+                  "Type": "keyDown",
+                  "Props": {
+                    "key": "ESC"
+                  },
+                  "Children": [],
+                  "Name": "",
+                  "Delay": 88,
+                  "DelayMax": 120,
+                  "IsDisabled": false
+                },
+                {
+                  "Type": "keyUp",
+                  "Props": {
+                    "key": "ESC"
+                  },
+                  "Children": [],
+                  "Name": "",
+                  "Delay": 95,
+                  "DelayMax": 170,
+                  "IsDisabled": false
+                },
+                {
+                  "Type": "gotoLabel",
+                  "Props": {
+                    "label": "\u062A\u0644\u0627\u0634 \u0648\u0631\u0648\u062F \u0628\u0647 \u062F\u0646\u06CC\u0627\u06CC \u0628\u0627\u0632\u06CC \u0628\u0639\u062F \u0627\u0632 \u062F\u06CC \u0633\u06CC"
+                  },
+                  "Children": [],
+                  "Name": "",
+                  "Delay": 0,
+                  "IsDisabled": false
+                }
+              ],
+              "Name": "",
+              "Delay": 55,
+              "IsDisabled": false
+            },
+            {
+              "Type": "comment",
+              "Props": {
+                "text": "Else"
+              },
+              "Children": [
+                {
+                  "Type": "findImage",
+                  "Props": {
+                    "pictures": "C:\\Users\\wasteland\\Downloads\\New folder\\captures\\cut_20260903_065643.bmp",
+                    "similarity": 75,
+                    "searchScope": "entireScreen",
+                    "x": 0,
+                    "y": 0,
+                    "w": 400,
+                    "h": 300,
+                    "neverTimeout": true,
+                    "timeoutValue": 3,
+                    "timeoutUnit": "second",
+                    "onFound": "moveAndClick",
+                    "onTimeout": "continue",
+                    "insertIfElse": false,
+                    "parkCursor": false
+                  },
+                  "Children": [
+                    {
+                      "Type": "keyDown",
+                      "Props": {
+                        "key": "ENTER"
+                      },
+                      "Children": [],
+                      "Name": "",
+                      "Delay": 88,
+                      "DelayMax": 140,
+                      "IsDisabled": false
+                    },
+                    {
+                      "Type": "keyUp",
+                      "Props": {
+                        "key": "ENTER"
+                      },
+                      "Children": [],
+                      "Name": "",
+                      "Delay": 90,
+                      "DelayMax": 160,
+                      "IsDisabled": false
+                    },
+                    {
+                      "Type": "gotoLabel",
+                      "Props": {
+                        "label": "\u062A\u0627\u06CC\u06CC\u062F \u0645\u062D\u06CC\u0637 \u0628\u0627\u0632\u06CC"
+                      },
+                      "Children": [],
+                      "Name": "",
+                      "Delay": 0,
+                      "IsDisabled": false
+                    }
+                  ],
+                  "Name": "\u062F\u0627\u0634\u0628\u0648\u0631\u062F \u06A9\u0631\u06A9\u062A\u0631 \u0647\u0627",
+                  "Delay": 55,
+                  "IsDisabled": false
+                }
+              ],
+              "Name": "",
+              "Delay": 0,
+              "IsDisabled": false
+            },
+            {
+              "Type": "comment",
+              "Props": {
+                "text": "End If"
+              },
+              "Children": [],
+              "Name": "",
+              "Delay": 0,
+              "IsDisabled": false
+            }
+          ],
+          "Name": "\u062A\u0635\u0648\u06CC\u0631 \u062F\u06CC \u0633\u06CC",
+          "Delay": 0,
+          "IsDisabled": false
+        }
+      ],
+      "Name": "\u0628\u0631\u0627\u06CC \u062F\u0647 \u062F\u0642\u06CC\u0642\u0647",
+      "Delay": 0,
+      "IsDisabled": false
+    },
+    {
+      "Type": "comment",
+      "Props": {
+        "text": "Next"
+      },
+      "Children": [],
+      "Name": "",
+      "Delay": 100,
+      "IsDisabled": false
+    }
+  ]
+}

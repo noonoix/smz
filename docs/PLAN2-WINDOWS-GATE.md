@@ -1,11 +1,172 @@
 # PLAN2 Windows gate report
 
-- generation: success
-- bridge compile: success
-- bridge test: success
-- restore: success
+- migration: success
+- bridge: success
 - app build: success
-- TestRunner build: success
-- TestRunner run: success
+- TestRunner: failure
 
-- result: === Results: 745 passed, 0 failed ===
+- result: === Results: 724 passed, 18 failed ===
+
+## Migration tail
+```
+PLAN2 parity migration applied
+wrote ams-shell\src\Ams.UI\Services\PlanExporter.cs (89168 chars)
+engine sha256: b94b4e8ba3647851814e0a7ea6a1ceb9d92c033a3ad8cc7058a0143853ed3674
+round trip: byte-identical to portable/plan3/CIRCUITPY/plan_engine.py
+MAKE OK
+SYNC OK: Step 59 now comes from tools/plan_exporter_test_step.cs.inc
+```
+
+## App build tail
+```
+  Determining projects to restore...
+  Restored D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj (in 4.12 sec).
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_onnpnmpa_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_onnpnmpa_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_onnpnmpa_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_onnpnmpa_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
+  Ams.UI -> D:\a\smc\smc\ams-shell\src\Ams.UI\bin\Release\net8.0-windows\ClassroomStudio.dll
+
+Build succeeded.
+
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_onnpnmpa_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_onnpnmpa_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_onnpnmpa_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_onnpnmpa_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
+    8 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:15.92
+```
+
+## Test tail
+```
+PASS: v0.9.55: waitForSound can be renamed and owns a type icon
+PASS: v0.9.55: waitForLight can be renamed and owns a type icon
+PASS: v0.9.55: findImage can be renamed and owns a type icon
+PASS: v0.9.55: a renamed head shows icon + custom title and keeps its informative tail
+PASS: v0.9.55: the group-title field has a Persian label
+PASS: v0.9.55: markers render as bare lowercase next/else while real comments keep the # prefix
+PASS: v0.9.55: marker rows reclaim the toggle gutter and sit tighter against the red vein
+PASS: v0.9.55: version pins for this release (csproj + banner + bundle)
+
+--- Step 56: v0.9.56 UART GP0/GP1 -> GP16/GP17 ---
+PASS: v0.9.56: firmware uses GP16/GP17 for UART arm
+PASS: v0.9.56: old GP0/GP1 UART pins are gone from firmware exporter
+PASS: v0.9.56: generated header comment mentions GP16 = TX and GP17 = RX
+PASS: v0.9.56: BH1750 I2C pins untouched (GP21/GP20)
+PASS: v0.9.56: BundleVersion is 0.9.64f
+PASS: v0.9.56: exported code.py carries GP16/GP17
+PASS: v0.9.56: exported code.py does not contain board.GP0
+PASS: v0.9.56: boot.py still enables CDC console+data
+PASS: v0.9.56: csproj version is 0.9.65
+
+--- Step 57: v0.9.58 portable/self-contained ---
+PASS: v0.9.58: ams_serial.py, ams_crypto.py, and vendored pyserial bundled in bridge/
+PASS: v0.9.58: bridge.py puts bundled stack first on sys.path
+PASS: v0.9.58: brain-first detect_board_port with Pico VID/PID
+PASS: v0.9.58: bridge emits stage events
+PASS: v0.9.58: all four stage event names present
+PASS: v0.9.58: PortablePaths has FirstExistingDir and FirstExistingFile
+PASS: v0.9.58: no hardcoded wasteland path in DocumentService defaults
+PASS: v0.9.58: AppSettings.Load sanitizes stale paths
+PASS: v0.9.58: CreateBridge prefers bundled bridge dir over settings
+PASS: v0.9.58: PythonBoardBridge uses PortablePaths.FindPython()
+PASS: v0.9.58: ConnectAsync has 15s timeout
+PASS: v0.9.58: csproj version is 0.9.65
+PASS: v0.9.58: csproj uses bridge wildcard with CopyToOutputDirectory
+PASS: v0.9.58d: Pico exporter converts configured modifier + numpad key
+PASS: v0.9.60: fixed keypad on GP4/GP3 emits Num Lock and Scroll Lock
+PASS: v0.9.58d: send_path parses semicolon-delimited delays, not individual characters
+PASS: v0.9.58d: fixed lock-key registrations and their startup warnings are gone
+PASS: v0.9.58d: serial log has selected/all clipboard copy actions
+PASS: v0.9.58: meta guard located TestRunner.cs on disk
+PASS: v0.9.58: all app version pins match current release 0.9.65 (found: 65)
+PASS: v0.9.58: all bundle pins stay on the untouched firmware line 0.9.64b (found: 64)
+
+--- Step 58: v0.9.60 firmware consolidation + transport hardening ---
+PASS: v0.9.60: version pins (firmware bundle, csproj, app banner)
+PASS: v0.9.60: WLUX/TRGLUX/LCAL answer ERR|NOSENSOR when the BH1750 is unplugged
+PASS: v0.9.60: the standalone engine never autoruns on boot (AUTOSTART=False)
+PASS: v0.9.60: fixed keypad GP4 = Num Lock start/stop, GP3 = Scroll Lock pause/resume
+PASS: v0.9.60: serial RX uses a bounded byte buffer, not string concatenation
+PASS: v0.9.60: permanent arm pump + fire-and-ack mouse path
+PASS: v0.9.60: keyboard always on the Pico; both legacy envelopes are consumed locally
+PASS: v0.9.60: exported code.py is fully baked with the fixed control contract
+PASS: v0.9.60: bridge stdio is forced to UTF-8 with an ASCII-safe emit fallback
+PASS: v0.9.60: the C# side reads the bridge as UTF-8 too
+PASS: v0.9.60: the serial log allows Ctrl/Shift multi-selection for copy-selected
+PASS: v0.9.60: stableSec 0.5 becomes 500ms on the wire (got: WLUX|1200,1300,500,20000,0)
+PASS: v0.9.60: the row summary shows the fractional stabilize time (got: Wait for light 1200-1300 lux for 0.5s · timeout 20000ms)
+PASS: v0.9.60: legacy integer stableSec plans still produce the same wire command
+PASS: v0.9.60: the step dialog accepts 0.5 regardless of the Windows display language
+
+
+
+--- Step 59: v0.9.65 plan exporter (PLAN|2) ---
+PASS: v0.9.65: plan header is PLAN|2 with SCREEN and SPEED from settings
+PASS: v0.9.65: randomMousePosition emits the exact golden RMOUSE line
+PASS: v0.9.65: per-step delay-after lands after the op
+PASS: v0.9.65: emission counts are reported
+FAIL: v0.9.65: mouseMove compiles to the deterministic 1x1 region with idle explicitly off
+PASS: v0.9.65: the engine's built-in idle default never leaks into a point move
+FAIL: v0.9.65: human=false is flagged, never silent
+PASS: v0.9.65: click line with swap-normalized hold
+PASS: v0.9.65: TYPE percent-encoding (% -> %25, | -> %7C, newline -> %0A)
+PASS: v0.9.65: word pauses + typing cadence defaults from settings
+PASS: v0.9.65: findImage blocked with a named reason
+FAIL: v0.9.65: waitForSound must be blocked on PLAN|2
+FAIL: v0.9.65: keystroke must be blocked on PLAN|2
+FAIL: v0.9.65: keyDown must be blocked on PLAN|2
+FAIL: v0.9.65: keyUp must be blocked on PLAN|2
+FAIL: v0.9.65: mouseScroll must be blocked on PLAN|2
+FAIL: v0.9.65: label must be blocked on PLAN|2
+FAIL: v0.9.65: gotoLabel blocked with a named reason
+FAIL: v0.9.65: rawCommand must be blocked on PLAN|2
+FAIL: v0.9.65: randomPackage blocked with a named reason
+FAIL: v0.9.65: parallelGroup blocked with a named reason
+FAIL: v0.9.65: playAudio blocked with a named reason
+FAIL: v0.9.65: playScript blocked with a named reason
+FAIL: v0.9.65: runExe blocked with a named reason
+FAIL: v0.9.65: openFile blocked with a named reason
+PASS: v0.9.65: randomMousePosition compiles on PLAN|2
+PASS: v0.9.65: mouseMove compiles on PLAN|2
+PASS: v0.9.65: mouseClick compiles on PLAN|2
+PASS: v0.9.65: delay compiles on PLAN|2
+PASS: v0.9.65: waitForLight compiles on PLAN|2
+PASS: v0.9.65: comment compiles on PLAN|2
+PASS: v0.9.65: forLoop compiles on PLAN|2
+PASS: v0.9.65: non-ASCII typing blocked with the ASCII rule
+PASS: v0.9.65: secret typing blocked (no PC clipboard on the Pico)
+PASS: v0.9.65: clipboard mode blocked
+FAIL: v0.9.65: insertIfElse must be blocked on PLAN|2
+PASS: v0.9.65: nested findImage + secret typing are NAMED inside a blocked head (3 errors)
+PASS: v0.9.65: stray marker error
+PASS: v0.9.65: unknown step type error
+PASS: v0.9.65: forLoop emits LOOP|2 ... ENDLOOP
+PASS: v0.9.65: the loop head consumes its Next marker
+PASS: v0.9.65: forLoop time 5 minute -> LOOPTIME|300
+PASS: v0.9.65: infinite loop -> LOOP|0
+PASS: v0.9.65: Play Options times-3 wraps the whole body
+PASS: v0.9.65: Play Options timed 1 minute -> LOOPTIME|60
+PASS: v0.9.65: plain WLIGHT (fractional stableSec becomes ms)
+PASS: v0.9.65: armed WLIGHT with key + react
+PASS: v0.9.65: disabled steps are counted and skipped; comments become # lines
+PASS: v0.9.65: KeyboardBoard=promicro is a documented FLAG, not silent
+PASS: v0.9.65: delay step is swap-normalized
+PASS: v0.9.65: a container's delay-after lands AFTER its ENDLOOP (app semantics)
+PASS: v0.9.65: firmware/code64b/plan_engine.py found next to the repo for the golden compare
+PASS: v0.9.65: the embedded plan engine is byte-identical to firmware/code64b/plan_engine.py
+PASS: v0.9.65: the plan exporter targets the current firmware bundle line (PLAN|2)
+PASS: v0.9.65: Export writes plan.txt + plan_engine.py + README-PLAN.md
+PASS: v0.9.65: the written bundle carries the plan and the real engine
+=== Results: 724 passed, 18 failed ===
+```

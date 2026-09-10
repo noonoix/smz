@@ -21,39 +21,69 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Apply PLAN2 parity, generate exporter and synchronize Step 59
+      - id: migrate
+        name: Apply PLAN2 parity and generate
+        continue-on-error: true
+        shell: pwsh
         run: |
-          python tools/upgrade_plan_exporter_plan2.py .
-          python tools/make_plan_exporter.py .
-          python tools/sync_plan_exporter_tests.py .
-      - name: Compile-check bridge stack
-        run: python -m py_compile ams-shell/bridge/bridge.py ams-shell/bridge/ams_serial.py ams-shell/bridge/ams_crypto.py
-      - name: Behavior-test Pico brain transport
-        run: python tools/test_bridge_pico.py
-      - name: Restore and build app
+          python tools/upgrade_plan_exporter_plan2.py . 2>&1 | Tee-Object ci-migrate.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/make_plan_exporter.py . 2>&1 | Tee-Object -Append ci-migrate.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/sync_plan_exporter_tests.py . 2>&1 | Tee-Object -Append ci-migrate.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - id: bridge
+        name: Bridge checks
+        if: steps.migrate.outcome == 'success'
+        continue-on-error: true
+        shell: pwsh
         run: |
-          dotnet restore ams-shell/AMS.sln
-          dotnet build ams-shell/AMS.sln -c Release --no-restore
-      - name: Build TestRunner
+          python -m py_compile ams-shell/bridge/bridge.py ams-shell/bridge/ams_serial.py ams-shell/bridge/ams_crypto.py 2>&1 | Tee-Object ci-bridge.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/test_bridge_pico.py 2>&1 | Tee-Object -Append ci-bridge.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - id: app
+        name: Restore and build app
+        if: steps.migrate.outcome == 'success'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          dotnet restore ams-shell/AMS.sln 2>&1 | Tee-Object ci-app.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build ams-shell/AMS.sln -c Release --no-restore 2>&1 | Tee-Object -Append ci-app.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - id: tests
+        name: Build and run TestRunner
+        if: steps.app.outcome == 'success'
+        continue-on-error: true
         shell: pwsh
         run: |
           Remove-Item -Recurse -Force tests/bin, tests/obj -ErrorAction SilentlyContinue
-          dotnet build tests/TestRunner.csproj -c Release 2>&1 | Tee-Object ci-plan2-build-output.txt
+          dotnet build tests/TestRunner.csproj -c Release 2>&1 | Tee-Object ci-tests.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Run TestRunner
+          dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object -Append ci-tests.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (Select-String -Path ci-tests.txt -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
+      - name: Persist sources and diagnostic report
+        if: always()
         shell: pwsh
         run: |
-          dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object ci-plan2-test-output.txt
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if (Select-String -Path ci-plan2-test-output.txt -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
-      - name: Persist generated sources and green report
-        if: success()
-        shell: pwsh
-        run: |
-          $result = (Select-String -Path ci-plan2-test-output.txt -Pattern '=== Results' | Select-Object -Last 1).Line
-          @('# PLAN2 Windows gate report','', '- generation: success','- C# PLAN2 parity migration: applied','- bridge compile: success','- bridge test: success','- restore: success','- app build: success','- TestRunner build: success','- TestRunner run: success','',"- result: $result") | Set-Content docs/PLAN2-WINDOWS-GATE.md -Encoding utf8
+          $result = if (Test-Path ci-tests.txt) { (Select-String -Path ci-tests.txt -Pattern '=== Results' | Select-Object -Last 1).Line } else { '' }
+          $lines = @('# PLAN2 Windows gate report','', '- migration: ${{ steps.migrate.outcome }}','- bridge: ${{ steps.bridge.outcome }}','- app build: ${{ steps.app.outcome }}','- TestRunner: ${{ steps.tests.outcome }}','',"- result: $result",'', '## Migration tail','```')
+          if (Test-Path ci-migrate.txt) { $lines += Get-Content ci-migrate.txt -Tail 80 }
+          $lines += @('```','', '## App build tail','```')
+          if (Test-Path ci-app.txt) { $lines += Get-Content ci-app.txt -Tail 120 }
+          $lines += @('```','', '## Test tail','```')
+          if (Test-Path ci-tests.txt) { $lines += Get-Content ci-tests.txt -Tail 120 }
+          $lines += '```'
+          $lines | Set-Content docs/PLAN2-WINDOWS-GATE.md -Encoding utf8
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add tools/PlanExporter.cs.tpl ams-shell/src/Ams.UI/Services/PlanExporter.cs tools/plan_exporter_test_step.cs.inc tests/TestRunner.cs docs/PLAN2-WINDOWS-GATE.md
-          git commit -m "feat(plan2): migrate C# exporter emitters and validator" || echo "no generated change"
+          git commit -m "ci(plan2): record C# parity gate result" || echo "no change"
           git push
+      - name: Enforce zero failures
+        if: always()
+        shell: pwsh
+        run: |
+          if ('${{ steps.migrate.outcome }}' -ne 'success' -or '${{ steps.bridge.outcome }}' -ne 'success' -or '${{ steps.app.outcome }}' -ne 'success' -or '${{ steps.tests.outcome }}' -ne 'success') { exit 1 }

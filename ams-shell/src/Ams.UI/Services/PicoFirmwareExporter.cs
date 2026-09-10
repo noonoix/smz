@@ -15,7 +15,7 @@ namespace Ams.UI.Services;
 /// is meant to be run once on every PC and copied onto that PC's Pico.
 /// Sensor: BH1750 (GY-302 / GY-30) on I2C0, SDA=GP20 / SCL=GP21, ADDR-&gt;GND =&gt; 0x23,
 /// continuous H-resolution (0x10, ~120 ms/sample), lux = raw / 1.2.
-/// v0.9.64b - template body resynced to the golden standalone firmware (code64b): portable plan.txt
+/// v0.9.64f - template body resynced to the golden standalone firmware (code64b): portable plan.txt
 /// engine + persistent cursor across Stop/Start, arm-ack watchdog, coalesced fire-and-forget MMOVE,
 /// press/release KTEXT typing, conditional start/stop button release + GP4 panic hold. plan_engine.py
 /// and plan.txt are NOT part of this bundle - the firmware boots bridge-only without them; the
@@ -23,7 +23,7 @@ namespace Ams.UI.Services;
 /// </summary>
 public static class PicoFirmwareExporter
 {
-    public const string BundleVersion = "0.9.64b";   // v0.9.64b — template resynced to the golden standalone firmware line (code64b): plan engine + persistent cursor + ack watchdog + coalescing + conditional start/stop release + GP4 panic hold
+    public const string BundleVersion = "0.9.64f";   // v0.9.64f — template resynced to the golden standalone firmware line (code64b): plan engine + persistent cursor + ack watchdog + coalescing + conditional start/stop release + GP4 panic hold
 
     /// <summary>One calibrated screen state taken from a Wait For Light step.</summary>
     public sealed record LightState(string Name, int LuxLow, int LuxHigh, int StableMs, int TimeoutMs, int Mode, int KeyVk, string KeyName, bool Armed);
@@ -401,8 +401,10 @@ public static class PicoFirmwareExporter
         # Keyboard commands: ALWAYS typed locally by this Pico (final contract).
         KBD_PREFIXES = ("KTEXT", "KCOMBO", "KDOWN", "KUP")
 
+        ARM_BAUD = 57600       # v0.9.64d - must match Serial1.begin() in the arm sketch (fw >= 2.4)
+
         try:
-            arm = busio.UART(board.GP16, board.GP17, baudrate=115200, timeout=0.2)
+            arm = busio.UART(board.GP16, board.GP17, baudrate=ARM_BAUD, timeout=0.2)
         except Exception:
             arm = None
 
@@ -448,9 +450,31 @@ public static class PicoFirmwareExporter
         _arm_lag = 0          # v0.9.60c - MMOVEs written to the arm minus the arm's OK|MMOVE acks
         _pending_move = None  # v0.9.60c - newest coalesced absolute MMOVE while the arm is behind
         _held_buttons = set()  # v0.9.64b - mouse buttons the Pico itself drove down and has not released
-        ARM_LAG_MAX = 8       # v0.9.60c - coalesce dense mouse moves once the arm is this far behind
+        ARM_LAG_MAX = 2       # v0.9.64d - real back-pressure. 8 unacked MMOVEs are ~220 bytes and
+                              # the Pro Micro's Serial1 RX buffer is 64 bytes: the overflow ate a
+                              # multi-byte chunk (sometimes a whole '#XX|' frame header) and fw 2.3
+                              # executed the header-less remnant as a bare MMOVE -> 1000 px teleport.
+                              # 2 in flight = ~60 bytes, always under the buffer.
+        _moves_dropped = 0    # v0.9.64d - path points skipped because the arm was busy
+        _noframe_errors = 0   # v0.9.64e - lines arm fw 2.4 refused for a missing '#' frame
+        _last_sent_xy = None  # v0.9.64e - previous MMOVE target actually written to the arm
+        _sent_jumps = 0       # v0.9.64e - jumps in the SENT stream (a Pico-side bug, not the wire)
+        _drops_at_last_send = 0  # v0.9.64f - coalesce counter at the previous write (gap = expected)
+        _partial_writes = 0   # v0.9.64f - short UART writes: a truncated frame the checksum cannot catch
+        MOVE_JUMP_PX = 200    # v0.9.64e - a humanized path step is 2-3 px; 200 px is never legitimate
+        _diag_last_print = 0.0
         _arm_last_ack = time.monotonic()  # v0.9.62 - the last OK|MMOVE the arm actually sent
         ARM_ACK_TIMEOUT = 1.0  # v0.9.62 - lag this old with zero acks = the ledger drifted: self-heal
+
+        # v0.9.64c - arm-link integrity frames (needs arm fw >= 2.3). Every line written to the
+        # Pro Micro is wrapped as '#' + 2 hex (sum of the payload bytes mod 256) + '|' + payload.
+        # The unframed UART drops bytes in the field: 2026-09-10 hardware run, three ~1280 px
+        # out-and-back teleports in one 32 s plan pass, each landing exactly on the target minus
+        # the leading '1' of x (MMOVE|1319,364 executed as 319,364). A framed line whose sum does
+        # not match is dropped by the arm with ERR|CKSUM and NEVER executed - and a dropped path
+        # point is invisible, because the next point of the humanized path is 2-3 px away.
+        ARM_FRAMING = True     # set False only for an arm running fw <= 2.2
+        _cksum_errors = 0      # v0.9.64c - corrupted lines the arm rejected since boot
 
 
         def pump_arm():
@@ -458,7 +482,8 @@ public static class PicoFirmwareExporter
             blocking wait) so the Pro Micro's small TX buffer can never fill up and wedge it.
             Arm EVT| lines stream to the PC live; fire-acked mouse OKs are discarded; every
             other reply is returned for a waiting forward_to_arm."""
-            global _arm_buf, _arm_lag, _pending_move, _arm_last_ack   # 60c: slice-safe flow; 62: watchdog
+            global _arm_buf, _arm_lag, _pending_move, _arm_last_ack, _cksum_errors   # 60c: flow; 62: watchdog; 64c: cksum
+            global _noframe_errors                                                   # 64e: strict-framing rejects
             if arm is None:
                 return []
             try:
@@ -482,6 +507,24 @@ public static class PicoFirmwareExporter
                 if line.startswith("EVT|"):
                     _serial_write_line(line)              # arm events reach the PC live
                     continue
+                if line.startswith("ERR|NOFRAME"):
+                    # v0.9.64e - arm fw 2.4 refused a line with no integrity frame. This is
+                    # the case 0.9.64c could not see: an RX gap ate the '#XX|' header and
+                    # fw 2.3 would have executed the remnant.
+                    _noframe_errors += 1
+                    if _arm_lag > 0:
+                        _arm_lag -= 1
+                    print("arm: NOFRAME drop #%d (header lost, line rejected)" % _noframe_errors)
+                    continue
+                if line.startswith("ERR|CKSUM"):
+                    # v0.9.64c - the arm caught a corrupted line and refused to execute it.
+                    # It will never be acked, so the lag ledger must be settled here, and the
+                    # drop is printed: a rising counter = a wiring/baud problem, not a bug.
+                    _cksum_errors += 1
+                    if _arm_lag > 0:
+                        _arm_lag -= 1
+                    print("arm: CKSUM drop #%d (line rejected, not executed)" % _cksum_errors)
+                    continue
                 parts = line.split("|")
                 if len(parts) > 1 and parts[0] == "OK" and parts[1] in MOUSE_PREFIXES:
                     if parts[1] == "MMOVE":               # v0.9.60c - the arm caught up one move
@@ -502,18 +545,70 @@ public static class PicoFirmwareExporter
             if _arm_lag > 0 and time.monotonic() - _arm_last_ack > ARM_ACK_TIMEOUT:
                 print("arm: ack watchdog reset (lag was %d)" % _arm_lag)
                 _arm_lag = 0
+                _arm_last_ack = time.monotonic()   # v0.9.64c - no immediate re-trigger
                 if _pending_move is not None:
-                    if engine_on and not engine_paused and _arm_write(_pending_move):
-                        _arm_lag = 1
+                    # v0.9.64c - DISCARD the stale coalesced target, never flush it. By the time
+                    # the watchdog fires the target is up to a second old (hundreds of px behind
+                    # the live path) and replaying it is exactly the catch-up dart seen on
+                    # hardware. The plan engine sends the next path point ~10 ms later, 2-3 px
+                    # from the cursor, so dropping it costs nothing.
                     _pending_move = None
             return ready
 
 
+        def _frame(line):
+            """v0.9.64c - arm fw>=2.3 integrity frame: '#' + 2 hex byte-sum + '|' + payload."""
+            total = 0
+            for b in line.encode("utf-8"):
+                total = (total + b) & 0xFF
+            return "#%02X|%s" % (total, line)
+
+
+        def _note_sent(line):
+            """v0.9.64f - sent-stream watchdog on the ONE place every line is written.
+            A gap right after a coalesce drop is expected (the dropped mid-points ARE the
+            gap and the arm interpolates across them), so those are tagged 'after-drop'.
+            A jump with no drop in between is a genuine Pico-side bug and says NO-DROP."""
+            global _last_sent_xy, _sent_jumps, _drops_at_last_send
+            if not line.startswith("MMOVE|"):
+                return
+            try:
+                _p = line.split("|")[1].split(",")
+                nx = int(_p[0])
+                ny = int(_p[1])
+            except Exception:
+                return
+            prev = _last_sent_xy
+            coalesced = _moves_dropped != _drops_at_last_send
+            _last_sent_xy = (nx, ny)
+            _drops_at_last_send = _moves_dropped
+            if prev is None:
+                return
+            dx = nx - prev[0]
+            dy = ny - prev[1]
+            if dx * dx + dy * dy <= MOVE_JUMP_PX * MOVE_JUMP_PX:
+                return
+            _sent_jumps += 1
+            print("plan: SENT JUMP #%d %s -> %d,%d (dx=%d dy=%d) %s" % (
+                _sent_jumps, prev, nx, ny, dx, dy,
+                "after-drop" if coalesced else "NO-DROP"))
+
+
         def _arm_write(line):
+            global _partial_writes
             if arm is None:
                 return False
             try:
-                arm.write((line + "\n").encode("utf-8"))
+                out = _frame(line) if ARM_FRAMING else line     # v0.9.64c
+                buf = (out + "\n").encode("utf-8")
+                n = arm.write(buf)
+                if n is not None and n != len(buf):
+                    # v0.9.64f - a short write truncates the frame mid-line and the arm
+                    # splices the remnant onto the next one. The checksum is computed
+                    # before the truncation, so it cannot catch this.
+                    _partial_writes += 1
+                    print("arm: PARTIAL WRITE #%d (%d of %d bytes)" % (_partial_writes, n, len(buf)))
+                _note_sent(line)      # v0.9.64f - covers EVERY write path, flush included
                 return True
             except Exception:
                 return False
@@ -525,10 +620,14 @@ public static class PicoFirmwareExporter
             AND flow-controlled: when the arm falls ARM_LAG_MAX behind we coalesce to the
             newest absolute target instead of blocking the USB read (the old per-move OK|MMOVE
             ack backed up USB TX - the PC reads only 1 per 12 - and wedged the link)."""
-            global _arm_lag, _pending_move
+            global _arm_lag, _pending_move, _moves_dropped
             head = line.split("|")[0]
             if head == "MMOVE":
                 if _arm_lag >= ARM_LAG_MAX:
+                    # v0.9.64d - the arm is busy: keep ONLY the newest target and never write.
+                    # Queueing more bytes is what overflowed the arm's 64-byte RX buffer; the
+                    # arm interpolates in 3 px micro-steps, so a skipped mid-path point is invisible.
+                    _moves_dropped += 1
                     _pending_move = line          # absolute move: the newest target wins
                     return None                   # no per-move ack (send_path never reads them)
                 if _arm_write(line):
@@ -778,7 +877,7 @@ public static class PicoFirmwareExporter
 
         def handle(line):
             if line == "PING":
-                return "OK|PONG|pico-light __VERSION__|role=brain+keyboard+light|arm=promicro"
+                return "OK|PONG|pico-light __VERSION__|role=brain+keyboard+light|arm=promicro|framing=%d|baud=%d|lagmax=%d|dropped=%d|cksum=%d|noframe=%d|sentjumps=%d|partial=%d" % (1 if ARM_FRAMING else 0, ARM_BAUD, ARM_LAG_MAX, _moves_dropped, _cksum_errors, _noframe_errors, _sent_jumps, _partial_writes)
             if line.startswith("LCAL|"):
                 if sensor is None:
                     return "ERR|NOSENSOR|LCAL"
@@ -977,7 +1076,7 @@ public static class PicoFirmwareExporter
         started = time.monotonic()
         # v0.9.64 - boot banner on the USB console (any serial tool proves the flashed version)
         # + two LED flashes = the brain booted alive.
-        print("pico-light __VERSION__ | GP4=NumLock start/stop (hold 1s=panic release) | GP3=ScrollLock pause")
+        print("pico-light __VERSION__ | GP4=NumLock start/stop (hold 1s=panic release) | GP3=ScrollLock pause | arm framing=%s baud=%d lagmax=%d | diag=full" % (ARM_FRAMING, ARM_BAUD, ARM_LAG_MAX))
         led_fault(2)
         while True:
             try:
@@ -1075,8 +1174,8 @@ public static class PicoFirmwareExporter
         sb.AppendLine("- `TRGLUX|luxLow,luxHigh,stableMs,timeoutMs,mode,vk,reactMin,reactMax,holdMin,holdMax` -> `EVT|TRGLUX|...` (\u06a9\u0644\u06cc\u062f \u0631\u0627 \u062e\u0648\u062f \u0628\u0631\u062f \u0645\u06cc\u200c\u0632\u0646\u062f)");
         sb.AppendLine("- `HALT` / `BYE` -> `OK|...`");
         sb.AppendLine("- v0.9.60: without the BH1750 wired, WLUX/TRGLUX/LCAL answer `ERR|NOSENSOR|...` and the brain stays alive (keyboard + arm keep working)");
-        sb.AppendLine("- v0.9.64b: dense mouse paths stream fire-and-forget with coalescing (the newest target always lands); clicks stay fire-and-ack; arm events (EVT|) stream to the PC live");
-        sb.AppendLine("- v0.9.64b: GP4 start/stop no longer teleports the cursor - the Pico tracks held buttons and releases only genuinely held ones (hold GP4 >= 1 s = panic release-all)");
+        sb.AppendLine("- v0.9.64f: dense mouse paths stream fire-and-forget with coalescing (the newest target always lands); clicks stay fire-and-ack; arm events (EVT|) stream to the PC live");
+        sb.AppendLine("- v0.9.64f: GP4 start/stop no longer teleports the cursor - the Pico tracks held buttons and releases only genuinely held ones (hold GP4 >= 1 s = panic release-all)");
         return sb.ToString();
     }
 

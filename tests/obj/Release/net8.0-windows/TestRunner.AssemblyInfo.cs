@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TestRunner")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4d8ccdb7764adb311d4f6585e7eea72bd6a6e77a")]
 [assembly: System.Reflection.AssemblyProductAttribute("TestRunner")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TestRunner")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

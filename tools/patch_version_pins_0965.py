@@ -6,7 +6,7 @@ release merge, on the release branch). The feature branch feat/plan-exporter-pla
 without any version bump (the proven PR #13/#16 rhythm).
 
 Why the meta guard changes shape here: v0.9.65 adds the plan exporter but does NOT touch
-the Pico firmware template, so PicoFirmwareExporter.BundleVersion honestly stays "0.9.64b"
+the Pico firmware template, so PicoFirmwareExporter.BundleVersion honestly stays "0.9.64f"
 (the exported code.py stays byte-identical to the golden firmware/code64b/code64b.py).
 Until now the guard demanded app-minor == bundle-minor; this patch teaches it the split:
 pins on BundleVersion lines must equal curBundleMinor (64), every other pin must equal
@@ -20,7 +20,7 @@ import sys
 
 APP_OLD = "0.9.64"
 APP = "0.9.65"
-BUNDLE = "0.9.64b"          # unchanged on purpose - the firmware template is untouched
+BUNDLE = "0.9.64f"          # unchanged on purpose - the firmware template stays on the accepted 0.9.64f line
 BS = chr(92)
 
 CSPROJ = "ams-shell/src/Ams.UI/Ams.UI.csproj"
@@ -35,7 +35,7 @@ EDITS = [
     (RUNNER, "<Version>" + APP_OLD + "</Version>", "<Version>" + APP + "</Version>", 20),
     (RUNNER, "Classroom Studio v" + APP_OLD, "Classroom Studio v" + APP, 15),
     (RUNNER, "csproj version is " + APP_OLD, "csproj version is " + APP, 2),
-    # the meta guard learns the app/bundle split (firmware untouched -> bundle stays on 0.9.64b)
+    # the meta guard learns the app/bundle split (firmware stays on the accepted 0.9.64f line -> bundle stays on 0.9.64f)
     (RUNNER, "        var pinned = new List<int>();",
              "        var pinned = new List<int>();\n"
              "        var pinnedBundle = new List<int>();   // bundle pins are tracked apart: the firmware template may stay on an older line",
@@ -109,7 +109,7 @@ for path in changed:
 # post-conditions -----------------------------------------------------------
 exporter = pathlib.Path(EXPORTER).read_text(encoding="utf-8")
 if ('BundleVersion = "' + BUNDLE + '"') not in exporter:
-    print("FAIL: PicoFirmwareExporter.BundleVersion moved - the firmware template is untouched in v0.9.65")
+    print("FAIL: PicoFirmwareExporter.BundleVersion moved - the firmware template stays on the accepted 0.9.64f line in v0.9.65")
     sys.exit(1)
 
 runner = pathlib.Path(RUNNER).read_text(encoding="utf-8")

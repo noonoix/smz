@@ -37,7 +37,7 @@ public static class PlanExporter
 {
     /// <summary>The on-drive engine format this exporter targets (firmware pico-light 0.9.64b).</summary>
     public const int PlanFormatVersion = 1;
-    public const string EngineVersion = "0.9.64b";
+    public const string EngineVersion = "0.9.64f";
 
     /// <summary>One successful compilation: the plan text plus the human-readable reports.</summary>
     public sealed record PlanResult(string Text, IReadOnlyList<string> Flags,

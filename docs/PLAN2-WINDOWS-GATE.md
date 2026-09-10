@@ -11,8 +11,8 @@
 ```
 PLAN2 parity migration already applied
 PLAN2 parity tests already applied
-PLAN2 recursive-bundle migration applied
-PLAN2 recursive-bundle tests applied
+PLAN2 recursive-bundle migration already applied
+PLAN2 recursive-bundle tests already applied
 wrote ams-shell\src\Ams.UI\Services\PlanExporter.cs (96290 chars)
 engine sha256: b94b4e8ba3647851814e0a7ea6a1ceb9d92c033a3ad8cc7058a0143853ed3674
 round trip: byte-identical to portable/plan3/CIRCUITPY/plan_engine.py
@@ -23,11 +23,11 @@ SYNC OK: Step 59 now comes from tools/plan_exporter_test_step.cs.inc
 ## App build tail
 ```
   Determining projects to restore...
-  Restored D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj (in 3.77 sec).
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_q34q5bre_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_q34q5bre_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_q34q5bre_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_q34q5bre_wpftmp.csproj]
+  Restored D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj (in 3.32 sec).
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_b3rhtefx_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_b3rhtefx_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_b3rhtefx_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_b3rhtefx_wpftmp.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
@@ -36,10 +36,10 @@ D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning 
 
 Build succeeded.
 
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_q34q5bre_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_q34q5bre_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_q34q5bre_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_q34q5bre_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_b3rhtefx_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_b3rhtefx_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_b3rhtefx_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_b3rhtefx_wpftmp.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
@@ -47,12 +47,11 @@ D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning 
     8 Warning(s)
     0 Error(s)
 
-Time Elapsed 00:00:20.61
+Time Elapsed 00:00:20.26
 ```
 
 ## Test tail
 ```
-PASS: v0.9.55: gomk87rs ships a complete default board spec (nothing left blank)
 PASS: v0.9.55: the Microchip defaults match the reference tool's board-spec card
 PASS: v0.9.55: the STM32 defaults are the real USB strings of that device
 PASS: v0.9.55: the AMS preset keeps the ams board id and Classroom Studio Board name
@@ -139,6 +138,7 @@ PASS: v0.9.60: stableSec 0.5 becomes 500ms on the wire (got: WLUX|1200,1300,500,
 PASS: v0.9.60: the row summary shows the fractional stabilize time (got: Wait for light 1200-1300 lux for 0.5s · timeout 20000ms)
 PASS: v0.9.60: legacy integer stableSec plans still produce the same wire command
 PASS: v0.9.60: the step dialog accepts 0.5 regardless of the Windows display language
+
 
 
 

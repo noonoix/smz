@@ -28,6 +28,8 @@ jobs:
         run: |
           python tools/upgrade_plan_exporter_plan2.py . 2>&1 | Tee-Object ci-migrate.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/upgrade_plan_exporter_tests_plan2.py . 2>&1 | Tee-Object -Append ci-migrate.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/make_plan_exporter.py . 2>&1 | Tee-Object -Append ci-migrate.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/sync_plan_exporter_tests.py . 2>&1 | Tee-Object -Append ci-migrate.txt
@@ -74,7 +76,7 @@ jobs:
           $lines += @('```','', '## App build tail','```')
           if (Test-Path ci-app.txt) { $lines += Get-Content ci-app.txt -Tail 120 }
           $lines += @('```','', '## Test tail','```')
-          if (Test-Path ci-tests.txt) { $lines += Get-Content ci-tests.txt -Tail 120 }
+          if (Test-Path ci-tests.txt) { $lines += Get-Content ci-tests.txt -Tail 160 }
           $lines += '```'
           $lines | Set-Content docs/PLAN2-WINDOWS-GATE.md -Encoding utf8
           git config user.name github-actions[bot]

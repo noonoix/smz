@@ -22,24 +22,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Generate exporter and synchronize Step 59
-        shell: pwsh
         run: |
           python tools/make_plan_exporter.py .
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          @'
-          from pathlib import Path
-          incp = Path('tools/plan_exporter_test_step.cs.inc')
-          inc = incp.read_text(encoding='utf-8').replace(
-              'PlanExporter.PlanFormatVersion == 1 && PlanExporter.EngineVersion == "0.9.66"',
-              'PlanExporter.PlanFormatVersion == 2 && PlanExporter.EngineVersion == "0.9.66"')
-          incp.write_text(inc, encoding='utf-8', newline='\n')
-          p = Path('tests/TestRunner.cs')
-          s = p.read_text(encoding='utf-8')
-          start = s.index('        // ── Step 59:')
-          end = s.index('        Console.WriteLine($"=== Results:', start)
-          p.write_text(s[:start] + inc.rstrip() + '\n' + s[end:], encoding='utf-8', newline='\n')
-          print('synchronized Step 59 from tools/plan_exporter_test_step.cs.inc')
-          '@ | python -
+          python tools/sync_plan_exporter_tests.py .
       - name: Compile-check bridge stack
         run: python -m py_compile ams-shell/bridge/bridge.py ams-shell/bridge/ams_serial.py ams-shell/bridge/ams_crypto.py
       - name: Behavior-test Pico brain transport
@@ -65,7 +50,7 @@ jobs:
         shell: pwsh
         run: |
           $result = (Select-String -Path ci-plan2-test-output.txt -Pattern '=== Results' | Select-Object -Last 1).Line
-          @('# PLAN2 Windows gate report','', '- generation: success','- bridge compile: success','- bridge test: success','- restore: success','- app build: success','- TestRunner build: success','- TestRunner run: success','',"- result: `$result`") | Set-Content docs/PLAN2-WINDOWS-GATE.md -Encoding utf8
+          @('# PLAN2 Windows gate report','', '- generation: success','- bridge compile: success','- bridge test: success','- restore: success','- app build: success','- TestRunner build: success','- TestRunner run: success','',"- result: $result") | Set-Content docs/PLAN2-WINDOWS-GATE.md -Encoding utf8
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add ams-shell/src/Ams.UI/Services/PlanExporter.cs tools/plan_exporter_test_step.cs.inc tests/TestRunner.cs docs/PLAN2-WINDOWS-GATE.md

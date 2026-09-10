@@ -110,6 +110,8 @@
                 <MenuItem Header="_Generate Script…" Command="{Binding GenerateCommand}" />
                 <MenuItem Header="Export _Pico Firmware… (per system)" Command="{Binding ExportPicoFirmwareCommand}"
                           ToolTip="خروجی CircuitPython برای رزبری پای پیکو — یک‌بار در هر سیستم" />
+                <MenuItem Header="Export Pico _Plan… (plan.txt)" Command="{Binding ExportPicoPlanCommand}"
+                          ToolTip="خروجی plan.txt پرتابل برای پیکو — موتور gen-1 فریم‌ور 0.9.64b" />
                 <Separator />
                 <MenuItem Header="E_xit" Command="{Binding ExitCommand}" />
             </MenuItem>

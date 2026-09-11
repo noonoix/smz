@@ -6,7 +6,9 @@ Fixes:
 2. Normalize standalone run state and Num Lock after the final configured pass.
 3. Add a regression that aborts from inside the lazy motion module.
 
-Idempotent; generated split/runtime files are rebuilt by the normal PLAN2 workflow.
+Idempotent and forward-aware: a repository already upgraded to h6 satisfies the
+superseded h5 completion requirement. Generated split/runtime files are rebuilt
+by the normal PLAN2 workflow.
 """
 from pathlib import Path
 import sys
@@ -16,6 +18,7 @@ SPLITTER = ROOT / "tools" / "split_plan_engine.py"
 FIRMWARE = ROOT / "ams-shell" / "src" / "Ams.UI" / "Services" / "PicoFirmwareExporter.cs"
 SPLIT_TEST = ROOT / "portable" / "plan3" / "sim" / "test_split_engine.py"
 MARKER = "PLAN2_H5_CONTROL_FIX"
+H6_MARKER = "PLAN2_H6_CONTROL_FIX"
 
 
 def replace_once(text, old, new, label):
@@ -41,10 +44,12 @@ else:
     print("h5: split abort binding already applied")
 
 
-# A completed once/times/timed macro must become stopped immediately. Mirroring that
-# transition through Num Lock makes the next physical press a Start, not a cleanup Stop.
+# A completed once/times/timed macro must become stopped immediately. h6 supersedes
+# this implementation with finite-plan-aware completion, so treat h6 as satisfied.
 f = FIRMWARE.read_text(encoding="utf-8")
-if MARKER not in f:
+if H6_MARKER in f:
+    print("h5: natural completion superseded by h6")
+elif MARKER not in f:
     old = '''                    if engine_on and not engine_paused and host_quiet and loop_due():
                         if plan_pass():            # v0.9.61 - a portable plan takes precedence
                             passes += 1
@@ -102,9 +107,12 @@ print("PASS h5 lazy-motion PlanAbort parity"); passed += 1
 else:
     print("h5: split abort regression already applied")
 
-# Postconditions catch partial application immediately.
+# Postconditions catch partial application immediately while accepting the h6
+# implementation that intentionally replaces h5's legacy loop-mode condition.
 assert "_motion_module.PlanAbort = PlanAbort" in SPLITTER.read_text(encoding="utf-8")
 fw = FIRMWARE.read_text(encoding="utf-8")
-assert "_completed_pass and not loop_due()" in fw and "tap_key(Keycode.KEYPAD_NUMLOCK)" in fw
+h5_completion = "_completed_pass and not loop_due()" in fw
+h6_completion = H6_MARKER in fw and '_plan_result == "done"' in fw
+assert (h5_completion or h6_completion) and "tap_key(Keycode.KEYPAD_NUMLOCK)" in fw
 assert "PASS h5 lazy-motion PlanAbort parity" in SPLIT_TEST.read_text(encoding="utf-8")
 print("PLAN2 h5 hotfix OK")

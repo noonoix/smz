@@ -8,7 +8,7 @@ namespace Ams.UI.Services;
 public static class AutoCyclePlanBundle
 {
     private static readonly string[] RuntimeFiles =
-        { "plan_cycle.py", "cycle_runtime.py", "restart_windows.py" };
+        { "plan_cycle.py", "cycle_runtime.py", "restart_windows.py", "auto_resume_boot.py" };
 
     public static IReadOnlyList<string> Export(string planPath, IList<StepNode> steps,
         AppSettings settings, int screenW, int screenH, string sourceName, string machine)

@@ -48,6 +48,19 @@
       <Link>tools\isp_flash.py</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- v0.9.67 — canonical auto-cycle adapter files shipped with the desktop app. -->
+    <None Include="..\..\..\portable\plan3\CIRCUITPY\plan_cycle.py">
+      <Link>portable-runtime\plan_cycle.py</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\..\portable\plan3\CIRCUITPY\cycle_runtime.py">
+      <Link>portable-runtime\cycle_runtime.py</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\..\portable\plan3\CIRCUITPY\restart_windows.py">
+      <Link>portable-runtime\restart_windows.py</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

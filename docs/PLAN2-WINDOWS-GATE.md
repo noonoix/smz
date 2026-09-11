@@ -1,6 +1,7 @@
 # PLAN2 Windows gate report
 
-- migration: failure
+- release pins: failure
+- migration: skipped
 - split runtime: skipped
 - bridge: skipped
 - app build: skipped
@@ -8,10 +9,19 @@
 
 - result: 
 
+## Release tail
+```
+ok    already patched: ams-shell\src\Ams.UI\Ams.UI.csproj
+ok    already patched: ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs
+ok    already patched: tests\TestRunner.cs
+ok    already patched: tests\TestRunner.cs
+ok    already patched: tests\TestRunner.cs
+ok    already patched: tests\TestRunner.cs
+PASS: app 0.9.66; Pico bundle 0.9.64f; Pro Micro baseline 2.5
+```
+
 ## Migration tail
 ```
-h5: split abort binding already applied
-natural completion state: anchor count 0, expected 1
 ```
 
 ## Split-runtime tail

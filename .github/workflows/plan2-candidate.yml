@@ -1,4 +1,4 @@
-name: PLAN2 downloadable candidate
+name: PLAN2 h5 downloadable candidate
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   candidate:
-    name: build-test-package candidate
+    name: build-test-package h5
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -54,28 +54,29 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (Select-String -Path ci-test-output.txt -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
 
-      - name: Package candidate
+      - name: Package h5 candidate
         shell: pwsh
         run: |
           $out = 'ams-shell/src/Ams.UI/bin/Release/net8.0-windows'
           Remove-Item -Recurse -Force "$out/bridge/__pycache__" -ErrorAction SilentlyContinue
           @(
-            'Classroom Studio PLAN2 candidate — hardware acceptance build',
+            'Classroom Studio PLAN2 h5 — hardware acceptance build',
             'Source branch: feat/portable-plan2-app-0966',
             'Source commit: ${{ github.sha }}',
             'This is not an official release and does not bump the app version.',
+            'h5 fixes split PlanAbort and one-press restart after natural completion.',
             'Export Pico Plan must emit plan_engine.py + plan_motion.py + plan_typing.py.'
-          ) | Set-Content "$out/PLAN2-CANDIDATE.txt" -Encoding utf8
-          Compress-Archive -Path "$out/*" -DestinationPath 'Classroom-Studio-PLAN2-candidate.zip' -Force
-          (Get-FileHash 'Classroom-Studio-PLAN2-candidate.zip' -Algorithm SHA256).Hash | Out-File 'plan2-candidate-sha256.txt' -Encoding ascii
+          ) | Set-Content "$out/PLAN2-H5-CANDIDATE.txt" -Encoding utf8
+          Compress-Archive -Path "$out/*" -DestinationPath 'Classroom-Studio-PLAN2-h5.zip' -Force
+          (Get-FileHash 'Classroom-Studio-PLAN2-h5.zip' -Algorithm SHA256).Hash | Out-File 'plan2-h5-sha256.txt' -Encoding ascii
 
-      - name: Upload candidate
+      - name: Upload h5 candidate
         uses: actions/upload-artifact@v4
         with:
-          name: Classroom-Studio-PLAN2-candidate
+          name: Classroom-Studio-PLAN2-h5
           path: |
-            Classroom-Studio-PLAN2-candidate.zip
-            plan2-candidate-sha256.txt
+            Classroom-Studio-PLAN2-h5.zip
+            plan2-h5-sha256.txt
             ci-test-output.txt
           retention-days: 14
           if-no-files-found: error

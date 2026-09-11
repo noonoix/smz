@@ -29,9 +29,10 @@ jobs:
         run: |
           python tools/patch_version_pins_0966.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if (-not (Select-String -Path 'portable/plan3/CIRCUITPY-SPLIT/plan_engine.py' -Pattern 'PLAN2_H6_CONTROL_FIX' -Quiet)) { throw 'h6 control marker missing' }
-          if (-not (Select-String -Path 'portable/plan3/CIRCUITPY-SPLIT/plan_engine.py' -Pattern '_plan_result == "done"' -Quiet)) { throw 'h6 finite-completion fix missing' }
-          if (-not (Select-String -Path 'portable/plan3/CIRCUITPY-SPLIT/plan_typing.py' -Pattern 'ABORT\|KTEXT' -Quiet)) { throw 'h6 interruptible typing fix missing' }
+          $fw = 'ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs'
+          if (-not (Select-String -Path $fw -Pattern 'PLAN2_H6_CONTROL_FIX' -Quiet)) { throw 'h6 control marker missing' }
+          if (-not (Select-String -Path $fw -Pattern '_plan_result == "done"' -Quiet)) { throw 'h6 finite-completion fix missing' }
+          if (-not (Select-String -Path $fw -Pattern 'ABORT\|KTEXT' -Quiet)) { throw 'h6 interruptible typing fix missing' }
 
       - name: Validate split runtime
         shell: pwsh

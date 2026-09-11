@@ -4,14 +4,16 @@
 
 ## وضعیت لحظه‌ای — ۲۰۲۶-۰۹-۱۱
 
-- خط ریلیز اپ: `0.9.66 / PLAN|2`
-- مخزن: `pedrampedi81-dotcom/smc`
-- شاخه‌ی ریلیز: `release/app-0.9.66`
-- PR #26 با squash در `main` ادغام شد.
-- merge commit مبنا: `837188161e5edb441802d9ff0d5ebdff58fb9cf2`.
-- Issue #25 با `state_reason=completed` بسته شد.
-- head نهایی پیش از merge: `8b4d049406eb7532b2d23fdc993551ba675ae94b`.
-- Windows app CI نهایی: run `34574394673` / job `103183453164` — success.
+- خط ریلیز اپ: `0.9.66 / PLAN|2`.
+- مخزن: `pedrampedi81-dotcom/smc`.
+- PR #26 با squash در `main` ادغام شد: `837188161e5edb441802d9ff0d5ebdff58fb9cf2`.
+- PR #27 نسخه‌ی اپ را مستقل به `0.9.66` رساند: `af2a9cdc747443fd8fb3c426df85f683ce4a9b6e`.
+- ریلیز رسمی اپ: `ci-31` با `751 passed, 0 failed`.
+- `Classroom-Studio-release.zip`: SHA-256 `1C1E9C2B4AF56663C65954AFC131FD44A5FBEE8959D7457762F5FE0ABD0247CB`، اندازه `3262189` بایت.
+- PR #28 workflow رسمی candidate را به `h6` ارتقا داد: `c0216f73b6ecd775f05f711a115efccef2c6a118`.
+- candidate run `34583319872` / job `103211678767` و sensitive run `34583323201` / job `103211689036` سبز شدند.
+- artifact candidate: `Classroom-Studio-PLAN2-h6.zip` + `plan2-h6-sha256.txt` + `ci-test-output.txt`، retention برابر ۱۴ روز.
+- Issue #25 با `state_reason=completed` بسته است.
 
 ## پذیرش تثبیت‌شده
 
@@ -21,24 +23,22 @@
 - لاگ `pico-console-20260911-095058.txt` هیچ `plan: run error` یا `PlanAbort isn't defined` نداشت.
 - PONG پذیرفته‌شده: `role=brain+keyboard+light`, `arm=promicro`, `planapi=3`, `engine=split`, `framing=1`, `baud=57600`, `lagmax=2`.
 - شمارنده‌های خرابی `cksum=0`, `noframe=0`, `sentjumps=0`, `partial=0` بودند؛ `dropped` coalescing عمدی تحت back-pressure است.
-- همه‌ی gateهای نهایی compile، golden، compiler، sim2، sim3، hashes، sensitive-guard و Windows build-test سبز شدند.
+- همه‌ی gateهای compile، golden، compiler، sim2، sim3، hashes، sensitive-guard و Windows build-test سبز شدند.
 - runtime سه‌فایلی در بودجه است: core ≤ 26,000، motion ≤ 15,000 و typing ≤ 5,000 بایت.
 - exporter، child planهای بازگشتی و runtime سه‌فایلی را با transaction کامل stage/publish/rollback منتشر می‌کند.
 
-## سیاست نسخه‌ی ریلیز
+## قرارداد نسخه‌ی نهایی
 
-- نسخه‌ی اپ در این PR از `0.9.65` به `0.9.66` می‌رود.
-- Pico firmware bundle عمداً روی baseline پذیرفته‌شده‌ی `0.9.64f` می‌ماند.
-- Pro Micro عمداً روی baseline پذیرفته‌شده‌ی `2.5` می‌ماند.
-- هیچ فایل کلید واقعی، HEX حساس یا backup وارد مخزن نمی‌شود.
+- Classroom Studio: `0.9.66`.
+- Pico firmware bundle: baseline پذیرفته‌شده‌ی `0.9.64f`.
+- Pro Micro: baseline پذیرفته‌شده‌ی `2.5`.
+- PLAN format: `PLAN|2`، engine line: `0.9.66`.
+- هیچ فایل کلید واقعی، HEX حساس یا backup وارد مخزن نشده است.
 
-## گیت ادغام PR ریلیز
+## گیت‌های تثبیت‌شده
 
 1. app build بدون خطا.
 2. TestRunner با `0 failed`.
 3. تمام checkهای PLAN2 و sensitive guard سبز روی head نهایی.
-4. merge فقط از مسیر PR؛ هیچ push مستقیمی به `main`.
-
-## بعد از ریلیز اپ
-
-- در صورت نیاز، candidate artifact رسمی از نام قدیمی `h5` به خط پذیرفته‌شده‌ی `h6` ارتقا داده شود؛ این کار از bump اپ جدا نگه داشته می‌شود.
+4. marker مربوط به `PLAN2_H6_CONTROL_FIX` و رفتارهای پایان طبیعی و توقف‌پذیری تایپ بررسی می‌شوند.
+5. merge فقط از مسیر PR؛ هیچ push مستقیمی به `main`.

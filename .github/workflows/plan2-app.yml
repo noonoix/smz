@@ -88,7 +88,7 @@ jobs:
           dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object -Append ci-tests.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (Select-String -Path ci-tests.txt -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
-      - name: Persist sources and diagnostic report
+      - name: Write diagnostic report (not committed)
         if: always()
         shell: pwsh
         run: |
@@ -103,12 +103,7 @@ jobs:
           if (Test-Path ci-tests.txt) { $lines += Get-Content ci-tests.txt -Tail 160 }
           $lines += '```'
           $lines | Set-Content docs/PLAN2-WINDOWS-GATE.md -Encoding utf8
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          $persist = @('tools/hotfix_plan2_h5.py','tools/hotfix_plan2_h6.py','tools/split_plan_engine.py','ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs','tools/upgrade_plan_exporter_split_runtime.py','portable/plan3/CIRCUITPY-SPLIT/plan_engine.py','portable/plan3/CIRCUITPY-SPLIT/plan_motion.py','portable/plan3/CIRCUITPY-SPLIT/plan_typing.py','portable/plan3/sim/test_split_engine.py','tools/make_plan_exporter.py','tools/PlanExporter.cs.tpl','ams-shell/src/Ams.UI/Services/PlanExporter.cs','tools/plan_exporter_test_step.cs.inc','tests/TestRunner.cs','tools/plan_exporter_vm_command.cs.inc','tools/patch_plan_exporter_ui.py','ams-shell/src/Ams.UI/ViewModels/MainViewModel.cs','ams-shell/src/Ams.UI/MainWindow.xaml','docs/PLAN2-WINDOWS-GATE.md')
-          foreach ($path in $persist) { if (Test-Path $path) { git add -- $path } }
-          git commit -m "ci(plan2): validate split runtime bundle" || echo "no change"
-          git push
+          # CI must validate the checked-out commit without pushing a new unverified head.
       - name: Enforce zero failures
         if: always()
         shell: pwsh

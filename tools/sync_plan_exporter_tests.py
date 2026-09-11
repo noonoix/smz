@@ -21,13 +21,18 @@ marker = "Step 59: v0.9.65 plan exporter"
 pos = runner.find(marker)
 if pos < 0:
     raise SystemExit("Step 59 marker not found in tests/TestRunner.cs")
-start = runner.rfind("\n", 0, pos) + 1
+# Start at the include's stable sentinel, not at the title line. Starting at the
+# title leaves the sentinel behind and duplicates three preface lines on every run.
+sentinel = "        // PLAN2_PARITY_TESTS\n"
+start = runner.rfind(sentinel, 0, pos)
+if start < 0:
+    raise SystemExit("Step 59 sentinel not found before marker")
 results = '        Console.WriteLine($"=== Results: {passed} passed, {failed} failed ===");'
 end = runner.find(results, pos)
 if end < 0:
     raise SystemExit("Results anchor not found after Step 59")
 updated = runner[:start] + inc.rstrip() + "\n" + runner[end:]
-if updated.count(marker) != 1 or updated.count(results) != 1:
+if updated.count(marker) != 1 or updated.count(results) != 1 or updated.count(sentinel) != 1:
     raise SystemExit("postcondition failed while synchronizing Step 59")
 runner_path.write_text(updated, encoding="utf-8", newline="\n")
 print("SYNC OK: Step 59 now comes from tools/plan_exporter_test_step.cs.inc")

@@ -97,6 +97,22 @@ for i, (text, needle) in enumerate(NEG, 1):
     except Exception:
         failed += 1; print("FAIL negative", i); traceback.print_exc()
 
+# PLAN2_H5_CONTROL_FIX: aborting inside lazy motion must use the core exception.
+class AbortMotionCtx(Ctx):
+    def sleep_ms(self, m):
+        self.ev.append(("delay", m))
+        return False
+
+abort_text = "PLAN|2\nSCREEN|1920,1080\nRMOUSE|region=100,120,200,150|before=1,1|after=0,0|curve=15,45|mid=0:0,0|over=0|idle=1,1:0,0"
+for engine, name in ((canonical, "canonical"), (split, "split")):
+    caught = False
+    try:
+        engine.run_plan(engine.parse_plan(abort_text), AbortMotionCtx())
+    except engine.PlanAbort:
+        caught = True
+    assert caught, name + " did not raise its exported PlanAbort"
+print("PASS h5 lazy-motion PlanAbort parity"); passed += 1
+
 bundle = {
     "plan.txt": "PLAN|2\nTYPE|text=PLAN2_OK|h=1,2\nINCLUDE|file=child-a.txt",
     "child-a.txt": "PLAN|2\nRMOUSE|region=100,120,200,150|before=0,0|after=0,0|curve=15,45|mid=0:0,0|over=0|idle=1,1:0,0\nINCLUDE|file=child-b.txt",

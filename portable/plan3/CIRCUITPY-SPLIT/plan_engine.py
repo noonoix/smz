@@ -587,6 +587,7 @@ def _exec_rmouse(prm, ctx, pauses, pos, target=None):
     global _motion_module
     if _motion_module is None:
         import plan_motion as _motion_module
+        _motion_module.PlanAbort = PlanAbort
     return _motion_module._exec_rmouse(prm, ctx, pauses, pos, target)
 
 def plan_typing(text, prm):

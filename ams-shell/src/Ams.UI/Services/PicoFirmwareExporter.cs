@@ -1105,11 +1105,22 @@ public static class PicoFirmwareExporter
                     poll_keypad()
                     host_quiet = time.monotonic() - last_host_cmd >= 3   # no double-fire after host runs
                     if engine_on and not engine_paused and host_quiet and loop_due():
+                        _completed_pass = False
                         if plan_pass():            # v0.9.61 - a portable plan takes precedence
                             passes += 1
+                            _completed_pass = True
                         elif states:
                             standalone_pass()
                             passes += 1
+                            _completed_pass = True
+                        if _completed_pass and not loop_due():
+                            # PLAN2_H5_CONTROL_FIX: natural once/times/timed completion is a
+                            # real Stop. Turn the engine and pause state off and mirror it via
+                            # Num Lock, so the next GP4 edge starts with one press.
+                            engine_on = False
+                            engine_paused = False
+                            release_all_buttons()
+                            tap_key(Keycode.KEYPAD_NUMLOCK)
                     time.sleep(0.02)
             except Exception:
                 # v0.9.60 - never-die: a bad line or a transient USB hiccup must never kill

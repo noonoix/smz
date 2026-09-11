@@ -71,7 +71,7 @@ def main():
         if names & {'time','math','random'}: std_imports.append(n)
     motion_text = '# Generated from canonical plan_engine.py; do not hand-edit.\n' + clean_unparse(std_imports + motion)
     typing_text = '# Generated from canonical plan_engine.py; do not hand-edit.\n' + clean_unparse(std_imports + typing)
-    wrappers=ast.parse('''\n_motion_module = None\n_typing_module = None\n\ndef _exec_rmouse(prm, ctx, pauses, pos, target=None):\n    global _motion_module\n    if _motion_module is None:\n        import plan_motion as _motion_module\n    return _motion_module._exec_rmouse(prm, ctx, pauses, pos, target)\n\ndef plan_typing(text, prm):\n    global _typing_module\n    if _typing_module is None:\n        import plan_typing as _typing_module\n    return _typing_module.plan_typing(text, prm)\n''').body
+    wrappers=ast.parse('''\n_motion_module = None\n_typing_module = None\n\ndef _exec_rmouse(prm, ctx, pauses, pos, target=None):\n    global _motion_module\n    if _motion_module is None:\n        import plan_motion as _motion_module\n        _motion_module.PlanAbort = PlanAbort  # PLAN2_H5_CONTROL_FIX: one shared abort type\n    return _motion_module._exec_rmouse(prm, ctx, pauses, pos, target)\n\ndef plan_typing(text, prm):\n    global _typing_module\n    if _typing_module is None:\n        import plan_typing as _typing_module\n    return _typing_module.plan_typing(text, prm)\n''').body
     core_text = '# Generated memory-fit core from canonical plan_engine.py; do not hand-edit.\n' + clean_unparse(core + wrappers)
     files={'plan_engine.py':core_text,'plan_motion.py':motion_text,'plan_typing.py':typing_text}
     for name,text in files.items():

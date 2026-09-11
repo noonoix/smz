@@ -6,22 +6,26 @@
 - app build: success
 - TestRunner: success
 
-- result: === Results: 751 passed, 0 failed ===
+- result: === Results: 755 passed, 0 failed ===
 
 ## Migration tail
 ```
+h5: split abort binding applied
+h5: natural completion normalization applied
+h5: split abort regression applied
+PLAN2 h5 hotfix OK
 PLAN2 parity migration already applied
 PLAN2 parity tests already applied
 PLAN2 recursive-bundle migration already applied
 PLAN2 recursive-bundle tests already applied
 PLAN2 split-runtime template migration already applied
 PLAN2 split-runtime C# tests already applied
-plan_engine.py 24994 c12f2f9c32ddc8648b32cd103b3158abe39c2b05beae914e6a9ce685819fc5ac
+plan_engine.py 25039 dfebb03f5835544e50db5596a789068ccc5d9f6afd84a70759d67d5c6873cb70
 plan_motion.py 14028 9a088d2e9d8c032ca39faef119f580852534d844c52f79188501d845103655f8
 plan_typing.py 3967 1a0ea9e79ece0aeee85530e2ac583c75067298b5f29f21383152fea160a235c5
-total 42989
-wrote ams-shell\src\Ams.UI\Services\PlanExporter.cs (89914 chars)
-plan_engine.py 24994 c12f2f9c32ddc8648b32cd103b3158abe39c2b05beae914e6a9ce685819fc5ac
+total 43034
+wrote ams-shell\src\Ams.UI\Services\PlanExporter.cs (89959 chars)
+plan_engine.py 25039 dfebb03f5835544e50db5596a789068ccc5d9f6afd84a70759d67d5c6873cb70
 plan_motion.py 14028 9a088d2e9d8c032ca39faef119f580852534d844c52f79188501d845103655f8
 plan_typing.py 3967 1a0ea9e79ece0aeee85530e2ac583c75067298b5f29f21383152fea160a235c5
 round trip: all three split modules byte-identical
@@ -46,21 +50,22 @@ PASS negative 3 GOTO 'missing' has no matching LABEL
 PASS negative 4 line 2: INCLUDE needs a plain *.txt file name
 PASS negative 5 line 2: RPKG counts out of range (1 items)
 PASS negative 6 line 2: PGROUP needs at least two branches
+PASS h5 lazy-motion PlanAbort parity
 PASS exact bundle canonical 1022
 PASS exact bundle split 1022
 PASS lazy modules loaded on demand
-RESULT 18 passed 0 failed
-{'plan_engine.py': 24994, 'plan_motion.py': 14028, 'plan_typing.py': 3967}
+RESULT 19 passed 0 failed
+{'plan_engine.py': 25039, 'plan_motion.py': 14028, 'plan_typing.py': 3967}
 ```
 
 ## App build tail
 ```
   Determining projects to restore...
-  Restored D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj (in 3.82 sec).
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_trtfcs2a_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_trtfcs2a_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_trtfcs2a_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_trtfcs2a_wpftmp.csproj]
+  Restored D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj (in 4.27 sec).
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_liuvrjce_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_liuvrjce_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_liuvrjce_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_liuvrjce_wpftmp.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
@@ -69,10 +74,10 @@ D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning 
 
 Build succeeded.
 
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_trtfcs2a_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_trtfcs2a_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_trtfcs2a_wpftmp.csproj]
-D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_trtfcs2a_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_liuvrjce_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_liuvrjce_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_liuvrjce_wpftmp.csproj]
+D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI_liuvrjce_wpftmp.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc\smc\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc\smc\ams-shell\src\Ams.UI\Ams.UI.csproj]
@@ -80,12 +85,11 @@ D:\a\smc\smc\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2569,52): warning 
     8 Warning(s)
     0 Error(s)
 
-Time Elapsed 00:00:21.11
+Time Elapsed 00:00:19.78
 ```
 
 ## Test tail
 ```
-PASS: v0.9.55: step 2 has the editable board-spec form back (id, name, VID, PIDs, product, maker)
 PASS: v0.9.55: editing a board-spec field refreshes the preview, and defaults can be restored
 PASS: v0.9.55: the form explains the auto-fill and the application-PID rule in Persian
 PASS: v0.9.55: selecting a device fills step 1 and step 2 with that device's defaults
@@ -178,6 +182,7 @@ PASS: v0.9.60: the step dialog accepts 0.5 regardless of the Windows display lan
 
 
 
+
 --- Step 59: v0.9.65 plan exporter (PLAN|2) ---
 PASS: v0.9.65: plan header is PLAN|2 with SCREEN and SPEED from settings
 PASS: v0.9.65: randomMousePosition emits the exact golden RMOUSE line
@@ -244,5 +249,5 @@ PASS: v0.9.66: all embedded split runtime modules are byte-identical to generate
 PASS: v0.9.65: the plan exporter targets the current firmware bundle line (PLAN|2)
 PASS: v0.9.65: Export writes plan.txt + plan_engine.py + README-PLAN.md
 PASS: v0.9.65: the written bundle carries the plan and the real engine
-=== Results: 751 passed, 0 failed ===
+=== Results: 755 passed, 0 failed ===
 ```

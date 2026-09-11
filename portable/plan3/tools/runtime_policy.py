@@ -4,7 +4,7 @@ import random
 
 DEFAULT_RESTART_MINUTES = (110, 130)
 DEFAULT_RESUME_MINUTES = (3, 5)
-ALLOWED_BUZZER_PINS = ("GP5", "GP6")
+BUZZER_PIN = "GP6"
 
 # Windows 11 English: Win+X -> Up -> Up -> Enter -> Up -> Enter.
 # (vk, hold range ms, delay-after range ms)
@@ -38,15 +38,15 @@ class RuntimeOptions:
 
     def __init__(self, restart_min_minutes=110, restart_max_minutes=130,
                  resume_min_minutes=3, resume_max_minutes=5,
-                 auto_resume=True, buzzer_pin="GP5"):
+                 auto_resume=True, buzzer_pin=BUZZER_PIN):
         self.restart_min_seconds, self.restart_max_seconds = minutes_to_seconds_range(
             restart_min_minutes, restart_max_minutes, "restart")
         self.resume_min_seconds, self.resume_max_seconds = minutes_to_seconds_range(
             resume_min_minutes, resume_max_minutes, "auto-resume")
         self.auto_resume = bool(auto_resume)
         pin = str(buzzer_pin).upper()
-        if pin not in ALLOWED_BUZZER_PINS:
-            raise ValueError("buzzer pin must be GP5 or GP6")
+        if pin != BUZZER_PIN:
+            raise ValueError("portable buzzer output is fixed to GP6")
         self.buzzer_pin = pin
 
     @classmethod
@@ -56,7 +56,7 @@ class RuntimeOptions:
         return cls(
             s.get("RestartMinMinutes", 110), s.get("RestartMaxMinutes", 130),
             s.get("AutoResumeMinMinutes", 3), s.get("AutoResumeMaxMinutes", 5),
-            s.get("AutoResumeEnabled", True), s.get("BuzzerPin", "GP5"))
+            s.get("AutoResumeEnabled", True), s.get("BuzzerPin", BUZZER_PIN))
 
     def as_settings(self):
         return {
@@ -104,13 +104,13 @@ def restart_plan_lines():
     return lines
 
 
-def portable_audio_line(mode, frequency_hz=880, duration_ms=120, buzzer_pin="GP5"):
-    """Portable sound is BEEP only; the firmware routes it to selected GP5/GP6."""
+def portable_audio_line(mode, frequency_hz=880, duration_ms=120, buzzer_pin=BUZZER_PIN):
+    """Portable sound is BEEP only and firmware output is fixed to GP6."""
     if mode != "deviceBuzzer":
         raise ValueError("portable audio is limited to deviceBuzzer/BEEP")
     pin = str(buzzer_pin).upper()
-    if pin not in ALLOWED_BUZZER_PINS:
-        raise ValueError("buzzer pin must be GP5 or GP6")
+    if pin != BUZZER_PIN:
+        raise ValueError("portable buzzer output is fixed to GP6")
     freq, duration = int(frequency_hz), int(duration_ms)
     if not 30 <= freq <= 20000:
         raise ValueError("buzzer frequency must be 30..20000 Hz")

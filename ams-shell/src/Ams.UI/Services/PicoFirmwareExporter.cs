@@ -818,7 +818,7 @@ public static class PicoFirmwareExporter
             return out
 
 
-        def handle_keyboard(line, head):
+        def handle_keyboard(line, head, plan_mode=False):
             # The Pico owns the keyboard (final contract) - always local execution.
             if head == "KDOWN":
                 kbd.press(keycode_for_vk(int(line.split("|")[1])))
@@ -860,6 +860,12 @@ public static class PicoFirmwareExporter
                         return "ERR|ASCII|KTEXT"
                 for ch in txt:
                     pump_arm()               # v0.9.60e - the arm is drained even mid-typing
+                    if plan_mode:
+                        # PLAN2_H6_CONTROL_FIX: service GP4 between every character. A Stop
+                        # edge aborts portable typing through the canonical PlanAbort path.
+                        poll_keypad()
+                        if not engine_on:
+                            return "ABORT|KTEXT"
                     if serial is not None and serial.in_waiting:   # v0.9.60e - no USB RX overflow
                         buffer.extend(serial.read(serial.in_waiting))   #   during a long chunk
                     kc, sh = _ascii_key(ch)
@@ -870,7 +876,12 @@ public static class PicoFirmwareExporter
                     if sh:
                         kbd.release(Keycode.LEFT_SHIFT)
                     if hmax > 0:
-                        time.sleep((hmin + random.random() * (hmax - hmin if hmax > hmin else 0)) / 1000)
+                        _type_delay = hmin + random.random() * (hmax - hmin if hmax > hmin else 0)
+                        if plan_mode:
+                            if not _plan_sleep_ms(_type_delay):
+                                return "ABORT|KTEXT"
+                        else:
+                            time.sleep(_type_delay / 1000)
                 return "OK|KTEXT"
             return "ERR|UNKNOWN|" + head
 
@@ -998,7 +1009,9 @@ public static class PicoFirmwareExporter
                 forward_fast(line)
 
             def ktext(self, hmin, hmax, text):
-                handle_keyboard("KTEXT|%d,%d,%s" % (hmin, hmax, text), "KTEXT")
+                _typed = handle_keyboard("KTEXT|%d,%d,%s" % (hmin, hmax, text), "KTEXT", True)
+                if _typed == "ABORT|KTEXT":
+                    raise _pe.PlanAbort()
 
             def kcombo(self, vk):
                 handle_keyboard("KCOMBO|%d" % vk, "KCOMBO")
@@ -1035,15 +1048,17 @@ public static class PicoFirmwareExporter
                 return False
             try:
                 _pe.run_plan(_plan_cache, _PlanCtx())
+                return "done"                     # PLAN2_H6_CONTROL_FIX: finite plan completed
             except _pe.PlanAbort:
                 release_all_buttons(force=True)   # v0.9.64b - full shield on the abort path
+                return "abort"
             except Exception as exc:
                 # v0.9.62 - ALWAYS reported (was PLAN_DEBUG-only: a swallowed error read as a
                 # silent death). 3 LED flashes = run fault, visible with no PC attached.
                 print("plan: run error:", exc)
                 led_fault(3)
                 release_all_buttons(force=True)   # v0.9.64b - full shield on the error path
-            return True
+                return "error"
 
 
         def standalone_pass():
@@ -1105,22 +1120,25 @@ public static class PicoFirmwareExporter
                     poll_keypad()
                     host_quiet = time.monotonic() - last_host_cmd >= 3   # no double-fire after host runs
                     if engine_on and not engine_paused and host_quiet and loop_due():
-                        _completed_pass = False
-                        if plan_pass():            # v0.9.61 - a portable plan takes precedence
+                        _plan_result = plan_pass()  # v0.9.61 - a portable plan takes precedence
+                        if _plan_result:
                             passes += 1
-                            _completed_pass = True
+                            if _plan_result == "done":
+                                # PLAN2_H6_CONTROL_FIX: a finite portable plan owns its loop
+                                # policy internally. Its return is a real natural Stop even when
+                                # the legacy light-state LOOP_MODE is "forever".
+                                engine_on = False
+                                engine_paused = False
+                                release_all_buttons()
+                                tap_key(Keycode.KEYPAD_NUMLOCK)
                         elif states:
                             standalone_pass()
                             passes += 1
-                            _completed_pass = True
-                        if _completed_pass and not loop_due():
-                            # PLAN2_H5_CONTROL_FIX: natural once/times/timed completion is a
-                            # real Stop. Turn the engine and pause state off and mirror it via
-                            # Num Lock, so the next GP4 edge starts with one press.
-                            engine_on = False
-                            engine_paused = False
-                            release_all_buttons()
-                            tap_key(Keycode.KEYPAD_NUMLOCK)
+                            if not loop_due():
+                                engine_on = False
+                                engine_paused = False
+                                release_all_buttons()
+                                tap_key(Keycode.KEYPAD_NUMLOCK)
                     time.sleep(0.02)
             except Exception:
                 # v0.9.60 - never-die: a bad line or a transient USB hiccup must never kill

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "baseline": "pico-light 0.9.64f-plan2h6",
+  "baseline": "pico-light 0.9.64f",
   "edits": [
     {
       "old": "import busio\nimport usb_cdc\nimport usb_hid\nfrom adafruit_hid.keyboard import Keyboard\nfrom adafruit_hid.keycode import Keycode\n\n",

@@ -15,6 +15,15 @@
 
 حداقل و حداکثر اگر برعکس وارد شوند، خودکار جابه‌جا می‌شوند. صفر و مقدار منفی پذیرفته نمی‌شود. در هر Start فقط یک زمان Restart انتخاب می‌شود و تا پایان همان اجرا تغییر نمی‌کند. در هر Resume نیز فقط یک Delay از بازه‌ی تنظیم‌شده انتخاب می‌شود.
 
+## قرارداد خروجی PLAN
+
+فقط پلن Root دو directive زیر را می‌گیرد:
+
+- `RUNFOR|minSeconds,maxSeconds`
+- `AUTORESUME|enabled,resumeMinSeconds,resumeMaxSeconds`
+
+پلن‌های `INCLUDE` این directiveها را نمی‌گیرند و deadline مستقل نمی‌سازند؛ تمام child planها deadline همان Root را به اشتراک می‌گذارند. عدد تصادفی هنگام Export انتخاب نمی‌شود: runtime در هر Start دقیقاً یک مقدار برای `RUNFOR` و، فقط پس از Restart مجاز، دقیقاً یک مقدار برای Resume انتخاب می‌کند.
+
 ## ترتیب چرخه
 
 1. شروع دستی با Num Lock.

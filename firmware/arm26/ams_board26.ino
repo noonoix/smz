@@ -346,33 +346,35 @@ static uint8_t g_line1Len = 0;
 // fw 2.6: helper-free Windows lifecycle signal. USBDevice.configured() and
 // USBDevice.isSuspended() come from the ATmega32U4 Arduino USB core. State changes
 // are debounced and reported only on the private Serial1 link to the Pico.
-enum HostUsbState : uint8_t { HOST_USB_DOWN = 0, HOST_USB_SUSPEND = 1, HOST_USB_UP = 2 };
-static HostUsbState g_hostUsbState = HOST_USB_DOWN;
-static HostUsbState g_hostUsbCandidate = HOST_USB_DOWN;
+#define HOST_USB_DOWN    0
+#define HOST_USB_SUSPEND 1
+#define HOST_USB_UP      2
+static uint8_t g_hostUsbState = HOST_USB_DOWN;
+static uint8_t g_hostUsbCandidate = HOST_USB_DOWN;
 static bool g_hostUsbInitialized = false;
 static unsigned long g_hostUsbCandidateSince = 0;
 #define HOST_USB_DEBOUNCE_MS 120UL
 
-static HostUsbState read_host_usb_state() {
+static uint8_t read_host_usb_state() {
   if (!USBDevice.configured()) return HOST_USB_DOWN;
   if (USBDevice.isSuspended()) return HOST_USB_SUSPEND;
   return HOST_USB_UP;
 }
 
-static const __FlashStringHelper* host_usb_name(HostUsbState s) {
+static const __FlashStringHelper* host_usb_name(uint8_t s) {
   if (s == HOST_USB_UP) return F("UP");
   if (s == HOST_USB_SUSPEND) return F("SUSPEND");
   return F("DOWN");
 }
 
-static void report_host_usb(HostUsbState s) {
+static void report_host_usb(uint8_t s) {
   Serial1.print(F("EVT|HOSTUSB|"));
   Serial1.println(host_usb_name(s));
   Serial1.flush();
 }
 
 static void poll_host_usb() {
-  HostUsbState sample = read_host_usb_state();
+  uint8_t sample = read_host_usb_state();
   unsigned long now = millis();
   if (!g_hostUsbInitialized) {
     g_hostUsbCandidate = sample;

@@ -1,0 +1,67 @@
+name: AutoCycle integration validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'ams-shell/**'
+      - 'firmware/arm26/**'
+      - 'firmware/autocycle-hostusb-v5/**'
+      - 'portable/plan3/**'
+      - '.github/workflows/autocycle.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  portable-contracts:
+    name: autocycle / portable contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile AutoCycle Python runtime and tests
+        run: |
+          python -m py_compile portable/plan3/CIRCUITPY/*.py
+          python -m py_compile portable/plan3/CIRCUITPY-SPLIT/*.py
+          python -m py_compile portable/plan3/tools/*.py portable/plan3/sim/*.py
+      - name: Run every portable contract test
+        shell: bash
+        run: |
+          set -euo pipefail
+          count=0
+          for test in portable/plan3/sim/test_*.py; do
+            echo "=== $test ==="
+            python "$test"
+            count=$((count + 1))
+          done
+          test "$count" -gt 0
+          echo "AutoCycle contract files passed: $count"
+
+  windows-app:
+    name: autocycle / Windows app build-test
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore
+        run: dotnet restore ams-shell/AMS.sln
+      - name: Build Classroom Studio
+        run: dotnet build ams-shell/AMS.sln -c Release --no-restore
+      - name: Build TestRunner from a clean tree
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force tests/bin, tests/obj -ErrorAction SilentlyContinue
+          dotnet build tests/TestRunner.csproj -c Release
+      - name: Run TestRunner and reject any failure
+        shell: pwsh
+        run: |
+          dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object autocycle-test-output.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (Select-String -Path autocycle-test-output.txt -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }

@@ -3,6 +3,8 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
 using Ams.UI.ViewModels;
+using WpfBinding = System.Windows.Data.Binding;
+using WpfTextBox = System.Windows.Controls.TextBox;
 
 namespace Ams.UI;
 
@@ -81,7 +83,7 @@ public partial class MainWindow
             VerticalAlignment = VerticalAlignment.Center,
             ToolTip = "این مقدار سخت‌افزاری ثابت است و قابل تغییر نیست.",
         };
-        buzzerValue.SetBinding(TextBlock.TextProperty, new Binding(nameof(MainViewModel.PortableBuzzerPinText)));
+        buzzerValue.SetBinding(TextBlock.TextProperty, new WpfBinding(nameof(MainViewModel.PortableBuzzerPinText)));
         Grid.SetColumn(buzzerLabel, 0);
         Grid.SetColumn(buzzerValue, 1);
         buzzer.Children.Add(buzzerLabel);
@@ -95,7 +97,7 @@ public partial class MainWindow
             TextWrapping = TextWrapping.Wrap,
             Opacity = 0.78,
         };
-        help.SetBinding(TextBlock.TextProperty, new Binding(nameof(MainViewModel.AutoCycleHelpText)));
+        help.SetBinding(TextBlock.TextProperty, new WpfBinding(nameof(MainViewModel.AutoCycleHelpText)));
         section.Children.Add(help);
     }
 
@@ -124,9 +126,9 @@ public partial class MainWindow
         return root;
     }
 
-    private static TextBox NumberBox(string property)
+    private static WpfTextBox NumberBox(string property)
     {
-        var box = new TextBox
+        var box = new WpfTextBox
         {
             Width = 58,
             Padding = new Thickness(4, 2, 4, 2),
@@ -134,7 +136,7 @@ public partial class MainWindow
             VerticalContentAlignment = VerticalAlignment.Center,
             FlowDirection = FlowDirection.LeftToRight,
         };
-        box.SetBinding(TextBox.TextProperty, new Binding(property)
+        box.SetBinding(WpfTextBox.TextProperty, new WpfBinding(property)
         {
             Mode = BindingMode.TwoWay,
             UpdateSourceTrigger = UpdateSourceTrigger.LostFocus,
@@ -143,7 +145,7 @@ public partial class MainWindow
         return box;
     }
 
-    private static Binding TwoWay(string property) => new(property)
+    private static WpfBinding TwoWay(string property) => new(property)
     {
         Mode = BindingMode.TwoWay,
         UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged,

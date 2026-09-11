@@ -35,7 +35,7 @@ def parse_cycle_plan(text):
         if not line or line.startswith("#"):
             kept.append(raw)
             continue
-        op, sep, body = line.partition("|")
+        op, _sep, body = line.partition("|")
         op = op.upper()
         if op == "PLAN":
             if seen_plan:
@@ -128,7 +128,9 @@ def run_root(text, ctx, rng=None, arm_store=None):
         if not cycle.arm_natural_restart(release):
             raise
         restart = getattr(ctx, "restart_windows", None)
-        if restart is None:
-            raise RuntimeError("cycle expiry requires restart_windows")
-        restart()
+        if restart is not None:
+            restart()
+        else:
+            import restart_windows
+            restart_windows.perform(ctx, rng)
         return "expired"

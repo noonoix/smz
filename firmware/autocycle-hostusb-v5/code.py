@@ -355,10 +355,12 @@ def pump_arm():
         if line.startswith("EVT|HOSTUSB|"):
             state = line.rsplit("|", 1)[-1]
             if state in ("UP", "SUSPEND", "DOWN"):
+                changed = (not _arm_host_usb_seen or state != _arm_host_usb_state)
                 _arm_host_usb_state = state
                 _arm_host_usb_seen = True
-                print("cycle: arm host USB", state)
-            _serial_write_line(line)
+                if changed:
+                    print("cycle: arm host USB", state)
+                    _serial_write_line(line)
             continue
         if line.startswith("EVT|"):
             _serial_write_line(line)              # other arm events reach the PC live

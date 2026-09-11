@@ -55,7 +55,7 @@
 //   Now the tracker boots at centre and every button/wheel report carries the TRACKED
 //   position (cursor_sync). Bonus: rel-MMOVE and MDRAG moved by AXIS units (+-127 of
 //   32767 ~ 7 px!) instead of pixels - both go through mouse_move_abs now.
-#define FW_VER   "2.6"
+#define FW_VER   "2.6.1"
 // 0 = disabled. If > 0, an idle secure session is dropped after this many ms
 // (releases mouse buttons and allows a fresh HELLO). Keep 0 for long scripts.
 #define SESSION_IDLE_MS 0UL
@@ -353,7 +353,9 @@ static uint8_t g_hostUsbState = HOST_USB_DOWN;
 static uint8_t g_hostUsbCandidate = HOST_USB_DOWN;
 static bool g_hostUsbInitialized = false;
 static unsigned long g_hostUsbCandidateSince = 0;
+static unsigned long g_hostUsbLastReport = 0;
 #define HOST_USB_DEBOUNCE_MS 120UL
+#define HOST_USB_HEARTBEAT_MS 2000UL
 
 static uint8_t read_host_usb_state() {
   if (!USBDevice.configured()) return HOST_USB_DOWN;
@@ -382,6 +384,7 @@ static void poll_host_usb() {
     g_hostUsbCandidateSince = now;
     g_hostUsbInitialized = true;
     report_host_usb(sample);
+    g_hostUsbLastReport = now;
     return;
   }
   if (sample != g_hostUsbCandidate) {
@@ -392,6 +395,14 @@ static void poll_host_usb() {
   if (sample != g_hostUsbState && now - g_hostUsbCandidateSince >= HOST_USB_DEBOUNCE_MS) {
     g_hostUsbState = sample;
     report_host_usb(sample);
+    g_hostUsbLastReport = now;
+    return;
+  }
+  // Re-announce the current state so a Pico that boots more slowly cannot miss
+  // the one initial UART event. The Pico deduplicates identical heartbeats.
+  if (now - g_hostUsbLastReport >= HOST_USB_HEARTBEAT_MS) {
+    report_host_usb(g_hostUsbState);
+    g_hostUsbLastReport = now;
   }
 }
 

@@ -1,9 +1,9 @@
-name: PLAN2 h5 downloadable candidate
+name: PLAN2 h6 downloadable candidate
 
 on:
   workflow_dispatch:
   push:
-    branches: [feat/portable-plan2-app-0966]
+    branches: [release/plan2-h6-candidate]
     paths:
       - '.github/workflows/plan2-candidate.yml'
 
@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   candidate:
-    name: build-test-package h5
+    name: build-test-package h6
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -23,6 +23,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Verify release and h6 control fix
+        shell: pwsh
+        run: |
+          python tools/patch_version_pins_0966.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $fw = 'ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs'
+          if (-not (Select-String -Path $fw -Pattern 'PLAN2_H6_CONTROL_FIX' -Quiet)) { throw 'h6 control marker missing' }
+          if (-not (Select-String -Path $fw -Pattern '_plan_result == "done"' -Quiet)) { throw 'h6 finite-completion fix missing' }
+          if (-not (Select-String -Path $fw -Pattern 'ABORT\|KTEXT' -Quiet)) { throw 'h6 interruptible typing fix missing' }
 
       - name: Validate split runtime
         shell: pwsh
@@ -54,29 +64,31 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (Select-String -Path ci-test-output.txt -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
 
-      - name: Package h5 candidate
+      - name: Package h6 candidate
         shell: pwsh
         run: |
           $out = 'ams-shell/src/Ams.UI/bin/Release/net8.0-windows'
           Remove-Item -Recurse -Force "$out/bridge/__pycache__" -ErrorAction SilentlyContinue
           @(
-            'Classroom Studio PLAN2 h5 — hardware acceptance build',
-            'Source branch: feat/portable-plan2-app-0966',
+            'Classroom Studio PLAN2 h6 — hardware-accepted candidate',
+            'Source branch: release/plan2-h6-candidate',
             'Source commit: ${{ github.sha }}',
-            'This is not an official release and does not bump the app version.',
-            'h5 fixes split PlanAbort and one-press restart after natural completion.',
-            'Export Pico Plan must emit plan_engine.py + plan_motion.py + plan_typing.py.'
-          ) | Set-Content "$out/PLAN2-H5-CANDIDATE.txt" -Encoding utf8
-          Compress-Archive -Path "$out/*" -DestinationPath 'Classroom-Studio-PLAN2-h5.zip' -Force
-          (Get-FileHash 'Classroom-Studio-PLAN2-h5.zip' -Algorithm SHA256).Hash | Out-File 'plan2-h5-sha256.txt' -Encoding ascii
+            'App version: 0.9.66',
+            'Pico bundle baseline: 0.9.64f',
+            'Pro Micro baseline: 2.5',
+            'Hardware acceptance: h6-v2 passed interruptible typing and one-press restart.',
+            'Export Pico Plan emits plan_engine.py + plan_motion.py + plan_typing.py.'
+          ) | Set-Content "$out/PLAN2-H6-CANDIDATE.txt" -Encoding utf8
+          Compress-Archive -Path "$out/*" -DestinationPath 'Classroom-Studio-PLAN2-h6.zip' -Force
+          (Get-FileHash 'Classroom-Studio-PLAN2-h6.zip' -Algorithm SHA256).Hash | Out-File 'plan2-h6-sha256.txt' -Encoding ascii
 
-      - name: Upload h5 candidate
+      - name: Upload h6 candidate
         uses: actions/upload-artifact@v4
         with:
-          name: Classroom-Studio-PLAN2-h5
+          name: Classroom-Studio-PLAN2-h6
           path: |
-            Classroom-Studio-PLAN2-h5.zip
-            plan2-h5-sha256.txt
+            Classroom-Studio-PLAN2-h6.zip
+            plan2-h6-sha256.txt
             ci-test-output.txt
           retention-days: 14
           if-no-files-found: error

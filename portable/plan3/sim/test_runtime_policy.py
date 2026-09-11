@@ -36,13 +36,15 @@ for args in ((0, 5, 3, 5), (110, 130, 0, 5)):
     else: raise AssertionError("invalid custom range accepted")
 
 lines = rp.restart_plan_lines()
+# Exact Win+X lifecycle: Win stays down until X is released.
+combo = ["KDOWN|91", "DELAY|25,60", "KDOWN|88", "DELAY|45,95",
+         "KUP|88", "DELAY|25,60", "KUP|91", "DELAY|450,850"]
+assert lines[1:9] == combo
+assert lines.index("KUP|88") < lines.index("KUP|91")
 downs = [int(x.split("|")[1]) for x in lines if x.startswith("KDOWN|")]
 ups = [int(x.split("|")[1]) for x in lines if x.startswith("KUP|")]
-assert downs == [91, 88, 38, 38, 13, 38, 13] and ups == downs
-for i, line in enumerate(lines):
-    if line.startswith("KDOWN|"):
-        vk = line.split("|")[1]
-        assert lines[i + 1].startswith("DELAY|") and lines[i + 2] == "KUP|" + vk
+assert downs == [91, 88, 38, 38, 13, 38, 13]
+assert ups == [88, 91, 38, 38, 13, 38, 13]
 assert all("," in x for x in lines if x.startswith("DELAY|"))
 
 assert rp.portable_audio_line("deviceBuzzer", 440, 80, "GP6") == "BEEP|440,80"
@@ -55,4 +57,4 @@ for invalid_pin in ("GP4", "GP5"):
     except ValueError: pass
     else: raise AssertionError("non-GP6 buzzer pin accepted")
 
-print("runtime policy: 27 passed, 0 failed")
+print("runtime policy: 30 passed, 0 failed")

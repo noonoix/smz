@@ -6,11 +6,8 @@ DEFAULT_RESTART_MINUTES = (110, 130)
 DEFAULT_RESUME_MINUTES = (3, 5)
 BUZZER_PIN = "GP6"
 
-# Windows 11 English: Win+X -> Up -> Up -> Enter -> Up -> Enter.
-# (vk, hold range ms, delay-after range ms)
-_RESTART_STEPS = (
-    (91, (55, 105), (25, 60)),
-    (88, (45, 95), (450, 850)),
+# Keys after Win+X: Up, Up, Enter, Up, Enter.
+_RESTART_MENU_STEPS = (
     (38, (45, 100), (110, 240)),
     (38, (45, 100), (180, 360)),
     (13, (55, 120), (280, 520)),
@@ -34,8 +31,6 @@ def minutes_to_seconds_range(mn, mx, name="time"):
 
 
 class RuntimeOptions:
-    """User-customizable values shared by UI, exporters and the Pico runtime."""
-
     def __init__(self, restart_min_minutes=110, restart_max_minutes=130,
                  resume_min_minutes=3, resume_max_minutes=5,
                  auto_resume=True, buzzer_pin=BUZZER_PIN):
@@ -51,7 +46,6 @@ class RuntimeOptions:
 
     @classmethod
     def from_settings(cls, settings):
-        """Read app-style names; absent values preserve safe factory defaults."""
         s = settings or {}
         return cls(
             s.get("RestartMinMinutes", 110), s.get("RestartMaxMinutes", 130),
@@ -70,8 +64,6 @@ class RuntimeOptions:
 
 
 class AutoCycle:
-    """One Start rolls one restart deadline and, when armed, one resume delay."""
-
     def __init__(self, now, options=None, rng=None):
         self.options = options or RuntimeOptions()
         self.rng = rng or random
@@ -94,13 +86,27 @@ class AutoCycle:
         return self.resume_delay_seconds
 
 
+def _tap(lines, vk, hold, after=None):
+    lines.extend(("KDOWN|%d" % vk, "DELAY|%d,%d" % hold, "KUP|%d" % vk))
+    if after is not None:
+        lines.append("DELAY|%d,%d" % after)
+
+
 def restart_plan_lines():
-    """Humanized restart tail; every key has independent down/hold/up timing."""
+    """Win is held while X is tapped; every hold/gap is independently ranged."""
     lines = ["# restart: Win+X > Up > Up > Enter > Up > Enter"]
-    for vk, hold, after in _RESTART_STEPS:
-        lines.extend(("KDOWN|%d" % vk, "DELAY|%d,%d" % hold, "KUP|%d" % vk))
-        if after is not None:
-            lines.append("DELAY|%d,%d" % after)
+    lines.extend((
+        "KDOWN|91",
+        "DELAY|25,60",
+        "KDOWN|88",
+        "DELAY|45,95",
+        "KUP|88",
+        "DELAY|25,60",
+        "KUP|91",
+        "DELAY|450,850",
+    ))
+    for vk, hold, after in _RESTART_MENU_STEPS:
+        _tap(lines, vk, hold, after)
     return lines
 
 

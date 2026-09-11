@@ -35,8 +35,12 @@ class AutoResumeBoot:
         self.start_at = None
 
     def tick(self):
+        # Windows restart normally leaves the Pico powered. Detect a marker that was
+        # armed after this controller was constructed; do not require a Pico reboot.
         if self.state == IDLE:
-            return IDLE
+            if not self.store.is_armed():
+                return IDLE
+            self.state = WAIT_FOR_HOST
         if self.cancel_pressed():
             self.cancel()
             return IDLE
@@ -50,7 +54,6 @@ class AutoResumeBoot:
             self.state = BOOT_SETTLE
             return self.state
         if self.state == BOOT_SETTLE:
-            # A disconnect restarts the full randomized settle window after reconnect.
             if not self.usb_ready():
                 self.ready_since = None
                 self.start_at = None
@@ -63,7 +66,6 @@ class AutoResumeBoot:
             try:
                 ok = self.start_root()
             except Exception:
-                # Keep the marker for a deliberate retry after the next reboot/reconnect.
                 self.state = WAIT_FOR_HOST
                 self.ready_since = None
                 self.start_at = None
@@ -73,7 +75,6 @@ class AutoResumeBoot:
                 self.ready_since = None
                 self.start_at = None
                 return self.state
-            # Consume only after Root accepted the start request.
             self.store.clear()
             self.state = IDLE
             return IDLE

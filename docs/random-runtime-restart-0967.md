@@ -1,39 +1,49 @@
-# Random wall-clock runtime, humanized restart, and GP5 audio contract
+# قرارداد فارسی چرخه‌ی خودکار، Resume Essentials و بازر
 
-Implementation line: `0.9.67` (draft)
+نسخه‌ی در حال توسعه: `0.9.67` — وضعیت: Draft
 
-## Runtime
+## تنظیمات قابل سفارشی‌سازی
 
-- On each manual Start, choose one inclusive random duration in `6600..7800` seconds (110–130 minutes).
-- Draw once only. Child plans and root repeats share that deadline.
-- The timer is wall-clock from Start; Pause does not extend it.
-- Deadline expiry must interrupt long `DELAY`, `KTEXT`, sensor waits, child plans, packages, and parallel branches.
-- Deadline expiry is distinct from manual Stop, transport failure, parser error, and other aborts.
-- Only natural deadline expiry may enter the restart tail.
-- After restart, a new run starts manually with Num Lock.
+در «گزینه‌های پخش / چرخه‌ی خودکار» این فیلدها اضافه می‌شوند:
 
-## Restart safety and timing
+- **حداقل زمان تا Restart (دقیقه):** پیش‌فرض `110`
+- **حداکثر زمان تا Restart (دقیقه):** پیش‌فرض `130`
+- **شروع خودکار پس از Restart:** روشن/خاموش
+- **حداقل انتظار پس از آماده‌شدن USB (دقیقه):** پیش‌فرض `3`
+- **حداکثر انتظار پس از آماده‌شدن USB (دقیقه):** پیش‌فرض `5`
+- **پایه‌ی بازر:** `GP5` یا `GP6`؛ پیش‌فرض `GP5`
 
-Before the restart tail, release every tracked keyboard key and mouse button. Then use the Windows 11 English power menu:
+حداقل و حداکثر اگر برعکس وارد شوند، خودکار جابه‌جا می‌شوند. صفر و مقدار منفی پذیرفته نمی‌شود. در هر Start فقط یک زمان Restart انتخاب می‌شود و تا پایان همان اجرا تغییر نمی‌کند. در هر Resume نیز فقط یک Delay از بازه‌ی تنظیم‌شده انتخاب می‌شود.
 
-`Win+X → Up → Up → Enter → Up → Enter`
+## ترتیب چرخه
 
-Every key is emitted as separate `KDOWN`, ranged hold `DELAY`, and matching `KUP`. Every inter-key wait is also a fresh ranged `DELAY`; no fixed robotic cadence is used. The final Enter is sent only after the release-all guard.
+1. شروع دستی با Num Lock.
+2. انتخاب یک deadline تصادفی از بازه‌ی سفارشی Restart.
+3. اجرای Root و child planها تا رسیدن deadline؛ Pause زمان wall-clock را متوقف نمی‌کند.
+4. با رسیدن طبیعی deadline، اکشن جاری فوراً متوقف و همه‌ی کلیدها/دکمه‌ها آزاد می‌شوند.
+5. ثبت `AUTO_RESUME_ARMED` و اجرای Restart انسانی با منوی Win+X.
+6. پس از برگشت USB/HID و پایدارشدن میزبان، انتخاب یک Delay تصادفی از بازه‌ی Resume.
+7. اجرای `Resume Essentials` با حالت `Shuffle All`؛ همه‌ی موارد ضروری یک‌بار و با ترتیب تازه اجرا می‌شوند.
+8. شروع Root از checkpoint امن و ساخت deadline تازه.
 
-This avoids creating a script, scheduled task, PowerShell process, command shell, or RunMRU entry. Windows still records a restart in the Event Log; this is low-footprint, not trace-free. The menu ordering must be hardware-tested on the target Windows 11 image.
+Stop دستی، خطای پلن، خطای ارتباطی، روشن‌شدن عادی سیستم یا abort معمولی اجازه‌ی Restart یا Auto Resume ندارند.
 
-## Portable audio
+## انسانی‌سازی Restart و Resume Essentials
 
-- Portable audio supports only `deviceBuzzer` compiled to `BEEP|frequency,duration`.
-- Output is fixed to Pico `GP5`.
-- MP3/WAV paths, Windows player macros, PC speaker mode, looping media, and output-device selection are blocking export errors.
-- Accepted frequency range: `30..20000 Hz`; duration must be non-negative.
+هر کلید به شکل زیر اجرا می‌شود:
 
-## Required integration gates
+`KeyDown → نگه‌داشتن تصادفی → KeyUp → فاصله‌ی تصادفی تا کلید بعدی`
 
-1. Wire the Play Options range fields into both C# and Python exporters.
-2. Add deadline checks to the Pico gate and all interruptible primitives.
-3. Add a dedicated deadline-expired signal and suppress restart for Stop/error/abort.
-4. Embed the generated split runtime byte-for-byte in `PlanExporter.cs`.
-5. Keep canonical/split runtime parity and memory budgets green.
-6. Keep the PR draft until CI is `0 failed` and the Windows-menu sequence passes hardware testing.
+هیچ فاصله‌ی ثابتی استفاده نمی‌شود. `Win+X → Up → Up → Enter → Up → Enter` به ترتیب منوی Windows 11 انگلیسی وابسته است و قبل از Merge باید روی سیستم واقعی تست شود.
+
+## Resume Essentials
+
+این گروه یک Random Package با حالت اجباری `Shuffle All` است؛ `Random Subset` برای آن مجاز نیست. برای هر خوردنی می‌توان کلید، بازه‌ی تکرار، اولویت، Hold، Delay قبل/بعد و فعال‌بودن را تعیین کرد. پس از Resume همه‌ی موارد فعال یک‌بار اجرا می‌شوند و زمان‌بندی مستقل هر مورد از اجرای موفق خودش دوباره آغاز می‌شود.
+
+## صوت پرتابل
+
+صوت در حالت Pico فقط از طریق `deviceBuzzer` و opcode `BEEP|frequency,duration` اجرا می‌شود. کاربر می‌تواند `GP5` یا `GP6` را در Firmware Export انتخاب کند. MP3/WAV، Windows Player، PC Speaker، انتخاب کارت صدا و Loop رسانه در خروجی پرتابل خطای مسدودکننده هستند.
+
+## نکته‌ی فنی
+
+Pico uptime واقعی ویندوز را نمی‌خواند. شروع خودکار با تشخیص reconnect و پایداری USB/HID انجام می‌شود. برای اطمینان بیشتر باید Auto-login فعال و صفحه‌ی BitLocker/Recovery/Update مزاحم مسیر بوت نباشد. Restart در Event Log ویندوز ثبت می‌شود؛ این روش کم‌ردپا است، نه بدون ردپا.

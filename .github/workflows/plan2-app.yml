@@ -2,7 +2,7 @@ name: PLAN2 app validation
 
 on:
   push:
-    branches: [feat/portable-plan2-app-0966]
+    branches: [feat/portable-plan2-app-0966, release/app-0.9.66]
   workflow_dispatch:
 
 permissions:
@@ -21,8 +21,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - id: release
+        name: Apply app 0.9.66 release pins
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          python tools/patch_version_pins_0966.py 2>&1 | Tee-Object ci-release.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - id: migrate
         name: Apply PLAN2 parity and generate
+        if: steps.release.outcome == 'success'
         continue-on-error: true
         shell: pwsh
         run: |
@@ -88,12 +96,25 @@ jobs:
           dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object -Append ci-tests.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (Select-String -Path ci-tests.txt -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
+      - name: Commit validated release pins
+        if: steps.tests.outcome == 'success'
+        shell: pwsh
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -- ams-shell/src/Ams.UI/Ams.UI.csproj ams-shell/src/Ams.UI/ViewModels/MainViewModel.cs tests/TestRunner.cs project-state/PROJECT-STATE.md
+          if (-not (git diff --cached --quiet)) {
+            git commit -m "chore(release): bump Classroom Studio to 0.9.66"
+            git push
+          }
       - name: Write diagnostic report (not committed)
         if: always()
         shell: pwsh
         run: |
           $result = if (Test-Path ci-tests.txt) { (Select-String -Path ci-tests.txt -Pattern '=== Results' | Select-Object -Last 1).Line } else { '' }
-          $lines = @('# PLAN2 Windows gate report','', '- migration: ${{ steps.migrate.outcome }}','- split runtime: ${{ steps.split.outcome }}','- bridge: ${{ steps.bridge.outcome }}','- app build: ${{ steps.app.outcome }}','- TestRunner: ${{ steps.tests.outcome }}','',"- result: $result",'', '## Migration tail','```')
+          $lines = @('# PLAN2 Windows gate report','', '- release pins: ${{ steps.release.outcome }}','- migration: ${{ steps.migrate.outcome }}','- split runtime: ${{ steps.split.outcome }}','- bridge: ${{ steps.bridge.outcome }}','- app build: ${{ steps.app.outcome }}','- TestRunner: ${{ steps.tests.outcome }}','',"- result: $result",'', '## Release tail','```')
+          if (Test-Path ci-release.txt) { $lines += Get-Content ci-release.txt -Tail 60 }
+          $lines += @('```','', '## Migration tail','```')
           if (Test-Path ci-migrate.txt) { $lines += Get-Content ci-migrate.txt -Tail 100 }
           $lines += @('```','', '## Split-runtime tail','```')
           if (Test-Path ci-split.txt) { $lines += Get-Content ci-split.txt -Tail 100 }
@@ -103,9 +124,7 @@ jobs:
           if (Test-Path ci-tests.txt) { $lines += Get-Content ci-tests.txt -Tail 160 }
           $lines += '```'
           $lines | Set-Content docs/PLAN2-WINDOWS-GATE.md -Encoding utf8
-          # Keep successful CI immutable. On failure only, persist diagnostics so the
-          # exact failing stage can be inspected without relying on runner log access.
-          if ('${{ steps.migrate.outcome }}' -ne 'success' -or '${{ steps.split.outcome }}' -ne 'success' -or '${{ steps.bridge.outcome }}' -ne 'success' -or '${{ steps.app.outcome }}' -ne 'success' -or '${{ steps.tests.outcome }}' -ne 'success') {
+          if ('${{ steps.release.outcome }}' -ne 'success' -or '${{ steps.migrate.outcome }}' -ne 'success' -or '${{ steps.split.outcome }}' -ne 'success' -or '${{ steps.bridge.outcome }}' -ne 'success' -or '${{ steps.app.outcome }}' -ne 'success' -or '${{ steps.tests.outcome }}' -ne 'success') {
             git config user.name github-actions[bot]
             git config user.email 41898282+github-actions[bot]@users.noreply.github.com
             git add -- docs/PLAN2-WINDOWS-GATE.md
@@ -116,4 +135,4 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          if ('${{ steps.migrate.outcome }}' -ne 'success' -or '${{ steps.split.outcome }}' -ne 'success' -or '${{ steps.bridge.outcome }}' -ne 'success' -or '${{ steps.app.outcome }}' -ne 'success' -or '${{ steps.tests.outcome }}' -ne 'success') { exit 1 }
+          if ('${{ steps.release.outcome }}' -ne 'success' -or '${{ steps.migrate.outcome }}' -ne 'success' -or '${{ steps.split.outcome }}' -ne 'success' -or '${{ steps.bridge.outcome }}' -ne 'success' -or '${{ steps.app.outcome }}' -ne 'success' -or '${{ steps.tests.outcome }}' -ne 'success') { exit 1 }

@@ -8,15 +8,19 @@ using Ams.UI.Models;
 
 namespace Ams.UI.Services;
 
+// PLAN2_PARITY_MIGRATION
+// PLAN2_BUNDLE_MIGRATION
+// PLAN2_SPLIT_RUNTIME_MIGRATION
+
 /// <summary>
 /// v0.9.65 - File → Export Pico Plan… (phase 2 of the portable line): compiles the open step
 /// tree into a portable plan.txt for the Pico. Generated from tools/PlanExporter.cs.tpl by
-/// tools/make_plan_exporter.py (the gen-1 engine is spliced in from firmware/code64b/plan_engine.py -
+/// tools/make_plan_exporter.py (the PLAN|2 engine is spliced in from portable/plan3/CIRCUITPY/plan_engine.py -
 /// never edit the embedded copy by hand). Sandbox-proven by sim/sim_plan_export.py against the
 /// real engine (54/54). Narrowed to the GEN-1 contract.
 ///
-/// Target contract (project page, 2026-09-10): the gen-1 plan engine on the drive (firmware
-/// pico-light 0.9.64b = firmware/code64b/plan_engine.py) accepts ONLY the header PLAN|1 and its
+/// Target contract (project page, 2026-09-10): the PLAN|2 plan engine on the drive (firmware
+/// pico-light 0.9.66 = portable/plan3/CIRCUITPY/plan_engine.py) accepts ONLY the header PLAN|2 and its
 /// 11 ops: PLAN, SCREEN, SPEED, RMOUSE, CLICK, TYPE, DELAY, LOOP, LOOPTIME, ENDLOOP, WLIGHT.
 /// The gen-3 engine (PLAN|2, portable/plan3/tools/plan_gen.py) belongs to the parked 0.9.66
 /// line, so every step that needs it is a BLOCKING ERROR here - never silently skipped.
@@ -28,22 +32,22 @@ namespace Ams.UI.Services;
 /// rawCommand, randomPackage, parallelGroup, playAudio, playScript, runExe, openFile.
 /// If/Else heads (insertIfElse) are blocked too - IFLUX/ELSE/ENDIF are gen-2 ops.
 ///
-/// Gen-1 compensations vs plan_gen (gen-3): the gen-1 engine DEFAULTS mid-pauses ON (12%) and
+/// PLAN|2 compensations vs plan_gen (gen-3): the PLAN|2 engine DEFAULTS mid-pauses ON (12%) and
 /// idle breaks ON (1000-5000 ms every 5-12 moves) when a key is omitted, so this exporter emits
 /// mid= and idle= EXPLICITLY on every move (mid=0:0,0 / idle=1,1:0,0 disable them), and the
 /// mouseMove emulation always carries idle=1,1:0,0 (a point-to-point move never idles).
 /// </summary>
 public static class PlanExporter
 {
-    /// <summary>The on-drive engine format this exporter targets (firmware pico-light 0.9.64b).</summary>
-    public const int PlanFormatVersion = 1;
-    public const string EngineVersion = "0.9.64f";
+    /// <summary>The on-drive engine format this exporter targets (firmware pico-light 0.9.66).</summary>
+    public const int PlanFormatVersion = 2;
+    public const string EngineVersion = "0.9.66";
 
     /// <summary>One successful compilation: the plan text plus the human-readable reports.</summary>
     public sealed record PlanResult(string Text, IReadOnlyList<string> Flags,
                                     IReadOnlyList<string> Disabled, IReadOnlyList<string> Counts);
 
-    /// <summary>Thrown when any step cannot be expressed on PLAN|1 - the file is NOT written.</summary>
+    /// <summary>Thrown when any step cannot be expressed on PLAN|2 - the file is NOT written.</summary>
     public sealed class PlanBlockedException : Exception
     {
         public IReadOnlyList<string> Errors { get; }
@@ -106,8 +110,11 @@ public static class PlanExporter
         public readonly Dictionary<string, int> Counts = new();
         public int Markers;
         private readonly Dictionary<StepNode, string> _numbering = new();
+        private readonly HashSet<string> _labels = new(StringComparer.Ordinal);
+        private readonly string _sourcePath;
 
-        public Gen(AppSettings settings) => _settings = settings;
+        public Gen(AppSettings settings, string sourcePath)
+        { _settings = settings; _sourcePath = sourcePath; }
 
         public void NumberTree(IEnumerable<StepNode> nodes, string prefix)
         {
@@ -201,37 +208,20 @@ public static class PlanExporter
             return i + 1;
         }
 
-        /// <summary>An insertIfElse head is a BLOCKING error on PLAN|1 (IFLUX/ELSE/ENDIF are gen-2);
+        /// <summary>An insertIfElse head is a BLOCKING error on PLAN|2 (IFLUX/ELSE/ENDIF are gen-2);
         /// its Else/End If markers are still consumed so they do not cascade as stray-marker errors,
         /// and nested blockers are still NAMED.</summary>
         private int EmitIf(IList<StepNode> nodes, int i)
         {
-            var n = nodes[i];
-            StepNode? elseNode = null, endifNode = null;
-            int j = i + 1;
-            if (j < nodes.Count && IsMarker(nodes[j], "else")) { elseNode = nodes[j]; j++; }
-            if (j < nodes.Count && IsMarker(nodes[j], "endif")) { endifNode = nodes[j]; j++; }
-            if (n.Type == "findImage")
-            {
-                Error(n, "findImage needs machine vision - it cannot run on the Pico. Convert "
-                         + "this step to Wait For Light (BH1750) or Wait For Sound in the app first");
-                CollectBlockers(n);
-            }
-            else if (n.Type == "waitForSound")
-            {
-                Error(n, "waitForSound has no WSND op in the PLAN|1 contract of firmware "
-                         + EngineVersion + " (the sound sensor needs the gen-2 line) - convert the "
-                         + "trigger to Wait For Light, or keep this plan in PC mode");
-            }
-            else
-            {
-                Error(n, "If/Else needs the gen-2 plan engine (IFLUX/ELSE/ENDIF are not in the PLAN|1 "
-                         + "contract of firmware " + EngineVersion + ") - uncheck 'Insert If-Else' so the "
-                         + "step runs as a plain wait, or keep this plan in PC mode");
-            }
-            foreach (var sub in new[] { elseNode, endifNode })
-                if (sub is not null) { Markers++; CollectBlockers(sub); }
-            return j;
+            var n=nodes[i]; StepNode? elseNode=null,endifNode=null; int j=i+1;
+            if(j<nodes.Count&&IsMarker(nodes[j],"else")){elseNode=nodes[j];j++;}
+            if(j<nodes.Count&&IsMarker(nodes[j],"endif")){endifNode=nodes[j];j++;}
+            if(endifNode is null) Error(n,"insertIfElse is on but the matching 'End If' marker is missing");
+            if(n.Type=="findImage") { Error(n,"findImage needs machine vision - it cannot run on the Pico"); CollectBlockers(n); foreach(var sub in new[]{elseNode,endifNode})if(sub is not null)CollectBlockers(sub); return j; }
+            var p=n.Props;
+            if(n.Type=="waitForSound") { Lines.Add("IFSND|"+PropEx.GetInt(p,"threshold",90)+","+PropEx.GetInt(p,"minDurationMs",60)+","+PropEx.GetInt(p,"timeoutMs",20000)); Count("IFSND"); }
+            else { var(lo,hi,stable,to,mode)=LuxArgs(p); Lines.Add("IFLUX|"+lo+","+hi+","+stable+","+to+","+mode); Count("IFLUX"); }
+            Walk(n.Children); if(elseNode is not null){Lines.Add("ELSE");Markers++;Walk(elseNode.Children);} if(endifNode is not null){Lines.Add("ENDIF");Markers++;} EmitDelay(n); return j;
         }
 
         /// <summary>A blocked container hides its subtree from the walk; sweep it so every nested
@@ -255,81 +245,19 @@ public static class PlanExporter
 
         private void EmitStep(StepNode n)
         {
-            switch (n.Type)
+            switch(n.Type)
             {
-                case "comment": EmitComment(n); return;
-                case "delay": EmitDelayStep(n); return;
-                case "randomMousePosition": EmitRandomMouse(n); return;
-                case "mouseMove": EmitMouseMove(n); return;
-                case "mouseClick": EmitMouseClick(n); return;
-                case "typeText": EmitTypeText(n); return;
-                case "forLoop": EmitForLoop(n); return;
-                case "waitForLight": EmitWaitForLight(n); return;
-
-                case "findImage":
-                    Error(n, "findImage needs machine vision - it cannot run on the Pico. Convert "
-                             + "this step to Wait For Light (BH1750) or Wait For Sound in the app first");
-                    CollectBlockers(n);
-                    return;
-                case "waitForSound":
-                    Error(n, "waitForSound has no WSND op in the PLAN|1 contract of firmware "
-                             + EngineVersion + " (the sound sensor needs the gen-2 line) - convert the "
-                             + "trigger to Wait For Light, or keep this plan in PC mode");
-                    return;
-                case "keystroke":
-                    Error(n, "the PLAN|1 engine of firmware " + EngineVersion + " has no KEY op (it types "
-                             + "TEXT only) - a Keystroke cannot be expressed; use Type Text for ASCII text "
-                             + "or keep this plan in PC mode until the gen-2 line ships");
-                    return;
-                case "keyDown":
-                    Error(n, "the PLAN|1 engine of firmware " + EngineVersion + " has no KDOWN op - "
-                             + "keep this plan in PC mode until the gen-2 line ships");
-                    return;
-                case "keyUp":
-                    Error(n, "the PLAN|1 engine of firmware " + EngineVersion + " has no KUP op - "
-                             + "keep this plan in PC mode until the gen-2 line ships");
-                    return;
-                case "mouseScroll":
-                    Error(n, "the PLAN|1 engine of firmware " + EngineVersion + " has no WHEEL op - "
-                             + "keep this plan in PC mode until the gen-2 line ships");
-                    return;
-                case "label":
-                case "gotoLabel":
-                    Error(n, "labels need the gen-2 engine (LABEL/GOTO are not in PLAN|1) - keep this "
-                             + "plan in PC mode until the gen-2 line ships");
-                    return;
-                case "rawCommand":
-                    Error(n, "RAW passthrough is a gen-2 op - on PLAN|1 the engine would reject the "
-                             + "line; keep this plan in PC mode");
-                    return;
-                case "randomPackage":
-                    Error(n, "random packages need the gen-2 engine (RPKG is not in PLAN|1) - keep this "
-                             + "plan in PC mode until the gen-2 line ships");
-                    return;
-                case "parallelGroup":
-                    Error(n, "parallel groups need the gen-2 engine (PGROUP is not in PLAN|1) - keep "
-                             + "this plan in PC mode until the gen-2 line ships");
-                    return;
-                case "playAudio":
-                    Error(n, "playAudio has no op in the PLAN|1 contract (the buzzer/BEEP belongs to "
-                             + "the gen-2 line) - keep this plan in PC mode");
-                    return;
-                case "playScript":
-                    Error(n, "playScript needs the gen-2 engine (INCLUDE is not in PLAN|1) - inline the "
-                             + "child steps, or keep this plan in PC mode");
-                    return;
-                case "runExe":
-                    Error(n, "runExe compiles to a Win+R macro on the gen-2 line only - PLAN|1 has no "
-                             + "launch ops; keep this plan in PC mode");
-                    return;
-                case "openFile":
-                    Error(n, "openFile compiles to a Win+R macro on the gen-2 line only - PLAN|1 has "
-                             + "no launch ops; keep this plan in PC mode");
-                    return;
-                default:
-                    Error(n, "unknown step type '" + n.Type + "' - this exporter does not know it "
-                             + "(supported: the 23 app actions)");
-                    return;
+                case "comment":EmitComment(n);return; case "delay":EmitDelayStep(n);return;
+                case "randomMousePosition":EmitRandomMouse(n);return; case "mouseMove":EmitMouseMove(n);return;
+                case "mouseClick":EmitMouseClick(n);return; case "mouseScroll":EmitMouseScroll(n);return;
+                case "keystroke":EmitKeystroke(n);return; case "keyDown":EmitKeyState(n,true);return; case "keyUp":EmitKeyState(n,false);return;
+                case "typeText":EmitTypeText(n);return; case "forLoop":EmitForLoop(n);return;
+                case "waitForSound":EmitWaitForSound(n);return; case "waitForLight":EmitWaitForLight(n);return;
+                case "label":EmitLabel(n);return; case "gotoLabel":EmitGoto(n);return; case "rawCommand":EmitRaw(n);return;
+                case "randomPackage":EmitRandomPackage(n);return; case "parallelGroup":EmitParallelGroup(n);return;
+                case "runExe":EmitLaunch(n,false);return; case "openFile":EmitLaunch(n,true);return; case "playAudio":EmitAudio(n);return; case "playScript":EmitInclude(n);return;
+                case "findImage":Error(n,"findImage needs machine vision - it cannot run on the Pico");CollectBlockers(n);return;
+                default:Error(n,"unknown step type '"+n.Type+"' - this exporter does not know it (supported: the 23 app actions)");return;
             }
         }
 
@@ -345,7 +273,7 @@ public static class PlanExporter
             Emit(n, new[] { hi > lo ? "DELAY|" + lo + "," + hi : "DELAY|" + lo }, "DELAY");
         }
 
-        /// <summary>The humanized-move layers; gen-1 forces EVERY key explicit (its built-in defaults
+        /// <summary>The humanized-move layers; PLAN|2 forces EVERY key explicit (its built-in defaults
         /// enable mid-pauses at 12% and idle breaks at 1000-5000 ms - the app defaults differ, so an
         /// omitted key would change behavior on the Pico).</summary>
         private string Tuning(StepNode n, (int i0, int i1, int p0, int p1) idle)
@@ -389,14 +317,7 @@ public static class PlanExporter
             Emit(n, new[] { "RMOUSE|region=" + x + "," + y + "," + w + "," + h + Tuning(n, idle) }, "RMOUSE");
         }
 
-        private void EmitMouseMove(StepNode n)
-        {
-            int x = PropEx.GetInt(n.Props, "x", 600), y = PropEx.GetInt(n.Props, "y", 497);
-            if (!PropEx.GetBool(n.Props, "human", true))
-                Flag(n, "instant (non-human) move is not in the PLAN|1 contract - a humanized move to "
-                        + "the exact point was emitted instead");
-            Emit(n, new[] { "RMOUSE|region=" + x + "," + y + ",1,1" + Tuning(n, (1, 1, 0, 0)) }, "MOVETO");
-        }
+        private void EmitMouseMove(StepNode n){int x=PropEx.GetInt(n.Props,"x",600),y=PropEx.GetInt(n.Props,"y",497);if(!PropEx.GetBool(n.Props,"human",true)){Emit(n,new[]{"MOVETO|x="+x+"|y="+y+"|human=0"},"MOVETO");return;}Emit(n,new[]{"MOVETO|x="+x+"|y="+y+Tuning(n,(1,1,0,0))},"MOVETO");}
 
         private void EmitMouseClick(StepNode n)
         {
@@ -460,6 +381,26 @@ public static class PlanExporter
             Emit(n, new[] { "TYPE|text=" + text + "|" + string.Join("|", parts) }, "TYPE");
         }
 
+
+        private int Vk(StepNode n,string name,string what){if(KeyMap.VK.TryGetValue(name,out var vk)||VkAliases.TryGetValue(name,out vk))return vk;Error(n,"unknown key name '"+name+"' for "+what);return 0;}
+        private void KeyboardFlag(StepNode n){if(PropEx.GetString(n.Props,"keyboardBoard","default")=="promicro")Flag(n,"keyboard executor 'promicro' is bridge-mode only; on the portable plan the Pico types it");}
+        private void EmitMouseScroll(StepNode n)=>Emit(n,new[]{"WHEEL|"+PropEx.GetInt(n.Props,"delta",-1)},"WHEEL");
+        private void EmitKeystroke(StepNode n){var p=n.Props;var keys=new List<int>();if(PropEx.GetBool(p,"modCtrl"))keys.Add(162);if(PropEx.GetBool(p,"modShift"))keys.Add(160);if(PropEx.GetBool(p,"modAlt"))keys.Add(164);if(PropEx.GetBool(p,"modWin"))keys.Add(91);var vk=Vk(n,PropEx.GetString(p,"key","F4"),"keystroke");if(vk==0)return;keys.Add(vk);var(h0,h1)=Pair(PropEx.GetInt(p,"holdMin",0),PropEx.GetInt(p,"holdMax",0));var line="KEY|combo="+string.Join("+",keys);if(h1>0)line+="|hold="+h0+","+h1;KeyboardFlag(n);Emit(n,new[]{line},"KEY");}
+        private void EmitKeyState(StepNode n,bool down){var vk=Vk(n,PropEx.GetString(n.Props,"key","SHIFT"),down?"keyDown":"keyUp");if(vk==0)return;KeyboardFlag(n);Emit(n,new[]{(down?"KDOWN|":"KUP|")+vk},down?"KDOWN":"KUP");}
+        private void EmitWaitForSound(StepNode n){var p=n.Props;int t=PropEx.GetInt(p,"threshold",90),m=PropEx.GetInt(p,"minDurationMs",60),to=PropEx.GetInt(p,"timeoutMs",20000);if(PropEx.GetBool(p,"armed")){int act=PropEx.GetString(p,"act","left")switch{"right"=>2,"middle"=>3,_=>1};var(r0,r1)=Pair(PropEx.GetInt(p,"reactMin",80),PropEx.GetInt(p,"reactMax",180));var(h0,h1)=Pair(PropEx.GetInt(p,"holdMin",30),PropEx.GetInt(p,"holdMax",90));Emit(n,new[]{"TRGSND|"+t+","+m+","+to+","+act+","+r0+","+r1+","+h0+","+h1},"TRGSND");}else Emit(n,new[]{"WSND|"+t+","+m+","+to},"WSND");}
+        private (int lo,int hi,int stable,int timeout,int mode) LuxArgs(Dictionary<string,object?> p){int c=PropEx.GetInt(p,"luxCenter",1250),tol=Math.Max(1,PropEx.GetInt(p,"luxTolerance",50));return(Math.Max(0,c-tol),c+tol,Math.Max(0,(int)Math.Round(PropEx.GetDouble(p,"stableSec",2)*1000)),PropEx.GetInt(p,"timeoutMs",20000),PropEx.GetString(p,"sampleMode","hires")=="lowres"?1:0);}
+        private void EmitLabel(StepNode n){var name=PropEx.GetString(n.Props,"label","label1").Trim();if(name.Length==0||name.Contains('=')||name.Contains('|')){Error(n,"bad label name '"+name+"'");return;}if(!_labels.Add(name)){Error(n,"duplicate label '"+name+"'");return;}Emit(n,new[]{"LABEL|"+name},"LABEL");}
+        private void EmitGoto(StepNode n){var name=PropEx.GetString(n.Props,"label").Trim();if(name.Length==0){Error(n,"Go To Label with no label chosen");return;}Emit(n,new[]{"GOTO|"+name},"GOTO");}
+        private void EmitRaw(StepNode n){var cmd=PropEx.GetString(n.Props,"cmd","PING").Trim();if(cmd.Length==0||cmd.Contains('\n')||cmd.Contains('\r')){Error(n,"raw command must be one non-empty line");return;}Emit(n,new[]{"RAW|"+cmd},"RAW");}
+        private void EmitRandomPackage(StepNode n){var kids=n.Children.Where(c=>!c.IsDisabled&&!IsMarker(c)).ToList();if(kids.Count==0){Error(n,"random package has no enabled children");return;}if(kids.Any(c=>Conditional.Contains(c.Type)&&PropEx.GetBool(c.Props,"insertIfElse"))){Error(n,"an If/Else structure cannot live inside a Random Package");return;}var mode=PropEx.GetString(n.Props,"mode","shuffleAll");int mn=1,mx=kids.Count;string em="all";if(mode=="randomSubset"){em="pick";mn=Math.Max(0,PropEx.GetInt(n.Props,"minCount",1));mx=Math.Min(kids.Count,PropEx.GetInt(n.Props,"maxCount",10));if(mn>mx)(mn,mx)=(mx,mn);}else if(mode!="shuffleAll"){Error(n,"unknown random package mode '"+mode+"'");return;}Lines.Add("RPKG|"+em+","+mn+","+mx);Count("RPKG");for(int i=0;i<kids.Count;i++){if(i>0)Lines.Add("PKGITEM");Walk(new List<StepNode>{kids[i]});}Lines.Add("ENDPKG");EmitDelay(n);}
+        private static readonly HashSet<string> ParallelOk=new(){"mouseMove","mouseClick","mouseScroll","keystroke","keyDown","keyUp","typeText","delay","rawCommand","comment"};
+        private void EmitParallelGroup(StepNode n){var kids=n.Children.Where(c=>!c.IsDisabled&&!IsMarker(c)).ToList();if(kids.Count<2){Error(n,"a Parallel Group needs at least two enabled branches");return;}var before=Errors.Count;foreach(var c in kids)if(!ParallelOk.Contains(c.Type))Error(c,"'"+c.Type+"' cannot live inside a Parallel Group on the Pico");if(Errors.Count>before)return;Lines.Add("PGROUP");Count("PGROUP");for(int i=0;i<kids.Count;i++){if(i>0)Lines.Add("PARITEM");Walk(new List<StepNode>{kids[i]});}Lines.Add("ENDPAR");EmitDelay(n);}
+        private static string QuoteRun(string value)=>value.Contains(' ')?"\""+value+"\"":value;
+        private void EmitRunMacro(StepNode n,string command,string kind){string enc;try{enc=PctType(command);}catch(FormatException ex){Error(n,ex.Message);return;}Emit(n,new[]{"# "+kind,"KEY|combo=91+82|hold=40,90","DELAY|350,650","TYPE|text="+enc,"DELAY|140,260","KEY|combo=13|hold=40,90","DELAY|600,1200"},kind);}
+        private void EmitLaunch(StepNode n,bool shellOpen){var p=n.Props;var path=PropEx.GetString(p,"path").Trim();if(path.Length==0){Error(n,"no path set");return;}var args=PropEx.GetString(p,"args");var state=PropEx.GetString(p,"windowState","normal");string cmd;if(state=="minimized")cmd="cmd /c start /min \"\" "+QuoteRun(path)+(args.Length>0?" "+args:"");else{if(state=="maximized")Flag(n,"'maximized' cannot be expressed through the Run box - launching visible/normal");cmd=QuoteRun(path)+(args.Length>0?" "+args:"");}EmitRunMacro(n,cmd,shellOpen?"openFile":"runExe");}
+        private void EmitAudio(StepNode n){var p=n.Props;var path=PropEx.GetString(p,"path").Trim();if(path.Length==0){Error(n,"no audio path set");return;}if(PropEx.GetString(p,"mode","playerMacro")!="playerMacro"){Error(n,"playAudio mode is PC-only; use playerMacro on the Pico");return;}var esc=path.Replace("'","''");var cmd=path.EndsWith(".wav",StringComparison.OrdinalIgnoreCase)?"powershell -w hidden -c \"(New-Object Media.SoundPlayer '"+esc+"').PlaySync()\"":"powershell -w hidden -c \"Add-Type -AssemblyName presentationCore;$p=New-Object System.Windows.Media.MediaPlayer;$p.Open([uri]'"+esc+"');$p.Play()\"";EmitRunMacro(n,cmd,"playAudio");}
+        private void EmitInclude(StepNode n){var raw=PropEx.GetString(n.Props,"path").Trim();if(raw.Length==0){Error(n,"no .amsj path set");return;}var sourceFull=Path.GetFullPath(_sourcePath);var full=Path.IsPathRooted(raw)?raw:Path.GetFullPath(Path.Combine(Path.GetDirectoryName(sourceFull)??".",raw));if(!File.Exists(full)){Error(n,"playScript child not found: "+raw);return;}var baseName=Path.GetFileNameWithoutExtension(full);if(baseName.Any(ch=>ch<32||ch>126||"/\\:|%".Contains(ch))){Error(n,"playScript file name cannot live on the Pico drive");return;}Emit(n,new[]{"INCLUDE|file="+baseName+".txt"},"INCLUDE");}
+
         private void EmitForLoop(StepNode n)
         {
             var p = n.Props;
@@ -507,38 +448,15 @@ public static class PlanExporter
             EmitDelay(n);   // the app's delay lands after the whole loop
         }
 
-        private void EmitWaitForLight(StepNode n)
-        {
-            var p = n.Props;
-            int center = PropEx.GetInt(p, "luxCenter", 1250);
-            int tol = Math.Max(1, PropEx.GetInt(p, "luxTolerance", 50));
-            int stable = Math.Max(0, (int)Math.Round(PropEx.GetDouble(p, "stableSec", 2) * 1000));
-            int to = PropEx.GetInt(p, "timeoutMs", 20000);
-            int mode = PropEx.GetString(p, "sampleMode", "hires") == "lowres" ? 1 : 0;
-            int lo = Math.Max(0, center - tol), hi = center + tol;
-            var head = "WLIGHT|" + lo + "," + hi + "," + stable + "," + to + "," + mode;
-            if (PropEx.GetBool(p, "armed"))
-            {
-                var keyName = PropEx.GetString(p, "key", "E");
-                if (!KeyMap.VK.TryGetValue(keyName, out var vk) && !VkAliases.TryGetValue(keyName, out vk))
-                {
-                    Error(n, "unknown key name '" + keyName + "' for waitForLight armed key");
-                    return;
-                }
-                var (hmin, hmax) = Pair(PropEx.GetInt(p, "holdMin", 30), PropEx.GetInt(p, "holdMax", 90));
-                var (rmin, rmax) = Pair(PropEx.GetInt(p, "reactMin", 80), PropEx.GetInt(p, "reactMax", 180));
-                head += "|key=" + vk + "," + hmin + "," + hmax + "|react=" + rmin + "," + rmax;
-            }
-            Emit(n, new[] { head }, "WLIGHT");
-        }
+        private void EmitWaitForLight(StepNode n){var p=n.Props;var(lo,hi,stable,to,mode)=LuxArgs(p);var head="WLIGHT|"+lo+","+hi+","+stable+","+to+","+mode;if(PropEx.GetBool(p,"armed")){var vk=Vk(n,PropEx.GetString(p,"key","E"),"waitForLight armed key");if(vk==0)return;var(h0,h1)=Pair(PropEx.GetInt(p,"holdMin",30),PropEx.GetInt(p,"holdMax",90));var(r0,r1)=Pair(PropEx.GetInt(p,"reactMin",80),PropEx.GetInt(p,"reactMax",180));head+="|key="+vk+","+h0+","+h1+"|react="+r0+","+r1;}Emit(n,new[]{head},"WLIGHT");}
     }
 
     /// <summary>Compiles the step tree into plan text. Throws PlanBlockedException when any step
-    /// cannot run on PLAN|1 - nothing is written in that case (never a partial plan).</summary>
+    /// cannot run on PLAN|2 - nothing is written in that case (never a partial plan).</summary>
     public static PlanResult Compile(IList<StepNode> roots, AppSettings settings,
         int screenW, int screenH, string sourceName, string machine)
     {
-        var gen = new Gen(settings);
+        var gen = new Gen(settings, sourceName);
         gen.NumberTree(roots, "");
         gen.Walk(roots);
 
@@ -580,8 +498,8 @@ public static class PlanExporter
         if (gen.Errors.Count > 0) throw new PlanBlockedException(gen.Errors);
 
         var sb = new StringBuilder();
-        sb.Append("PLAN|1\n");
-        sb.Append("# generated by Classroom Studio PlanExporter (engine " + EngineVersion + ") from " + sourceName + "\n");
+        sb.Append("PLAN|2\n");
+        sb.Append("# generated by Classroom Studio PlanExporter (engine " + EngineVersion + ") from " + Path.GetFileName(sourceName) + "\n");
         sb.Append("# machine: " + machine + " · generated: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) + "\n");
         sb.Append("SCREEN|" + screenW + "," + screenH + "\n");
         sb.Append("SPEED|" + settings.MouseMoveSpeedMin + "," + settings.MouseMoveSpeedMax + "\n\n");
@@ -592,37 +510,163 @@ public static class PlanExporter
                               gen.Counts.OrderBy(kv => kv.Key).Select(kv => kv.Key + " x" + kv.Value).ToList());
     }
 
-    /// <summary>Writes plan.txt (the compiled plan), plan_engine.py (the gen-1 engine) and
+    /// <summary>Writes plan.txt, every recursively compiled child plan, plan_engine.py + plan_motion.py + plan_typing.py (the split PLAN|2 runtime) and
     /// README-PLAN.md next to <paramref name="planPath"/>. Returns the written paths.</summary>
+    private sealed record CompiledBundle(PlanResult Root, IReadOnlyList<(string FileName, string Text)> Children);
+
+    private static AppSettings ChildSettings(AppSettings source) => new()
+    {
+        PlayRepeatMode = "once",
+        MouseMoveSpeedMin = source.MouseMoveSpeedMin,
+        MouseMoveSpeedMax = source.MouseMoveSpeedMax,
+        TypeKeyMinMs = source.TypeKeyMinMs,
+        TypeKeyMaxMs = source.TypeKeyMaxMs,
+        KeyboardBoard = source.KeyboardBoard,
+    };
+
+    /// <summary>Preflights and compiles every reachable playScript document before the first
+    /// destination is touched. Root depth is zero; four included levels are allowed.</summary>
+    private static CompiledBundle CompileBundle(IList<StepNode> roots, AppSettings settings,
+        int screenW, int screenH, string sourcePath, string machine, string rootOutputName)
+    {
+        var rootResult = Compile(roots, settings, screenW, screenH, sourcePath, machine);
+        var children = new List<(string FileName, string Text)>();
+        var errors = new List<string>();
+        var completed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var outputSources = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [rootOutputName] = Path.GetFullPath(sourcePath),
+        };
+        var active = new List<string> { Path.GetFullPath(sourcePath) };
+
+        void Visit(IList<StepNode> nodes, string ownerPath, int ownerDepth)
+        {
+            foreach (var node in nodes)
+            {
+                if (node.IsDisabled) continue;
+                if (node.Type == "playScript")
+                {
+                    var raw = PropEx.GetString(node.Props, "path").Trim();
+                    if (raw.Length == 0) { errors.Add("include in " + Path.GetFileName(ownerPath) + ": no .amsj path set"); continue; }
+                    var ownerDir = Path.GetDirectoryName(Path.GetFullPath(ownerPath)) ?? ".";
+                    var full = Path.GetFullPath(Path.IsPathRooted(raw) ? raw : Path.Combine(ownerDir, raw));
+                    if (!File.Exists(full)) { errors.Add("include in " + Path.GetFileName(ownerPath) + ": child not found: " + raw); continue; }
+                    if (active.Contains(full, StringComparer.OrdinalIgnoreCase))
+                    {
+                        errors.Add("include cycle: " + string.Join(" -> ", active.Select(Path.GetFileName).Concat(new[] { Path.GetFileName(full) })));
+                        continue;
+                    }
+                    if (ownerDepth >= 4)
+                    {
+                        errors.Add("include depth cap 4 exceeded at " + Path.GetFileName(full));
+                        continue;
+                    }
+                    var outputName = Path.GetFileNameWithoutExtension(full) + ".txt";
+                    if (outputName.Any(ch => ch < 32 || ch > 126 || "/\\:|%".Contains(ch)))
+                    {
+                        errors.Add("include output name is unsafe for CIRCUITPY: " + outputName);
+                        continue;
+                    }
+                    if (outputSources.TryGetValue(outputName, out var prior) &&
+                        !string.Equals(prior, full, StringComparison.OrdinalIgnoreCase))
+                    {
+                        errors.Add("duplicate include output '" + outputName + "' from " + prior + " and " + full);
+                        continue;
+                    }
+                    outputSources[outputName] = full;
+                    if (completed.Contains(full)) continue; // same source may be referenced more than once; emit once
+
+                    List<StepNode> childSteps;
+                    try { childSteps = DocumentService.Load(full); }
+                    catch (Exception ex) { errors.Add("include '" + raw + "' is not a valid .amsj: " + ex.Message); continue; }
+
+                    PlanResult childResult;
+                    try { childResult = Compile(childSteps, ChildSettings(settings), screenW, screenH, full, machine); }
+                    catch (PlanBlockedException bx)
+                    {
+                        errors.AddRange(bx.Errors.Select(e => "include " + Path.GetFileName(full) + ": " + e));
+                        continue;
+                    }
+                    children.Add((outputName, childResult.Text));
+                    active.Add(full);
+                    Visit(childSteps, full, ownerDepth + 1);
+                    active.RemoveAt(active.Count - 1);
+                    completed.Add(full);
+                }
+                Visit(node.Children, ownerPath, ownerDepth);
+            }
+        }
+
+        Visit(roots, sourcePath, 0);
+        if (errors.Count > 0) throw new PlanBlockedException(errors);
+        return new CompiledBundle(rootResult, children);
+    }
+
     public static IReadOnlyList<string> Export(string planPath, IList<StepNode> steps,
         AppSettings settings, int screenW, int screenH, string sourceName, string machine)
     {
-        var result = Compile(steps, settings, screenW, screenH, sourceName, machine);
         var full = Path.GetFullPath(planPath);
         var dir = Path.GetDirectoryName(full);
         if (string.IsNullOrEmpty(dir)) throw new IOException("cannot resolve the folder of " + planPath);
-        var written = new List<string> { full };
-        File.WriteAllText(full, result.Text);
+        var bundle = CompileBundle(steps, settings, screenW, screenH, sourceName, machine, Path.GetFileName(full));
         var enginePath = Path.Combine(dir, "plan_engine.py");
-        File.WriteAllText(enginePath, BuildEnginePy());
-        written.Add(enginePath);
+        var motionPath = Path.Combine(dir, "plan_motion.py");
+        var typingPath = Path.Combine(dir, "plan_typing.py");
         var readmePath = Path.Combine(dir, "README-PLAN.md");
-        File.WriteAllText(readmePath, BuildReadme(result, sourceName, machine));
-        written.Add(readmePath);
-        return written;
+        var payloads = new List<(string Path, string Text)> { (full, bundle.Root.Text) };
+        payloads.AddRange(bundle.Children.Select(c => (Path.Combine(dir, c.FileName), c.Text)));
+        payloads.Add((enginePath, BuildEnginePy()));
+        payloads.Add((motionPath, BuildMotionPy()));
+        payloads.Add((typingPath, BuildTypingPy()));
+        payloads.Add((readmePath, BuildReadme(bundle.Root, Path.GetFileName(sourceName), machine)));
+
+        var tx = Guid.NewGuid().ToString("N");
+        var temps = payloads.Select(p => p.Path + "." + tx + ".tmp").ToArray();
+        var backups = payloads.Select(p => p.Path + "." + tx + ".bak").ToArray();
+        var published = new List<int>();
+        try
+        {
+            // No destination is touched until every root/child/runtime/readme payload is staged.
+            for (int i = 0; i < payloads.Count; i++)
+                File.WriteAllText(temps[i], payloads[i].Text, new UTF8Encoding(false));
+            for (int i = 0; i < payloads.Count; i++)
+            {
+                if (File.Exists(payloads[i].Path)) File.Move(payloads[i].Path, backups[i]);
+                File.Move(temps[i], payloads[i].Path);
+                published.Add(i);
+            }
+            foreach (var b in backups) if (File.Exists(b)) File.Delete(b);
+            return payloads.Select(p => p.Path).ToList();
+        }
+        catch
+        {
+            // Restore every prior file, including a backup made just before the failing move.
+            foreach (var i in published.AsEnumerable().Reverse())
+                if (File.Exists(payloads[i].Path)) File.Delete(payloads[i].Path);
+            for (int i = 0; i < payloads.Count; i++)
+                if (File.Exists(backups[i])) File.Move(backups[i], payloads[i].Path, true);
+            throw;
+        }
+        finally
+        {
+            foreach (var p in temps.Concat(backups))
+                if (File.Exists(p)) File.Delete(p);
+        }
     }
 
-    /// <summary>The gen-1 plan engine, embedded verbatim (firmware/code64b/plan_engine.py).
+    /// <summary>The PLAN|2 plan engine, embedded verbatim (portable/plan3/CIRCUITPY/plan_engine.py).
     /// Normalized to LF so the written file is byte-stable regardless of the .cs line endings.</summary>
     public static string BuildEnginePy() => EngineTemplate.Replace("\r\n", "\n");
+    public static string BuildMotionPy() => MotionTemplate.Replace("\r\n", "\n");
+    public static string BuildTypingPy() => TypingTemplate.Replace("\r\n", "\n");
 
     private static string BuildReadme(PlanResult result, string sourceName, string machine)
     {
         var sb = new StringBuilder();
-        sb.Append("# راهنمای پلن پرتابل پیکو (PLAN|1 - فریم‌ور 0.9.64b)\n\n");
-        sb.Append("این سه فایل را روی درایو CIRCUITPY کپی کن (کنار code.py از «Export Pico Firmware»):\n");
-        sb.Append("- plan.txt ← پلن کامپایل‌شده (همین فایل)\n");
-        sb.Append("- plan_engine.py ← موتور gen-1 (فقط وقتی نسخه‌ی فریم‌ور عوض شود دوباره لازم است)\n\n");
+        sb.Append("# راهنمای پلن پرتابل پیکو (PLAN|2 - فریم‌ور 0.9.66)\n\n");
+        sb.Append("همه‌ی فایل‌های این bundle را روی درایو CIRCUITPY کپی کن (کنار code.py از «Export Pico Firmware»):\n");
+        sb.Append("- plan.txt ← پلن اصلی؛ فایل‌های *.txt دیگر ← playScriptهای کامپایل‌شده\n");
+        sb.Append("- plan_engine.py + plan_motion.py + plan_typing.py ← runtime کامل کم‌حافظه‌ی PLAN|2\n\n");
         sb.Append("- منبع: " + sourceName + " · سیستم: " + machine + "\n");
         sb.Append("- استپ‌های کامپایل‌شده: " + (result.Counts.Count > 0 ? string.Join(" · ", result.Counts) : "-") + "\n");
         if (result.Disabled.Count > 0)
@@ -639,13 +683,17 @@ public static class PlanExporter
         return sb.ToString();
     }
 
-    /// <summary>Structural self-check mirroring the gen-1 parser: op whitelist, PLAN|1 first,
+    /// <summary>Structural self-check mirroring the PLAN|2 parser: op whitelist, PLAN|2 first,
     /// loop balance, RMOUSE region quad, WLIGHT positionals, TYPE text=, DELAY/SCREEN/SPEED ints.
     /// A failure here is a generator BUG - it throws before anything reaches a file.</summary>
     private static void ValidatePlan(string text)
     {
-        var stack = 0;
-        var first = true;
+        var stack = new List<(string Kind, bool ElseSeen, int Line)>();
+        var labels = new HashSet<string>(StringComparer.Ordinal);
+        var gotos = new List<string>();
+        var known = new HashSet<string>{"PLAN","SCREEN","SPEED","DELAY","LOOP","LOOPTIME","ENDLOOP","RMOUSE","MOVETO","CLICK","TYPE","WLIGHT","WSND","TRGSND","IFSND","IFLUX","ELSE","ENDIF","KEY","KDOWN","KUP","WHEEL","LABEL","GOTO","RAW","RPKG","PKGITEM","ENDPKG","PGROUP","PARITEM","ENDPAR","INCLUDE","BEEP"};
+        bool first = true;
+        string previousOp = "";
         var lines = text.Split('\n');
         for (int li = 0; li < lines.Length; li++)
         {
@@ -654,50 +702,67 @@ public static class PlanExporter
             var fields = line.Split('|');
             var op = fields[0];
             void Bad(string why) => throw new PlanBlockedException(new[] { "PlanExporter BUG: line " + (li + 1) + ": " + why + " (please report)" });
+            void Need(string kind, string closer)
+            {
+                if (stack.Count == 0 || stack[^1].Kind != kind)
+                    Bad(closer + " cannot close " + (stack.Count == 0 ? "the root" : stack[^1].Kind));
+            }
+
+            if (!known.Contains(op)) Bad("unknown op '" + op + "'");
+            if (first && (op != "PLAN" || fields.Length < 2 || fields[1] != "2")) Bad("PLAN must be first with version 2");
+            if (op == "PLAN" && !first) Bad("duplicate/non-first PLAN");
+
             switch (op)
             {
-                case "PLAN":
-                    if (!first || fields.Length < 2 || fields[1] != "1") Bad("PLAN must be first with version 1");
+                case "LOOP": case "LOOPTIME": stack.Add(("LOOP", false, li + 1)); break;
+                case "IFSND": case "IFLUX": stack.Add(("IF", false, li + 1)); break;
+                case "RPKG": stack.Add(("RPKG", false, li + 1)); break;
+                case "PGROUP": stack.Add(("PGROUP", false, li + 1)); break;
+                case "ENDLOOP": Need("LOOP", op); stack.RemoveAt(stack.Count - 1); break;
+                case "ELSE":
+                    Need("IF", op);
+                    if (stack[^1].ElseSeen) Bad("duplicate ELSE in one IF block");
+                    stack[^1] = ("IF", true, stack[^1].Line);
                     break;
-                case "SCREEN":
-                case "SPEED":
-                    if (fields.Length < 2 || fields[1].Split(',').Length != 2
-                        || !fields[1].Split(',').All(IsInt)) Bad(op + " needs exactly two ints");
+                case "ENDIF": Need("IF", op); stack.RemoveAt(stack.Count - 1); break;
+                case "PKGITEM":
+                    Need("RPKG", op);
+                    if (previousOp is "RPKG" or "PKGITEM") Bad("empty Random Package item");
                     break;
-                case "DELAY":
-                    if (fields.Length < 2 || !IsIntPair(fields[1])) Bad("DELAY needs one or two ints");
+                case "ENDPKG":
+                    Need("RPKG", op);
+                    if (previousOp is "RPKG" or "PKGITEM") Bad("empty Random Package item");
+                    stack.RemoveAt(stack.Count - 1);
                     break;
-                case "LOOP":
-                case "LOOPTIME":
-                    if (fields.Length < 2 || !long.TryParse(fields[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
-                        Bad(op + " needs a number");
-                    stack++;
+                case "PARITEM":
+                    Need("PGROUP", op);
+                    if (previousOp is "PGROUP" or "PARITEM") Bad("empty Parallel Group branch");
                     break;
-                case "ENDLOOP":
-                    if (stack <= 0) Bad("ENDLOOP without LOOP");
-                    stack--;
-                    break;
-                case "RMOUSE":
-                    if (!HasKv(fields, "region", out var rv) || rv.Split(',').Length != 4
-                        || !rv.Split(',').All(IsInt)) Bad("RMOUSE needs region=x,y,w,h");
-                    break;
-                case "CLICK":
-                    break;   // btn/n/hold all have engine-side defaults
-                case "TYPE":
-                    if (!HasKv(fields, "text", out _)) Bad("TYPE needs text=");
-                    break;
-                case "WLIGHT":
-                    if (fields.Length < 2 || fields[1].Split(',').Length < 5
-                        || !fields[1].Split(',').Take(5).All(IsInt)) Bad("WLIGHT needs lo,hi,stable,to,mode");
-                    break;
-                default:
-                    Bad("unknown op '" + op + "'");
+                case "ENDPAR":
+                    Need("PGROUP", op);
+                    if (previousOp is "PGROUP" or "PARITEM") Bad("empty Parallel Group branch");
+                    stack.RemoveAt(stack.Count - 1);
                     break;
             }
+
+            if (op == "LABEL")
+            {
+                if (fields.Length < 2 || fields[1].Length == 0 || !labels.Add(fields[1])) Bad("bad/duplicate LABEL");
+            }
+            if (op == "GOTO")
+            {
+                if (fields.Length < 2 || fields[1].Length == 0) Bad("empty GOTO");
+                gotos.Add(fields[1]);
+            }
+            if (op == "INCLUDE" && (!HasKv(fields, "file", out var file) || file.Length == 0 ||
+                file.Any(ch => ch < 32 || ch > 126 || "/\\:|%".Contains(ch)))) Bad("unsafe INCLUDE filename");
             first = false;
+            previousOp = op;
         }
-        if (stack != 0)
-            throw new PlanBlockedException(new[] { "PlanExporter BUG: LOOP without ENDLOOP (please report)" });
+        if (stack.Count > 0)
+            throw new PlanBlockedException(new[] { "PlanExporter BUG: line " + stack[^1].Line + ": unclosed " + stack[^1].Kind + " container (please report)" });
+        foreach (var target in gotos)
+            if (!labels.Contains(target)) throw new PlanBlockedException(new[] { "PlanExporter BUG: GOTO target '" + target + "' is undefined (please report)" });
     }
 
     private static bool IsInt(string s)
@@ -717,50 +782,24 @@ public static class PlanExporter
         return false;
     }
 
-    // The gen-1 plan engine (firmware/code64b/plan_engine.py) is spliced in here by
-    // tools/make_plan_exporter.py as a 4-quote raw string (the engine holds docstrings).
-    // TestRunner compares the embedded copy byte-for-byte against the repo golden
-    // (modulo line endings), so the template can never drift from the firmware line it targets.
+    // Hardware-proven split runtime. Generated from the canonical engine; do not hand-edit.
     private const string EngineTemplate = """"
-# plan_engine.py - Classroom Studio portable plan engine (code64)
-# Runs on the Pico (CircuitPython) and on CPython (the sim). Exact port of the app's
-# humanization layers: WindMouse (HumanMouse.cs v0.9.24) and the typing planner
-# (StepDefinitions.TypeScript v0.9.15). Fresh randomness is rolled for every pass,
-# so repeated loops never replay an identical path - exactly like the PC app.
-#
-# plan.txt - one op per line, pipe-separated, key=value args, %-encoding inside text:
-#   PLAN|1                                header (format version, must be first)
-#   SCREEN|1920,1080                      clamp bounds for all moves
-#   SPEED|0,2000                          app mouse speed px/s (max 0 = shape-only pacing)
-#   RMOUSE|region=x,y,w,h|mt=mn,mx|curve=mn,mx|before=mn,mx|after=mn,mx|
-#         mid=chance:mn,mx|idle=everyMn,everyMx:pauseMn,pauseMx|over=pct
-#   CLICK|btn=left|n=1|hold=mn,mx
-#   TYPE|h=mn,mx|w=mn,mx|wp=pct|p=mn,mx|think=chance:mn,mx|typo=mn,mx|text=<encoded>
-#   DELAY|mn,mx
-#   LOOP|n  ... ENDLOOP                   n = pass count, 0 = forever
-#   LOOPTIME|sec ... ENDLOOP              repeats until the deadline passes
-#   WLIGHT|lo,hi,stable_ms,timeout_ms,mode[|key=vk,hmn,hmx|react=mn,mx]
-# Blank lines and lines starting with # are ignored. Unknown ops fail the whole file.
-
+# Generated memory-fit core from canonical plan_engine.py; do not hand-edit.
 import time
 import math
 import random
 
-
 class PlanAbort(Exception):
-    """Raised inside a step when the host took over or the keypad stopped the run."""
+    pass
 
-
-# code64: optional persistent cursor contract. The Pico context owns the saved
-# coordinate so Start/Stop does not reset every new run_plan() call to screen centre.
 def _load_mouse_pos(ctx, ops):
-    sw, sh = ctx.screen_w, ctx.screen_h
+    sw, sh = (ctx.screen_w, ctx.screen_h)
     for op, prm in ops:
-        if op == "SCREEN":
-            sw, sh = prm["v"]
+        if op == 'SCREEN':
+            sw, sh = prm['v']
             break
     saved = None
-    getter = getattr(ctx, "get_mouse_pos", None)
+    getter = getattr(ctx, 'get_mouse_pos', None)
     if getter is not None:
         try:
             saved = getter()
@@ -768,45 +807,31 @@ def _load_mouse_pos(ctx, ops):
             saved = None
     if saved is None or len(saved) < 2:
         return [sw // 2, sh // 2]
-    return [_clamp(int(saved[0]), 0, max(0, sw - 1)),
-            _clamp(int(saved[1]), 0, max(0, sh - 1))]
-
+    return [_clamp(int(saved[0]), 0, max(0, sw - 1)), _clamp(int(saved[1]), 0, max(0, sh - 1))]
 
 def _save_mouse_pos(ctx, pos):
-    setter = getattr(ctx, "set_mouse_pos", None)
+    setter = getattr(ctx, 'set_mouse_pos', None)
     if setter is not None:
         setter(int(pos[0]), int(pos[1]))
 
-
-# ── rng helpers (mirror HumanMouse.Rand / RandRange: swap-tolerant, max<=0 → 0) ─────────
-
-def _rf():
-    return random.random()
-
-
-def _below(n):            # C# Random.Next(n): 0..n-1
+def _below(n):
     return random.randrange(n) if n > 0 else 0
 
-
-def rand_range(mn, mx):   # C# Rand: inclusive, swap-tolerant, 0 when max <= 0
+def rand_range(mn, mx):
     if mx < mn:
-        mn, mx = mx, mn
+        mn, mx = (mx, mn)
     if mx <= 0:
         return 0
     return mn if mx <= mn else random.randint(mn, mx)
 
-
 def _clamp(v, lo, hi):
     return lo if v < lo else hi if v > hi else v
-
-
-# ── %-codec for TYPE text (|, %, newline are structural in plan.txt) ─────────────────────
 
 def pct_dec(s):
     out = []
     i = 0
     while i < len(s):
-        if s[i] == "%" and i + 2 < len(s) + 1 and i + 2 <= len(s) - 1:
+        if s[i] == '%' and i + 2 < len(s) + 1 and (i + 2 <= len(s) - 1):
             try:
                 out.append(chr(int(s[i + 1:i + 3], 16)))
                 i += 3
@@ -815,169 +840,596 @@ def pct_dec(s):
                 pass
         out.append(s[i])
         i += 1
-    return "".join(out)
-
-
-# ── parser ───────────────────────────────────────────────────────────────────────────────
-
-_OPS = ("PLAN", "SCREEN", "SPEED", "RMOUSE", "CLICK", "TYPE",
-        "DELAY", "LOOP", "LOOPTIME", "ENDLOOP", "WLIGHT")
-
+    return ''.join(out)
+_OPS = ('PLAN', 'SCREEN', 'SPEED', 'RMOUSE', 'CLICK', 'TYPE', 'DELAY', 'LOOP', 'LOOPTIME', 'ENDLOOP', 'WLIGHT', 'MOVETO', 'KEY', 'KDOWN', 'KUP', 'WHEEL', 'RAW', 'WSND', 'TRGSND', 'IFSND', 'IFLUX', 'ELSE', 'ENDIF', 'LABEL', 'GOTO', 'INCLUDE', 'RPKG', 'PKGITEM', 'ENDPKG', 'PGROUP', 'PARITEM', 'ENDPAR', 'BEEP')
+_V2_OPS = frozenset(_OPS[11:])
 
 def _pair(s, what, line_no):
-    parts = s.split(",")
+    parts = s.split(',')
     try:
-        a, b = int(parts[0]), int(parts[1])
+        a, b = (int(parts[0]), int(parts[1]))
     except Exception:
         raise ValueError("line %d: bad %s '%s'" % (line_no, what, s))
-    return (a, b) if b >= a else (b, a)     # normalize like the app (swap-tolerant)
-
+    return (a, b) if b >= a else (b, a)
 
 def _quad(s, what, line_no):
-    parts = s.split(",")
+    parts = s.split(',')
     if len(parts) != 4:
         raise ValueError("line %d: bad %s '%s'" % (line_no, what, s))
     try:
-        return tuple(int(p) for p in parts)
+        return tuple((int(p) for p in parts))
     except Exception:
         raise ValueError("line %d: bad %s '%s'" % (line_no, what, s))
 
+def _link_blocks(ops):
+    stack = []
+    labels = {}
+    for i, (op, prm) in enumerate(ops):
+        if op in ('LOOP', 'LOOPTIME', 'IFSND', 'IFLUX'):
+            stack.append(i)
+        elif op == 'ENDLOOP':
+            ops[stack.pop()][1]['end_ip'] = i
+        elif op == 'ELSE':
+            ops[stack[-1]][1]['else_line'] = i
+        elif op == 'ENDIF':
+            sp = ops[stack.pop()][1]
+            sp['endif_ip'] = i + 1
+            if 'else_line' in sp:
+                ops[sp['else_line']][1]['endif_ip'] = i + 1
+                sp['else_ip'] = sp['else_line'] + 1
+            else:
+                sp['else_ip'] = i + 1
+        elif op == 'LABEL':
+            if prm['name'] in labels:
+                raise ValueError("duplicate LABEL '%s'" % prm['name'])
+            labels[prm['name']] = i
+    for op, prm in ops:
+        if op != 'GOTO':
+            continue
+        lip = labels.get(prm['name'])
+        if lip is None:
+            raise ValueError("GOTO '%s' has no matching LABEL" % prm['name'])
+        gc = prm.get('_chain', ())
+        lc = ops[lip][1].get('_chain', ())
+        if lc != gc[:len(lc)]:
+            raise ValueError("GOTO '%s': the label is not visible from this block" % prm['name'])
+_PAR_OK = ('MOVETO', 'CLICK', 'KEY', 'KDOWN', 'KUP', 'WHEEL', 'TYPE', 'DELAY', 'RAW', 'BEEP')
+_PKG_MODES = ('pick', 'all', 'seq')
+
+def _extract_containers(text):
+    lines = text.split('\n')
+    out = []
+    table = []
+    i = 0
+    while i < len(lines):
+        head = lines[i].strip()
+        kind = head.split('|')[0].upper()
+        if kind not in ('RPKG', 'PGROUP'):
+            if kind in ('PKGITEM', 'ENDPKG', 'PARITEM', 'ENDPAR'):
+                raise ValueError('line %d: %s outside a package/parallel block' % (i + 1, kind))
+            out.append(lines[i])
+            i += 1
+            continue
+        sep = 'PKGITEM' if kind == 'RPKG' else 'PARITEM'
+        end = 'ENDPKG' if kind == 'RPKG' else 'ENDPAR'
+        items = [[]]
+        depth = 0
+        closed = False
+        j = i + 1
+        while j < len(lines):
+            k = lines[j].strip().split('|')[0].upper()
+            if k in ('RPKG', 'PGROUP'):
+                depth += 1
+            elif k in ('ENDPKG', 'ENDPAR'):
+                if depth == 0:
+                    if k != end:
+                        raise ValueError('line %d: %s closes a %s block' % (j + 1, k, kind))
+                    closed = True
+                    break
+                depth -= 1
+            elif k == sep and depth == 0:
+                items.append([])
+                j += 1
+                continue
+            items[-1].append(lines[j])
+            j += 1
+        if not closed:
+            raise ValueError('line %d: %s is never closed with %s' % (i + 1, kind, end))
+        table.append(['\n'.join(b) for b in items])
+        out.append(head + (',' if '|' in head else '|') + '#%d' % (len(table) - 1))
+        i = j + 1
+    return ('\n'.join(out), table)
+
+def _parse_v3(op, fields, prm, line_no, ctab):
+    if op in ('PKGITEM', 'ENDPKG', 'PARITEM', 'ENDPAR'):
+        raise ValueError('line %d: stray %s' % (line_no, op))
+    body = fields[1] if len(fields) > 1 else ''
+    if op == 'BEEP':
+        parts = body.split(',')
+        if len(parts) != 2:
+            raise ValueError('line %d: BEEP needs freq,ms' % line_no)
+        try:
+            prm['v'] = (int(parts[0]), int(parts[1]))
+        except Exception:
+            raise ValueError("line %d: bad BEEP '%s'" % (line_no, body))
+        if not 30 <= prm['v'][0] <= 20000 or prm['v'][1] < 0:
+            raise ValueError('line %d: BEEP out of range (30..20000 Hz)' % line_no)
+        return
+    parts = body.split(',')
+    if not parts[-1].startswith('#'):
+        raise ValueError('line %d: %s must open a block body' % (line_no, op))
+    bodies = ctab[int(parts[-1][1:])]
+    progs = [parse_plan('PLAN|2\n' + b) for b in bodies]
+    if op == 'RPKG':
+        if len(parts) != 4:
+            raise ValueError('line %d: RPKG needs mode,min,max' % line_no)
+        mode = parts[0].strip().lower()
+        if mode not in _PKG_MODES:
+            raise ValueError("line %d: unknown RPKG mode '%s' (pick|all|seq)" % (line_no, parts[0]))
+        try:
+            mn, mx = (int(parts[1]), int(parts[2]))
+        except Exception:
+            raise ValueError("line %d: bad RPKG counts '%s'" % (line_no, body))
+        if not progs:
+            raise ValueError('line %d: RPKG has no items' % line_no)
+        if mn < 0 or mx < mn or mx > len(progs):
+            raise ValueError('line %d: RPKG counts out of range (%d items)' % (line_no, len(progs)))
+        prm['mode'], prm['mn'], prm['mx'], prm['progs'] = (mode, mn, mx, progs)
+        return
+    if len(parts) != 1:
+        raise ValueError('line %d: PGROUP takes no arguments' % line_no)
+    if len(progs) < 2:
+        raise ValueError('line %d: PGROUP needs at least two branches' % line_no)
+    for b in progs:
+        for o, _p in b:
+            if o != 'PLAN' and o not in _PAR_OK:
+                raise ValueError('line %d: %s is not allowed inside PGROUP' % (line_no, o))
+    prm['progs'] = progs
 
 def parse_plan(text):
-    """Returns [(op, params), ...]; params is a dict. Raises ValueError with line no."""
+    text, _ctab = _extract_containers(text)
     ops = []
     loop_stack = []
-    for line_no, raw in enumerate(text.split("\n"), 1):
+    else_seen = set()
+    for line_no, raw in enumerate(text.split('\n'), 1):
         line = raw.strip()
-        if not line or line.startswith("#"):
+        if not line or line.startswith('#'):
             continue
-        fields = line.split("|")
+        fields = line.split('|')
         op = fields[0].upper()
         if op not in _OPS:
             raise ValueError("line %d: unknown op '%s'" % (line_no, fields[0]))
         prm = {}
-        if op in ("PLAN", "SCREEN", "SPEED", "DELAY", "LOOP", "LOOPTIME"):
-            body = fields[1] if len(fields) > 1 else ""
-            if op == "PLAN":
+        prm['_chain'] = tuple((b[2] for b in loop_stack))
+        if op in ('RPKG', 'PGROUP', 'BEEP', 'PKGITEM', 'ENDPKG', 'PARITEM', 'ENDPAR'):
+            _parse_v3(op, fields, prm, line_no, _ctab)
+            ops.append((op, prm))
+            continue
+        if op in ('PLAN', 'SCREEN', 'SPEED', 'DELAY', 'LOOP', 'LOOPTIME'):
+            body = fields[1] if len(fields) > 1 else ''
+            if op == 'PLAN':
                 try:
-                    prm["v"] = int(body or "0")
+                    prm['v'] = int(body or '0')
                 except Exception:
-                    raise ValueError("line %d: bad PLAN version" % line_no)
-                if prm["v"] != 1:
-                    raise ValueError("line %d: unsupported PLAN version %d" % (line_no, prm["v"]))
-            elif op == "SCREEN":
-                parts = body.split(",")
+                    raise ValueError('line %d: bad PLAN version' % line_no)
+                if prm['v'] not in (1, 2):
+                    raise ValueError('line %d: unsupported PLAN version %d' % (line_no, prm['v']))
+            elif op == 'SCREEN':
+                parts = body.split(',')
                 try:
-                    # ordered pair: width,height are NOT a sortable range - _pair would
-                    # swap 1920,1080 into 1080,1920 and clamp every x to the wrong axis
-                    prm["v"] = (int(parts[0]), int(parts[1]))
+                    prm['v'] = (int(parts[0]), int(parts[1]))
                 except Exception:
                     raise ValueError("line %d: bad SCREEN '%s'" % (line_no, body))
-            elif op == "SPEED":
-                prm["v"] = _pair(body, op, line_no)
-            elif op == "DELAY":
-                prm["v"] = _pair(body + ("," + body if "," not in body else ""), op, line_no)
-            elif op == "LOOP":
-                prm["n"] = int(body or "1")
-                loop_stack.append((op, line_no))
+            elif op == 'SPEED':
+                prm['v'] = _pair(body, op, line_no)
+            elif op == 'DELAY':
+                prm['v'] = _pair(body + (',' + body if ',' not in body else ''), op, line_no)
+            elif op == 'LOOP':
+                prm['n'] = int(body or '1')
+                loop_stack.append((op, line_no, len(ops)))
             else:
-                prm["sec"] = float(body or "0")
-                loop_stack.append((op, line_no))
-        elif op == "ENDLOOP":
-            if not loop_stack:
-                raise ValueError("line %d: ENDLOOP without LOOP" % line_no)
+                prm['sec'] = float(body or '0')
+                loop_stack.append((op, line_no, len(ops)))
+        elif op == 'ENDLOOP':
+            if not loop_stack or loop_stack[-1][0] in ('IFSND', 'IFLUX'):
+                raise ValueError('line %d: ENDLOOP without LOOP' % line_no)
             loop_stack.pop()
-        elif op == "WLIGHT":
-            pos = fields[1].split(",") if len(fields) > 1 else []
-            if len(pos) < 5:
-                raise ValueError("line %d: WLIGHT needs lo,hi,stable,to,mode" % line_no)
+        elif op == 'ENDIF':
+            if not loop_stack or loop_stack[-1][0] not in ('IFSND', 'IFLUX'):
+                raise ValueError('line %d: ENDIF without IFSND/IFLUX' % line_no)
+            loop_stack.pop()
+        elif op == 'ELSE':
+            if not loop_stack or loop_stack[-1][0] not in ('IFSND', 'IFLUX'):
+                raise ValueError('line %d: ELSE outside an IF block' % line_no)
+            if loop_stack[-1][1] in else_seen:
+                raise ValueError('line %d: duplicate ELSE in one IF block' % line_no)
+            else_seen.add(loop_stack[-1][1])
+        elif op in ('WSND', 'TRGSND', 'IFSND', 'IFLUX'):
+            pa = fields[1].split(',') if len(fields) > 1 else []
+            need = {'WSND': 3, 'IFSND': 3, 'IFLUX': 5, 'TRGSND': 8}[op]
+            if len(pa) < need:
+                raise ValueError('line %d: %s needs %d comma numbers' % (line_no, op, need))
             try:
-                prm["lo"], prm["hi"] = int(pos[0]), int(pos[1])
-                prm["stable"], prm["to"], prm["mode"] = int(pos[2]), int(pos[3]), int(pos[4])
+                prm['a'] = [int(x) for x in pa[:need]]
             except Exception:
-                raise ValueError("line %d: bad WLIGHT numbers" % line_no)
+                raise ValueError('line %d: bad %s numbers' % (line_no, op))
+            if op in ('IFSND', 'IFLUX'):
+                loop_stack.append((op, line_no, len(ops)))
+        elif op in ('KDOWN', 'KUP', 'WHEEL'):
+            try:
+                prm['v'] = int(fields[1]) if len(fields) > 1 else 0
+            except Exception:
+                raise ValueError('line %d: %s needs a number' % (line_no, op))
+            if op != 'WHEEL' and (not 0 < prm['v'] < 256):
+                raise ValueError('line %d: %s vk out of range' % (line_no, op))
+        elif op in ('LABEL', 'GOTO'):
+            nm = fields[1].strip() if len(fields) > 1 else ''
+            if not nm or '=' in nm:
+                raise ValueError('line %d: %s needs a plain name' % (line_no, op))
+            prm['name'] = nm
+        elif op == 'RAW':
+            prm['line'] = '|'.join(fields[1:]).strip()
+            if not prm['line']:
+                raise ValueError('line %d: RAW needs a board line' % line_no)
+        elif op == 'WLIGHT':
+            pos = fields[1].split(',') if len(fields) > 1 else []
+            if len(pos) < 5:
+                raise ValueError('line %d: WLIGHT needs lo,hi,stable,to,mode' % line_no)
+            try:
+                prm['lo'], prm['hi'] = (int(pos[0]), int(pos[1]))
+                prm['stable'], prm['to'], prm['mode'] = (int(pos[2]), int(pos[3]), int(pos[4]))
+            except Exception:
+                raise ValueError('line %d: bad WLIGHT numbers' % line_no)
             for kv in fields[2:]:
-                if "=" not in kv:
+                if '=' not in kv:
                     raise ValueError("line %d: bad arg '%s'" % (line_no, kv))
-                k, v = kv.split("=", 1)
-                if k == "key":
-                    t = v.split(",")
-                    prm["key"] = (int(t[0]), int(t[1]) if len(t) > 1 else 30,
-                                  int(t[2]) if len(t) > 2 else 90)
-                elif k == "react":
-                    prm["react"] = _pair(v, k, line_no)
+                k, v = kv.split('=', 1)
+                if k == 'key':
+                    t = v.split(',')
+                    prm['key'] = (int(t[0]), int(t[1]) if len(t) > 1 else 30, int(t[2]) if len(t) > 2 else 90)
+                elif k == 'react':
+                    prm['react'] = _pair(v, k, line_no)
                 else:
                     raise ValueError("line %d: unknown WLIGHT key '%s'" % (line_no, k))
-        else:   # RMOUSE / CLICK / TYPE: key=value args
+        else:
             for kv in fields[1:]:
-                if "=" not in kv:
+                if '=' not in kv:
                     raise ValueError("line %d: bad arg '%s' (want key=value)" % (line_no, kv))
-                k, v = kv.split("=", 1)
+                k, v = kv.split('=', 1)
                 prm[k] = v
-            if op == "RMOUSE":
-                if "region" not in prm:
-                    raise ValueError("line %d: RMOUSE needs region=x,y,w,h" % line_no)
-                prm["region"] = _quad(prm["region"], "region", line_no)
-                for k in ("mt", "curve", "before", "after"):
+            if op == 'RMOUSE':
+                if 'region' not in prm:
+                    raise ValueError('line %d: RMOUSE needs region=x,y,w,h' % line_no)
+                prm['region'] = _quad(prm['region'], 'region', line_no)
+                for k in ('mt', 'curve', 'before', 'after'):
                     if k in prm:
                         prm[k] = _pair(prm[k], k, line_no)
-                if "mid" in prm:                       # chance:mn,mx
-                    c, _, r = prm["mid"].partition(":")
-                    prm["mid"] = (int(c), _pair(r, "mid", line_no))
-                if "idle" in prm:                      # everyMn,everyMx:pauseMn,pauseMx
-                    e, _, r = prm["idle"].partition(":")
-                    prm["idle"] = (_pair(e, "idle-every", line_no), _pair(r, "idle-pause", line_no))
-                if "over" in prm:
-                    prm["over"] = int(prm["over"])
-            elif op == "CLICK":
-                prm["btn"] = prm.get("btn", "left")
-                prm["n"] = int(prm.get("n", "1"))
-                if "hold" in prm:
-                    prm["hold"] = _pair(prm["hold"], "hold", line_no)
-            elif op == "TYPE":
-                if "text" not in prm:
-                    raise ValueError("line %d: TYPE needs text=" % line_no)
-                prm["text"] = pct_dec(prm["text"])
-                for k in ("h", "w", "p", "typo"):
+                if 'mid' in prm:
+                    c, _, r = prm['mid'].partition(':')
+                    prm['mid'] = (int(c), _pair(r, 'mid', line_no))
+                if 'idle' in prm:
+                    e, _, r = prm['idle'].partition(':')
+                    prm['idle'] = (_pair(e, 'idle-every', line_no), _pair(r, 'idle-pause', line_no))
+                if 'over' in prm:
+                    prm['over'] = int(prm['over'])
+            elif op == 'CLICK':
+                prm['btn'] = prm.get('btn', 'left')
+                prm['n'] = int(prm.get('n', '1'))
+                if 'hold' in prm:
+                    prm['hold'] = _pair(prm['hold'], 'hold', line_no)
+            elif op == 'TYPE':
+                if 'text' not in prm:
+                    raise ValueError('line %d: TYPE needs text=' % line_no)
+                prm['text'] = pct_dec(prm['text'])
+                for k in ('h', 'w', 'p', 'typo'):
                     if k in prm:
                         prm[k] = _pair(prm[k], k, line_no)
-                if "think" in prm:
-                    c, _, r = prm["think"].partition(":")
-                    prm["think"] = (int(c), _pair(r, "think", line_no))
-                if "wp" in prm:
-                    prm["wp"] = int(prm["wp"])
+                if 'think' in prm:
+                    c, _, r = prm['think'].partition(':')
+                    prm['think'] = (int(c), _pair(r, 'think', line_no))
+                if 'wp' in prm:
+                    prm['wp'] = int(prm['wp'])
+            elif op == 'MOVETO':
+                if 'x' not in prm or 'y' not in prm:
+                    raise ValueError('line %d: MOVETO needs x= and y=' % line_no)
+                try:
+                    prm['x'] = int(prm['x'])
+                    prm['y'] = int(prm['y'])
+                    prm['human'] = int(prm.get('human', '1'))
+                except Exception:
+                    raise ValueError('line %d: bad MOVETO numbers' % line_no)
+                for k in ('mt', 'curve', 'before', 'after'):
+                    if k in prm:
+                        prm[k] = _pair(prm[k], k, line_no)
+                if 'mid' in prm:
+                    c, _, r = prm['mid'].partition(':')
+                    prm['mid'] = (int(c), _pair(r, 'mid', line_no))
+                if 'idle' in prm:
+                    e, _, r = prm['idle'].partition(':')
+                    prm['idle'] = (_pair(e, 'idle-every', line_no), _pair(r, 'idle-pause', line_no))
+                if 'over' in prm:
+                    prm['over'] = int(prm['over'])
+            elif op == 'KEY':
+                if 'combo' not in prm:
+                    raise ValueError('line %d: KEY needs combo=vk+vk' % line_no)
+                try:
+                    prm['combo'] = [int(v) for v in prm['combo'].split('+') if v != '']
+                except Exception:
+                    raise ValueError('line %d: bad KEY combo' % line_no)
+                if not prm['combo'] or any((v <= 0 or v > 255 for v in prm['combo'])):
+                    raise ValueError('line %d: bad KEY combo' % line_no)
+                if 'hold' in prm:
+                    prm['hold'] = _pair(prm['hold'], 'hold', line_no)
+            elif op == 'INCLUDE':
+                nm = prm.get('file', '')
+                if not nm or any((ch in nm for ch in '/\\:')) or (not nm.lower().endswith('.txt')):
+                    raise ValueError('line %d: INCLUDE needs a plain *.txt file name' % line_no)
         ops.append((op, prm))
     if loop_stack:
-        raise ValueError("line %d: LOOP without ENDLOOP" % loop_stack[-1][1])
-    if not ops or ops[0][0] != "PLAN":
-        raise ValueError("plan must start with PLAN|1")
+        _k, _ln, _ = loop_stack[-1]
+        raise ValueError('line %d: %s without %s' % (_ln, _k, 'ENDIF' if _k in ('IFSND', 'IFLUX') else 'ENDLOOP'))
+    if not ops or ops[0][0] != 'PLAN':
+        raise ValueError('plan must start with PLAN|1 or PLAN|2')
+    _link_blocks(ops)
     return ops
 
+class PausePlanner:
 
-# ── HumanMouse port (C# v0.9.24 → Python; banker-rounding matches Math.Round) ───────────
+    def __init__(self):
+        self.moves_since = 0
+        self.next_idle_at = -1
+
+    def mid_pause(self, c):
+        if c['mid_chance'] > 0 and _below(100) < c['mid_chance']:
+            return rand_range(c['mid_min'], c['mid_max'])
+        return 0
+
+    def roll_long(self, c):
+        if c['idle_pause_max'] <= 0 or c['idle_every_max'] <= 0:
+            return 0
+        self.moves_since += 1
+        if self.next_idle_at < 0:
+            self.next_idle_at = max(1, rand_range(c['idle_every_min'], c['idle_every_max']))
+        if self.moves_since < self.next_idle_at:
+            return 0
+        self.moves_since = 0
+        self.next_idle_at = max(1, rand_range(c['idle_every_min'], c['idle_every_max']))
+        return rand_range(c['idle_pause_min'], c['idle_pause_max'])
+
+def run_plan(ops, ctx, _pos=None, _pauses=None, _inc=()):
+    if any((o in _V2_OPS for o, _ in ops)) and getattr(ctx, 'plan_api', 1) < 2:
+        raise ValueError('this plan uses v2 ops but the firmware ctx is plan_api 1 - flash code65+')
+    pauses = _pauses if _pauses is not None else PausePlanner()
+    pos = _pos if _pos is not None else _load_mouse_pos(ctx, ops)
+    labels = {}
+    for _li, (_o, _p) in enumerate(ops):
+        if _o == 'LABEL':
+            labels[_p['name']] = _li
+    inc = tuple(_inc)
+    i = 0
+    stack = []
+    while i < len(ops):
+        op, prm = ops[i]
+        _gate = getattr(ctx, 'gate', None)
+        if _gate is not None and (not _gate()):
+            raise PlanAbort()
+        if op == 'PLAN':
+            pass
+        elif op == 'SCREEN':
+            ctx.screen_w, ctx.screen_h = prm['v']
+            _sr = getattr(ctx, 'setres', None)
+            if _sr is not None:
+                _sr(prm['v'][0], prm['v'][1])
+            pos[0] = _clamp(pos[0], 0, max(0, ctx.screen_w - 1))
+            pos[1] = _clamp(pos[1], 0, max(0, ctx.screen_h - 1))
+            _save_mouse_pos(ctx, pos)
+        elif op == 'SPEED':
+            ctx.speed_min, ctx.speed_max = prm['v']
+        elif op == 'DELAY':
+            if not ctx.sleep_ms(rand_range(*prm['v'])):
+                raise PlanAbort()
+        elif op == 'LOOP':
+            stack.append([i, prm['n'], None])
+        elif op == 'LOOPTIME':
+            stack.append([i, 0, ctx.now() + prm['sec']])
+        elif op == 'ENDLOOP':
+            top = stack[-1]
+            if top[2] is not None:
+                if ctx.now() < top[2]:
+                    i = top[0]
+                else:
+                    stack.pop()
+            elif top[1] == 0:
+                i = top[0]
+            else:
+                top[1] -= 1
+                if top[1] > 0:
+                    i = top[0]
+                else:
+                    stack.pop()
+        elif op == 'RMOUSE':
+            _exec_rmouse(prm, ctx, pauses, pos)
+        elif op == 'CLICK':
+            hold = prm.get('hold', (0, 0))
+            ctx.mclick(prm['btn'], prm['n'], hold[0], hold[1])
+        elif op == 'TYPE':
+            for cmd in plan_typing(prm['text'], prm):
+                if cmd[0] == 'KTEXT':
+                    ctx.ktext(cmd[1], cmd[2], cmd[3])
+                elif cmd[0] == 'DLY':
+                    if not ctx.sleep_ms(cmd[1]):
+                        raise PlanAbort()
+                else:
+                    ctx.kcombo(cmd[1])
+        elif op == 'WLIGHT':
+            ok = ctx.wait_light(prm['lo'], prm['hi'], prm['stable'], prm['to'], prm['mode'])
+            if ok and 'key' in prm:
+                vk, hmn, hmx = prm['key']
+                rmn, rmx = prm.get('react', (80, 180))
+                if not ctx.sleep_ms(rand_range(rmn, rmx)):
+                    raise PlanAbort()
+                ctx.key(vk, rand_range(hmn, hmx))
+            ctx.log('wlight ' + ('match' if ok else 'timeout'))
+        elif op == 'WSND':
+            r = ctx.wait_sound(prm['a'][0], prm['a'][1], prm['a'][2])
+            if r is None:
+                raise PlanAbort()
+            ctx.log('wsnd ' + ('heard' if r else 'timeout - continue'))
+        elif op == 'IFSND':
+            r = ctx.wait_sound(prm['a'][0], prm['a'][1], prm['a'][2])
+            if r is None:
+                raise PlanAbort()
+            ctx.log('ifsnd ' + ('heard -> then' if r else 'timeout -> else'))
+            if not r:
+                i = prm['else_ip']
+                continue
+        elif op == 'TRGSND':
+            a = prm['a']
+            r = ctx.trg_sound(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7])
+            if r is None:
+                raise PlanAbort()
+            ctx.log('trgsnd ' + ('fired' if r else 'timeout - continue'))
+        elif op == 'IFLUX':
+            ok2 = ctx.wait_light(prm['a'][0], prm['a'][1], prm['a'][2], prm['a'][3], prm['a'][4])
+            ctx.log('iflux ' + ('match -> then' if ok2 else 'timeout -> else'))
+            if not ok2:
+                i = prm['else_ip']
+                continue
+        elif op == 'ELSE':
+            i = prm['endif_ip']
+            continue
+        elif op == 'ENDIF':
+            pass
+        elif op == 'MOVETO':
+            _exec_rmouse(prm, ctx, pauses, pos, (prm['x'], prm['y']))
+        elif op == 'KEY':
+            hold = prm.get('hold', (0, 0))
+            ctx.key_combo(prm['combo'], hold[0], hold[1])
+        elif op == 'KDOWN':
+            ctx.kdown(prm['v'])
+        elif op == 'KUP':
+            ctx.kup(prm['v'])
+        elif op == 'WHEEL':
+            ctx.wheel(prm['v'])
+        elif op == 'RAW':
+            if ctx.raw(prm['line']) is None:
+                raise PlanAbort()
+        elif op == 'LABEL':
+            pass
+        elif op == 'GOTO':
+            lip = labels.get(prm['name'])
+            if lip is None:
+                ctx.log('goto: label not found: ' + prm['name'] + ' - plan stopped')
+                return
+            while stack and (not stack[-1][0] < lip < ops[stack[-1][0]][1].get('end_ip', 1 << 30)):
+                stack.pop()
+            i = lip
+            continue
+        elif op == 'RPKG':
+            progs = prm['progs']
+            order = list(range(len(progs)))
+            if prm['mode'] != 'seq':
+                for _k in range(len(order) - 1, 0, -1):
+                    _j = _below(_k + 1)
+                    order[_k], order[_j] = (order[_j], order[_k])
+                if prm['mode'] == 'pick':
+                    order = order[:rand_range(prm['mn'], prm['mx'])]
+            ctx.log('package: %d of %d' % (len(order), len(progs)))
+            for _ix in order:
+                run_plan(progs[_ix], ctx, _pos=pos, _pauses=pauses, _inc=inc)
+        elif op == 'PGROUP':
+            _rr = [[o for o in p if o[0] != 'PLAN'] for p in prm['progs']]
+            while True:
+                _live = False
+                for _b in _rr:
+                    if _b:
+                        _live = True
+                        run_plan([_b.pop(0)], ctx, _pos=pos, _pauses=pauses, _inc=inc)
+                if not _live:
+                    break
+        elif op == 'BEEP':
+            _bp = getattr(ctx, 'beep', None)
+            if _bp is None:
+                raise ValueError('BEEP needs a plan_api>=3 firmware (buzzer pin)')
+            _bp(prm['v'][0], prm['v'][1])
+        elif op == 'INCLUDE':
+            nm = prm['file']
+            if nm in inc:
+                ctx.log('include cycle: ' + nm + ' - skipped')
+            elif len(inc) >= 4:
+                ctx.log('include depth cap (4): ' + nm + ' - skipped')
+            else:
+                try:
+                    sub = parse_plan(ctx.read_plan_file(nm))
+                except Exception as exc:
+                    ctx.log('include failed: ' + nm + ': ' + str(exc))
+                else:
+                    run_plan(sub, ctx, _pos=pos, _pauses=pauses, _inc=inc + (nm,))
+        i += 1
+_motion_module = None
+_typing_module = None
+
+def _exec_rmouse(prm, ctx, pauses, pos, target=None):
+    global _motion_module
+    if _motion_module is None:
+        import plan_motion as _motion_module
+        _motion_module.PlanAbort = PlanAbort
+    return _motion_module._exec_rmouse(prm, ctx, pauses, pos, target)
+
+def plan_typing(text, prm):
+    global _typing_module
+    if _typing_module is None:
+        import plan_typing as _typing_module
+    return _typing_module.plan_typing(text, prm)
+
+"""";
+    private const string MotionTemplate = """"
+# Generated from canonical plan_engine.py; do not hand-edit.
+import time
+import math
+import random
+
+def _save_mouse_pos(ctx, pos):
+    setter = getattr(ctx, 'set_mouse_pos', None)
+    if setter is not None:
+        setter(int(pos[0]), int(pos[1]))
+
+def _rf():
+    return random.random()
+
+def _below(n):
+    return random.randrange(n) if n > 0 else 0
+
+def rand_range(mn, mx):
+    if mx < mn:
+        mn, mx = (mx, mn)
+    if mx <= 0:
+        return 0
+    return mn if mx <= mn else random.randint(mn, mx)
+
+def _clamp(v, lo, hi):
+    return lo if v < lo else hi if v > hi else v
 
 def tuned_wind(dist, curve):
-    cv = 0.30 if curve < 0 else _clamp(curve, 0.0, 2.0)
+    cv = 0.3 if curve < 0 else _clamp(curve, 0.0, 2.0)
     base = 0.3 + cv * 3.0 if cv < 1.0 else 3.3 + (cv - 1.0) * 4.7
     return base * _clamp(dist / 400.0, 0.35, 1.0)
 
-
 def build_range_profile(mn, mx, knot_count, low_ends=False):
     if mx < mn:
-        mn, mx = mx, mn
+        mn, mx = (mx, mn)
     knot_count = int(_clamp(knot_count, 2, 12))
-    if abs(mx - mn) < 1e-9:
+    if abs(mx - mn) < 1e-09:
         return [float(mn)] * knot_count
     span = mx - mn
     knots = []
     upper = _below(2) == 1
     for i in range(knot_count):
         force_low = low_ends and (i == 0 or i == knot_count - 1)
-        band = _rf() * 0.18 if force_low else (0.60 + _rf() * 0.40 if upper else _rf() * 0.40)
+        band = _rf() * 0.18 if force_low else 0.6 + _rf() * 0.4 if upper else _rf() * 0.4
         knots.append(mn + span * band)
         upper = not upper
     return knots
-
 
 def sample_profile(knots, t):
     if not knots:
@@ -987,9 +1439,8 @@ def sample_profile(knots, t):
     p = _clamp(t, 0.0, 1.0) * (len(knots) - 1)
     i = min(len(knots) - 2, int(math.floor(p)))
     u = p - i
-    smooth = u * u * (3.0 - 2.0 * u)          # C1 smoothstep
+    smooth = u * u * (3.0 - 2.0 * u)
     return knots[i] + (knots[i + 1] - knots[i]) * smooth
-
 
 def _poly_len(pts):
     total = 0.0
@@ -997,10 +1448,9 @@ def _poly_len(pts):
         total += math.sqrt((pts[i][0] - pts[i - 1][0]) ** 2 + (pts[i][1] - pts[i - 1][1]) ** 2)
     return total
 
-
 def windmouse(sx, sy, tx, ty, wind, gravity, curve, profile):
-    sqrt3, sqrt5 = math.sqrt(3.0), math.sqrt(5.0)
-    x, y = float(sx), float(sy)
+    sqrt3, sqrt5 = (math.sqrt(3.0), math.sqrt(5.0))
+    x, y = (float(sx), float(sy))
     vx = vy = wx = wy = 0.0
     dist0 = max(1.0, math.sqrt((tx - sx) ** 2 + (ty - sy) ** 2))
     if dist0 < 3:
@@ -1019,13 +1469,13 @@ def windmouse(sx, sy, tx, ty, wind, gravity, curve, profile):
             progress = _clamp(1.0 - dist / dist0, 0.0, 1.0)
             live_wind = tuned_wind(dist0, sample_profile(profile, progress) / 100.0)
         wmag = min(live_wind, dist)
-        if dist >= stop_radius * 4:             # far: wind roams; near: wind calms
+        if dist >= stop_radius * 4:
             wx = wx / sqrt3 + (2 * _rf() - 1) * wmag / sqrt5
             wy = wy / sqrt3 + (2 * _rf() - 1) * wmag / sqrt5
         else:
             wx /= sqrt3
             wy /= sqrt3
-            max_step = max(2.5, max_step / sqrt5)   # decelerate on approach
+            max_step = max(2.5, max_step / sqrt5)
         vx += wx + gravity * (tx - x) / dist
         vy += wy + gravity * (ty - y) / dist
         vmag = math.sqrt(vx * vx + vy * vy)
@@ -1035,9 +1485,8 @@ def windmouse(sx, sy, tx, ty, wind, gravity, curve, profile):
         x += vx
         y += vy
         pts.append([int(round(x)), int(round(y)), 0])
-    pts.append([tx, ty, 0])                     # land exactly on the target
+    pts.append([tx, ty, 0])
     return pts
-
 
 def resample_variable(spine, mn_sp, mx_sp):
     if not spine:
@@ -1045,25 +1494,24 @@ def resample_variable(spine, mn_sp, mx_sp):
     if len(spine) == 1:
         return [list(spine[0])]
     if mx_sp < mn_sp:
-        mn_sp, mx_sp = mx_sp, mn_sp
+        mn_sp, mx_sp = (mx_sp, mn_sp)
     mn_sp = max(0.5, mn_sp)
     mx_sp = max(mn_sp, mx_sp)
     total = _poly_len(spine)
-    if total < 1e-6:
+    if total < 1e-06:
         return [list(spine[-1])]
     profile = build_range_profile(mn_sp, mx_sp, 5)
     outp = []
     next_at = sample_profile(profile, 0.0)
     acc = 0.0
     for i in range(1, len(spine)):
-        x0, y0 = spine[i - 1][0], spine[i - 1][1]
+        x0, y0 = (spine[i - 1][0], spine[i - 1][1])
         seg = math.sqrt((spine[i][0] - x0) ** 2 + (spine[i][1] - y0) ** 2)
-        if seg < 1e-6:
+        if seg < 1e-06:
             continue
         while acc + seg >= next_at:
             u = (next_at - acc) / seg
-            outp.append([int(round(x0 + (spine[i][0] - x0) * u)),
-                         int(round(y0 + (spine[i][1] - y0) * u)), 0])
+            outp.append([int(round(x0 + (spine[i][0] - x0) * u)), int(round(y0 + (spine[i][1] - y0) * u)), 0])
             phase = _clamp(next_at / total, 0.0, 1.0)
             next_at += max(0.5, sample_profile(profile, phase))
         acc += seg
@@ -1072,10 +1520,7 @@ def resample_variable(spine, mn_sp, mx_sp):
         outp.append([last[0], last[1], 0])
     return outp
 
-
 def assign_dynamic_delays(pts, sx, sy, smin, smax, target_ms=0):
-    """v0.9.8/10 port: per-point delay from a smooth speed profile (low at both ends,
-    alternating interior knots), normalized to target_ms when the step set a duration."""
     for p in pts:
         p[2] = 0
     if not pts or (smax <= 0 and target_ms <= 0):
@@ -1087,13 +1532,13 @@ def assign_dynamic_delays(pts, sx, sy, smin, smax, target_ms=0):
     prof = build_range_profile(float(lo), float(hi), knot_count, low_ends=True)
     segs = []
     path = 0.0
-    px, py = sx, sy
+    px, py = (sx, sy)
     for p in pts:
         s = math.sqrt((p[0] - px) ** 2 + (p[1] - py) ** 2)
         segs.append(s)
         path += s
-        px, py = p[0], p[1]
-    if path < 1e-6:
+        px, py = (p[0], p[1])
+    if path < 1e-06:
         return
     weights = []
     wsum = 0.0
@@ -1111,38 +1556,33 @@ def assign_dynamic_delays(pts, sx, sy, smin, smax, target_ms=0):
     for i in range(len(pts)):
         pts[i][2] = max(1, int(round(weights[i] * scale)))
 
-
 def curve_height_ratio(pct):
     p = _clamp(float(pct), 0.0, 200.0)
     if p <= 100.0:
-        return 0.08 * ((p / 100.0) ** 1.15)
+        return 0.08 * (p / 100.0) ** 1.15
     return 0.08 + 0.42 * math.sqrt((p - 100.0) / 100.0)
-
 
 def _ray_to_edge(x, y, dx, dy, w, h, margin):
     max_x = max(margin, w - 1.0 - margin)
     max_y = max(margin, h - 1.0 - margin)
-    limit = float("inf")
-    if abs(dx) > 1e-9:
+    limit = float('inf')
+    if abs(dx) > 1e-09:
         limit = min(limit, (max_x - x) / dx if dx > 0 else (margin - x) / dx)
-    if abs(dy) > 1e-9:
+    if abs(dy) > 1e-09:
         limit = min(limit, (max_y - y) / dy if dy > 0 else (margin - y) / dy)
-    return max(0.0, limit) if limit != float("inf") else 0.0
-
+    return max(0.0, limit) if limit != float('inf') else 0.0
 
 def build_arc(sx, sy, tx, ty, total_ms, cmin, cmax, w, h):
-    """v0.9.7/8 port: one continuous half-ellipse; curvature glides through the range;
-    the side with screen room is chosen and pre-scaled so no flat clamped sections."""
-    dx, dy = tx - sx, ty - sy
+    dx, dy = (tx - sx, ty - sy)
     dist = math.sqrt(dx * dx + dy * dy)
     if dist < 3:
-        return [[tx, ty, max(0, total_ms)]], 0.0, total_ms
+        return ([[tx, ty, max(0, total_ms)]], 0.0, total_ms)
     cmin = _clamp(cmin, 0, 200)
     cmax = _clamp(cmax, 0, 200)
     if cmax < cmin:
-        cmin, cmax = cmax, cmin
-    ux, uy = dx / dist, dy / dist
-    nx, ny = -uy, ux
+        cmin, cmax = (cmax, cmin)
+    ux, uy = (dx / dist, dy / dist)
+    nx, ny = (-uy, ux)
     skew = _rf() * 0.14 - 0.07
     wobble = 0.025 + _rf() * 0.045
     phase0 = _rf() * math.pi * 2.0
@@ -1160,21 +1600,19 @@ def build_arc(sx, sy, tx, ty, total_ms, cmin, cmax, w, h):
             bx = sx + ux * dist * along
             by = sy + uy * dist * along
             required = dist * curve_height_ratio(sample_profile(knots, t)) * max(0.0, shape)
-            if required < 1e-6:
+            if required < 1e-06:
                 continue
             room = _ray_to_edge(bx, by, nx * side, ny * side, w, h, 2.0)
             fit = min(fit, room / required)
         return _clamp(fit * 0.94, 0.0, 1.0)
-
-    fit_pos, fit_neg = fit_for_side(+1), fit_for_side(-1)
-    if fit_pos >= 0.90 and fit_neg >= 0.90:
+    fit_pos, fit_neg = (fit_for_side(+1), fit_for_side(-1))
+    if fit_pos >= 0.9 and fit_neg >= 0.9:
         side = -1 if _below(2) == 0 else +1
         fit = fit_pos if side > 0 else fit_neg
     elif fit_pos >= fit_neg:
-        side, fit = +1, fit_pos
+        side, fit = (+1, fit_pos)
     else:
-        side, fit = -1, fit_neg
-
+        side, fit = (-1, fit_neg)
     spine = [[sx, sy, 0]]
     actual_height = 0.0
     for i in range(1, samples):
@@ -1185,77 +1623,39 @@ def build_arc(sx, sy, tx, ty, total_ms, cmin, cmax, w, h):
         local_h = dist * curve_height_ratio(sample_profile(knots, t)) * fit
         normal = side * local_h * max(0.0, shape)
         actual_height = max(actual_height, abs(normal))
-        spine.append([int(round(sx + ux * dist * along + nx * normal)),
-                      int(round(sy + uy * dist * along + ny * normal)), 0])
+        spine.append([int(round(sx + ux * dist * along + nx * normal)), int(round(sy + uy * dist * along + ny * normal)), 0])
     spine.append([tx, ty, 0])
     path_len = _poly_len(spine)
     arc_ms = 0 if total_ms <= 0 else int(_clamp(round(total_ms * max(1.0, path_len / dist)), 60, 30000))
-    # memory guard: Pico RAM - only >2500px moves (>4K diagonals) get wider spacing;
-    # every screen up to 1440p keeps the hand-matched 2.0-3.2 px gliding steps.
     scale = max(1.0, dist / 2500.0)
-    return resample_variable(spine, 2.0 * scale, 3.2 * scale), actual_height, arc_ms
-
-
-class PausePlanner:
-    """Run-scoped pause manager: long distraction breaks once per fresh random cadence."""
-
-    def __init__(self):
-        self.moves_since = 0
-        self.next_idle_at = -1
-
-    def mid_pause(self, c):
-        if c["mid_chance"] > 0 and _below(100) < c["mid_chance"]:
-            return rand_range(c["mid_min"], c["mid_max"])
-        return 0
-
-    def roll_long(self, c):
-        if c["idle_pause_max"] <= 0 or c["idle_every_max"] <= 0:
-            return 0
-        self.moves_since += 1
-        if self.next_idle_at < 0:
-            self.next_idle_at = max(1, rand_range(c["idle_every_min"], c["idle_every_max"]))
-        if self.moves_since < self.next_idle_at:
-            return 0
-        self.moves_since = 0
-        self.next_idle_at = max(1, rand_range(c["idle_every_min"], c["idle_every_max"]))
-        return rand_range(c["idle_pause_min"], c["idle_pause_max"])
-
-
-_DEFAULT_CFG = dict(before_min=120, before_max=450, after_min=150, after_max=600,
-                    mid_chance=12, mid_min=100, mid_max=400,
-                    idle_every_min=5, idle_every_max=12, idle_pause_min=1000, idle_pause_max=5000,
-                    over_chance=15, curve_min=15, curve_max=45,
-                    speed_min=0, speed_max=2000, mt_min=0, mt_max=0)
-
+    return (resample_variable(spine, 2.0 * scale, 3.2 * scale), actual_height, arc_ms)
+_DEFAULT_CFG = dict(before_min=120, before_max=450, after_min=150, after_max=600, mid_chance=12, mid_min=100, mid_max=400, idle_every_min=5, idle_every_max=12, idle_pause_min=1000, idle_pause_max=5000, over_chance=15, curve_min=15, curve_max=45, speed_min=0, speed_max=2000, mt_min=0, mt_max=0)
 
 def plan_move(sx, sy, tx, ty, c, pauses, w, h):
-    """Full PlanMove port. Returns dict(before, after, long, pts=[[x,y,delayMs]...])."""
     tx = int(_clamp(tx, 0, max(0, w - 1)))
     ty = int(_clamp(ty, 0, max(0, h - 1)))
     sx = int(_clamp(sx, 0, max(0, w - 1)))
     sy = int(_clamp(sy, 0, max(0, h - 1)))
     dist = math.sqrt((tx - sx) ** 2 + (ty - sy) ** 2)
-    speed_lo = max(150, c["speed_min"])
-    speed_hi = max(speed_lo, c["speed_max"])
-    total_ms = 0 if c["speed_max"] <= 0 else int(_clamp(
-        dist * 1000.0 / max(1.0, (speed_lo + speed_hi) / 2.0), 60, 30000))
-    curve_min = int(_clamp(c["curve_min"], 0, 200))
-    curve_max = int(_clamp(c["curve_max"], 0, 200))
+    speed_lo = max(150, c['speed_min'])
+    speed_hi = max(speed_lo, c['speed_max'])
+    total_ms = 0 if c['speed_max'] <= 0 else int(_clamp(dist * 1000.0 / max(1.0, (speed_lo + speed_hi) / 2.0), 60, 30000))
+    curve_min = int(_clamp(c['curve_min'], 0, 200))
+    curve_max = int(_clamp(c['curve_max'], 0, 200))
     if curve_max < curve_min:
-        curve_min, curve_max = curve_max, curve_min
+        curve_min, curve_max = (curve_max, curve_min)
     sampled = curve_min if curve_max == curve_min else random.randint(curve_min, curve_max)
     curve = _clamp(sampled / 100.0, 0.0, 2.0)
-    mt_min, mt_max = max(0, c["mt_min"]), max(0, c["mt_max"])
+    mt_min, mt_max = (max(0, c['mt_min']), max(0, c['mt_max']))
     if mt_max < mt_min:
-        mt_min, mt_max = mt_max, mt_min
+        mt_min, mt_max = (mt_max, mt_min)
     target_ms = rand_range(max(1, mt_min), max(1, mt_max)) if mt_max > 0 else 0
-
     dense = []
     overshoot_idx = -1
-    if curve_max > 100 and dist >= 80:                          # true arc mode
+    if curve_max > 100 and dist >= 80:
         dense, _height, _arc_ms = build_arc(sx, sy, tx, ty, total_ms, curve_min, curve_max, w, h)
-    elif dist >= 60 and c["over_chance"] > 0 and _below(100) < c["over_chance"]:
-        ux, uy = (tx - sx) / dist, (ty - sy) / dist
+    elif dist >= 60 and c['over_chance'] > 0 and (_below(100) < c['over_chance']):
+        ux, uy = ((tx - sx) / dist, (ty - sy) / dist)
         cscale = min(1.0, curve)
         over = int(_clamp(dist * (0.03 + _rf() * 0.05) * cscale, 2, 20))
         perp = int(_rf() * (2.0 + cscale * 5.0) - (1.0 + cscale * 2.5))
@@ -1268,25 +1668,16 @@ def plan_move(sx, sy, tx, ty, c, pauses, w, h):
         dense += _build_leg(ox, oy, tx, ty, leg2_ms, curve, curve_min, curve_max)
     else:
         dense = _build_leg(sx, sy, tx, ty, total_ms, curve, curve_min, curve_max)
-
-    for p in dense:                                             # keep on-screen
+    for p in dense:
         p[0] = int(_clamp(p[0], 0, max(0, w - 1)))
         p[1] = int(_clamp(p[1], 0, max(0, h - 1)))
-
-    assign_dynamic_delays(dense, sx, sy, c["speed_min"], c["speed_max"], target_ms)
-
-    if overshoot_idx >= 0:                                      # re-aim pause
+    assign_dynamic_delays(dense, sx, sy, c['speed_min'], c['speed_max'], target_ms)
+    if overshoot_idx >= 0:
         dense[overshoot_idx][2] += rand_range(60, 180)
-    mid = pauses.mid_pause(c)                                   # one hesitation per move
+    mid = pauses.mid_pause(c)
     if mid > 0 and len(dense) >= 8:
         dense[2 + _below(len(dense) - 4)][2] += mid
-
-    return {"before": rand_range(c["before_min"], c["before_max"]),
-            "after": rand_range(c["after_min"], c["after_max"]),
-            "long": pauses.roll_long(c),
-            "target": (tx, ty),
-            "pts": dense}
-
+    return {'before': rand_range(c['before_min'], c['before_max']), 'after': rand_range(c['after_min'], c['after_max']), 'long': pauses.roll_long(c), 'target': (tx, ty), 'pts': dense}
 
 def _build_leg(sx, sy, tx, ty, total_ms, curve, cmin, cmax):
     dist0 = max(1.0, math.sqrt((tx - sx) ** 2 + (ty - sy) ** 2))
@@ -1295,15 +1686,77 @@ def _build_leg(sx, sy, tx, ty, total_ms, curve, cmin, cmax):
         profile = build_range_profile(cmin, cmax, int(_clamp(4 + int(dist0 / 320.0), 4, 8)))
     spine = windmouse(sx, sy, tx, ty, tuned_wind(dist0, curve), 14.0, curve, profile)
     with_start = [[sx, sy, 0]] + spine
-    scale = max(1.0, dist0 / 2500.0)                           # Pico RAM guard (>4K only)
+    scale = max(1.0, dist0 / 2500.0)
     return resample_variable(with_start, 2.0 * scale, 3.2 * scale)
 
+def _exec_rmouse(prm, ctx, pauses, pos, target=None):
+    rx, ry, rw, rh = prm.get('region', (0, 0, ctx.screen_w, ctx.screen_h))
+    c = dict(_DEFAULT_CFG)
+    c['speed_min'], c['speed_max'] = (ctx.speed_min, ctx.speed_max)
+    if 'mt' in prm:
+        c['mt_min'], c['mt_max'] = prm['mt']
+    if 'curve' in prm:
+        c['curve_min'], c['curve_max'] = prm['curve']
+    if 'before' in prm:
+        c['before_min'], c['before_max'] = prm['before']
+    if 'after' in prm:
+        c['after_min'], c['after_max'] = prm['after']
+    if 'mid' in prm:
+        c['mid_chance'], (c['mid_min'], c['mid_max']) = prm['mid']
+    if 'idle' in prm:
+        (c['idle_every_min'], c['idle_every_max']), (c['idle_pause_min'], c['idle_pause_max']) = prm['idle']
+    if 'over' in prm:
+        c['over_chance'] = prm['over']
+    if target is None:
+        tx = random.randint(rx, rx + max(0, rw - 1))
+        ty = random.randint(ry, ry + max(0, rh - 1))
+    else:
+        tx, ty = target
+    if prm.get('human', 1) == 0:
+        ctx.mmove(tx, ty)
+        pos[0], pos[1] = (tx, ty)
+        _save_mouse_pos(ctx, pos)
+        return
+    plan = plan_move(pos[0], pos[1], tx, ty, c, pauses, ctx.screen_w, ctx.screen_h)
+    ctx.log('rmouse -> (%d,%d) %d pts' % (tx, ty, len(plan['pts'])))
+    if not ctx.sleep_ms(plan['before']):
+        raise PlanAbort()
+    for pt in plan['pts']:
+        ctx.mmove(pt[0], pt[1])
+        pos[0], pos[1] = (pt[0], pt[1])
+        _save_mouse_pos(ctx, pos)
+        if not ctx.sleep_ms(pt[2]):
+            raise PlanAbort()
+    pos[0], pos[1] = plan['target']
+    _save_mouse_pos(ctx, pos)
+    if not ctx.sleep_ms(plan['after']):
+        raise PlanAbort()
+    if plan['long'] > 0:
+        ctx.log('idle break %d ms' % plan['long'])
+        if not ctx.sleep_ms(plan['long']):
+            raise PlanAbort()
 
-# ── typing port (C# TypeTextCommands v0.9.15 → Python) ──────────────────────────────────
+"""";
+    private const string TypingTemplate = """"
+# Generated from canonical plan_engine.py; do not hand-edit.
+import time
+import math
+import random
 
-_QWERTY_ROWS = ("1234567890", "qwertyuiop", "asdfghjkl", "zxcvbnm")
-_PUNCT = ".,!?;:"
+def _below(n):
+    return random.randrange(n) if n > 0 else 0
 
+def rand_range(mn, mx):
+    if mx < mn:
+        mn, mx = (mx, mn)
+    if mx <= 0:
+        return 0
+    return mn if mx <= mn else random.randint(mn, mx)
+
+def _clamp(v, lo, hi):
+    return lo if v < lo else hi if v > hi else v
+_QWERTY_ROWS = ('1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm')
+_PUNCT = '.,!?;:'
 
 def _qwerty_neighbor(ch):
     lower = ch.lower()
@@ -1318,11 +1771,9 @@ def _qwerty_neighbor(ch):
         return n.upper() if ch.isupper() else n
     return None
 
-
 def _split_punct(s):
     outp = []
     start = 0
-
     for i in range(len(s) - 1):
         if s[i] in _PUNCT:
             outp.append(s[start:i + 1])
@@ -1333,50 +1784,44 @@ def _split_punct(s):
         outp.append(s)
     return outp
 
-
 def plan_typing(text, p):
-    """Returns [("KTEXT",hmin,hmax,chunk) | ("DLY",ms) | ("KCOMBO",vk), ...].
-    p keys: h,w (ms ranges), wp (word pause chance %), p (punct pause range),
-    think ((chance,(mn,mx))), typo ((mn,mx) cadence, 0/0=off)."""
-    hmin, hmax = p.get("h", (80, 220))
-    wmin, wmax = p.get("w", (0, 0))
-    wp = _clamp(p.get("wp", 100), 0, 100)
-    pmin, pmax = p.get("p", (0, 0))
-    think_chance, think_range = p.get("think", (0, (800, 2200)))
+    hmin, hmax = p.get('h', (80, 220))
+    wmin, wmax = p.get('w', (0, 0))
+    wp = _clamp(p.get('wp', 100), 0, 100)
+    pmin, pmax = p.get('p', (0, 0))
+    think_chance, think_range = p.get('think', (0, (800, 2200)))
     think_chance = _clamp(think_chance, 0, 100)
     think_min, think_max = think_range
-    typo_min, typo_max = p.get("typo", (0, 0))
+    typo_min, typo_max = p.get('typo', (0, 0))
     typo_cadence = typo_max > 0
     next_typo_at = max(1, rand_range(typo_min, typo_max)) if typo_cadence else -1
     words_since_typo = 0
     word_mode = wmax > 0 or pmax > 0 or think_chance > 0 or typo_cadence
-
     cmds = []
-    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    lines = text.replace('\r\n', '\n').replace('\r', '\n').split('\n')
     pending = []
 
     def flush():
-        s = "".join(pending)
+        s = ''.join(pending)
         pending.clear()
         for i in range(0, len(s), 60):
-            cmds.append(("KTEXT", hmin, hmax, s[i:i + 60]))
-
+            cmds.append(('KTEXT', hmin, hmax, s[i:i + 60]))
     for li, line in enumerate(lines):
         if word_mode:
             words = [wd for wd in line.split() if wd]
             for wi, word in enumerate(words):
-                tail = " " if wi < len(words) - 1 else ""
+                tail = ' ' if wi < len(words) - 1 else ''
                 typed = word + tail
-                typo_due = typo_cadence and (words_since_typo := words_since_typo + 1) >= next_typo_at
+                typo_due = typo_cadence and (words_since_typo := (words_since_typo + 1)) >= next_typo_at
                 if typo_due and 2 <= len(word) <= 60:
-                    pos = 1 + _below(len(word) - 1)      # never the first char
+                    pos = 1 + _below(len(word) - 1)
                     wrong = _qwerty_neighbor(word[pos])
                     if wrong is not None:
                         flush()
-                        cmds.append(("KTEXT", hmin, hmax, word[:pos] + wrong))
-                        cmds.append(("DLY", rand_range(max(hmax, 120), hmax * 2 + 200)))
-                        cmds.append(("KCOMBO", 8))       # Backspace
-                        cmds.append(("DLY", rand_range(hmin, hmax)))
+                        cmds.append(('KTEXT', hmin, hmax, word[:pos] + wrong))
+                        cmds.append(('DLY', rand_range(max(hmax, 120), hmax * 2 + 200)))
+                        cmds.append(('KCOMBO', 8))
+                        cmds.append(('DLY', rand_range(hmin, hmax)))
                         typed = word[pos:] + tail
                         words_since_typo = 0
                         next_typo_at = max(1, rand_range(typo_min, typo_max))
@@ -1385,135 +1830,21 @@ def plan_typing(text, p):
                     pending.append(seg)
                     if si < len(segs) - 1:
                         flush()
-                        cmds.append(("DLY", rand_range(pmin, pmax)))
+                        cmds.append(('DLY', rand_range(pmin, pmax)))
                 if wi < len(words) - 1:
                     if wmax > 0 and _below(100) < wp:
                         flush()
-                        cmds.append(("DLY", rand_range(wmin, wmax)))
-                    if think_chance > 0 and think_max > 0 and _below(100) < think_chance:
+                        cmds.append(('DLY', rand_range(wmin, wmax)))
+                    if think_chance > 0 and think_max > 0 and (_below(100) < think_chance):
                         flush()
-                        cmds.append(("DLY", rand_range(think_min, think_max)))
+                        cmds.append(('DLY', rand_range(think_min, think_max)))
             flush()
         else:
             for i in range(0, len(line), 60):
-                cmds.append(("KTEXT", hmin, hmax, line[i:i + 60]))
+                cmds.append(('KTEXT', hmin, hmax, line[i:i + 60]))
         if li < len(lines) - 1:
-            cmds.append(("KCOMBO", 13))                  # Enter between lines
+            cmds.append(('KCOMBO', 13))
     return cmds
-
-
-# ── executor ─────────────────────────────────────────────────────────────────────────────
-
-def run_plan(ops, ctx):
-    """Executes parsed ops against ctx. ctx provides:
-    now()->float seconds, sleep_ms(ms)->bool(False=abort), mmove(x,y),
-    mclick(btn,n,hmin,hmax), ktext(hmin,hmax,text), kcombo(vk),
-    wait_light(lo,hi,stable,to,mode)->bool, key(vk,hold_ms), log(msg),
-    screen_w, screen_h, speed_min, speed_max."""
-    pauses = PausePlanner()
-    pos = _load_mouse_pos(ctx, ops)
-    i = 0
-    stack = []          # [start_index, remaining(0=forever), deadline_or_None]
-    while i < len(ops):
-        op, prm = ops[i]
-        if op == "PLAN":
-            pass
-        elif op == "SCREEN":
-            ctx.screen_w, ctx.screen_h = prm["v"]
-            pos[0] = _clamp(pos[0], 0, max(0, ctx.screen_w - 1))
-            pos[1] = _clamp(pos[1], 0, max(0, ctx.screen_h - 1))
-            _save_mouse_pos(ctx, pos)
-        elif op == "SPEED":
-            ctx.speed_min, ctx.speed_max = prm["v"]
-        elif op == "DELAY":
-            if not ctx.sleep_ms(rand_range(*prm["v"])):
-                raise PlanAbort()
-        elif op == "LOOP":
-            stack.append([i, prm["n"], None])
-        elif op == "LOOPTIME":
-            stack.append([i, 0, ctx.now() + prm["sec"]])
-        elif op == "ENDLOOP":
-            top = stack[-1]
-            if top[2] is not None:                       # LOOPTIME
-                if ctx.now() < top[2]:
-                    i = top[0]
-                else:
-                    stack.pop()
-            elif top[1] == 0:                            # forever
-                i = top[0]
-            else:
-                top[1] -= 1
-                if top[1] > 0:
-                    i = top[0]
-                else:
-                    stack.pop()
-        elif op == "RMOUSE":
-            _exec_rmouse(prm, ctx, pauses, pos)
-        elif op == "CLICK":
-            hold = prm.get("hold", (0, 0))
-            ctx.mclick(prm["btn"], prm["n"], hold[0], hold[1])
-        elif op == "TYPE":
-            for cmd in plan_typing(prm["text"], prm):
-                if cmd[0] == "KTEXT":
-                    ctx.ktext(cmd[1], cmd[2], cmd[3])
-                elif cmd[0] == "DLY":
-                    if not ctx.sleep_ms(cmd[1]):
-                        raise PlanAbort()
-                else:
-                    ctx.kcombo(cmd[1])
-        elif op == "WLIGHT":
-            ok = ctx.wait_light(prm["lo"], prm["hi"], prm["stable"], prm["to"], prm["mode"])
-            if ok and "key" in prm:
-                vk, hmn, hmx = prm["key"]
-                rmn, rmx = prm.get("react", (80, 180))
-                if not ctx.sleep_ms(rand_range(rmn, rmx)):
-                    raise PlanAbort()
-                ctx.key(vk, rand_range(hmn, hmx))
-            ctx.log("wlight " + ("match" if ok else "timeout"))
-        i += 1
-
-
-
-def _exec_rmouse(prm, ctx, pauses, pos):
-    rx, ry, rw, rh = prm["region"]
-    c = dict(_DEFAULT_CFG)
-    c["speed_min"], c["speed_max"] = ctx.speed_min, ctx.speed_max
-    if "mt" in prm:
-        c["mt_min"], c["mt_max"] = prm["mt"]
-    if "curve" in prm:
-        c["curve_min"], c["curve_max"] = prm["curve"]
-    if "before" in prm:
-        c["before_min"], c["before_max"] = prm["before"]
-    if "after" in prm:
-        c["after_min"], c["after_max"] = prm["after"]
-    if "mid" in prm:
-        c["mid_chance"], (c["mid_min"], c["mid_max"]) = prm["mid"]
-    if "idle" in prm:
-        (c["idle_every_min"], c["idle_every_max"]), (c["idle_pause_min"], c["idle_pause_max"]) = prm["idle"]
-    if "over" in prm:
-        c["over_chance"] = prm["over"]
-    tx = random.randint(rx, rx + max(0, rw - 1))
-    ty = random.randint(ry, ry + max(0, rh - 1))
-    plan = plan_move(pos[0], pos[1], tx, ty, c, pauses, ctx.screen_w, ctx.screen_h)
-    ctx.log("rmouse -> (%d,%d) %d pts" % (tx, ty, len(plan["pts"])))
-    if not ctx.sleep_ms(plan["before"]):
-        raise PlanAbort()
-    for pt in plan["pts"]:
-        ctx.mmove(pt[0], pt[1])
-        # Persist immediately, before the abortable delay: Stop in the middle of
-        # a path resumes from the last point that was actually sent to the arm.
-        pos[0], pos[1] = pt[0], pt[1]
-        _save_mouse_pos(ctx, pos)
-        if not ctx.sleep_ms(pt[2]):
-            raise PlanAbort()
-    pos[0], pos[1] = plan["target"]
-    _save_mouse_pos(ctx, pos)
-    if not ctx.sleep_ms(plan["after"]):
-        raise PlanAbort()
-    if plan["long"] > 0:
-        ctx.log("idle break %d ms" % plan["long"])
-        if not ctx.sleep_ms(plan["long"]):
-            raise PlanAbort()
 
 """";
 }

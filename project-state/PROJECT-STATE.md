@@ -1,61 +1,57 @@
 # Classroom Studio — وضعیت زنده‌ی پروژه
 
-> این سند، منبع حقیقت جاری پروژه است. بعد از هر نسخه به‌روز می‌شود.
-> برگه‌ی Notion («Classroom Studio — پروژه ۲») تاریخچه‌ی کامل جلسات را دارد؛ این فایل وضعیت لحظه‌ای است.
+> منبع حقیقت جاری پروژه؛ تاریخچه‌ی کامل در صفحه‌ی Notion پروژه نگهداری می‌شود.
 
-## وضعیت لحظه‌ای — ۲۰۲۶-۰۹-۰۸ (به‌روزرسانی چهارم)
+## وضعیت لحظه‌ای — ۲۰۲۶-۰۹-۱۱
 
-**مبنای فعلی: `main` @ v0.9.60 — CI سبز (`ci-16`: ۶۷۶ پاس / ۰ فیل) + پچ تجمیع v0.9.60**
+- خط کاری: `0.9.66 / PLAN|2`
+- مخزن: `pedrampedi81-dotcom/smc`
+- شاخه: `feat/portable-plan2-app-0966`
+- PR: `#26` — همچنان Draft تا ثبت PONG نهایی و تأیید مشاهده‌ای تایپ/حرکت
+- مبنای `main`: `f9f819ba7a8a183f2c7f9040c039e7f502abbe26`؛ هیچ تغییر مستقیمی روی `main` انجام نشده است.
+- checkpoint split-runtime سبز: `0df78e3f`.
 
-- ریپو: `pedrampedi81-dotcom/smc` (private) · هر push سبز ← Release خودکار (زیپ + sha256 + لاگ) · هر قرمز ← Issue با خطوط FAIL
-- آخرین Release قبل از این نسخه: **ci-16** (676/0) روی commit `a004df45` (دکمه‌ی کپی لاگ)
-- آخرین نسخه‌ی منسوج: **v0.9.60 — firmware consolidation + transport hardening**
+## نتیجه‌های تثبیت‌شده
 
-## v0.9.60 چه چیزی را یکجا می‌کند
+- Python gate اصلی: `103 passed, 0 failed` (`sim2=21`, `sim3=42`, `compiler=40`).
+- Windows app build: `0 errors`؛ هشدارهای nullable موجود و غیرمسدودکننده‌اند.
+- `TestRunner`: `752 passed, 0 failed`.
+- engine کامل canonical برابر `50,174 bytes` و SHA-256 صحیح آن `b94b4e8ba3647851814e0a7ea6a1ceb9d92c033a3ad8cc7058a0143853ed3674` است.
+- import مستقیم engine کامل روی Pico/CircuitPython 10.3.0 با `memory allocation failed, allocating 3112 bytes` شکست خورد؛ این محدودیت با حذف opcode پنهان نشده است.
+- generator قطعی `tools/split_plan_engine.py` همان engine canonical را به runtime سه‌فایلی lazy تبدیل می‌کند:
+  - `plan_engine.py`: `24,994 bytes` — `c12f2f9c32ddc8648b32cd103b3158abe39c2b05beae914e6a9ce685819fc5ac`
+  - `plan_motion.py`: `14,028 bytes` — `9a088d2e9d8c032ca39faef119f580852534d844c52f79188501d845103655f8`
+  - `plan_typing.py`: `3,967 bytes` — `1a0ea9e79ece0aeee85530e2ac583c75067298b5f29f21383152fea160a235c5`
+- differential gate split-runtime برابر `18 passed, 0 failed` است و PLAN|1/2، همه‌ی flow/sound/light/key/raw/package/parallel/beep/includeهای پوشش‌داده‌شده، negative parser cases و lazy import را با canonical مقایسه می‌کند.
+- build سخت‌افزاری `pico-light 0.9.64f-plan2h4` روی Pico واقعی `plan: loaded 7 ops` و سپس `plan: rmouse -> (1286,234) 175 pts` ثبت کرد؛ بنابراین core، typing (که قبل از RMOUSE اجرا می‌شود) و motion هر سه بدون MemoryError بارگذاری شدند. در لاگ ۶۰ثانیه‌ای هیچ `MemoryError`، `run error` یا `ack watchdog reset` ثبت نشد.
+- exporter اکنون `plan.txt`، child planهای بازگشتی، `plan_engine.py`، `plan_motion.py`، `plan_typing.py` و `README-PLAN.md` را در یک transaction stage/publish/rollback می‌کند.
+- هر سه ماژول Python به‌شکل byte-identical داخل `PlanExporter.cs` جاسازی و در TestRunner با goldens تولیدشده مقایسه می‌شوند.
+- size budget در CI: core حداکثر 26,000، motion حداکثر 15,000 و typing حداکثر 5,000 بایت.
+- `findImage` و typing غیر ASCII/secret/clipboard صریحاً blocking هستند؛ silent skip وجود ندارد.
+- `playScript` childهای `.amsj` را بازگشتی با depth cap چهار، cycle/missing/malformed/collision guard و `PlayRepeatMode=once` compile می‌کند.
+- گارد CI برای منع `ams_key.json`, `ams_key.h`، کلید خصوصی/token، HEX شخصی/واقعی و backupهای flash/EEPROM فعال و سبز است.
 
-قرارداد نهایی سخت‌افزار (مصوب ۰۰:۱۷ بامداد ۰۹-۰۸) که قبلاً فقط به‌صورت فایل standalone دست‌آزمایی شده بود (0.9.59h/k/m/n)، حالا وارد سورس و ژنراتور شد:
+## سیاست bundle
 
-1. **فرم‌ور پیکو (`PicoFirmwareExporter.CodeTemplate`)** — بازنویسی hardened:
-   - سنسور BH1750 **اختیاری** است؛ بدون سنسور بوت و `PING` کار می‌کند و `WLUX`/`TRGLUX`/`LCAL` ← `ERR|NOSENSOR` (رفع مرگ خاموش بوت با سیم شل‌شده)
-   - بافر سریال **بایتی و کران‌دار** به‌جای الحاق رشته‌ای (رفع خردشدن heap و MemoryError)
-   - **پمپ دائمی بازو** در هر تکرار حلقه و داخل انتظارها: EVTهای پرو میکرو زنده به PC می‌رسند و بافر TX کوچک بازو هرگز پر نمی‌شود (رفع زنجیره‌ی مرگ ۲۲:۲۲)
-   - فرمان‌های موس **fire-and-ack** (فوروارد + پاسخ فوری) تا مسیرهای متراکم انسانی نرم بمانند؛ صدا/SETRES همچنان پاسخ واقعی بازو را منتظر می‌مانند
-   - **کیبورد همیشه روی پیکو**: هر دو envelope ‏`KBDPICO|` و `KBDARM|` محلی مصرف می‌شوند؛ پرو میکرو هرگز تایپ نمی‌کند
-   - **کیپد ثابت** مستقل از Options: ‏GP4→GND = Num Lock = Start/Stop · ‏GP3→GND = Scroll Lock = Pause/Resume (هم موتور standalone و هم HID به PC)
-   - `AUTOSTART = False` پیش‌فرض: کپی/بوت code.py ماکرو را خودکار شروع نمی‌کند؛ موتور standalone تا ۳ ثانیه بعد از آخرین فرمان host ساکت است (ضد اجرای دوبل)
-   - نگهبان **never-die** دور هر خط و کل حلقه (Ctrl+C همچنان کار می‌کند — Exception نیست)
-2. **bridge.py** — خروجی never-die با UTF-8 اجباری (`reconfigure(encoding="utf-8", errors="replace")`) + فالبک `ensure_ascii=True` در emit؛ رفع کرش cp1252 هنگام **گزارش** خطا که خطای واقعی را پنهان می‌کرد
-3. **PythonBoardBridge.cs** — `StandardOutputEncoding`/`StandardErrorEncoding = UTF-8` + `PYTHONIOENCODING=utf-8`؛ لاگ فارسی دیگر mojibake نیست
-4. **UI** — `SelectionMode="Extended"` برای لاگ سریال (کپی خطوط انتخاب‌شده با Ctrl/Shift واقعاً کار می‌کند)
-5. **stableSec اعشاری end-to-end** — `0.5` → ‏`WLUX|...,500,...` · خلاصه‌ی ردیف `0.5s` را نشان می‌دهد (نه int گردشده) · پارس دیالوگ مستقل از locale ویندوز (InvariantCulture + فالبک محلی)
+- child plan قدیمی که دیگر در dependency graph نیست خودکار حذف نمی‌شود؛ پاک‌سازی آن باید آگاهانه و دستی انجام شود.
+- generator split منبع حقیقت را fork نمی‌کند؛ خروجی سه‌فایلی همیشه از canonical engine بازتولید می‌شود.
+- شکست staging/publish باید کل bundle قبلی شامل هر سه ماژول runtime را بازگرداند و `.tmp/.bak` باقی نگذارد.
 
-نسخه‌ها: csproj + بنر + `BundleVersion` = **0.9.60** · نگهبان مِتای TestRunner: `curMinor = 60` · گام ۵۸ تست با ۱۵ assertion تازه
+## مرحله‌ی باز بعدی
 
-## معماری بردها (قرارداد قطعی)
+1. ثبت PONG نهایی `h4` با `planapi=3|engine=split` و صفر `cksum/noframe/sentjumps/partial`.
+2. تأیید مشاهده‌ای اینکه `PLAN2_OK` دقیقاً یک بار تایپ و موس یک بار نرم حرکت کرده است.
+3. پس از این پذیرش نهایی، آماده‌سازی PR جدا برای version bump؛ هیچ bump در PR #26 انجام نشود.
 
-| برد | نقش | پین‌ها |
-| --- | --- | --- |
-| Raspberry Pi Pico | مغز: کیبورد HID + سنسور نور BH1750 + موتور ماکرو standalone | UART0: GP16=TX ← GP17=RX (BSS138) · I2C: SDA=GP20 / SCL=GP21 (0x23) · کیپد: GP4=Start/Stop · GP3=Pause/Resume |
-| Arduino Pro Micro (fw 1.7) | بازو: فقط موس + سنسور صدا | A0 = سنسور صدا · رم ۸۸٪ / فلش ۸۱٪ — فلش ISP با `isp_flash_app.py` انجام شد |
+## baseline سخت‌افزار که نباید تغییر کند
 
-- مسیر عملیاتی همیشه از پیکو می‌گذرد؛ اتصال مستقیم USB به بازو فقط برای سرویس/تشخیص است
-- `PING` روی پیکو: `OK|PONG|pico-light 0.9.60|role=brain+keyboard+light|arm=promicro`
-- پل bridge اول مغز پیکو را پروب می‌کند (متن‌باز، بدون ams_key.json)؛ نبود ← BoardLink رمزشده برای اتصال مستقیم به بازو
+- Pico transport: `0.9.64f-plan2h4` روی CircuitPython `10.3.0`
+- Pro Micro: `2.5`
 
-## CI/CD
+## قواعد ثابت
 
-- ورک‌فلو v5.2: `py_compile` روی bridge.py + تست رفتاری `tools/test_bridge_pico.py` + build جداگانه‌ی TestRunner + تست‌ها با خروجی کامل (`2>&1`) · فقط ۰ فیل Release می‌سازد · push فقط-مستنداتی نادیده گرفته می‌شود
-- دارون‌وابسته‌ها روی CI تمیز SKIP می‌شوند (طراحی‌شده)
-
-## قدم بعدی
-
-1. **تست سخت‌افزار v0.9.60:** Export Pico Firmware از اپ buildشده ← کپی روی CIRCUITPY ← `PING` باید `pico-light 0.9.60` بدهد ← تست موس از مسیر پیکو←بازو (باید نرم بماند — پمپ دائمی) ← تست کیپد GP4/GP3 ← تست بوت بدون سنسور
-2. تست صدا: یک‌بار سکوت + یک‌بار صدای بلند Calibrate ← «کپی کل لاگ» ← تفکیک ۱۱–۱۲
-3. بکلاگ: ایمپورتر AMK (دارون۱) · موارد بصری v0.9.46–52 · کاندیدای fw 1.8 بازو: رهاکردن پاسخ Serial1 وقتی TX پر است
-
-## قواعد ثابت (خلاصه)
-
-- هرگز selective merge نه — کل درخت جایگزین می‌شود · بلوک build اجباری + خروجی تازه‌ی TestRunner
-- اول شبیه‌سازی Python، بعد C# · داده قبل از حدس
-- هر نسخه: بنر + csproj + سند docs + ورودی MEMORY.md + نگهبان نسخه در TestRunner
-- آینه‌ی گیت‌هاب برای هر مصنوع (sim/ · uploads/ · tools/)
+- هرگز push مستقیم به `main`؛ فقط branch و PR.
+- هیچ استپ پشتیبانی‌نشده‌ای silent skip نشود.
+- شرط همه‌ی gateها `0 failed` است.
+- فایل کلید واقعی، HEX حساس و backup وارد مخزن نشود.
+- version bump فقط در PR جدا و پس از پذیرش سخت‌افزاری.

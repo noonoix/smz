@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""patch_plan_exporter_ui.py - v0.9.65 wiring patcher (phase 2 of the portable line).
+"""patch_plan_exporter_ui.py - v0.9.66 PLAN|2 wiring patcher (phase 2 of the portable line).
 
 Applies the three anchored, idempotent edits that wire PlanExporter into the app:
 
   1. tests/TestRunner.cs   <- inserts the step-59 block (tools/plan_exporter_test_step.cs.inc)
-                              before the '=== Results' print (59 pins the PLAN|1 contract).
+                              before the '=== Results' print (59 pins the PLAN|2 recursive-bundle contract).
   2. MainViewModel.cs      <- inserts the ExportPicoPlan command
                               (tools/plan_exporter_vm_command.cs.inc) before UpdateFileText().
   3. MainWindow.xaml       <- adds File -> 'Export Pico Plan... (plan.txt)' right after
@@ -20,7 +20,10 @@ Usage: python tools/patch_plan_exporter_ui.py [repo root]
 Exit: 0 = applied/already, 1 = unexpected source shape (nothing half-written).
 """
 import pathlib
+import subprocess
 import sys
+
+# PLAN2_BUNDLE_PATCHER
 
 ROOT = pathlib.Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else pathlib.Path(".").resolve()
 XAML = ROOT / "ams-shell" / "src" / "Ams.UI" / "MainWindow.xaml"
@@ -34,7 +37,7 @@ VM_ANCHOR = "    private void UpdateFileText()"
 XAML_ANCHOR = ('                <MenuItem Header="Export _Pico Firmware… (per system)" Command="{Binding ExportPicoFirmwareCommand}"\n'
                '                          ToolTip="خروجی CircuitPython برای رزبری پای پیکو — یک‌بار در هر سیستم" />')
 XAML_ITEM = ('                <MenuItem Header="Export Pico _Plan… (plan.txt)" Command="{Binding ExportPicoPlanCommand}"\n'
-             '                          ToolTip="خروجی plan.txt پرتابل برای پیکو — موتور gen-1 فریم‌ور 0.9.64b" />')
+             '                          ToolTip="خروجی plan.txt پرتابل برای پیکو — bundle بازگشتی PLAN|2 فریم‌ور 0.9.66" />')
 
 MARK_TEST = "Step 59: v0.9.65 plan exporter"
 MARK_VM = "private void ExportPicoPlan()"
@@ -123,6 +126,19 @@ if problems:
     for p in problems:
         print("  " + p)
     sys.exit(1)
+
+# PLAN2_MIGRATION_CHAIN — one legacy patch command now deterministically reaches the current sources.
+for script in (
+    "upgrade_plan_exporter_plan2.py",
+    "upgrade_plan_exporter_tests_plan2.py",
+    "upgrade_plan_exporter_bundle.py",
+    "upgrade_plan_exporter_bundle_tests.py",
+    "make_plan_exporter.py",
+    "sync_plan_exporter_tests.py",
+):
+    result = subprocess.run([sys.executable, str(ROOT / "tools" / script), str(ROOT)])
+    if result.returncode != 0:
+        raise SystemExit(result.returncode)
 
 # -- post-conditions --------------------------------------------------------------------
 runner = RUNNER.read_text(encoding="utf-8")

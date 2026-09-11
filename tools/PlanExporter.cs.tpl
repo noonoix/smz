@@ -8,15 +8,19 @@ using Ams.UI.Models;
 
 namespace Ams.UI.Services;
 
+// PLAN2_PARITY_MIGRATION
+// PLAN2_BUNDLE_MIGRATION
+// PLAN2_SPLIT_RUNTIME_MIGRATION
+
 /// <summary>
 /// v0.9.65 - File → Export Pico Plan… (phase 2 of the portable line): compiles the open step
 /// tree into a portable plan.txt for the Pico. Generated from tools/PlanExporter.cs.tpl by
-/// tools/make_plan_exporter.py (the gen-1 engine is spliced in from firmware/code64b/plan_engine.py -
+/// tools/make_plan_exporter.py (the PLAN|2 engine is spliced in from portable/plan3/CIRCUITPY/plan_engine.py -
 /// never edit the embedded copy by hand). Sandbox-proven by sim/sim_plan_export.py against the
 /// real engine (54/54). Narrowed to the GEN-1 contract.
 ///
-/// Target contract (project page, 2026-09-10): the gen-1 plan engine on the drive (firmware
-/// pico-light 0.9.64b = firmware/code64b/plan_engine.py) accepts ONLY the header PLAN|1 and its
+/// Target contract (project page, 2026-09-10): the PLAN|2 plan engine on the drive (firmware
+/// pico-light 0.9.66 = portable/plan3/CIRCUITPY/plan_engine.py) accepts ONLY the header PLAN|2 and its
 /// 11 ops: PLAN, SCREEN, SPEED, RMOUSE, CLICK, TYPE, DELAY, LOOP, LOOPTIME, ENDLOOP, WLIGHT.
 /// The gen-3 engine (PLAN|2, portable/plan3/tools/plan_gen.py) belongs to the parked 0.9.66
 /// line, so every step that needs it is a BLOCKING ERROR here - never silently skipped.
@@ -28,22 +32,22 @@ namespace Ams.UI.Services;
 /// rawCommand, randomPackage, parallelGroup, playAudio, playScript, runExe, openFile.
 /// If/Else heads (insertIfElse) are blocked too - IFLUX/ELSE/ENDIF are gen-2 ops.
 ///
-/// Gen-1 compensations vs plan_gen (gen-3): the gen-1 engine DEFAULTS mid-pauses ON (12%) and
+/// PLAN|2 compensations vs plan_gen (gen-3): the PLAN|2 engine DEFAULTS mid-pauses ON (12%) and
 /// idle breaks ON (1000-5000 ms every 5-12 moves) when a key is omitted, so this exporter emits
 /// mid= and idle= EXPLICITLY on every move (mid=0:0,0 / idle=1,1:0,0 disable them), and the
 /// mouseMove emulation always carries idle=1,1:0,0 (a point-to-point move never idles).
 /// </summary>
 public static class PlanExporter
 {
-    /// <summary>The on-drive engine format this exporter targets (firmware pico-light 0.9.64b).</summary>
-    public const int PlanFormatVersion = 1;
-    public const string EngineVersion = "0.9.64b";
+    /// <summary>The on-drive engine format this exporter targets (firmware pico-light 0.9.66).</summary>
+    public const int PlanFormatVersion = 2;
+    public const string EngineVersion = "0.9.66";
 
     /// <summary>One successful compilation: the plan text plus the human-readable reports.</summary>
     public sealed record PlanResult(string Text, IReadOnlyList<string> Flags,
                                     IReadOnlyList<string> Disabled, IReadOnlyList<string> Counts);
 
-    /// <summary>Thrown when any step cannot be expressed on PLAN|1 - the file is NOT written.</summary>
+    /// <summary>Thrown when any step cannot be expressed on PLAN|2 - the file is NOT written.</summary>
     public sealed class PlanBlockedException : Exception
     {
         public IReadOnlyList<string> Errors { get; }
@@ -106,8 +110,11 @@ public static class PlanExporter
         public readonly Dictionary<string, int> Counts = new();
         public int Markers;
         private readonly Dictionary<StepNode, string> _numbering = new();
+        private readonly HashSet<string> _labels = new(StringComparer.Ordinal);
+        private readonly string _sourcePath;
 
-        public Gen(AppSettings settings) => _settings = settings;
+        public Gen(AppSettings settings, string sourcePath)
+        { _settings = settings; _sourcePath = sourcePath; }
 
         public void NumberTree(IEnumerable<StepNode> nodes, string prefix)
         {
@@ -201,37 +208,20 @@ public static class PlanExporter
             return i + 1;
         }
 
-        /// <summary>An insertIfElse head is a BLOCKING error on PLAN|1 (IFLUX/ELSE/ENDIF are gen-2);
+        /// <summary>An insertIfElse head is a BLOCKING error on PLAN|2 (IFLUX/ELSE/ENDIF are gen-2);
         /// its Else/End If markers are still consumed so they do not cascade as stray-marker errors,
         /// and nested blockers are still NAMED.</summary>
         private int EmitIf(IList<StepNode> nodes, int i)
         {
-            var n = nodes[i];
-            StepNode? elseNode = null, endifNode = null;
-            int j = i + 1;
-            if (j < nodes.Count && IsMarker(nodes[j], "else")) { elseNode = nodes[j]; j++; }
-            if (j < nodes.Count && IsMarker(nodes[j], "endif")) { endifNode = nodes[j]; j++; }
-            if (n.Type == "findImage")
-            {
-                Error(n, "findImage needs machine vision - it cannot run on the Pico. Convert "
-                         + "this step to Wait For Light (BH1750) or Wait For Sound in the app first");
-                CollectBlockers(n);
-            }
-            else if (n.Type == "waitForSound")
-            {
-                Error(n, "waitForSound has no WSND op in the PLAN|1 contract of firmware "
-                         + EngineVersion + " (the sound sensor needs the gen-2 line) - convert the "
-                         + "trigger to Wait For Light, or keep this plan in PC mode");
-            }
-            else
-            {
-                Error(n, "If/Else needs the gen-2 plan engine (IFLUX/ELSE/ENDIF are not in the PLAN|1 "
-                         + "contract of firmware " + EngineVersion + ") - uncheck 'Insert If-Else' so the "
-                         + "step runs as a plain wait, or keep this plan in PC mode");
-            }
-            foreach (var sub in new[] { elseNode, endifNode })
-                if (sub is not null) { Markers++; CollectBlockers(sub); }
-            return j;
+            var n=nodes[i]; StepNode? elseNode=null,endifNode=null; int j=i+1;
+            if(j<nodes.Count&&IsMarker(nodes[j],"else")){elseNode=nodes[j];j++;}
+            if(j<nodes.Count&&IsMarker(nodes[j],"endif")){endifNode=nodes[j];j++;}
+            if(endifNode is null) Error(n,"insertIfElse is on but the matching 'End If' marker is missing");
+            if(n.Type=="findImage") { Error(n,"findImage needs machine vision - it cannot run on the Pico"); CollectBlockers(n); foreach(var sub in new[]{elseNode,endifNode})if(sub is not null)CollectBlockers(sub); return j; }
+            var p=n.Props;
+            if(n.Type=="waitForSound") { Lines.Add("IFSND|"+PropEx.GetInt(p,"threshold",90)+","+PropEx.GetInt(p,"minDurationMs",60)+","+PropEx.GetInt(p,"timeoutMs",20000)); Count("IFSND"); }
+            else { var(lo,hi,stable,to,mode)=LuxArgs(p); Lines.Add("IFLUX|"+lo+","+hi+","+stable+","+to+","+mode); Count("IFLUX"); }
+            Walk(n.Children); if(elseNode is not null){Lines.Add("ELSE");Markers++;Walk(elseNode.Children);} if(endifNode is not null){Lines.Add("ENDIF");Markers++;} EmitDelay(n); return j;
         }
 
         /// <summary>A blocked container hides its subtree from the walk; sweep it so every nested
@@ -255,81 +245,19 @@ public static class PlanExporter
 
         private void EmitStep(StepNode n)
         {
-            switch (n.Type)
+            switch(n.Type)
             {
-                case "comment": EmitComment(n); return;
-                case "delay": EmitDelayStep(n); return;
-                case "randomMousePosition": EmitRandomMouse(n); return;
-                case "mouseMove": EmitMouseMove(n); return;
-                case "mouseClick": EmitMouseClick(n); return;
-                case "typeText": EmitTypeText(n); return;
-                case "forLoop": EmitForLoop(n); return;
-                case "waitForLight": EmitWaitForLight(n); return;
-
-                case "findImage":
-                    Error(n, "findImage needs machine vision - it cannot run on the Pico. Convert "
-                             + "this step to Wait For Light (BH1750) or Wait For Sound in the app first");
-                    CollectBlockers(n);
-                    return;
-                case "waitForSound":
-                    Error(n, "waitForSound has no WSND op in the PLAN|1 contract of firmware "
-                             + EngineVersion + " (the sound sensor needs the gen-2 line) - convert the "
-                             + "trigger to Wait For Light, or keep this plan in PC mode");
-                    return;
-                case "keystroke":
-                    Error(n, "the PLAN|1 engine of firmware " + EngineVersion + " has no KEY op (it types "
-                             + "TEXT only) - a Keystroke cannot be expressed; use Type Text for ASCII text "
-                             + "or keep this plan in PC mode until the gen-2 line ships");
-                    return;
-                case "keyDown":
-                    Error(n, "the PLAN|1 engine of firmware " + EngineVersion + " has no KDOWN op - "
-                             + "keep this plan in PC mode until the gen-2 line ships");
-                    return;
-                case "keyUp":
-                    Error(n, "the PLAN|1 engine of firmware " + EngineVersion + " has no KUP op - "
-                             + "keep this plan in PC mode until the gen-2 line ships");
-                    return;
-                case "mouseScroll":
-                    Error(n, "the PLAN|1 engine of firmware " + EngineVersion + " has no WHEEL op - "
-                             + "keep this plan in PC mode until the gen-2 line ships");
-                    return;
-                case "label":
-                case "gotoLabel":
-                    Error(n, "labels need the gen-2 engine (LABEL/GOTO are not in PLAN|1) - keep this "
-                             + "plan in PC mode until the gen-2 line ships");
-                    return;
-                case "rawCommand":
-                    Error(n, "RAW passthrough is a gen-2 op - on PLAN|1 the engine would reject the "
-                             + "line; keep this plan in PC mode");
-                    return;
-                case "randomPackage":
-                    Error(n, "random packages need the gen-2 engine (RPKG is not in PLAN|1) - keep this "
-                             + "plan in PC mode until the gen-2 line ships");
-                    return;
-                case "parallelGroup":
-                    Error(n, "parallel groups need the gen-2 engine (PGROUP is not in PLAN|1) - keep "
-                             + "this plan in PC mode until the gen-2 line ships");
-                    return;
-                case "playAudio":
-                    Error(n, "playAudio has no op in the PLAN|1 contract (the buzzer/BEEP belongs to "
-                             + "the gen-2 line) - keep this plan in PC mode");
-                    return;
-                case "playScript":
-                    Error(n, "playScript needs the gen-2 engine (INCLUDE is not in PLAN|1) - inline the "
-                             + "child steps, or keep this plan in PC mode");
-                    return;
-                case "runExe":
-                    Error(n, "runExe compiles to a Win+R macro on the gen-2 line only - PLAN|1 has no "
-                             + "launch ops; keep this plan in PC mode");
-                    return;
-                case "openFile":
-                    Error(n, "openFile compiles to a Win+R macro on the gen-2 line only - PLAN|1 has "
-                             + "no launch ops; keep this plan in PC mode");
-                    return;
-                default:
-                    Error(n, "unknown step type '" + n.Type + "' - this exporter does not know it "
-                             + "(supported: the 23 app actions)");
-                    return;
+                case "comment":EmitComment(n);return; case "delay":EmitDelayStep(n);return;
+                case "randomMousePosition":EmitRandomMouse(n);return; case "mouseMove":EmitMouseMove(n);return;
+                case "mouseClick":EmitMouseClick(n);return; case "mouseScroll":EmitMouseScroll(n);return;
+                case "keystroke":EmitKeystroke(n);return; case "keyDown":EmitKeyState(n,true);return; case "keyUp":EmitKeyState(n,false);return;
+                case "typeText":EmitTypeText(n);return; case "forLoop":EmitForLoop(n);return;
+                case "waitForSound":EmitWaitForSound(n);return; case "waitForLight":EmitWaitForLight(n);return;
+                case "label":EmitLabel(n);return; case "gotoLabel":EmitGoto(n);return; case "rawCommand":EmitRaw(n);return;
+                case "randomPackage":EmitRandomPackage(n);return; case "parallelGroup":EmitParallelGroup(n);return;
+                case "runExe":EmitLaunch(n,false);return; case "openFile":EmitLaunch(n,true);return; case "playAudio":EmitAudio(n);return; case "playScript":EmitInclude(n);return;
+                case "findImage":Error(n,"findImage needs machine vision - it cannot run on the Pico");CollectBlockers(n);return;
+                default:Error(n,"unknown step type '"+n.Type+"' - this exporter does not know it (supported: the 23 app actions)");return;
             }
         }
 
@@ -345,7 +273,7 @@ public static class PlanExporter
             Emit(n, new[] { hi > lo ? "DELAY|" + lo + "," + hi : "DELAY|" + lo }, "DELAY");
         }
 
-        /// <summary>The humanized-move layers; gen-1 forces EVERY key explicit (its built-in defaults
+        /// <summary>The humanized-move layers; PLAN|2 forces EVERY key explicit (its built-in defaults
         /// enable mid-pauses at 12% and idle breaks at 1000-5000 ms - the app defaults differ, so an
         /// omitted key would change behavior on the Pico).</summary>
         private string Tuning(StepNode n, (int i0, int i1, int p0, int p1) idle)
@@ -389,14 +317,7 @@ public static class PlanExporter
             Emit(n, new[] { "RMOUSE|region=" + x + "," + y + "," + w + "," + h + Tuning(n, idle) }, "RMOUSE");
         }
 
-        private void EmitMouseMove(StepNode n)
-        {
-            int x = PropEx.GetInt(n.Props, "x", 600), y = PropEx.GetInt(n.Props, "y", 497);
-            if (!PropEx.GetBool(n.Props, "human", true))
-                Flag(n, "instant (non-human) move is not in the PLAN|1 contract - a humanized move to "
-                        + "the exact point was emitted instead");
-            Emit(n, new[] { "RMOUSE|region=" + x + "," + y + ",1,1" + Tuning(n, (1, 1, 0, 0)) }, "MOVETO");
-        }
+        private void EmitMouseMove(StepNode n){int x=PropEx.GetInt(n.Props,"x",600),y=PropEx.GetInt(n.Props,"y",497);if(!PropEx.GetBool(n.Props,"human",true)){Emit(n,new[]{"MOVETO|x="+x+"|y="+y+"|human=0"},"MOVETO");return;}Emit(n,new[]{"MOVETO|x="+x+"|y="+y+Tuning(n,(1,1,0,0))},"MOVETO");}
 
         private void EmitMouseClick(StepNode n)
         {
@@ -460,6 +381,26 @@ public static class PlanExporter
             Emit(n, new[] { "TYPE|text=" + text + "|" + string.Join("|", parts) }, "TYPE");
         }
 
+
+        private int Vk(StepNode n,string name,string what){if(KeyMap.VK.TryGetValue(name,out var vk)||VkAliases.TryGetValue(name,out vk))return vk;Error(n,"unknown key name '"+name+"' for "+what);return 0;}
+        private void KeyboardFlag(StepNode n){if(PropEx.GetString(n.Props,"keyboardBoard","default")=="promicro")Flag(n,"keyboard executor 'promicro' is bridge-mode only; on the portable plan the Pico types it");}
+        private void EmitMouseScroll(StepNode n)=>Emit(n,new[]{"WHEEL|"+PropEx.GetInt(n.Props,"delta",-1)},"WHEEL");
+        private void EmitKeystroke(StepNode n){var p=n.Props;var keys=new List<int>();if(PropEx.GetBool(p,"modCtrl"))keys.Add(162);if(PropEx.GetBool(p,"modShift"))keys.Add(160);if(PropEx.GetBool(p,"modAlt"))keys.Add(164);if(PropEx.GetBool(p,"modWin"))keys.Add(91);var vk=Vk(n,PropEx.GetString(p,"key","F4"),"keystroke");if(vk==0)return;keys.Add(vk);var(h0,h1)=Pair(PropEx.GetInt(p,"holdMin",0),PropEx.GetInt(p,"holdMax",0));var line="KEY|combo="+string.Join("+",keys);if(h1>0)line+="|hold="+h0+","+h1;KeyboardFlag(n);Emit(n,new[]{line},"KEY");}
+        private void EmitKeyState(StepNode n,bool down){var vk=Vk(n,PropEx.GetString(n.Props,"key","SHIFT"),down?"keyDown":"keyUp");if(vk==0)return;KeyboardFlag(n);Emit(n,new[]{(down?"KDOWN|":"KUP|")+vk},down?"KDOWN":"KUP");}
+        private void EmitWaitForSound(StepNode n){var p=n.Props;int t=PropEx.GetInt(p,"threshold",90),m=PropEx.GetInt(p,"minDurationMs",60),to=PropEx.GetInt(p,"timeoutMs",20000);if(PropEx.GetBool(p,"armed")){int act=PropEx.GetString(p,"act","left")switch{"right"=>2,"middle"=>3,_=>1};var(r0,r1)=Pair(PropEx.GetInt(p,"reactMin",80),PropEx.GetInt(p,"reactMax",180));var(h0,h1)=Pair(PropEx.GetInt(p,"holdMin",30),PropEx.GetInt(p,"holdMax",90));Emit(n,new[]{"TRGSND|"+t+","+m+","+to+","+act+","+r0+","+r1+","+h0+","+h1},"TRGSND");}else Emit(n,new[]{"WSND|"+t+","+m+","+to},"WSND");}
+        private (int lo,int hi,int stable,int timeout,int mode) LuxArgs(Dictionary<string,object?> p){int c=PropEx.GetInt(p,"luxCenter",1250),tol=Math.Max(1,PropEx.GetInt(p,"luxTolerance",50));return(Math.Max(0,c-tol),c+tol,Math.Max(0,(int)Math.Round(PropEx.GetDouble(p,"stableSec",2)*1000)),PropEx.GetInt(p,"timeoutMs",20000),PropEx.GetString(p,"sampleMode","hires")=="lowres"?1:0);}
+        private void EmitLabel(StepNode n){var name=PropEx.GetString(n.Props,"label","label1").Trim();if(name.Length==0||name.Contains('=')||name.Contains('|')){Error(n,"bad label name '"+name+"'");return;}if(!_labels.Add(name)){Error(n,"duplicate label '"+name+"'");return;}Emit(n,new[]{"LABEL|"+name},"LABEL");}
+        private void EmitGoto(StepNode n){var name=PropEx.GetString(n.Props,"label").Trim();if(name.Length==0){Error(n,"Go To Label with no label chosen");return;}Emit(n,new[]{"GOTO|"+name},"GOTO");}
+        private void EmitRaw(StepNode n){var cmd=PropEx.GetString(n.Props,"cmd","PING").Trim();if(cmd.Length==0||cmd.Contains('\n')||cmd.Contains('\r')){Error(n,"raw command must be one non-empty line");return;}Emit(n,new[]{"RAW|"+cmd},"RAW");}
+        private void EmitRandomPackage(StepNode n){var kids=n.Children.Where(c=>!c.IsDisabled&&!IsMarker(c)).ToList();if(kids.Count==0){Error(n,"random package has no enabled children");return;}if(kids.Any(c=>Conditional.Contains(c.Type)&&PropEx.GetBool(c.Props,"insertIfElse"))){Error(n,"an If/Else structure cannot live inside a Random Package");return;}var mode=PropEx.GetString(n.Props,"mode","shuffleAll");int mn=1,mx=kids.Count;string em="all";if(mode=="randomSubset"){em="pick";mn=Math.Max(0,PropEx.GetInt(n.Props,"minCount",1));mx=Math.Min(kids.Count,PropEx.GetInt(n.Props,"maxCount",10));if(mn>mx)(mn,mx)=(mx,mn);}else if(mode!="shuffleAll"){Error(n,"unknown random package mode '"+mode+"'");return;}Lines.Add("RPKG|"+em+","+mn+","+mx);Count("RPKG");for(int i=0;i<kids.Count;i++){if(i>0)Lines.Add("PKGITEM");Walk(new List<StepNode>{kids[i]});}Lines.Add("ENDPKG");EmitDelay(n);}
+        private static readonly HashSet<string> ParallelOk=new(){"mouseMove","mouseClick","mouseScroll","keystroke","keyDown","keyUp","typeText","delay","rawCommand","comment"};
+        private void EmitParallelGroup(StepNode n){var kids=n.Children.Where(c=>!c.IsDisabled&&!IsMarker(c)).ToList();if(kids.Count<2){Error(n,"a Parallel Group needs at least two enabled branches");return;}var before=Errors.Count;foreach(var c in kids)if(!ParallelOk.Contains(c.Type))Error(c,"'"+c.Type+"' cannot live inside a Parallel Group on the Pico");if(Errors.Count>before)return;Lines.Add("PGROUP");Count("PGROUP");for(int i=0;i<kids.Count;i++){if(i>0)Lines.Add("PARITEM");Walk(new List<StepNode>{kids[i]});}Lines.Add("ENDPAR");EmitDelay(n);}
+        private static string QuoteRun(string value)=>value.Contains(' ')?"\""+value+"\"":value;
+        private void EmitRunMacro(StepNode n,string command,string kind){string enc;try{enc=PctType(command);}catch(FormatException ex){Error(n,ex.Message);return;}Emit(n,new[]{"# "+kind,"KEY|combo=91+82|hold=40,90","DELAY|350,650","TYPE|text="+enc,"DELAY|140,260","KEY|combo=13|hold=40,90","DELAY|600,1200"},kind);}
+        private void EmitLaunch(StepNode n,bool shellOpen){var p=n.Props;var path=PropEx.GetString(p,"path").Trim();if(path.Length==0){Error(n,"no path set");return;}var args=PropEx.GetString(p,"args");var state=PropEx.GetString(p,"windowState","normal");string cmd;if(state=="minimized")cmd="cmd /c start /min \"\" "+QuoteRun(path)+(args.Length>0?" "+args:"");else{if(state=="maximized")Flag(n,"'maximized' cannot be expressed through the Run box - launching visible/normal");cmd=QuoteRun(path)+(args.Length>0?" "+args:"");}EmitRunMacro(n,cmd,shellOpen?"openFile":"runExe");}
+        private void EmitAudio(StepNode n){var p=n.Props;var path=PropEx.GetString(p,"path").Trim();if(path.Length==0){Error(n,"no audio path set");return;}if(PropEx.GetString(p,"mode","playerMacro")!="playerMacro"){Error(n,"playAudio mode is PC-only; use playerMacro on the Pico");return;}var esc=path.Replace("'","''");var cmd=path.EndsWith(".wav",StringComparison.OrdinalIgnoreCase)?"powershell -w hidden -c \"(New-Object Media.SoundPlayer '"+esc+"').PlaySync()\"":"powershell -w hidden -c \"Add-Type -AssemblyName presentationCore;$p=New-Object System.Windows.Media.MediaPlayer;$p.Open([uri]'"+esc+"');$p.Play()\"";EmitRunMacro(n,cmd,"playAudio");}
+        private void EmitInclude(StepNode n){var raw=PropEx.GetString(n.Props,"path").Trim();if(raw.Length==0){Error(n,"no .amsj path set");return;}var sourceFull=Path.GetFullPath(_sourcePath);var full=Path.IsPathRooted(raw)?raw:Path.GetFullPath(Path.Combine(Path.GetDirectoryName(sourceFull)??".",raw));if(!File.Exists(full)){Error(n,"playScript child not found: "+raw);return;}var baseName=Path.GetFileNameWithoutExtension(full);if(baseName.Any(ch=>ch<32||ch>126||"/\\:|%".Contains(ch))){Error(n,"playScript file name cannot live on the Pico drive");return;}Emit(n,new[]{"INCLUDE|file="+baseName+".txt"},"INCLUDE");}
+
         private void EmitForLoop(StepNode n)
         {
             var p = n.Props;
@@ -507,38 +448,15 @@ public static class PlanExporter
             EmitDelay(n);   // the app's delay lands after the whole loop
         }
 
-        private void EmitWaitForLight(StepNode n)
-        {
-            var p = n.Props;
-            int center = PropEx.GetInt(p, "luxCenter", 1250);
-            int tol = Math.Max(1, PropEx.GetInt(p, "luxTolerance", 50));
-            int stable = Math.Max(0, (int)Math.Round(PropEx.GetDouble(p, "stableSec", 2) * 1000));
-            int to = PropEx.GetInt(p, "timeoutMs", 20000);
-            int mode = PropEx.GetString(p, "sampleMode", "hires") == "lowres" ? 1 : 0;
-            int lo = Math.Max(0, center - tol), hi = center + tol;
-            var head = "WLIGHT|" + lo + "," + hi + "," + stable + "," + to + "," + mode;
-            if (PropEx.GetBool(p, "armed"))
-            {
-                var keyName = PropEx.GetString(p, "key", "E");
-                if (!KeyMap.VK.TryGetValue(keyName, out var vk) && !VkAliases.TryGetValue(keyName, out vk))
-                {
-                    Error(n, "unknown key name '" + keyName + "' for waitForLight armed key");
-                    return;
-                }
-                var (hmin, hmax) = Pair(PropEx.GetInt(p, "holdMin", 30), PropEx.GetInt(p, "holdMax", 90));
-                var (rmin, rmax) = Pair(PropEx.GetInt(p, "reactMin", 80), PropEx.GetInt(p, "reactMax", 180));
-                head += "|key=" + vk + "," + hmin + "," + hmax + "|react=" + rmin + "," + rmax;
-            }
-            Emit(n, new[] { head }, "WLIGHT");
-        }
+        private void EmitWaitForLight(StepNode n){var p=n.Props;var(lo,hi,stable,to,mode)=LuxArgs(p);var head="WLIGHT|"+lo+","+hi+","+stable+","+to+","+mode;if(PropEx.GetBool(p,"armed")){var vk=Vk(n,PropEx.GetString(p,"key","E"),"waitForLight armed key");if(vk==0)return;var(h0,h1)=Pair(PropEx.GetInt(p,"holdMin",30),PropEx.GetInt(p,"holdMax",90));var(r0,r1)=Pair(PropEx.GetInt(p,"reactMin",80),PropEx.GetInt(p,"reactMax",180));head+="|key="+vk+","+h0+","+h1+"|react="+r0+","+r1;}Emit(n,new[]{head},"WLIGHT");}
     }
 
     /// <summary>Compiles the step tree into plan text. Throws PlanBlockedException when any step
-    /// cannot run on PLAN|1 - nothing is written in that case (never a partial plan).</summary>
+    /// cannot run on PLAN|2 - nothing is written in that case (never a partial plan).</summary>
     public static PlanResult Compile(IList<StepNode> roots, AppSettings settings,
         int screenW, int screenH, string sourceName, string machine)
     {
-        var gen = new Gen(settings);
+        var gen = new Gen(settings, sourceName);
         gen.NumberTree(roots, "");
         gen.Walk(roots);
 
@@ -580,8 +498,8 @@ public static class PlanExporter
         if (gen.Errors.Count > 0) throw new PlanBlockedException(gen.Errors);
 
         var sb = new StringBuilder();
-        sb.Append("PLAN|1\n");
-        sb.Append("# generated by Classroom Studio PlanExporter (engine " + EngineVersion + ") from " + sourceName + "\n");
+        sb.Append("PLAN|2\n");
+        sb.Append("# generated by Classroom Studio PlanExporter (engine " + EngineVersion + ") from " + Path.GetFileName(sourceName) + "\n");
         sb.Append("# machine: " + machine + " · generated: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) + "\n");
         sb.Append("SCREEN|" + screenW + "," + screenH + "\n");
         sb.Append("SPEED|" + settings.MouseMoveSpeedMin + "," + settings.MouseMoveSpeedMax + "\n\n");
@@ -592,37 +510,163 @@ public static class PlanExporter
                               gen.Counts.OrderBy(kv => kv.Key).Select(kv => kv.Key + " x" + kv.Value).ToList());
     }
 
-    /// <summary>Writes plan.txt (the compiled plan), plan_engine.py (the gen-1 engine) and
+    /// <summary>Writes plan.txt, every recursively compiled child plan, plan_engine.py + plan_motion.py + plan_typing.py (the split PLAN|2 runtime) and
     /// README-PLAN.md next to <paramref name="planPath"/>. Returns the written paths.</summary>
+    private sealed record CompiledBundle(PlanResult Root, IReadOnlyList<(string FileName, string Text)> Children);
+
+    private static AppSettings ChildSettings(AppSettings source) => new()
+    {
+        PlayRepeatMode = "once",
+        MouseMoveSpeedMin = source.MouseMoveSpeedMin,
+        MouseMoveSpeedMax = source.MouseMoveSpeedMax,
+        TypeKeyMinMs = source.TypeKeyMinMs,
+        TypeKeyMaxMs = source.TypeKeyMaxMs,
+        KeyboardBoard = source.KeyboardBoard,
+    };
+
+    /// <summary>Preflights and compiles every reachable playScript document before the first
+    /// destination is touched. Root depth is zero; four included levels are allowed.</summary>
+    private static CompiledBundle CompileBundle(IList<StepNode> roots, AppSettings settings,
+        int screenW, int screenH, string sourcePath, string machine, string rootOutputName)
+    {
+        var rootResult = Compile(roots, settings, screenW, screenH, sourcePath, machine);
+        var children = new List<(string FileName, string Text)>();
+        var errors = new List<string>();
+        var completed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var outputSources = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [rootOutputName] = Path.GetFullPath(sourcePath),
+        };
+        var active = new List<string> { Path.GetFullPath(sourcePath) };
+
+        void Visit(IList<StepNode> nodes, string ownerPath, int ownerDepth)
+        {
+            foreach (var node in nodes)
+            {
+                if (node.IsDisabled) continue;
+                if (node.Type == "playScript")
+                {
+                    var raw = PropEx.GetString(node.Props, "path").Trim();
+                    if (raw.Length == 0) { errors.Add("include in " + Path.GetFileName(ownerPath) + ": no .amsj path set"); continue; }
+                    var ownerDir = Path.GetDirectoryName(Path.GetFullPath(ownerPath)) ?? ".";
+                    var full = Path.GetFullPath(Path.IsPathRooted(raw) ? raw : Path.Combine(ownerDir, raw));
+                    if (!File.Exists(full)) { errors.Add("include in " + Path.GetFileName(ownerPath) + ": child not found: " + raw); continue; }
+                    if (active.Contains(full, StringComparer.OrdinalIgnoreCase))
+                    {
+                        errors.Add("include cycle: " + string.Join(" -> ", active.Select(Path.GetFileName).Concat(new[] { Path.GetFileName(full) })));
+                        continue;
+                    }
+                    if (ownerDepth >= 4)
+                    {
+                        errors.Add("include depth cap 4 exceeded at " + Path.GetFileName(full));
+                        continue;
+                    }
+                    var outputName = Path.GetFileNameWithoutExtension(full) + ".txt";
+                    if (outputName.Any(ch => ch < 32 || ch > 126 || "/\\:|%".Contains(ch)))
+                    {
+                        errors.Add("include output name is unsafe for CIRCUITPY: " + outputName);
+                        continue;
+                    }
+                    if (outputSources.TryGetValue(outputName, out var prior) &&
+                        !string.Equals(prior, full, StringComparison.OrdinalIgnoreCase))
+                    {
+                        errors.Add("duplicate include output '" + outputName + "' from " + prior + " and " + full);
+                        continue;
+                    }
+                    outputSources[outputName] = full;
+                    if (completed.Contains(full)) continue; // same source may be referenced more than once; emit once
+
+                    List<StepNode> childSteps;
+                    try { childSteps = DocumentService.Load(full); }
+                    catch (Exception ex) { errors.Add("include '" + raw + "' is not a valid .amsj: " + ex.Message); continue; }
+
+                    PlanResult childResult;
+                    try { childResult = Compile(childSteps, ChildSettings(settings), screenW, screenH, full, machine); }
+                    catch (PlanBlockedException bx)
+                    {
+                        errors.AddRange(bx.Errors.Select(e => "include " + Path.GetFileName(full) + ": " + e));
+                        continue;
+                    }
+                    children.Add((outputName, childResult.Text));
+                    active.Add(full);
+                    Visit(childSteps, full, ownerDepth + 1);
+                    active.RemoveAt(active.Count - 1);
+                    completed.Add(full);
+                }
+                Visit(node.Children, ownerPath, ownerDepth);
+            }
+        }
+
+        Visit(roots, sourcePath, 0);
+        if (errors.Count > 0) throw new PlanBlockedException(errors);
+        return new CompiledBundle(rootResult, children);
+    }
+
     public static IReadOnlyList<string> Export(string planPath, IList<StepNode> steps,
         AppSettings settings, int screenW, int screenH, string sourceName, string machine)
     {
-        var result = Compile(steps, settings, screenW, screenH, sourceName, machine);
         var full = Path.GetFullPath(planPath);
         var dir = Path.GetDirectoryName(full);
         if (string.IsNullOrEmpty(dir)) throw new IOException("cannot resolve the folder of " + planPath);
-        var written = new List<string> { full };
-        File.WriteAllText(full, result.Text);
+        var bundle = CompileBundle(steps, settings, screenW, screenH, sourceName, machine, Path.GetFileName(full));
         var enginePath = Path.Combine(dir, "plan_engine.py");
-        File.WriteAllText(enginePath, BuildEnginePy());
-        written.Add(enginePath);
+        var motionPath = Path.Combine(dir, "plan_motion.py");
+        var typingPath = Path.Combine(dir, "plan_typing.py");
         var readmePath = Path.Combine(dir, "README-PLAN.md");
-        File.WriteAllText(readmePath, BuildReadme(result, sourceName, machine));
-        written.Add(readmePath);
-        return written;
+        var payloads = new List<(string Path, string Text)> { (full, bundle.Root.Text) };
+        payloads.AddRange(bundle.Children.Select(c => (Path.Combine(dir, c.FileName), c.Text)));
+        payloads.Add((enginePath, BuildEnginePy()));
+        payloads.Add((motionPath, BuildMotionPy()));
+        payloads.Add((typingPath, BuildTypingPy()));
+        payloads.Add((readmePath, BuildReadme(bundle.Root, Path.GetFileName(sourceName), machine)));
+
+        var tx = Guid.NewGuid().ToString("N");
+        var temps = payloads.Select(p => p.Path + "." + tx + ".tmp").ToArray();
+        var backups = payloads.Select(p => p.Path + "." + tx + ".bak").ToArray();
+        var published = new List<int>();
+        try
+        {
+            // No destination is touched until every root/child/runtime/readme payload is staged.
+            for (int i = 0; i < payloads.Count; i++)
+                File.WriteAllText(temps[i], payloads[i].Text, new UTF8Encoding(false));
+            for (int i = 0; i < payloads.Count; i++)
+            {
+                if (File.Exists(payloads[i].Path)) File.Move(payloads[i].Path, backups[i]);
+                File.Move(temps[i], payloads[i].Path);
+                published.Add(i);
+            }
+            foreach (var b in backups) if (File.Exists(b)) File.Delete(b);
+            return payloads.Select(p => p.Path).ToList();
+        }
+        catch
+        {
+            // Restore every prior file, including a backup made just before the failing move.
+            foreach (var i in published.AsEnumerable().Reverse())
+                if (File.Exists(payloads[i].Path)) File.Delete(payloads[i].Path);
+            for (int i = 0; i < payloads.Count; i++)
+                if (File.Exists(backups[i])) File.Move(backups[i], payloads[i].Path, true);
+            throw;
+        }
+        finally
+        {
+            foreach (var p in temps.Concat(backups))
+                if (File.Exists(p)) File.Delete(p);
+        }
     }
 
-    /// <summary>The gen-1 plan engine, embedded verbatim (firmware/code64b/plan_engine.py).
+    /// <summary>The PLAN|2 plan engine, embedded verbatim (portable/plan3/CIRCUITPY/plan_engine.py).
     /// Normalized to LF so the written file is byte-stable regardless of the .cs line endings.</summary>
     public static string BuildEnginePy() => EngineTemplate.Replace("\r\n", "\n");
+    public static string BuildMotionPy() => MotionTemplate.Replace("\r\n", "\n");
+    public static string BuildTypingPy() => TypingTemplate.Replace("\r\n", "\n");
 
     private static string BuildReadme(PlanResult result, string sourceName, string machine)
     {
         var sb = new StringBuilder();
-        sb.Append("# راهنمای پلن پرتابل پیکو (PLAN|1 - فریم‌ور 0.9.64b)\n\n");
-        sb.Append("این سه فایل را روی درایو CIRCUITPY کپی کن (کنار code.py از «Export Pico Firmware»):\n");
-        sb.Append("- plan.txt ← پلن کامپایل‌شده (همین فایل)\n");
-        sb.Append("- plan_engine.py ← موتور gen-1 (فقط وقتی نسخه‌ی فریم‌ور عوض شود دوباره لازم است)\n\n");
+        sb.Append("# راهنمای پلن پرتابل پیکو (PLAN|2 - فریم‌ور 0.9.66)\n\n");
+        sb.Append("همه‌ی فایل‌های این bundle را روی درایو CIRCUITPY کپی کن (کنار code.py از «Export Pico Firmware»):\n");
+        sb.Append("- plan.txt ← پلن اصلی؛ فایل‌های *.txt دیگر ← playScriptهای کامپایل‌شده\n");
+        sb.Append("- plan_engine.py + plan_motion.py + plan_typing.py ← runtime کامل کم‌حافظه‌ی PLAN|2\n\n");
         sb.Append("- منبع: " + sourceName + " · سیستم: " + machine + "\n");
         sb.Append("- استپ‌های کامپایل‌شده: " + (result.Counts.Count > 0 ? string.Join(" · ", result.Counts) : "-") + "\n");
         if (result.Disabled.Count > 0)
@@ -639,13 +683,17 @@ public static class PlanExporter
         return sb.ToString();
     }
 
-    /// <summary>Structural self-check mirroring the gen-1 parser: op whitelist, PLAN|1 first,
+    /// <summary>Structural self-check mirroring the PLAN|2 parser: op whitelist, PLAN|2 first,
     /// loop balance, RMOUSE region quad, WLIGHT positionals, TYPE text=, DELAY/SCREEN/SPEED ints.
     /// A failure here is a generator BUG - it throws before anything reaches a file.</summary>
     private static void ValidatePlan(string text)
     {
-        var stack = 0;
-        var first = true;
+        var stack = new List<(string Kind, bool ElseSeen, int Line)>();
+        var labels = new HashSet<string>(StringComparer.Ordinal);
+        var gotos = new List<string>();
+        var known = new HashSet<string>{"PLAN","SCREEN","SPEED","DELAY","LOOP","LOOPTIME","ENDLOOP","RMOUSE","MOVETO","CLICK","TYPE","WLIGHT","WSND","TRGSND","IFSND","IFLUX","ELSE","ENDIF","KEY","KDOWN","KUP","WHEEL","LABEL","GOTO","RAW","RPKG","PKGITEM","ENDPKG","PGROUP","PARITEM","ENDPAR","INCLUDE","BEEP"};
+        bool first = true;
+        string previousOp = "";
         var lines = text.Split('\n');
         for (int li = 0; li < lines.Length; li++)
         {
@@ -654,50 +702,67 @@ public static class PlanExporter
             var fields = line.Split('|');
             var op = fields[0];
             void Bad(string why) => throw new PlanBlockedException(new[] { "PlanExporter BUG: line " + (li + 1) + ": " + why + " (please report)" });
+            void Need(string kind, string closer)
+            {
+                if (stack.Count == 0 || stack[^1].Kind != kind)
+                    Bad(closer + " cannot close " + (stack.Count == 0 ? "the root" : stack[^1].Kind));
+            }
+
+            if (!known.Contains(op)) Bad("unknown op '" + op + "'");
+            if (first && (op != "PLAN" || fields.Length < 2 || fields[1] != "2")) Bad("PLAN must be first with version 2");
+            if (op == "PLAN" && !first) Bad("duplicate/non-first PLAN");
+
             switch (op)
             {
-                case "PLAN":
-                    if (!first || fields.Length < 2 || fields[1] != "1") Bad("PLAN must be first with version 1");
+                case "LOOP": case "LOOPTIME": stack.Add(("LOOP", false, li + 1)); break;
+                case "IFSND": case "IFLUX": stack.Add(("IF", false, li + 1)); break;
+                case "RPKG": stack.Add(("RPKG", false, li + 1)); break;
+                case "PGROUP": stack.Add(("PGROUP", false, li + 1)); break;
+                case "ENDLOOP": Need("LOOP", op); stack.RemoveAt(stack.Count - 1); break;
+                case "ELSE":
+                    Need("IF", op);
+                    if (stack[^1].ElseSeen) Bad("duplicate ELSE in one IF block");
+                    stack[^1] = ("IF", true, stack[^1].Line);
                     break;
-                case "SCREEN":
-                case "SPEED":
-                    if (fields.Length < 2 || fields[1].Split(',').Length != 2
-                        || !fields[1].Split(',').All(IsInt)) Bad(op + " needs exactly two ints");
+                case "ENDIF": Need("IF", op); stack.RemoveAt(stack.Count - 1); break;
+                case "PKGITEM":
+                    Need("RPKG", op);
+                    if (previousOp is "RPKG" or "PKGITEM") Bad("empty Random Package item");
                     break;
-                case "DELAY":
-                    if (fields.Length < 2 || !IsIntPair(fields[1])) Bad("DELAY needs one or two ints");
+                case "ENDPKG":
+                    Need("RPKG", op);
+                    if (previousOp is "RPKG" or "PKGITEM") Bad("empty Random Package item");
+                    stack.RemoveAt(stack.Count - 1);
                     break;
-                case "LOOP":
-                case "LOOPTIME":
-                    if (fields.Length < 2 || !long.TryParse(fields[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
-                        Bad(op + " needs a number");
-                    stack++;
+                case "PARITEM":
+                    Need("PGROUP", op);
+                    if (previousOp is "PGROUP" or "PARITEM") Bad("empty Parallel Group branch");
                     break;
-                case "ENDLOOP":
-                    if (stack <= 0) Bad("ENDLOOP without LOOP");
-                    stack--;
-                    break;
-                case "RMOUSE":
-                    if (!HasKv(fields, "region", out var rv) || rv.Split(',').Length != 4
-                        || !rv.Split(',').All(IsInt)) Bad("RMOUSE needs region=x,y,w,h");
-                    break;
-                case "CLICK":
-                    break;   // btn/n/hold all have engine-side defaults
-                case "TYPE":
-                    if (!HasKv(fields, "text", out _)) Bad("TYPE needs text=");
-                    break;
-                case "WLIGHT":
-                    if (fields.Length < 2 || fields[1].Split(',').Length < 5
-                        || !fields[1].Split(',').Take(5).All(IsInt)) Bad("WLIGHT needs lo,hi,stable,to,mode");
-                    break;
-                default:
-                    Bad("unknown op '" + op + "'");
+                case "ENDPAR":
+                    Need("PGROUP", op);
+                    if (previousOp is "PGROUP" or "PARITEM") Bad("empty Parallel Group branch");
+                    stack.RemoveAt(stack.Count - 1);
                     break;
             }
+
+            if (op == "LABEL")
+            {
+                if (fields.Length < 2 || fields[1].Length == 0 || !labels.Add(fields[1])) Bad("bad/duplicate LABEL");
+            }
+            if (op == "GOTO")
+            {
+                if (fields.Length < 2 || fields[1].Length == 0) Bad("empty GOTO");
+                gotos.Add(fields[1]);
+            }
+            if (op == "INCLUDE" && (!HasKv(fields, "file", out var file) || file.Length == 0 ||
+                file.Any(ch => ch < 32 || ch > 126 || "/\\:|%".Contains(ch)))) Bad("unsafe INCLUDE filename");
             first = false;
+            previousOp = op;
         }
-        if (stack != 0)
-            throw new PlanBlockedException(new[] { "PlanExporter BUG: LOOP without ENDLOOP (please report)" });
+        if (stack.Count > 0)
+            throw new PlanBlockedException(new[] { "PlanExporter BUG: line " + stack[^1].Line + ": unclosed " + stack[^1].Kind + " container (please report)" });
+        foreach (var target in gotos)
+            if (!labels.Contains(target)) throw new PlanBlockedException(new[] { "PlanExporter BUG: GOTO target '" + target + "' is undefined (please report)" });
     }
 
     private static bool IsInt(string s)
@@ -717,9 +782,8 @@ public static class PlanExporter
         return false;
     }
 
-    // The gen-1 plan engine (firmware/code64b/plan_engine.py) is spliced in here by
-    // tools/make_plan_exporter.py as a 4-quote raw string (the engine holds docstrings).
-    // TestRunner compares the embedded copy byte-for-byte against the repo golden
-    // (modulo line endings), so the template can never drift from the firmware line it targets.
-    private const string EngineTemplate = __ENGINE_TEMPLATE__;
+    // Hardware-proven split runtime. Generated from the canonical engine; do not hand-edit.
+    private const string EngineTemplate = __ENGINE_CORE_TEMPLATE__;
+    private const string MotionTemplate = __ENGINE_MOTION_TEMPLATE__;
+    private const string TypingTemplate = __ENGINE_TYPING_TEMPLATE__;
 }

@@ -1,65 +1,66 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""plan_check.py - validate a plan.txt against the REAL plan engine (dogfood).
+"""Blocking validator for portable plans (plan.txt).
 
-Usage:  python3 tools/plan_check.py CIRCUITPY/plan.txt [more.txt ...]
-Exit:   0 = every file parsed by the engine, 1 = at least one failed.
-The parser IS the board's parser (CIRCUITPY/plan_engine.py), so "plan ok" here
-means the Pico will accept the file too. '# FLAG' lines are surfaced as warnings.
+Parses the plan with the REAL engine, so anything the Pico would reject fails here
+first. It also surfaces every '# FLAG' line, because a plan is only "fully covered"
+when nothing was skipped silently.
+
+Usage: python3 plan_check.py plan.txt
+Exit 0 = safe to copy to the board, 1 = do not ship.
 """
+import argparse
 import os
 import sys
 
-try:
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-except Exception:
-    pass
-
 _HERE = os.path.dirname(os.path.abspath(__file__))
-for _cand in (_HERE, os.path.dirname(_HERE), os.path.join(os.path.dirname(_HERE), "CIRCUITPY"),
-              os.path.join(_HERE, "CIRCUITPY"), os.getcwd()):
+_ROOT = os.path.dirname(_HERE)
+for _cand in (_ROOT, os.path.join(_ROOT, "CIRCUITPY"), _HERE, os.getcwd()):
     if os.path.exists(os.path.join(_cand, "plan_engine.py")):
         sys.path.insert(0, _cand)
         break
-
 import plan_engine as pe                                        # noqa: E402
 
 
-def check(path):
-    try:
-        with open(path, "r", encoding="utf-8") as fh:
-            text = fh.read()
-    except Exception as exc:
-        print("error: cannot read %s: %s" % (path, exc))
-        return False
-    flags = [l for l in text.splitlines() if l.startswith("# FLAG")]
+def walk(ops, depth=0):
+    for op, prm in ops:
+        yield op, depth
+        if isinstance(prm, dict):
+            for sub in prm.get("progs", ()):
+                for item in walk(sub, depth + 1):
+                    yield item
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("plan")
+    ap.add_argument("--quiet", action="store_true")
+    args = ap.parse_args()
+    text = open(args.plan, "r").read()
     try:
         ops = pe.parse_plan(text)
     except Exception as exc:
-        print("FAIL %s: %s" % (path, exc))
-        return False
-    top = sum(1 for op, _p in ops if not _p.get("_chain"))
-    print("plan ok: header %s, %d ops (%d top level)  <- %s" % (
-        text.splitlines()[0] if text else "?", len(ops), top, path))
+        print("INVALID PLAN: %s" % exc)
+        return 1
+    if not ops or ops[0][0] != "PLAN":
+        print("INVALID PLAN: missing PLAN|2 header")
+        return 1
     counts = {}
-    for op, _p in ops:
+    total = 0
+    for op, _depth in walk(ops):
         counts[op] = counts.get(op, 0) + 1
-    for op in sorted(counts):
-        print("  %-8s %d" % (op, counts[op]))
-    for f in flags:
-        print("  warning " + f)
-    return True
-
-
-def main(argv):
-    if len(argv) < 2:
-        print(__doc__.strip())
-        return 2
-    ok = True
-    for path in argv[1:]:
-        ok = check(path) and ok
-    return 0 if ok else 1
+        total += 1
+    print("plan ok: header PLAN|%s, %d ops (%d top level)"
+          % (ops[0][1].get("v"), total, len(ops)))
+    if not args.quiet:
+        for key in sorted(counts):
+            print("  %-9s %d" % (key, counts[key]))
+    flags = [ln.strip() for ln in text.split("\n") if ln.strip().startswith("# FLAG")]
+    if flags:
+        print("flags that need a PC or a manual decision:")
+        for flag in flags:
+            print("  " + flag)
+    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+    sys.exit(main())

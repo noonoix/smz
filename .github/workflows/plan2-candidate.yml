@@ -1,0 +1,82 @@
+name: PLAN2 h5 downloadable candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/portable-plan2-app-0966]
+    paths:
+      - '.github/workflows/plan2-candidate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    name: build-test-package h5
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate split runtime
+        shell: pwsh
+        run: |
+          python -c "import pathlib,py_compile; [py_compile.compile(str(f),doraise=True) for f in pathlib.Path('portable/plan3/CIRCUITPY-SPLIT').glob('*.py')]"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python portable/plan3/sim/test_split_engine.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -c "from pathlib import Path; p=Path('portable/plan3/CIRCUITPY-SPLIT'); s={f.name:f.stat().st_size for f in p.glob('*.py')}; print(s); assert s['plan_engine.py'] <= 26000; assert s['plan_motion.py'] <= 15000; assert s['plan_typing.py'] <= 5000"
+
+      - name: Validate bridge
+        shell: pwsh
+        run: |
+          python -m py_compile ams-shell/bridge/bridge.py ams-shell/bridge/ams_serial.py ams-shell/bridge/ams_crypto.py
+          python tools/test_bridge_pico.py
+
+      - name: Build app
+        shell: pwsh
+        run: |
+          dotnet restore ams-shell/AMS.sln
+          dotnet build ams-shell/AMS.sln -c Release --no-restore
+
+      - name: Run TestRunner
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force tests/bin, tests/obj -ErrorAction SilentlyContinue
+          dotnet build tests/TestRunner.csproj -c Release
+          dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object ci-test-output.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (Select-String -Path ci-test-output.txt -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
+
+      - name: Package h5 candidate
+        shell: pwsh
+        run: |
+          $out = 'ams-shell/src/Ams.UI/bin/Release/net8.0-windows'
+          Remove-Item -Recurse -Force "$out/bridge/__pycache__" -ErrorAction SilentlyContinue
+          @(
+            'Classroom Studio PLAN2 h5 — hardware acceptance build',
+            'Source branch: feat/portable-plan2-app-0966',
+            'Source commit: ${{ github.sha }}',
+            'This is not an official release and does not bump the app version.',
+            'h5 fixes split PlanAbort and one-press restart after natural completion.',
+            'Export Pico Plan must emit plan_engine.py + plan_motion.py + plan_typing.py.'
+          ) | Set-Content "$out/PLAN2-H5-CANDIDATE.txt" -Encoding utf8
+          Compress-Archive -Path "$out/*" -DestinationPath 'Classroom-Studio-PLAN2-h5.zip' -Force
+          (Get-FileHash 'Classroom-Studio-PLAN2-h5.zip' -Algorithm SHA256).Hash | Out-File 'plan2-h5-sha256.txt' -Encoding ascii
+
+      - name: Upload h5 candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: Classroom-Studio-PLAN2-h5
+          path: |
+            Classroom-Studio-PLAN2-h5.zip
+            plan2-h5-sha256.txt
+            ci-test-output.txt
+          retention-days: 14
+          if-no-files-found: error

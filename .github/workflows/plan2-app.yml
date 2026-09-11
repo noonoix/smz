@@ -1,0 +1,119 @@
+name: PLAN2 app validation
+
+on:
+  push:
+    branches: [feat/portable-plan2-app-0966]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows-exporter:
+    name: plan2-app / build-test
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - id: migrate
+        name: Apply PLAN2 parity and generate
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          python tools/hotfix_plan2_h5.py . 2>&1 | Tee-Object ci-migrate.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/hotfix_plan2_h6.py . 2>&1 | Tee-Object -Append ci-migrate.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/upgrade_plan_exporter_plan2.py . 2>&1 | Tee-Object -Append ci-migrate.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/upgrade_plan_exporter_tests_plan2.py . 2>&1 | Tee-Object -Append ci-migrate.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/upgrade_plan_exporter_bundle.py . 2>&1 | Tee-Object -Append ci-migrate.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/upgrade_plan_exporter_bundle_tests.py . 2>&1 | Tee-Object -Append ci-migrate.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/upgrade_plan_exporter_split_runtime.py . 2>&1 | Tee-Object -Append ci-migrate.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/make_plan_exporter.py . 2>&1 | Tee-Object -Append ci-migrate.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/sync_plan_exporter_tests.py . 2>&1 | Tee-Object -Append ci-migrate.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - id: split
+        name: Split runtime parity and size gate
+        if: steps.migrate.outcome == 'success'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          python -c "import pathlib,py_compile; [py_compile.compile(str(f),doraise=True) for f in pathlib.Path('portable/plan3/CIRCUITPY-SPLIT').glob('*.py')]" 2>&1 | Tee-Object ci-split.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python portable/plan3/sim/test_split_engine.py 2>&1 | Tee-Object -Append ci-split.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -c "from pathlib import Path; p=Path('portable/plan3/CIRCUITPY-SPLIT'); sizes={f.name:f.stat().st_size for f in p.glob('*.py')}; print(sizes); assert sizes['plan_engine.py'] <= 26000; assert sizes['plan_motion.py'] <= 15000; assert sizes['plan_typing.py'] <= 5000" 2>&1 | Tee-Object -Append ci-split.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - id: bridge
+        name: Bridge checks
+        if: steps.split.outcome == 'success'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          python -m py_compile ams-shell/bridge/bridge.py ams-shell/bridge/ams_serial.py ams-shell/bridge/ams_crypto.py 2>&1 | Tee-Object ci-bridge.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/test_bridge_pico.py 2>&1 | Tee-Object -Append ci-bridge.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - id: app
+        name: Restore and build app
+        if: steps.split.outcome == 'success'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          dotnet restore ams-shell/AMS.sln 2>&1 | Tee-Object ci-app.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build ams-shell/AMS.sln -c Release --no-restore 2>&1 | Tee-Object -Append ci-app.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - id: tests
+        name: Build and run TestRunner
+        if: steps.app.outcome == 'success'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force tests/bin, tests/obj -ErrorAction SilentlyContinue
+          dotnet build tests/TestRunner.csproj -c Release 2>&1 | Tee-Object ci-tests.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object -Append ci-tests.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (Select-String -Path ci-tests.txt -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
+      - name: Write diagnostic report (not committed)
+        if: always()
+        shell: pwsh
+        run: |
+          $result = if (Test-Path ci-tests.txt) { (Select-String -Path ci-tests.txt -Pattern '=== Results' | Select-Object -Last 1).Line } else { '' }
+          $lines = @('# PLAN2 Windows gate report','', '- migration: ${{ steps.migrate.outcome }}','- split runtime: ${{ steps.split.outcome }}','- bridge: ${{ steps.bridge.outcome }}','- app build: ${{ steps.app.outcome }}','- TestRunner: ${{ steps.tests.outcome }}','',"- result: $result",'', '## Migration tail','```')
+          if (Test-Path ci-migrate.txt) { $lines += Get-Content ci-migrate.txt -Tail 100 }
+          $lines += @('```','', '## Split-runtime tail','```')
+          if (Test-Path ci-split.txt) { $lines += Get-Content ci-split.txt -Tail 100 }
+          $lines += @('```','', '## App build tail','```')
+          if (Test-Path ci-app.txt) { $lines += Get-Content ci-app.txt -Tail 120 }
+          $lines += @('```','', '## Test tail','```')
+          if (Test-Path ci-tests.txt) { $lines += Get-Content ci-tests.txt -Tail 160 }
+          $lines += '```'
+          $lines | Set-Content docs/PLAN2-WINDOWS-GATE.md -Encoding utf8
+          # Keep successful CI immutable. On failure only, persist diagnostics so the
+          # exact failing stage can be inspected without relying on runner log access.
+          if ('${{ steps.migrate.outcome }}' -ne 'success' -or '${{ steps.split.outcome }}' -ne 'success' -or '${{ steps.bridge.outcome }}' -ne 'success' -or '${{ steps.app.outcome }}' -ne 'success' -or '${{ steps.tests.outcome }}' -ne 'success') {
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add -- docs/PLAN2-WINDOWS-GATE.md
+            git commit -m "ci(plan2): capture failure diagnostics" || echo "no diagnostic change"
+            git push
+          }
+      - name: Enforce zero failures
+        if: always()
+        shell: pwsh
+        run: |
+          if ('${{ steps.migrate.outcome }}' -ne 'success' -or '${{ steps.split.outcome }}' -ne 'success' -or '${{ steps.bridge.outcome }}' -ne 'success' -or '${{ steps.app.outcome }}' -ne 'success' -or '${{ steps.tests.outcome }}' -ne 'success') { exit 1 }

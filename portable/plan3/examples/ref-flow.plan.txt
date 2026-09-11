@@ -27,26 +27,26 @@ TYPE|text=ab|h=80,120
 PARITEM
 CLICK|btn=left|n=1
 ENDPAR
-# playAudio playerMacro (background): C:\\snd\\ok.wav
+# playAudio playerMacro (background): C:\snd\ok.wav
 KEY|combo=91+82|hold=40,90
 DELAY|350,650
-TYPE|text=powershell -w hidden -c "(New-Object Media.SoundPlayer 'C:\\snd\\ok.wav').PlaySync(); Remove-ItemProperty 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RunMRU' -Name * -EA 0"
+TYPE|text=powershell -w hidden -c "(New-Object Media.SoundPlayer 'C:\snd\ok.wav').PlaySync(); Remove-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\RunMRU' -Name * -EA 0"
 DELAY|140,260
 KEY|combo=13|hold=40,90
 DELAY|200,400
 # FLAG step 13 (runExe): mode=min types into the visible Run box and leaves RunMRU history; use a hidden-capable state or a pinned taskbar icon for zero footprint
-# runExe mode=min: C:\\tools\\app.exe
+# runExe mode=min: C:\tools\app.exe
 KEY|combo=91+82|hold=40,90
 DELAY|350,650
-TYPE|text=cmd /c start /min "" C:\\tools\\app.exe --fast
+TYPE|text=cmd /c start /min "" C:\tools\app.exe --fast
 DELAY|140,260
 KEY|combo=13|hold=40,90
 DELAY|600,1200
 # FLAG step 14 (openFile): mode=visible types into the visible Run box and leaves RunMRU history; use a hidden-capable state or a pinned taskbar icon for zero footprint
-# openFile mode=visible: C:\\docs\\readme.txt
+# openFile mode=visible: C:\docs\readme.txt
 KEY|combo=91+82|hold=40,90
 DELAY|350,650
-TYPE|text=C:\\docs\\readme.txt
+TYPE|text=C:\docs\readme.txt
 DELAY|140,260
 KEY|combo=13|hold=40,90
 DELAY|600,1200

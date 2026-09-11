@@ -28,6 +28,8 @@ jobs:
         run: |
           python tools/hotfix_plan2_h5.py . 2>&1 | Tee-Object ci-migrate.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/hotfix_plan2_h6.py . 2>&1 | Tee-Object -Append ci-migrate.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/upgrade_plan_exporter_plan2.py . 2>&1 | Tee-Object -Append ci-migrate.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/upgrade_plan_exporter_tests_plan2.py . 2>&1 | Tee-Object -Append ci-migrate.txt
@@ -103,7 +105,7 @@ jobs:
           $lines | Set-Content docs/PLAN2-WINDOWS-GATE.md -Encoding utf8
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          $persist = @('tools/hotfix_plan2_h5.py','tools/split_plan_engine.py','ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs','tools/upgrade_plan_exporter_split_runtime.py','portable/plan3/CIRCUITPY-SPLIT/plan_engine.py','portable/plan3/CIRCUITPY-SPLIT/plan_motion.py','portable/plan3/CIRCUITPY-SPLIT/plan_typing.py','portable/plan3/sim/test_split_engine.py','tools/make_plan_exporter.py','tools/PlanExporter.cs.tpl','ams-shell/src/Ams.UI/Services/PlanExporter.cs','tools/plan_exporter_test_step.cs.inc','tests/TestRunner.cs','tools/plan_exporter_vm_command.cs.inc','tools/patch_plan_exporter_ui.py','ams-shell/src/Ams.UI/ViewModels/MainViewModel.cs','ams-shell/src/Ams.UI/MainWindow.xaml','docs/PLAN2-WINDOWS-GATE.md')
+          $persist = @('tools/hotfix_plan2_h5.py','tools/hotfix_plan2_h6.py','tools/split_plan_engine.py','ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs','tools/upgrade_plan_exporter_split_runtime.py','portable/plan3/CIRCUITPY-SPLIT/plan_engine.py','portable/plan3/CIRCUITPY-SPLIT/plan_motion.py','portable/plan3/CIRCUITPY-SPLIT/plan_typing.py','portable/plan3/sim/test_split_engine.py','tools/make_plan_exporter.py','tools/PlanExporter.cs.tpl','ams-shell/src/Ams.UI/Services/PlanExporter.cs','tools/plan_exporter_test_step.cs.inc','tests/TestRunner.cs','tools/plan_exporter_vm_command.cs.inc','tools/patch_plan_exporter_ui.py','ams-shell/src/Ams.UI/ViewModels/MainViewModel.cs','ams-shell/src/Ams.UI/MainWindow.xaml','docs/PLAN2-WINDOWS-GATE.md')
           foreach ($path in $persist) { if (Test-Path $path) { git add -- $path } }
           git commit -m "ci(plan2): validate split runtime bundle" || echo "no change"
           git push

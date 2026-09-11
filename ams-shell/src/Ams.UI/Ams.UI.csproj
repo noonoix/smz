@@ -6,12 +6,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <!-- WinForms for System.Drawing (screen capture / template bitmaps) and
-         Cursor.Position (findImage clickRestoreCursor) — VisionService -->
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationIcon>Resources\ams.ico</ApplicationIcon>
-    <!-- Neutral educational branding. This changes the build output/process name to
-         ClassroomStudio.exe; it does not claim affiliation with a school or bypass anti-cheat. -->
     <AssemblyName>ClassroomStudio</AssemblyName>
     <AssemblyTitle>Classroom Studio</AssemblyTitle>
     <Product>Classroom Studio</Product>
@@ -23,10 +19,7 @@
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
     <PackageReference Include="NAudio" Version="2.2.0" />
-    <!-- Correct package id is WPF-UI (hyphenated). The camelCase "Wpf.Ui" package
-         only carries .NET Framework assemblies and fails on net8.0 (MC3074). -->
     <PackageReference Include="WPF-UI" Version="3.0.5" />
-    <!-- v0.9.50 — board checkup HELLO handshake reads the serial port directly -->
     <PackageReference Include="System.IO.Ports" Version="8.0.0" />
   </ItemGroup>
 
@@ -39,13 +32,37 @@
       <Link>bridge\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <!-- v0.9.50 — board preparation companions, copied next to the exe like bridge.py -->
     <None Include="..\..\caterina\Caterina.hex">
       <Link>caterina\Caterina.hex</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="..\..\tools\isp_flash.py">
       <Link>tools\isp_flash.py</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <!-- v0.9.67 — canonical automatic-cycle runtime shipped beside the desktop app. -->
+    <None Include="..\..\..\portable\plan3\CIRCUITPY\plan_cycle.py">
+      <Link>portable-runtime\plan_cycle.py</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\..\portable\plan3\CIRCUITPY\cycle_runtime.py">
+      <Link>portable-runtime\cycle_runtime.py</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\..\portable\plan3\CIRCUITPY\restart_windows.py">
+      <Link>portable-runtime\restart_windows.py</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\..\portable\plan3\CIRCUITPY\auto_resume_boot.py">
+      <Link>portable-runtime\auto_resume_boot.py</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\..\portable\plan3\CIRCUITPY\resume_essentials_runtime.py">
+      <Link>portable-runtime\resume_essentials_runtime.py</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\..\portable\plan3\autocycle_h6_patch.json">
+      <Link>portable-runtime\autocycle_h6_patch.json</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

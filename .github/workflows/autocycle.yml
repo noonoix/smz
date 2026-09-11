@@ -1,0 +1,89 @@
+name: AutoCycle integration validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'ams-shell/**'
+      - 'firmware/arm26/**'
+      - 'firmware/autocycle-hostusb-v5/**'
+      - 'portable/plan3/**'
+      - '.github/workflows/autocycle.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  portable-contracts:
+    name: autocycle / portable contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile and run every portable contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            python -m py_compile portable/plan3/CIRCUITPY/*.py
+            python -m py_compile portable/plan3/CIRCUITPY-SPLIT/*.py
+            python -m py_compile portable/plan3/tools/*.py portable/plan3/sim/*.py
+            count=0
+            for test in portable/plan3/sim/test_*.py; do
+              echo "=== $test ==="
+              python "$test"
+              count=$((count + 1))
+            done
+            test "$count" -gt 0
+            echo "AutoCycle contract files passed: $count"
+          } 2>&1 | tee autocycle-portable.log
+      - name: Report portable failure tail
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const log = fs.existsSync('autocycle-portable.log') ? fs.readFileSync('autocycle-portable.log','utf8') : '(no log)';
+            const tail = log.split('\n').slice(-80).join('\n');
+            await github.rest.issues.createComment({owner:context.repo.owner,repo:context.repo.repo,issue_number:context.issue.number,body:'<!-- autocycle-portable-failure -->\n**AutoCycle portable failure tail**\n```\n'+tail+'\n```'});
+
+  windows-app:
+    name: autocycle / Windows app build-test
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore
+        shell: pwsh
+        run: dotnet restore ams-shell/AMS.sln 2>&1 | Tee-Object windows-restore.log
+      - name: Build Classroom Studio
+        shell: pwsh
+        run: dotnet build ams-shell/AMS.sln -c Release --no-restore 2>&1 | Tee-Object windows-build.log
+      - name: Build TestRunner from a clean tree
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force tests/bin, tests/obj -ErrorAction SilentlyContinue
+          dotnet build tests/TestRunner.csproj -c Release 2>&1 | Tee-Object windows-testrunner-build.log
+      - name: Run TestRunner and reject any failure
+        shell: pwsh
+        run: |
+          dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object windows-tests.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (Select-String -Path windows-tests.log -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
+      - name: Report Windows failure tail
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const names=['windows-restore.log','windows-build.log','windows-testrunner-build.log','windows-tests.log'];
+            const text=names.map(n=>fs.existsSync(n)?('=== '+n+' ===\n'+fs.readFileSync(n,'utf8')):'').join('\n');
+            const tail=text.split('\n').slice(-100).join('\n');
+            await github.rest.issues.createComment({owner:context.repo.owner,repo:context.repo.repo,issue_number:context.issue.number,body:'<!-- autocycle-windows-failure -->\n**AutoCycle Windows failure tail**\n```\n'+tail+'\n```'});

@@ -73,7 +73,7 @@ public static class DocumentService
 
     internal static void FixParents(StepNode n, StepNode? parent)
     {
-        n.Parent = parent;   // Parent is [JsonIgnore] — rebuilt here
+        n.Parent = parent;
         foreach (var c in n.Children) FixParents(c, n);
     }
 }
@@ -90,44 +90,62 @@ public sealed class AppSettings
     public string ToolkitDir { get; set; } = "";
 
     // Play Options (AMK bottom-panel parity, §9.1): app-side run settings — never in the .amsj
-    public string PlayRepeatMode { get; set; } = "once";      // once | times | timed
+    public string PlayRepeatMode { get; set; } = "once";
     public int PlayRepeatTimes { get; set; } = 10;
     public int PlayRepeatValue { get; set; } = 1;
-    public string PlayRepeatUnit { get; set; } = "minute";    // second | minute | hour
+    public string PlayRepeatUnit { get; set; } = "minute";
     public bool ShutdownWhenFinished { get; set; }
     public bool NoActivateWhenStopped { get; set; }
-    // Word-level humanize defaults for typeText steps (§v0.8.4)
+
+    // v0.9.67 — portable automatic-cycle settings. These belong to app settings and are
+    // intentionally not written into .amsj documents. The buzzer pin is hardware policy,
+    // not a user option: every portable export uses GP6.
+    public int RestartMinMinutes { get; set; } = 110;
+    public int RestartMaxMinutes { get; set; } = 130;
+    public bool AutoResumeEnabled { get; set; } = true;
+    public int AutoResumeMinMinutes { get; set; } = 3;
+    public int AutoResumeMaxMinutes { get; set; } = 5;
+    public const string PortableBuzzerPin = "GP6";
+
     public int WordDelayMin { get; set; }
     public int WordDelayMax { get; set; }
-    // Human-like mouse movement: random delay after MMOVE proportional to distance (§v0.8.5)
-    // speed range in px/s — 0/0 = disabled (firmware-paced move).
-    // v0.9.24: recalibrated from the user's DENSE hand recording (6,269 samples, ≥40 ms
-    // windows): travel speed p25 ≈ 416, median ≈ 980, p75 ≈ 1970 px/s. The v0.9.23
-    // range (150–500) came from a coarsely-sampled export and ran 2–6× slower than the real hand.
     public int MouseMoveSpeedMin { get; set; } = 300;
     public int MouseMoveSpeedMax { get; set; } = 2000;
-    // v0.9.23 — personal typing cadence from Options → "Measure from my hand"; used as the
-    // Type Text fallback when a step omits hmin/hmax. Human-calibrated default 80–220 ms.
     public int TypeKeyMinMs { get; set; } = 80;
     public int TypeKeyMaxMs { get; set; } = 220;
-    // Hotkey bindings (saved as "Key + Modifiers" strings, §v0.8.5)
-    public string RunHotkey { get; set; } = "Shift+F1";      // legacy — migrated into RunStopHotkey (v0.9.43)
-    public string StopHotkey { get; set; } = "Shift+F2";     // legacy — stop now shares the run key
-    public string PauseHotkey { get; set; } = "Shift+F3";    // legacy — migrated into PauseResumeHotkey
-    public string ResumeHotkey { get; set; } = "Shift+F4";   // legacy — resume now shares the pause key
-    // v0.9.43 — paired playback hotkeys (user request: 4 keys → 2). Empty until migrated in Load().
+    public string RunHotkey { get; set; } = "Shift+F1";
+    public string StopHotkey { get; set; } = "Shift+F2";
+    public string PauseHotkey { get; set; } = "Shift+F3";
+    public string ResumeHotkey { get; set; } = "Shift+F4";
     public string RunStopHotkey { get; set; } = "";
     public string PauseResumeHotkey { get; set; } = "";
-    // v0.9.44 — flexible role split: which board executes keyboard commands ("pico" = the brain, "promicro" = the arm).
     public string KeyboardBoard { get; set; } = "pico";
 
     private static string Path_ => System.IO.Path.Combine(AppContext.BaseDirectory, "ams-settings.json");
 
-    /// <summary>v0.9.23/v0.9.24 — migrate the untouched factory speed range (0/2300) to the
-    /// CURRENT human default (150/500 in v0.9.23, 300/2000 since v0.9.24); custom values and
-    /// the deliberate 0/0 are preserved. Pure method so TestRunner can drive the matrix.</summary>
     public static (int min, int max) NormalizeSpeedDefaults(int min, int max)
         => min == 0 && max == 2300 ? (300, 2000) : (min, max);
+
+    /// <summary>Normalizes one positive minute range. Missing/corrupt non-positive values
+    /// return to their factory defaults; reversed valid bounds are swapped.</summary>
+    public static (int min, int max) NormalizeMinuteRange(int min, int max, int defaultMin, int defaultMax)
+    {
+        if (min <= 0) min = defaultMin;
+        if (max <= 0) max = defaultMax;
+        if (max < min) (min, max) = (max, min);
+        return (min, max);
+    }
+
+    /// <summary>Applies the v0.9.67 contract and reports whether persistence changed.</summary>
+    public bool NormalizeAutoCycleSettings()
+    {
+        var old = (RestartMinMinutes, RestartMaxMinutes, AutoResumeMinMinutes, AutoResumeMaxMinutes);
+        (RestartMinMinutes, RestartMaxMinutes) = NormalizeMinuteRange(
+            RestartMinMinutes, RestartMaxMinutes, 110, 130);
+        (AutoResumeMinMinutes, AutoResumeMaxMinutes) = NormalizeMinuteRange(
+            AutoResumeMinMinutes, AutoResumeMaxMinutes, 3, 5);
+        return old != (RestartMinMinutes, RestartMaxMinutes, AutoResumeMinMinutes, AutoResumeMaxMinutes);
+    }
 
     public static AppSettings Load()
     {
@@ -136,7 +154,6 @@ public sealed class AppSettings
             if (File.Exists(Path_))
             {
                 var s = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(Path_)) ?? new();
-                // v0.9.23 — one-time migration of the untouched factory speed range
                 var (m0, m1) = NormalizeSpeedDefaults(s.MouseMoveSpeedMin, s.MouseMoveSpeedMax);
                 if (m0 != s.MouseMoveSpeedMin || m1 != s.MouseMoveSpeedMax)
                 {
@@ -144,15 +161,12 @@ public sealed class AppSettings
                     s.MouseMoveSpeedMax = m1;
                     s.Save();
                 }
-                // v0.9.43 — one-time migration to the paired hotkeys: run/stop take the old run key,
-                // pause/resume take the old pause key; the old stop/resume keys are retired.
                 if (string.IsNullOrWhiteSpace(s.RunStopHotkey))
                 {
                     s.RunStopHotkey = s.RunHotkey;
                     s.PauseResumeHotkey = s.PauseHotkey;
                     s.Save();
                 }
-                // v0.9.57 — sanitize stale paths from another machine
                 if (!string.IsNullOrEmpty(s.PythonDir) && !System.IO.Directory.Exists(s.PythonDir))
                 {
                     s.PythonDir = "";
@@ -168,6 +182,7 @@ public sealed class AppSettings
                     s.Port = "AUTO";
                     s.Save();
                 }
+                if (s.NormalizeAutoCycleSettings()) s.Save();
                 return s;
             }
         }

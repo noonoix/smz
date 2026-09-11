@@ -1,16 +1,11 @@
-"""Humanized Windows 11 restart sequence for the Pico keyboard HID.
-
-Sequence: Win+X -> Up -> Up -> Enter -> Up -> Enter.
-Each press hold and each inter-key gap is freshly drawn from a range.
+"""Humanized Windows 11 restart with shutdown-blocker confirmation.
+Sequence: Win+X, Up, Up, Enter, Up, Enter; then wait for the
+' apps are preventing restart' screen and press Shift+Tab, Enter.
 """
 import random
 
-WIN = 91
-X = 88
-UP = 38
-ENTER = 13
-
-_MENU_STEPS = (
+WIN, X, UP, ENTER, SHIFT, TAB = 91, 88, 38, 13, 16, 9
+_STEPS = (
     (UP, (45, 100), (110, 240)),
     (UP, (45, 100), (180, 360)),
     (ENTER, (55, 120), (280, 520)),
@@ -20,10 +15,7 @@ _MENU_STEPS = (
 
 
 def _wait(ctx, rng, bounds):
-    if bounds is None:
-        return
-    ms = rng.randint(bounds[0], bounds[1])
-    if not ctx.sleep_ms(ms):
+    if bounds is not None and not ctx.sleep_ms(rng.randint(bounds[0], bounds[1])):
         raise RuntimeError("restart sequence aborted")
 
 
@@ -34,11 +26,21 @@ def _tap(ctx, rng, vk, hold, after):
     _wait(ctx, rng, after)
 
 
-def perform(ctx, rng=None):
-    """Execute the power-menu restart after the caller has released all held inputs."""
-    rng = rng or random
+def _shift_tab(ctx, rng):
+    # Keep Shift physically down for the complete Tab press/release cycle.
+    ctx.kdown(SHIFT)
+    _wait(ctx, rng, (320, 480))
+    ctx.kdown(TAB)
+    _wait(ctx, rng, (160, 240))
+    ctx.kup(TAB)
+    _wait(ctx, rng, (180, 300))
+    ctx.kup(SHIFT)
 
-    # Win must remain held while X is tapped; releasing Win first would type a plain X.
+
+def perform(ctx, rng=None):
+    rng = rng or random
+    print("cycle: restart sequence start")
+
     ctx.kdown(WIN)
     _wait(ctx, rng, (25, 60))
     ctx.kdown(X)
@@ -48,5 +50,13 @@ def perform(ctx, rng=None):
     ctx.kup(WIN)
     _wait(ctx, rng, (450, 850))
 
-    for vk, hold, after in _MENU_STEPS:
+    for vk, hold, after in _STEPS:
         _tap(ctx, rng, vk, hold, after)
+
+    # Windows may show "apps are preventing restart". On the tested machine,
+    # one Shift+Tab selects "Restart anyway"; Enter confirms it.
+    _wait(ctx, rng, (5200, 6000))
+    print("cycle: confirming shutdown blocker with Shift+Tab, Enter")
+    _shift_tab(ctx, rng)
+    _wait(ctx, rng, (300, 650))
+    _tap(ctx, rng, ENTER, (65, 130), None)

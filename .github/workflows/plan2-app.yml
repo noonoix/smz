@@ -103,7 +103,15 @@ jobs:
           if (Test-Path ci-tests.txt) { $lines += Get-Content ci-tests.txt -Tail 160 }
           $lines += '```'
           $lines | Set-Content docs/PLAN2-WINDOWS-GATE.md -Encoding utf8
-          # CI must validate the checked-out commit without pushing a new unverified head.
+          # Keep successful CI immutable. On failure only, persist diagnostics so the
+          # exact failing stage can be inspected without relying on runner log access.
+          if ('${{ steps.migrate.outcome }}' -ne 'success' -or '${{ steps.split.outcome }}' -ne 'success' -or '${{ steps.bridge.outcome }}' -ne 'success' -or '${{ steps.app.outcome }}' -ne 'success' -or '${{ steps.tests.outcome }}' -ne 'success') {
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add -- docs/PLAN2-WINDOWS-GATE.md
+            git commit -m "ci(plan2): capture failure diagnostics" || echo "no diagnostic change"
+            git push
+          }
       - name: Enforce zero failures
         if: always()
         shell: pwsh

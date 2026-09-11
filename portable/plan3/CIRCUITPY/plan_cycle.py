@@ -1,6 +1,7 @@
 """PLAN v0.9.67 root auto-cycle adapter.
 
-Keeps cycle policy root-scoped while the existing plan engine executes normal ops.
+Keeps cycle policy and Resume Essentials root-scoped while the existing plan
+engine executes ordinary ops and INCLUDE files against one shared deadline.
 """
 import time
 
@@ -72,16 +73,17 @@ def parse_cycle_plan(text):
 
 
 class _CycleContext:
-    """Proxy that checks the root deadline during every engine sleep chunk."""
-    def __init__(self, inner, cycle):
+    """Proxy checking deadline and recurring essentials only at safe boundaries."""
+    def __init__(self, inner, cycle, essentials=None):
         object.__setattr__(self, "_inner", inner)
         object.__setattr__(self, "_cycle", cycle)
+        object.__setattr__(self, "_essentials", essentials)
 
     def __getattr__(self, name):
         return getattr(self._inner, name)
 
     def __setattr__(self, name, value):
-        if name in ("_inner", "_cycle"):
+        if name in ("_inner", "_cycle", "_essentials"):
             object.__setattr__(self, name, value)
         else:
             setattr(self._inner, name, value)
@@ -89,7 +91,21 @@ class _CycleContext:
     def gate(self):
         self._cycle.gate()
         base = getattr(self._inner, "gate", None)
-        return True if base is None else base()
+        if base is not None and not base():
+            return False
+        if self._essentials is not None:
+            try:
+                self._essentials.run_due(self)
+            except Exception as exc:
+                try:
+                    from resume_essentials_runtime import EssentialAbort
+                    if isinstance(exc, EssentialAbort):
+                        raise plan_engine.PlanAbort()
+                except ImportError:
+                    pass
+                raise
+        self._cycle.gate()
+        return True
 
     def sleep_ms(self, ms):
         left = max(0, int(ms))
@@ -117,8 +133,20 @@ def run_root(text, ctx, rng=None, arm_store=None):
     cycle.configure(policy["run"][0], policy["run"][1],
                     policy["auto"], policy["resume"][0], policy["resume"][1])
     cycle.start()
-    wrapped = _CycleContext(ctx, cycle)
+    essentials = getattr(ctx, "resume_essentials", None)
+    wrapped = _CycleContext(ctx, cycle, essentials)
     try:
+        if essentials is not None:
+            try:
+                essentials.run_resume(wrapped)
+            except Exception as exc:
+                try:
+                    from resume_essentials_runtime import EssentialAbort
+                    if isinstance(exc, EssentialAbort):
+                        raise plan_engine.PlanAbort()
+                except ImportError:
+                    pass
+                raise
         plan_engine.run_plan(ops, wrapped)
         return "finished"
     except PlanDeadline:

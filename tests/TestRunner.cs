@@ -3603,6 +3603,9 @@ class TestRunner
         // PLAN2_PARITY_TESTS
         // ── Step 59: v0.9.65 — portable plan exporter (PLAN|2 gen-1 contract, firmware 0.9.64b) ──
         Console.WriteLine();
+        // PLAN2_PARITY_TESTS
+        // ── Step 59: v0.9.65 — portable plan exporter (PLAN|2 gen-1 contract, firmware 0.9.64b) ──
+        Console.WriteLine();
         Console.WriteLine("--- Step 59: v0.9.65 plan exporter (PLAN|2) ---");
         {
             static string PexNormEol(string s) => s.Replace("\r\n", "\n").TrimEnd() + "\n";

@@ -39,7 +39,7 @@ public partial class MainWindow
         var head = new Grid { Margin = new Thickness(0, 0, 0, 6) };
         head.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var title = AutoCycleUiKit.Title("زمان‌بندی Restart و Auto Resume");
+        var title = AutoCycleUiKit.Title("زمان‌بندی چرخه‌ی خودکار پیکو");
         var buzzerValue = new TextBlock
         {
             Foreground = AutoCycleUiKit.Success,

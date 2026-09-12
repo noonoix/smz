@@ -156,7 +156,7 @@
                 <MenuItem Header="Wait For _Light (BH1750)" Command="{Binding AddStepCommand}" CommandParameter="waitForLight" />
                 <Separator />
                 <MenuItem Header="Open _File / Program" Command="{Binding AddStepCommand}" CommandParameter="openFile" />
-                <MenuItem Header="_Play Audio (wav/mp3)" Command="{Binding AddStepCommand}" CommandParameter="playAudio" />
+                <MenuItem Header="_Play Audio (wav/mp3)" Command="{Binding AddStepCommand}" CommandParameter="buzzer" />
                 <MenuItem Header="_Run Exe" Command="{Binding AddStepCommand}" CommandParameter="runExe" />
                 <MenuItem Header="_Play Script (.amsj)" Command="{Binding AddStepCommand}" CommandParameter="playScript" />
                 <MenuItem Header="Insert _Label" Command="{Binding AddStepCommand}" CommandParameter="label" />
@@ -300,7 +300,7 @@
                                            PreviewMouseLeftButtonDown="RailSubmenu_PreviewMouseLeftButtonDown" />
                             </StackPanel>
                         </Button>
-                        <Button Style="{StaticResource RailButton}" Command="{Binding AddStepCommand}" CommandParameter="playAudio"
+                        <Button Style="{StaticResource RailButton}" Command="{Binding AddStepCommand}" CommandParameter="buzzer"
                                 ToolTip="پخش صدا — فایل wav/mp3 (تکرار اختیاری)">
                             <StackPanel>
                                 <TextBlock Text="🔈" FontSize="15" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center" Foreground="{StaticResource StepAudioBrush}" />
@@ -416,7 +416,7 @@
                                       Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                             <Separator />
                             <!-- v0.9.43 — these two were missing from the right-click menu -->
-                            <MenuItem Header="Play Audio (wav/mp3)" CommandParameter="playAudio"
+                            <MenuItem Header="Play Audio (wav/mp3)" CommandParameter="buzzer"
                                       Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                             <MenuItem Header="Run Exe" CommandParameter="runExe"
                                       Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />

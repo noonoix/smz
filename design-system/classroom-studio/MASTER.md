@@ -6,7 +6,8 @@ Variance 3/10 · Motion 2/10 · Density 9/10.
 
 ## AutoCycle section
 - Keep only the two export actions visible in the normal Play Options state.
-- Put Resume Essentials and Schedule in one collapsed-by-default “AutoCycle settings” expander.
+- Put Resume Essentials, Schedule, and Restart Launch in one collapsed-by-default “AutoCycle settings” expander.
+- Keep Restart Launch compact and ordered: genuine Auto Resume → humanized Win+taskbar slot → post-launch wait → Resume Essentials → root plan.
 - Keep the two export actions on one right-aligned WrapPanel row: Plan first, Firmware second.
 - Use compact fixed-width desktop buttons; never stretch action buttons across the editor.
 - Explain overwrite behavior beside the export actions, not in a remote dialog.

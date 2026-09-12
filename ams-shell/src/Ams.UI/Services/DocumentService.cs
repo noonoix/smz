@@ -105,6 +105,12 @@ public sealed class AppSettings
     public bool AutoResumeEnabled { get; set; } = true;
     public int AutoResumeMinMinutes { get; set; } = 3;
     public int AutoResumeMaxMinutes { get; set; } = 5;
+    public bool PostRestartLaunchEnabled { get; set; } = true;
+    public int PostRestartTaskbarSlot { get; set; } = 1;
+    public int PostRestartLaunchBeforeMinSeconds { get; set; } = 1;
+    public int PostRestartLaunchBeforeMaxSeconds { get; set; } = 3;
+    public int PostRestartLaunchAfterMinSeconds { get; set; } = 20;
+    public int PostRestartLaunchAfterMaxSeconds { get; set; } = 40;
     public const string PortableBuzzerPin = "GP6";
 
     public int WordDelayMin { get; set; }
@@ -128,7 +134,7 @@ public sealed class AppSettings
 
     /// <summary>Normalizes one positive minute range. Missing/corrupt non-positive values
     /// return to their factory defaults; reversed valid bounds are swapped.</summary>
-    public static (int min, int max) NormalizeMinuteRange(int min, int max, int defaultMin, int defaultMax)
+    public static (int min, int max) NormalizePositiveRange(int min, int max, int defaultMin, int defaultMax)
     {
         if (min <= 0) min = defaultMin;
         if (max <= 0) max = defaultMax;
@@ -136,15 +142,27 @@ public sealed class AppSettings
         return (min, max);
     }
 
+    public static (int min, int max) NormalizeMinuteRange(int min, int max, int defaultMin, int defaultMax)
+        => NormalizePositiveRange(min, max, defaultMin, defaultMax);
+
     /// <summary>Applies the v0.9.67 contract and reports whether persistence changed.</summary>
     public bool NormalizeAutoCycleSettings()
     {
-        var old = (RestartMinMinutes, RestartMaxMinutes, AutoResumeMinMinutes, AutoResumeMaxMinutes);
+        var old = (RestartMinMinutes, RestartMaxMinutes, AutoResumeMinMinutes, AutoResumeMaxMinutes,
+            PostRestartTaskbarSlot, PostRestartLaunchBeforeMinSeconds, PostRestartLaunchBeforeMaxSeconds,
+            PostRestartLaunchAfterMinSeconds, PostRestartLaunchAfterMaxSeconds);
         (RestartMinMinutes, RestartMaxMinutes) = NormalizeMinuteRange(
             RestartMinMinutes, RestartMaxMinutes, 110, 130);
         (AutoResumeMinMinutes, AutoResumeMaxMinutes) = NormalizeMinuteRange(
             AutoResumeMinMinutes, AutoResumeMaxMinutes, 3, 5);
-        return old != (RestartMinMinutes, RestartMaxMinutes, AutoResumeMinMinutes, AutoResumeMaxMinutes);
+        PostRestartTaskbarSlot = Math.Clamp(PostRestartTaskbarSlot, 1, 9);
+        (PostRestartLaunchBeforeMinSeconds, PostRestartLaunchBeforeMaxSeconds) = NormalizePositiveRange(
+            PostRestartLaunchBeforeMinSeconds, PostRestartLaunchBeforeMaxSeconds, 1, 3);
+        (PostRestartLaunchAfterMinSeconds, PostRestartLaunchAfterMaxSeconds) = NormalizePositiveRange(
+            PostRestartLaunchAfterMinSeconds, PostRestartLaunchAfterMaxSeconds, 20, 40);
+        return old != (RestartMinMinutes, RestartMaxMinutes, AutoResumeMinMinutes, AutoResumeMaxMinutes,
+            PostRestartTaskbarSlot, PostRestartLaunchBeforeMinSeconds, PostRestartLaunchBeforeMaxSeconds,
+            PostRestartLaunchAfterMinSeconds, PostRestartLaunchAfterMaxSeconds);
     }
 
     public static AppSettings Load()

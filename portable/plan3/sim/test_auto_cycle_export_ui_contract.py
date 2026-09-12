@@ -25,7 +25,9 @@ assert "WrapPanel EnsureExportCard" in kit and "HorizontalAlignment = Horizontal
 assert "EnsureAdvancedPanel" in kit and "IsExpanded = false" in kit
 assert "EnsureAdvancedPanel(body)" in essentials_ui and "EnsureAdvancedPanel(body)" in schedule_ui
 assert "ReorderAdvanced" in essentials_ui and "ReorderAdvanced" in schedule_ui
+assert "Restart Launch" in schedule_ui and "PostRestartLaunchEnabled" in schedule_ui
+assert "PostRestartTaskbarSlot" in schedule_ui and "BuildRangeRow" in schedule_ui
 assert "۱  ·" in ui and "۲  ·" in firmware_ui
 assert "ToolTip" in ui and "ToolTip" in firmware_ui
 assert "GridUnitType.Star" in essentials_ui and "GridUnitType.Star" in schedule_ui
-print("auto-cycle compact UI: 20 passed, 0 failed")
+print("auto-cycle compact UI: 22 passed, 0 failed")

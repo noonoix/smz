@@ -69,14 +69,51 @@ public partial class MainWindow
             HorizontalAlignment = HorizontalAlignment.Right,
         };
         ranges.Children.Add(BuildRangeRow(
-            "Restart از Start",
+            "Restart از Start", "دقیقه",
             nameof(MainViewModel.RestartMinMinutes), nameof(MainViewModel.RestartMaxMinutes),
             "کل برنامه در یک زمان تصادفی داخل این بازه متوقف و ویندوز Restart می‌شود."));
         ranges.Children.Add(BuildRangeRow(
-            "USB/HID تا Resume",
+            "USB/HID تا Resume", "دقیقه",
             nameof(MainViewModel.AutoResumeMinMinutes), nameof(MainViewModel.AutoResumeMaxMinutes),
             "پس از reconnect پایدار، یک زمان تازه از این بازه انتخاب می‌شود؛ سپس Resume Essentials اجرا می‌شود."));
         section.Children.Add(ranges);
+
+        var launch = new WrapPanel
+        {
+            FlowDirection = FlowDirection.RightToLeft,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 6, 0, 0),
+        };
+        var launchEnabled = new CheckBox
+        {
+            Content = "Restart Launch",
+            MinHeight = 32,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            ToolTip = "پس از بازگشت Windows و پیش از Resume Essentials، برنامه‌ی پین‌شده را با Win+شماره اجرا می‌کند.",
+            Margin = new Thickness(8, 0, 0, 0),
+        };
+        launchEnabled.SetBinding(ToggleButton.IsCheckedProperty,
+            TwoWay(nameof(MainViewModel.PostRestartLaunchEnabled)));
+        launch.Children.Add(launchEnabled);
+        launch.Children.Add(new TextBlock
+        {
+            Text = "جایگاه Taskbar",
+            Foreground = AutoCycleUiKit.Muted,
+            FontSize = 10,
+            VerticalAlignment = VerticalAlignment.Center,
+        });
+        launch.Children.Add(NumberBox(nameof(MainViewModel.PostRestartTaskbarSlot)));
+        launch.Children.Add(BuildRangeRow(
+            "مکث قبل", "ثانیه",
+            nameof(MainViewModel.PostRestartLaunchBeforeMinSeconds),
+            nameof(MainViewModel.PostRestartLaunchBeforeMaxSeconds),
+            "مکث تصادفی پیش از Win+شماره."));
+        launch.Children.Add(BuildRangeRow(
+            "مکث بعد", "ثانیه",
+            nameof(MainViewModel.PostRestartLaunchAfterMinSeconds),
+            nameof(MainViewModel.PostRestartLaunchAfterMaxSeconds),
+            "فرصت تصادفی برای بازشدن برنامه پیش از Resume Essentials."));
+        section.Children.Add(launch);
 
         var footer = new Grid { Margin = new Thickness(0, 6, 0, 0) };
         footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -111,7 +148,7 @@ public partial class MainWindow
     }
 
     private static FrameworkElement BuildRangeRow(
-        string label, string minProperty, string maxProperty, string toolTip)
+        string label, string unit, string minProperty, string maxProperty, string toolTip)
     {
         var root = new Border
         {
@@ -131,7 +168,7 @@ public partial class MainWindow
         };
         row.Children.Add(new TextBlock
         {
-            Text = label + " (دقیقه)",
+            Text = label + " (" + unit + ")",
             Foreground = AutoCycleUiKit.Text,
             FontSize = 11,
             FontWeight = FontWeights.SemiBold,

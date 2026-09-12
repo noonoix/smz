@@ -4022,6 +4022,7 @@ class TestRunner
             Assert(cycleText.Contains("AUTO_CYCLE_PATCH_0967_H6")
                    && cycleText.Contains("import plan_cycle as _pc")
                    && cycleText.Contains("_resume_boot.tick()")
+                   && cycleText.Contains("restart armed; waiting for host reboot")
                    && cycleText.Contains("board.GP6")
                    && cycleText.Contains("0x10: Keycode.LEFT_SHIFT"),
                 "v0.9.67: AutoCycle manifest patches the real per-system firmware output");
@@ -4058,10 +4059,14 @@ class TestRunner
                 PlayRepeatMode = "times", PlayRepeatTimes = 3,
                 RestartMinMinutes = 2, RestartMaxMinutes = 3,
                 AutoResumeEnabled = true, AutoResumeMinMinutes = 1, AutoResumeMaxMinutes = 2,
+                PostRestartLaunchEnabled = true, PostRestartTaskbarSlot = 1,
+                PostRestartLaunchBeforeMinSeconds = 1, PostRestartLaunchBeforeMaxSeconds = 3,
+                PostRestartLaunchAfterMinSeconds = 20, PostRestartLaunchAfterMaxSeconds = 40,
             };
             var essentialWritten = AutoCyclePlanBundle.Export(Path.Combine(essentialsTmp, "plan.txt"),
                 essentialRoots, essentialSettings, 1920, 1080, "essential.amsj", "TESTPC");
             var essentialText = File.ReadAllText(Path.Combine(essentialsTmp, "resume_essentials.txt"));
+            var rootText = File.ReadAllText(Path.Combine(essentialsTmp, "plan.txt"));
             Assert(essentialWritten.Count == 11
                    && File.Exists(Path.Combine(essentialsTmp, "resume_essentials_runtime.py")),
                 "v0.9.67: AutoCycle plan bundle writes runtime plus resume_essentials.txt");
@@ -4070,6 +4075,9 @@ class TestRunner
                    && essentialText.Contains("TYPE|text= resume essential")
                    && !essentialText.Contains("LOOP|3"),
                 "v0.9.67: selected Random Package is compiled once as the Resume Essentials pre-pass");
+            Assert(rootText.Contains("POSTLAUNCH|1,1,1,3,20,40")
+                   && !essentialText.Contains("POSTLAUNCH|"),
+                "v0.9.67: Restart Launch is root-only and precedes the Resume Essentials pre-pass");
         }
         finally { if (Directory.Exists(essentialsTmp)) Directory.Delete(essentialsTmp, true); }
 

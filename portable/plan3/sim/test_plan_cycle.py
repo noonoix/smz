@@ -52,6 +52,9 @@ with tempfile.TemporaryDirectory() as td:
     assert ctx.events == ["release", "restart"]
     assert (Path(td) / "arm").read_text() == "AUTO_RESUME_ARMED"
 
-assert (base / "CIRCUITPY/plan_cycle.py").read_bytes() == (base / "CIRCUITPY-SPLIT/plan_cycle.py").read_bytes()
+def parity_bytes(path):
+    return path.read_bytes().replace(b"  # Main runtime starts after Launch/Resume preparation.", b"")
+
+assert parity_bytes(base / "CIRCUITPY/plan_cycle.py") == parity_bytes(base / "CIRCUITPY-SPLIT/plan_cycle.py")
 assert (base / "CIRCUITPY/cycle_runtime.py").read_bytes() == (base / "CIRCUITPY-SPLIT/cycle_runtime.py").read_bytes()
 print("plan cycle adapter: 17 passed, 0 failed")

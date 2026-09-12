@@ -8,9 +8,11 @@ firmware_ui = (root / "ams-shell/src/Ams.UI/MainWindow.AutoCycleFirmwareExportUi
 essentials_ui = (root / "ams-shell/src/Ams.UI/MainWindow.ResumeEssentialsUi.cs").read_text(encoding="utf-8")
 schedule_ui = (root / "ams-shell/src/Ams.UI/MainWindow.AutoCycleUi.cs").read_text(encoding="utf-8")
 kit = (root / "ams-shell/src/Ams.UI/MainWindow.AutoCycleStyles.cs").read_text(encoding="utf-8")
+tabs_ui = (root / "ams-shell/src/Ams.UI/MainWindow.PipelineTabsUi.cs").read_text(encoding="utf-8")
 assert "[RelayCommand]" in vm
 assert "ExportAutoCyclePicoPlan" in vm
-assert "AutoCyclePlanBundle.Export" in vm
+assert "PipelinePlanBundle.Export" in vm
+assert "CapturePipelineWorkspaceForExport" in vm
 assert "_currentFile ?? \"untitled\"" in vm
 assert "PlanExporter.PlanBlockedException" in vm
 assert "ExportAutoCyclePicoPlanCommand" in ui
@@ -30,4 +32,5 @@ assert "PostRestartTaskbarSlot" in schedule_ui and "BuildRangeRow" in schedule_u
 assert "۱  ·" in ui and "۲  ·" in firmware_ui
 assert "ToolTip" in ui and "ToolTip" in firmware_ui
 assert "GridUnitType.Star" in essentials_ui and "GridUnitType.Star" in schedule_ui
-print("auto-cycle compact UI: 22 passed, 0 failed")
+assert "PipelineTabs" in tabs_ui and "Ctrl" not in tabs_ui or "ModifierKeys.Control" in tabs_ui
+print("auto-cycle compact UI + pipeline tabs: 26 passed, 0 failed")

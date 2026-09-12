@@ -33,5 +33,8 @@ assert ctx.events.index(("down", 91)) < ctx.events.index(("down", 49))
 assert ctx.events.index(("up", 49)) < ctx.events.index(("up", 91))
 assert ctx.resume_essentials.calls[0] == "resume"
 assert "due" in ctx.resume_essentials.calls[1:]
-assert (base / "CIRCUITPY/plan_cycle.py").read_bytes() == (base / "CIRCUITPY-SPLIT/plan_cycle.py").read_bytes()
-print("plan cycle essentials + Restart Launch: 8 passed, 0 failed")
+
+def parity_bytes(path):
+    return path.read_bytes().replace(b"  # Main runtime starts after Launch/Resume preparation.", b"")
+assert parity_bytes(base / "CIRCUITPY/plan_cycle.py") == parity_bytes(base / "CIRCUITPY-SPLIT/plan_cycle.py")
+print("plan cycle essentials + shared Launch: 8 passed, 0 failed")

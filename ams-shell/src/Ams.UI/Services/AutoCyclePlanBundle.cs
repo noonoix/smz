@@ -19,17 +19,26 @@ public static class AutoCyclePlanBundle
             if (!File.Exists(Path.Combine(runtimeDir, name)))
                 throw new IOException("فایل runtime چرخه پیدا نشد: " + name);
 
-        var errors = ResumeEssentialsContract.Validate(steps);
+        var errors = ResumeEssentialsContract.Validate(steps)
+            .Concat(LaunchStepsContract.Validate(steps)).ToList();
         if (errors.Count > 0) throw new PlanExporter.PlanBlockedException(errors);
 
-        // The old exporter still owns action lowering and recursive INCLUDE compilation.
-        var written = PlanExporter.Export(planPath, steps, settings, screenW, screenH, sourceName, machine).ToList();
+        var launch = LaunchStepsContract.Find(steps);
+        var rootSteps = CloneWithoutLaunchGroup(steps, launch);
+        var written = PlanExporter.Export(planPath, rootSteps, settings, screenW, screenH, sourceName, machine).ToList();
         var full = Path.GetFullPath(planPath);
         var dir = Path.GetDirectoryName(full) ?? throw new IOException("مسیر خروجی پلن نامعتبر است.");
         var decorated = DecorateRoot(File.ReadAllText(full), settings);
+
+        var launchText = launch is null
+            ? "PLAN|2\n"
+            : PlanExporter.CompileOnce(launch.Children.ToList(), settings,
+                screenW, screenH, sourceName + "#launch-steps", machine).Text;
+        var launchPath = Path.Combine(dir, "launch_steps.txt");
+
         var essential = ResumeEssentialsContract.Find(steps);
         var essentialsText = essential is null
-            ? "ESSENTIALS|1\n" // overwrite any stale package from a previous export
+            ? "ESSENTIALS|1\n"
             : PlanExporter.CompileOnce(new List<StepNode> { essential }, settings,
                 screenW, screenH, sourceName + "#resume-essentials", machine).Text;
         var essentialsPath = Path.Combine(dir, "resume_essentials.txt");
@@ -37,14 +46,41 @@ public static class AutoCyclePlanBundle
         var payloads = new List<(string Path, byte[] Bytes)>
         {
             (full, new UTF8Encoding(false).GetBytes(decorated)),
+            (launchPath, new UTF8Encoding(false).GetBytes(launchText)),
             (essentialsPath, new UTF8Encoding(false).GetBytes(essentialsText)),
         };
         foreach (var name in RuntimeFiles)
             payloads.Add((Path.Combine(dir, name), File.ReadAllBytes(Path.Combine(runtimeDir, name))));
         PublishAtomically(payloads);
+        // Keep the legacy returned-file count stable; PipelinePlanBundle reports launch_steps.txt.
         written.Add(essentialsPath);
         written.AddRange(RuntimeFiles.Select(name => Path.Combine(dir, name)));
         return written.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static List<StepNode> CloneWithoutLaunchGroup(IEnumerable<StepNode> nodes, StepNode? launch)
+    {
+        var result = new List<StepNode>();
+        foreach (var node in nodes)
+        {
+            if (ReferenceEquals(node, launch)) continue;
+            var clone = new StepNode
+            {
+                Type = node.Type,
+                Name = node.Name,
+                Delay = node.Delay,
+                DelayMax = node.DelayMax,
+                IsDisabled = node.IsDisabled,
+                Props = new Dictionary<string, object?>(node.Props),
+            };
+            foreach (var child in CloneWithoutLaunchGroup(node.Children, launch))
+            {
+                child.Parent = clone;
+                clone.Children.Add(child);
+            }
+            result.Add(clone);
+        }
+        return result;
     }
 
     public static string DecorateRoot(string text, AppSettings settings)
@@ -54,7 +90,8 @@ public static class AutoCyclePlanBundle
             throw new PlanExporter.PlanBlockedException(new[] { "PlanExporter BUG: خروجی Root با PLAN|2 شروع نشده است." });
         if (lines.Skip(1).Any(line => line.StartsWith("RUNFOR|", StringComparison.Ordinal)
                                    || line.StartsWith("AUTORESUME|", StringComparison.Ordinal)
-                                   || line.StartsWith("POSTLAUNCH|", StringComparison.Ordinal)))
+                                   || line.StartsWith("POSTLAUNCH|", StringComparison.Ordinal)
+                                   || line.StartsWith("LAUNCH|", StringComparison.Ordinal)))
             throw new PlanExporter.PlanBlockedException(new[] { "PlanExporter BUG: directive چرخه در Root تکراری است." });
 
         var (restartMin, restartMax) = AppSettings.NormalizeMinuteRange(
@@ -72,6 +109,8 @@ public static class AutoCyclePlanBundle
             "AUTORESUME|" + (settings.AutoResumeEnabled ? "1" : "0") + ","
                 + (resumeMin * 60).ToString(CultureInfo.InvariantCulture) + ","
                 + (resumeMax * 60).ToString(CultureInfo.InvariantCulture),
+            // Export the legacy spelling for now so the Windows app regression suite stays compatible.
+            // Runtime accepts both POSTLAUNCH and the clearer LAUNCH alias; non-root files guard both.
             "POSTLAUNCH|" + (settings.PostRestartLaunchEnabled ? "1" : "0") + ","
                 + launchSlot.ToString(CultureInfo.InvariantCulture) + ","
                 + launchBeforeMin.ToString(CultureInfo.InvariantCulture) + ","

@@ -7,7 +7,6 @@ namespace Ams.UI.ViewModels;
 
 public partial class MainViewModel
 {
-    /// <summary>v0.9.67 — cycle-aware export entry point while the legacy File menu remains stable.</summary>
     [RelayCommand]
     private void ExportAutoCyclePicoPlan()
     {
@@ -20,31 +19,31 @@ public partial class MainViewModel
         if (dlg.ShowDialog() != true) return;
         try
         {
-            var written = AutoCyclePlanBundle.Export(dlg.FileName, Steps, _settings,
+            var workspace = CapturePipelineWorkspaceForExport();
+            var written = PipelinePlanBundle.Export(dlg.FileName, workspace, _settings,
                 (int)SystemParameters.PrimaryScreenWidth, (int)SystemParameters.PrimaryScreenHeight,
                 _currentFile ?? "untitled", Environment.MachineName);
             foreach (var file in written) Log("auto-cycle plan: " + Path.GetFileName(file));
-            Log($"auto-cycle plan: {written.Count} file(s) written — Root owns the wall-clock deadline; INCLUDE plans inherit it");
+            Log($"auto-cycle pipeline: {written.Count} file(s) written; Main owns cycle directives");
             MessageBox.Show(
-                $"بسته‌ی چرخه‌ی خودکار ساخته شد ({written.Count} فایل).\n"
+                $"بسته‌ی Pipeline ساخته شد ({written.Count} فایل).\n"
+                + "Launch، Main، دو Recovery و Resume Essentials به فایل‌های مستقل PLAN|2 تبدیل شدند.\n"
                 + "RUNFOR و AUTORESUME فقط در plan.txt اصلی نوشته شدند.\n"
-                + "resume_essentials.txt و همه‌ی runtimeهای چرخه نیز کنار پلن قرار گرفتند.\n"
-                + "همه‌ی فایل‌های خروجی را در ریشه‌ی CIRCUITPY نگه دار.",
-                "Export automatic-cycle Pico plan", MessageBoxButton.OK, MessageBoxImage.Information);
+                + "همه‌ی فایل‌ها را در ریشه‌ی CIRCUITPY نگه دار.",
+                "Export AutoCycle Pipeline", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (PlanExporter.PlanBlockedException bx)
         {
             Log($"auto-cycle export blocked ({bx.Errors.Count} problem(s)):");
             foreach (var error in bx.Errors) Log("  x " + error);
-            MessageBox.Show(
-                $"اکسپورت چرخه متوقف شد — {bx.Errors.Count} خطا. جزئیات در لاگ برنامه است.",
-                "Export automatic-cycle Pico plan", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show($"اکسپورت Pipeline متوقف شد — {bx.Errors.Count} خطا. جزئیات در لاگ است.",
+                "Export AutoCycle Pipeline", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         catch (Exception ex)
         {
             Log("auto-cycle export failed: " + ex.Message);
-            MessageBox.Show("خروجی چرخه‌ی خودکار ناموفق بود: " + ex.Message,
-                "Export automatic-cycle Pico plan", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show("خروجی Pipeline ناموفق بود: " + ex.Message,
+                "Export AutoCycle Pipeline", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 }

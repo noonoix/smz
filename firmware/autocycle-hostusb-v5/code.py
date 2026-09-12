@@ -1170,9 +1170,7 @@ while True:
                 if _plan_result:
                     passes += 1
                     if _plan_result in ("done", "expired"):
-                        # A completed finite plan stops normally. After a Restart request,
-                        # stay quiescent while AutoResumeBoot watches HOSTUSB DOWN -> UP;
-                        # never start another macro pass before Windows has rebooted.
+                        # PLAN2_H6_CONTROL_FIX: finite plan completion is a real Stop.
                         engine_on = False
                         engine_paused = False
                         release_all_buttons()

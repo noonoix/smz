@@ -1,9 +1,12 @@
 using System.Runtime.CompilerServices;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Media;
 using Ams.UI.Models;
 using Ams.UI.ViewModels;
+using WpfDragEventArgs = System.Windows.DragEventArgs;
+using WpfDragEventHandler = System.Windows.DragEventHandler;
+using WpfListBox = System.Windows.Controls.ListBox;
+using WpfListBoxItem = System.Windows.Controls.ListBoxItem;
 
 namespace Ams.UI;
 
@@ -15,12 +18,12 @@ internal static class ConditionalDragDropBootstrap
 {
     [ModuleInitializer]
     internal static void Initialize()
-        => EventManager.RegisterClassHandler(typeof(ListBox), UIElement.DropEvent,
-            new DragEventHandler(OnDrop), true);
+        => EventManager.RegisterClassHandler(typeof(WpfListBox), UIElement.DropEvent,
+            new WpfDragEventHandler(OnDrop), true);
 
-    private static void OnDrop(object sender, System.Windows.DragEventArgs e)
+    private static void OnDrop(object sender, WpfDragEventArgs e)
     {
-        if (sender is not ListBox list || list.Name != "StepsList") return;
+        if (sender is not WpfListBox list || list.Name != "StepsList") return;
         if (e.Data.GetData(typeof(StepNode)) is not StepNode node) return;
         if (list.DataContext is not MainViewModel vm || !vm.IsConditionalDragNode(node)) return;
 
@@ -41,10 +44,10 @@ internal static class ConditionalDragDropBootstrap
         e.Handled = true;
     }
 
-    private static ListBoxItem? FindRow(DependencyObject? value)
+    private static WpfListBoxItem? FindRow(DependencyObject? value)
     {
-        while (value is not null and not ListBoxItem)
+        while (value is not null and not WpfListBoxItem)
             value = VisualTreeHelper.GetParent(value);
-        return value as ListBoxItem;
+        return value as WpfListBoxItem;
     }
 }

@@ -109,7 +109,9 @@ public static class AutoCyclePlanBundle
             "AUTORESUME|" + (settings.AutoResumeEnabled ? "1" : "0") + ","
                 + (resumeMin * 60).ToString(CultureInfo.InvariantCulture) + ","
                 + (resumeMax * 60).ToString(CultureInfo.InvariantCulture),
-            "LAUNCH|" + (settings.PostRestartLaunchEnabled ? "1" : "0") + ","
+            // Export the legacy spelling for now so the Windows app regression suite stays compatible.
+            // Runtime accepts both POSTLAUNCH and the clearer LAUNCH alias; non-root files guard both.
+            "POSTLAUNCH|" + (settings.PostRestartLaunchEnabled ? "1" : "0") + ","
                 + launchSlot.ToString(CultureInfo.InvariantCulture) + ","
                 + launchBeforeMin.ToString(CultureInfo.InvariantCulture) + ","
                 + launchBeforeMax.ToString(CultureInfo.InvariantCulture) + ","

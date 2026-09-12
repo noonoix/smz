@@ -151,7 +151,9 @@ def run_root(text,ctx,rng=None,arm_store=None):
     cycle=RootCycle(getattr(ctx,"now",None),rng,arm_store)
     # AutoResumeBoot keeps the marker armed until start_root succeeds. No marker means
     # this is a new manual session, so only then may the persistent restart count reset.
-    if not cycle.arm_store.is_armed(): cycle.reset_restart_session()
+    is_armed=getattr(cycle.arm_store,"is_armed",None)
+    reset_count=getattr(cycle.arm_store,"reset_restart_count",None)
+    if is_armed is not None and reset_count is not None and not is_armed(): cycle.reset_restart_session()
     cycle.configure(policy["run"][0],policy["run"][1],policy["auto"],policy["resume"][0],policy["resume"][1])
     essentials=getattr(ctx,"resume_essentials",None); wrapped=_CycleContext(ctx,cycle,essentials)
     try:

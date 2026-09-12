@@ -13,7 +13,8 @@ assert "ResumeEssentialsContract.Validate(steps)" in helper
 assert "ResumeEssentialsContract.Find(steps)" in helper
 assert "PlanExporter.CompileOnce" in helper
 assert '"resume_essentials.txt"' in helper
-assert '"RUNFOR|"' in helper and '"AUTORESUME|"' in helper and '"POSTLAUNCH|"' in helper
+assert '"RUNFOR|"' in helper and '"AUTORESUME|"' in helper and '"LAUNCH|"' in helper
+assert '"POSTLAUNCH|"' in helper  # legacy alias must still be guarded/understood
 assert "settings.RestartMinMinutes" in helper and "settings.RestartMaxMinutes" in helper
 assert "settings.AutoResumeMinMinutes" in helper and "settings.AutoResumeMaxMinutes" in helper
 assert "settings.PostRestartLaunchEnabled" in helper and "settings.PostRestartTaskbarSlot" in helper
@@ -21,4 +22,4 @@ assert "settings.PostRestartLaunchBeforeMinSeconds" in helper
 assert "settings.PostRestartLaunchAfterMaxSeconds" in helper
 assert "PublishAtomically(payloads)" in helper
 assert "Distinct(StringComparer.OrdinalIgnoreCase)" in helper
-print("auto-cycle C# bundle: 25 passed, 0 failed")
+print("auto-cycle C# bundle: 26 passed, 0 failed")

@@ -73,7 +73,8 @@ internal static class PipelineTabsUiBootstrap
 
         for (var i = 0; i < vm.PipelineTabs.Count && i < 9; i++)
             window.InputBindings.Add(new KeyBinding(vm.SwitchPipelineCommand,
-                new KeyGesture(Key.D1 + i, ModifierKeys.Control)) { CommandParameter = vm.PipelineTabs[i] });
+                new KeyGesture((Key)((int)Key.D1 + i), ModifierKeys.Control))
+                { CommandParameter = vm.PipelineTabs[i] });
     }
 
     private static Button ToolButton(string title, ICommand command) => new()

@@ -8,7 +8,8 @@ namespace Ams.UI.Services;
 public static class AutoCyclePlanBundle
 {
     private static readonly string[] RuntimeFiles =
-        { "plan_cycle.py", "cycle_runtime.py", "restart_windows.py", "auto_resume_boot.py" };
+        { "plan_cycle.py", "cycle_runtime.py", "restart_windows.py", "auto_resume_boot.py",
+          "resume_essentials_runtime.py" };
 
     public static IReadOnlyList<string> Export(string planPath, IList<StepNode> steps,
         AppSettings settings, int screenW, int screenH, string sourceName, string machine)
@@ -26,14 +27,22 @@ public static class AutoCyclePlanBundle
         var full = Path.GetFullPath(planPath);
         var dir = Path.GetDirectoryName(full) ?? throw new IOException("مسیر خروجی پلن نامعتبر است.");
         var decorated = DecorateRoot(File.ReadAllText(full), settings);
+        var essential = ResumeEssentialsContract.Find(steps);
+        var essentialsText = essential is null
+            ? "ESSENTIALS|1\n" // overwrite any stale package from a previous export
+            : PlanExporter.CompileOnce(new List<StepNode> { essential }, settings,
+                screenW, screenH, sourceName + "#resume-essentials", machine).Text;
+        var essentialsPath = Path.Combine(dir, "resume_essentials.txt");
 
         var payloads = new List<(string Path, byte[] Bytes)>
         {
             (full, new UTF8Encoding(false).GetBytes(decorated)),
+            (essentialsPath, new UTF8Encoding(false).GetBytes(essentialsText)),
         };
         foreach (var name in RuntimeFiles)
             payloads.Add((Path.Combine(dir, name), File.ReadAllBytes(Path.Combine(runtimeDir, name))));
         PublishAtomically(payloads);
+        written.Add(essentialsPath);
         written.AddRange(RuntimeFiles.Select(name => Path.Combine(dir, name)));
         return written.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }

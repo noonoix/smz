@@ -6,7 +6,7 @@ using Ams.UI.ViewModels;
 
 namespace Ams.UI;
 
-/// <summary>Adds Resume Essentials controls below the automatic-cycle fields.</summary>
+/// <summary>Accessible card for selecting the resume-only Random Package pre-pass.</summary>
 internal static class ResumeEssentialsUiBootstrap
 {
     private static readonly DependencyProperty InstalledProperty = DependencyProperty.RegisterAttached(
@@ -23,39 +23,39 @@ internal static class ResumeEssentialsUiBootstrap
         if (window.FindName("PlayOptBody") is not StackPanel body) return;
         window.SetValue(InstalledProperty, true);
 
-        var panel = new StackPanel
-        {
-            FlowDirection = FlowDirection.RightToLeft,
-            Margin = new Thickness(0, 8, 0, 0),
-        };
-        panel.Children.Add(new TextBlock
-        {
-            Text = "Resume Essentials",
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 0, 0, 4),
-        });
-        panel.Children.Add(new TextBlock
-        {
-            Text = "یک Random Package را انتخاب کن و آن را به‌عنوان بسته‌ی ضروری بازگشت ثبت کن. حالت آن همیشه Shuffle All است.",
-            TextWrapping = TextWrapping.Wrap,
-            FontSize = 11,
-            Opacity = 0.78,
-            Margin = new Thickness(0, 0, 0, 5),
-        });
+        var panel = new StackPanel { FlowDirection = FlowDirection.RightToLeft };
+        var head = new Grid();
+        head.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var title = AutoCycleUiKit.Title("بسته‌ی ضروری پس از راه‌اندازی مجدد");
+        var badge = AutoCycleUiKit.Badge("Resume Essentials");
+        Grid.SetColumn(title, 0);
+        Grid.SetColumn(badge, 1);
+        head.Children.Add(title);
+        head.Children.Add(badge);
+        panel.Children.Add(head);
+        panel.Children.Add(AutoCycleUiKit.Helper(
+            "یک Random Package را انتخاب و ثبت کن. پس از Auto Resume، تمام آیتم‌های فعال آن یک‌بار در حالت Shuffle All اجرا می‌شوند."));
 
-        var row = new StackPanel { Orientation = Orientation.Horizontal };
-        var mark = new Button { Content = "ثبت بسته‌ی انتخاب‌شده", Padding = new Thickness(8, 3, 8, 3) };
+        var actions = new Grid();
+        actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
+        actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var mark = AutoCycleUiKit.Action("ثبت بسته‌ی انتخاب‌شده", true);
+        mark.ToolTip = "بسته‌ی انتخاب‌شده را به‌عنوان پیش‌اجرای یک‌باره پس از Auto Resume ثبت می‌کند.";
         mark.SetBinding(Button.CommandProperty, new Binding(nameof(MainViewModel.MarkResumeEssentialsCommand)));
-        var clear = new Button
-        {
-            Content = "پاک‌کردن",
-            Padding = new Thickness(8, 3, 8, 3),
-            Margin = new Thickness(6, 0, 0, 0),
-        };
+        Grid.SetColumn(mark, 0);
+
+        var clear = AutoCycleUiKit.Action("پاک‌کردن انتخاب");
+        clear.ToolTip = "انتخاب Resume Essentials را پاک می‌کند.";
         clear.SetBinding(Button.CommandProperty, new Binding(nameof(MainViewModel.ClearResumeEssentialsCommand)));
-        row.Children.Add(mark);
-        row.Children.Add(clear);
-        panel.Children.Add(row);
-        body.Children.Add(panel);
+        Grid.SetColumn(clear, 2);
+
+        actions.Children.Add(mark);
+        actions.Children.Add(clear);
+        panel.Children.Add(actions);
+        body.Children.Add(AutoCycleUiKit.Card(AutoCycleUiKit.EssentialsTag, panel));
+        AutoCycleUiKit.Reorder(body);
     }
 }

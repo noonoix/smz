@@ -61,6 +61,43 @@ def parse(text):
     return items
 
 
+class PlanManager:
+    """Runs the UI-selected Random Package once before the resumed root plan.
+
+    The package is compiled by the same C# PlanExporter into a standalone PLAN|2
+    program, so every portable child action keeps exactly the normal semantics.
+    Scheduled ESSENTIALS|1 files remain supported by Manager below.
+    """
+    def __init__(self, text, now=None, rng=None, resume_pending=False):
+        self.text = text
+        self.now = now or time.monotonic
+        self.rng = rng or random
+        self.resume_pending = bool(resume_pending)
+        self.running = False
+        self.initialized = False
+        self._ops = None
+
+    def run_resume(self, ctx):
+        if not self.resume_pending or self.running:
+            return 0
+        import plan_engine
+        if self._ops is None:
+            self._ops = plan_engine.parse_plan(self.text)
+        self.running = True
+        try:
+            plan_engine.run_plan(self._ops, ctx)
+            self.resume_pending = False
+            self.initialized = True
+            return 1
+        finally:
+            self.running = False
+
+    def run_due(self, ctx):
+        # A selected Random Package is a resume-only pre-pass. The legacy
+        # ESSENTIALS|1 format below continues to own recurring key schedules.
+        return 0
+
+
 class Manager:
     def __init__(self, items, now=None, rng=None, resume_pending=False):
         self.items = items
@@ -77,6 +114,8 @@ class Manager:
                 text = fh.read()
         except OSError:
             return cls([], **kwargs)
+        if text.lstrip().startswith("PLAN|2"):
+            return PlanManager(text, **kwargs)
         return cls(parse(text), **kwargs)
 
     def _draw(self, pair):

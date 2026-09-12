@@ -524,6 +524,11 @@ public static class PlanExporter
         KeyboardBoard = source.KeyboardBoard,
     };
 
+    /// <summary>Compile a portable fragment exactly once, ignoring the root Play Options wrapper.</summary>
+    public static PlanResult CompileOnce(IList<StepNode> roots, AppSettings settings,
+        int screenW, int screenH, string sourceName, string machine)
+        => Compile(roots, ChildSettings(settings), screenW, screenH, sourceName, machine);
+
     /// <summary>Preflights and compiles every reachable playScript document before the first
     /// destination is touched. Root depth is zero; four included levels are allowed.</summary>
     private static CompiledBundle CompileBundle(IList<StepNode> roots, AppSettings settings,

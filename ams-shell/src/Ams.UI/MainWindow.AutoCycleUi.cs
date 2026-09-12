@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Media;
 using Ams.UI.ViewModels;
@@ -8,10 +9,7 @@ using WpfTextBox = System.Windows.Controls.TextBox;
 
 namespace Ams.UI;
 
-/// <summary>
-/// v0.9.67 — adds the portable automatic-cycle section to the existing Play Options body.
-/// Kept in a partial file so the large main XAML stays stable while this feature is reviewed.
-/// </summary>
+/// <summary>Compact, accessible AutoCycle schedule card for the Play Options panel.</summary>
 public partial class MainWindow
 {
     private static readonly DependencyProperty AutoCycleUiInstalledProperty =
@@ -31,98 +29,154 @@ public partial class MainWindow
         if (window.FindName("PlayOptBody") is not StackPanel body) return;
         window.SetValue(AutoCycleUiInstalledProperty, true);
 
-        body.Children.Add(new Separator { Margin = new Thickness(0, 10, 0, 8) });
-
         var section = new StackPanel
         {
             FlowDirection = FlowDirection.RightToLeft,
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };
-        body.Children.Add(section);
+        var head = new Grid();
+        head.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var title = AutoCycleUiKit.Title("زمان‌بندی چرخه‌ی خودکار پیکو");
+        var status = AutoCycleUiKit.Badge("Restart + Auto Resume");
+        Grid.SetColumn(title, 0);
+        Grid.SetColumn(status, 1);
+        head.Children.Add(title);
+        head.Children.Add(status);
+        section.Children.Add(head);
+        section.Children.Add(AutoCycleUiKit.Helper(
+            "بازه‌های زمانی در هر چرخه دوباره قرعه‌کشی می‌شوند. Stop یا خطا هرگز Auto Resume را مسلح نمی‌کند."));
 
-        section.Children.Add(new TextBlock
-        {
-            Text = "چرخه‌ی خودکار پیکو",
-            FontWeight = FontWeights.SemiBold,
-            FontSize = 13,
-            Margin = new Thickness(0, 0, 0, 7),
-        });
-
-        section.Children.Add(BuildRangeRow(
-            "Restart از لحظه‌ی Start (دقیقه)",
+        var ranges = new Grid { Margin = new Thickness(0, 0, 0, 10) };
+        ranges.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        ranges.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
+        ranges.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var restartRange = BuildRangeRow(
+            "Restart پس از Start",
             nameof(MainViewModel.RestartMinMinutes), nameof(MainViewModel.RestartMaxMinutes),
-            "کل برنامه در یک زمان تصادفی داخل این بازه متوقف و ویندوز Restart می‌شود."));
+            "کل برنامه در یک زمان تصادفی داخل این بازه متوقف و ویندوز Restart می‌شود.");
+        var resumeRange = BuildRangeRow(
+            "انتظار پس از آماده‌شدن USB/HID",
+            nameof(MainViewModel.AutoResumeMinMinutes), nameof(MainViewModel.AutoResumeMaxMinutes),
+            "پس از reconnect پایدار، یک زمان تازه از این بازه انتخاب می‌شود؛ سپس Resume Essentials اجرا می‌شود.");
+        Grid.SetColumn(restartRange, 0);
+        Grid.SetColumn(resumeRange, 2);
+        ranges.Children.Add(restartRange);
+        ranges.Children.Add(resumeRange);
+        section.Children.Add(ranges);
 
+        var resumeSurface = new Border
+        {
+            Background = AutoCycleUiKit.Raised,
+            BorderBrush = AutoCycleUiKit.BorderBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(12, 8, 12, 8),
+        };
         var resumeEnabled = new CheckBox
         {
             Content = "شروع خودکار چرخه پس از Restart طبیعی",
-            Margin = new Thickness(0, 7, 0, 5),
+            MinHeight = 40,
             VerticalContentAlignment = VerticalAlignment.Center,
             ToolTip = "فقط Restart طبیعی همین چرخه AUTO_RESUME_ARMED را فعال می‌کند؛ Stop یا خطا آن را فعال نمی‌کند.",
         };
         resumeEnabled.SetBinding(ToggleButton.IsCheckedProperty, TwoWay(nameof(MainViewModel.AutoResumeEnabled)));
-        section.Children.Add(resumeEnabled);
+        resumeSurface.Child = resumeEnabled;
+        section.Children.Add(resumeSurface);
 
-        section.Children.Add(BuildRangeRow(
-            "انتظار پس از آماده‌شدن USB/HID (دقیقه)",
-            nameof(MainViewModel.AutoResumeMinMinutes), nameof(MainViewModel.AutoResumeMaxMinutes),
-            "پس از reconnect پایدار، یک زمان تازه از این بازه انتخاب می‌شود؛ سپس Resume Essentials اجرا می‌شود."));
-
-        var buzzer = new Grid { Margin = new Thickness(0, 7, 0, 0) };
-        buzzer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(210) });
-        buzzer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var buzzerLabel = new TextBlock
+        var hardware = new Grid { Margin = new Thickness(0, 12, 0, 0) };
+        hardware.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        hardware.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var hardwareText = new StackPanel();
+        hardwareText.Children.Add(new TextBlock
         {
-            Text = "پایه‌ی بازر پرتابل",
-            VerticalAlignment = VerticalAlignment.Center,
-        };
+            Text = "خروجی صوتی پرتابل",
+            Foreground = AutoCycleUiKit.Text,
+            FontWeight = FontWeights.SemiBold,
+        });
+        hardwareText.Children.Add(new TextBlock
+        {
+            Text = "پایه‌ی ثابت سخت‌افزار؛ قابل ویرایش نیست",
+            Foreground = AutoCycleUiKit.Muted,
+            FontSize = 11,
+            Margin = new Thickness(0, 3, 0, 0),
+        });
         var buzzerValue = new TextBlock
         {
             FontFamily = new FontFamily("Cascadia Code"),
             FontWeight = FontWeights.SemiBold,
+            Foreground = AutoCycleUiKit.Success,
             VerticalAlignment = VerticalAlignment.Center,
             ToolTip = "این مقدار سخت‌افزاری ثابت است و قابل تغییر نیست.",
         };
         buzzerValue.SetBinding(TextBlock.TextProperty, new WpfBinding(nameof(MainViewModel.PortableBuzzerPinText)));
-        Grid.SetColumn(buzzerLabel, 0);
-        Grid.SetColumn(buzzerValue, 1);
-        buzzer.Children.Add(buzzerLabel);
-        buzzer.Children.Add(buzzerValue);
-        section.Children.Add(buzzer);
+        var buzzerBadge = new Border
+        {
+            Background = AutoCycleUiKit.Raised,
+            BorderBrush = AutoCycleUiKit.BorderBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(7),
+            Padding = new Thickness(12, 7, 12, 7),
+            Child = buzzerValue,
+        };
+        Grid.SetColumn(hardwareText, 0);
+        Grid.SetColumn(buzzerBadge, 1);
+        hardware.Children.Add(hardwareText);
+        hardware.Children.Add(buzzerBadge);
+        section.Children.Add(hardware);
 
         var help = new TextBlock
         {
-            Margin = new Thickness(0, 7, 0, 0),
+            Margin = new Thickness(0, 12, 0, 0),
+            Padding = new Thickness(12, 9, 12, 9),
             FontSize = 11,
+            Foreground = AutoCycleUiKit.Muted,
+            Background = AutoCycleUiKit.PrimarySoft,
             TextWrapping = TextWrapping.Wrap,
-            Opacity = 0.78,
         };
         help.SetBinding(TextBlock.TextProperty, new WpfBinding(nameof(MainViewModel.AutoCycleHelpText)));
         section.Children.Add(help);
+
+        body.Children.Add(AutoCycleUiKit.Card(AutoCycleUiKit.ScheduleTag, section));
+        AutoCycleUiKit.Reorder(body);
     }
 
     private static FrameworkElement BuildRangeRow(
         string label, string minProperty, string maxProperty, string toolTip)
     {
-        var root = new StackPanel { Margin = new Thickness(0, 3, 0, 2), ToolTip = toolTip };
-        root.Children.Add(new TextBlock { Text = label, Margin = new Thickness(0, 0, 0, 3) });
-
-        var row = new StackPanel { Orientation = Orientation.Horizontal };
-        row.Children.Add(new TextBlock
+        var root = new Border
         {
-            Text = "حداقل",
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 5, 0),
-        });
-        row.Children.Add(NumberBox(minProperty));
-        row.Children.Add(new TextBlock
+            Background = AutoCycleUiKit.Raised,
+            BorderBrush = AutoCycleUiKit.BorderBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(12),
+            ToolTip = toolTip,
+        };
+        var stack = new StackPanel();
+        stack.Children.Add(new TextBlock
         {
-            Text = "حداکثر",
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(14, 0, 5, 0),
+            Text = label + "  (دقیقه)",
+            Foreground = AutoCycleUiKit.Text,
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 0, 0, 9),
         });
-        row.Children.Add(NumberBox(maxProperty));
-        root.Children.Add(row);
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(20) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var minLabel = new TextBlock { Text = "حداقل", Foreground = AutoCycleUiKit.Muted, VerticalAlignment = VerticalAlignment.Center };
+        var min = NumberBox(minProperty);
+        var maxLabel = new TextBlock { Text = "حداکثر", Foreground = AutoCycleUiKit.Muted, VerticalAlignment = VerticalAlignment.Center };
+        var max = NumberBox(maxProperty);
+        Grid.SetColumn(minLabel, 0); Grid.SetColumn(min, 2); Grid.SetColumn(maxLabel, 4); Grid.SetColumn(max, 6);
+        row.Children.Add(minLabel); row.Children.Add(min); row.Children.Add(maxLabel); row.Children.Add(max);
+        stack.Children.Add(row);
+        root.Child = stack;
         return root;
     }
 
@@ -130,8 +184,9 @@ public partial class MainWindow
     {
         var box = new WpfTextBox
         {
-            Width = 58,
-            Padding = new Thickness(4, 2, 4, 2),
+            Width = 64,
+            MinHeight = 40,
+            Padding = new Thickness(6, 4, 6, 4),
             TextAlignment = TextAlignment.Center,
             VerticalContentAlignment = VerticalAlignment.Center,
             FlowDirection = FlowDirection.LeftToRight,

@@ -85,5 +85,8 @@ jobs:
             const fs = require('fs');
             const names=['windows-restore.log','windows-build.log','windows-testrunner-build.log','windows-tests.log'];
             const text=names.map(n=>fs.existsSync(n)?('=== '+n+' ===\n'+fs.readFileSync(n,'utf8')):'').join('\n');
-            const tail=text.split('\n').slice(-100).join('\n');
-            await github.rest.issues.createComment({owner:context.repo.owner,repo:context.repo.repo,issue_number:context.issue.number,body:'<!-- autocycle-windows-failure -->\n**AutoCycle Windows failure tail**\n```\n'+tail+'\n```'});
+            const lines=text.split('\n');
+            const failures=lines.filter(line=>line.includes('FAIL:')||line.includes('Unhandled exception')||line.includes('Results:')).join('\n');
+            const tail=lines.slice(-100).join('\n');
+            const report=(failures?'=== failure markers ===\n'+failures+'\n':'')+'=== tail ===\n'+tail;
+            await github.rest.issues.createComment({owner:context.repo.owner,repo:context.repo.repo,issue_number:context.issue.number,body:'<!-- autocycle-windows-failure -->\n**AutoCycle Windows failure diagnostics**\n```\n'+report+'\n```'});

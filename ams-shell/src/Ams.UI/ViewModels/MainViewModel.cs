@@ -548,6 +548,16 @@ public partial class MainViewModel : ObservableObject
 
     {
 
+        if (type == RecoveryCallStepDefinitions.CallLaunch && !IsLaunchPipeline)
+
+        {
+
+            Log("add blocked: Run/Call Launch DC Recovery is only valid in the Launch tab");
+
+            return;
+
+        }
+
         var def = StepDefinitions.Get(type);
 
         // v0.9.32 — playScript: if current .amsj file exists, prefill path so user just presses OK

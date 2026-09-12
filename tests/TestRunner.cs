@@ -32,6 +32,16 @@ class TestRunner
         def = StepDefinitions.Get("playScript");
         Assert(def.Label == "Play Script (.amsj)", "playScript definition exists");
 
+        var launchRecoveryDef = StepDefinitions.Get("callLaunchDcRecovery");
+        Assert(launchRecoveryDef.Label == "Run/Call Launch DC Recovery" && launchRecoveryDef.Fields.Count == 0,
+            "Launch DC Recovery call is a first-class zero-configuration action");
+        var launchActionVm = new MainViewModel();
+        launchActionVm.InitializePipelineTabs();
+        Assert(!launchActionVm.IsLaunchPipeline, "Launch recovery action is disabled outside the Launch tab");
+        var launchTab = launchActionVm.PipelineTabs.Single(t => t.Kind == PipelineKind.Launch);
+        launchActionVm.SwitchPipelineCommand.Execute(launchTab);
+        Assert(launchActionVm.IsLaunchPipeline, "Launch recovery action becomes available in the Launch tab");
+
         // ── Step 2: Commands generation ──────────────────────────────
         var mouseClick = new StepNode
         {

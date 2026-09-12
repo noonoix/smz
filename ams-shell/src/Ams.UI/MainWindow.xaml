@@ -161,6 +161,9 @@
                 <MenuItem Header="_Play Script (.amsj)" Command="{Binding AddStepCommand}" CommandParameter="playScript" />
                 <MenuItem Header="Insert _Label" Command="{Binding AddStepCommand}" CommandParameter="label" />
                 <MenuItem Header="_Go To Label" Command="{Binding AddStepCommand}" CommandParameter="gotoLabel" />
+                <MenuItem Header="Run/Call _Launch DC Recovery" Command="{Binding AddStepCommand}"
+                          CommandParameter="callLaunchDcRecovery" IsEnabled="{Binding IsLaunchPipeline}"
+                          ToolTip="فقط در تب Launch: اجرای launch_recovery.txt و سپس ادامه‌ی مسیر لانچر" />
                 <Separator />
                 <MenuItem Header="Co_mment" Command="{Binding AddStepCommand}" CommandParameter="comment" />
                 <MenuItem Header="_Raw Command" Command="{Binding AddStepCommand}" CommandParameter="rawCommand" />
@@ -334,6 +337,11 @@
                                               Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                     <MenuItem Header="Go To Label" CommandParameter="gotoLabel"
                                               Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                    <Separator />
+                                    <MenuItem Header="Run/Call Launch DC Recovery" CommandParameter="callLaunchDcRecovery"
+                                              IsEnabled="{Binding PlacementTarget.DataContext.IsLaunchPipeline, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                              ToolTip="فقط در تب Launch: اجرای launch_recovery.txt"
+                                              Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                 </ContextMenu>
                             </Button.ContextMenu>
                             <StackPanel>
@@ -427,6 +435,10 @@
                             <MenuItem Header="Insert Label" CommandParameter="label"
                                       Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                             <MenuItem Header="Go To Label" CommandParameter="gotoLabel"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="Run/Call Launch DC Recovery" CommandParameter="callLaunchDcRecovery"
+                                      IsEnabled="{Binding PlacementTarget.DataContext.IsLaunchPipeline, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      ToolTip="فقط در تب Launch: اجرای launch_recovery.txt"
                                       Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                             <Separator />
                             <MenuItem Header="Comment" CommandParameter="comment"

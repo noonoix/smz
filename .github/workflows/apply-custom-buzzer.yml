@@ -1,0 +1,23 @@
+name: apply custom GP6 buzzer
+on:
+  push:
+    branches: [feat/custom-gp6-buzzer]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/custom-gp6-buzzer
+      - name: Apply patch
+        run: python tools/apply_custom_buzzer.py
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: replace Play Audio insertion with custom GP6 buzzer"
+          git push

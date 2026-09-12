@@ -1,0 +1,50 @@
+name: reposition buzzer handler
+on:
+  push:
+    branches: [feat/custom-gp6-buzzer]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/custom-gp6-buzzer
+      - run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs')
+          s=p.read_text(encoding='utf-8')
+          block='''            if line.startswith("BEEP|"):
+                try:
+                    import pwmio
+                    a = ints(line.split("|", 1)[1].split(","), 2)
+                    if not 30 <= a[0] <= 20000 or a[1] <= 0:
+                        return "ERR|RANGE|BEEP"
+                    tone = pwmio.PWMOut(board.GP6, duty_cycle=0, frequency=a[0], variable_frequency=True)
+                    try:
+                        tone.duty_cycle = 32768
+                        time.sleep(a[1] / 1000)
+                    finally:
+                        tone.duty_cycle = 0
+                        tone.deinit()
+                    return "OK|BEEP"
+                except Exception:
+                    return "ERR|BUZZER|BEEP"
+'''
+          if s.count(block)!=1: raise SystemExit('BEEP block not unique')
+          s=s.replace(block,'')
+          marker='            if line.startswith("TRGLUX|"):'
+          if s.count(marker)!=1: raise SystemExit('TRGLUX marker not unique')
+          s=s.replace(marker,block+marker)
+          p.write_text(s,encoding='utf-8')
+          Path('.github/workflows/reposition-buzzer-handler.yml').unlink()
+          PY
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: preserve AutoCycle firmware patch anchor"
+          git push

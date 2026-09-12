@@ -12,12 +12,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: feat/custom-gp6-buzzer
-      - name: Apply patch
-        run: python tools/apply_custom_buzzer.py
-      - name: Commit
+      - name: Apply patch and capture diagnostics
+        run: python tools/apply_custom_buzzer.py > patch-custom-buzzer.log 2>&1 || true
+      - name: Commit result or diagnostics
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "feat: replace Play Audio insertion with custom GP6 buzzer"
+          git commit -m "chore: capture custom buzzer patch result" || exit 0
           git push

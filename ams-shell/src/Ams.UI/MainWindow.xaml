@@ -585,9 +585,9 @@
                     <Button x:Name="PlayOptToggle" Click="PlayOptToggle_Click"
                             HorizontalAlignment="Left" Background="Transparent" BorderThickness="0"
                             Cursor="Hand" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Padding="0,2">
-                        <TextBlock x:Name="PlayOptToggleText" Text="▾ گزینه‌های پخش" />
+                        <TextBlock x:Name="PlayOptToggleText" Text="▸ اجرای دستی پیشرفته" />
                     </Button>
-                    <StackPanel x:Name="PlayOptBody" Margin="2,4,2,4">
+                    <StackPanel x:Name="PlayOptBody" Margin="2,4,2,4" Visibility="Collapsed">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <RadioButton GroupName="playMode" Content="بدون تکرار (یک بار)"
                                          IsChecked="{Binding PlayModeOnce}" Foreground="{StaticResource TextPrimaryBrush}" VerticalContentAlignment="Center" />
@@ -616,14 +616,9 @@
                             </ComboBox>
                             <TextBlock Text="" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" Margin="4,0,0,0" />
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0" VerticalAlignment="Center">
-                            <CheckBox Content="وقتی تکرار تمام شد کامپیوتر خاموش شود"
-                                      IsChecked="{Binding ShutdownWhenFinished}" Foreground="{StaticResource TextPrimaryBrush}" VerticalContentAlignment="Center" />
-                            <CheckBox Content="وقتی اسکریپت متوقف شد پنجره‌ی اصلی فعال نشود"
-                                      IsChecked="{Binding NoActivateWhenStopped}" Foreground="{StaticResource TextPrimaryBrush}" Margin="16,0,0,0" VerticalContentAlignment="Center" />
-                            <Button Content="ذخیره‌ی لاگ اجرا…" Command="{Binding SaveLogCommand}"
-                                    Margin="16,0,0,0" Padding="8,3" FontSize="12" Cursor="Hand" />
-                        </StackPanel>
+                        <TextBlock Text="فقط برای تست دستی تب Main؛ اجرای خودکار از AutoCycle تنظیم می‌شود."
+                                   Margin="0,6,0,0" FontSize="11"
+                                   Foreground="{StaticResource TextTertiaryBrush}" />
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -667,6 +662,9 @@
                         <Button Content="📋 کپی" Click="CopyAllLog_Click"
                                 FontSize="11" Padding="8,1" Margin="6,0,0,0" Cursor="Hand"
                                 ToolTip="کپی همه‌ی خطوط لاگ به کلیپبورد" />
+                        <Button Content="💾 ذخیره…" Command="{Binding SaveLogCommand}"
+                                FontSize="11" Padding="8,1" Margin="6,0,0,0" Cursor="Hand"
+                                ToolTip="ذخیره‌ی کل لاگ اجرا در فایل" />
                     </StackPanel>
                 </Expander.Header>
                 <ListBox x:Name="SerialLogList" ItemsSource="{Binding LogLines}" Height="160"

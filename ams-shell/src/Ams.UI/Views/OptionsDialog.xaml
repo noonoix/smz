@@ -42,6 +42,12 @@
                               BorderBrush="{StaticResource BorderSubtleBrush}"
                               BorderThickness="1" Foreground="{StaticResource TextPrimaryBrush}"
                               Cursor="Hand" Margin="4,0,0,0" />
+                <ToggleButton x:Name="TabBehavior" Content="رفتار" Padding="10,3"
+                              Click="TabBehavior_Click"
+                              Background="{StaticResource BgElevatedBrush}"
+                              BorderBrush="{StaticResource BorderSubtleBrush}"
+                              BorderThickness="1" Foreground="{StaticResource TextPrimaryBrush}"
+                              Cursor="Hand" Margin="4,0,0,0" />
             </StackPanel>
 
             <!-- Serial / Board -->
@@ -126,6 +132,18 @@
                 <TextBlock Text="این انتخاب هنگام Export داخل code.py ثبت می‌شود؛ پس از تغییر، خروجی پیکو را دوباره بساز."
                            TextWrapping="Wrap" TextAlignment="Right" Foreground="{StaticResource TextTertiaryBrush}"
                            FontSize="11" Margin="0,8,0,0" />
+            </StackPanel>
+
+            <!-- Behavior -->
+            <StackPanel x:Name="BehaviorPanel" Visibility="Collapsed">
+                <TextBlock Text="رفتار برنامه" FontWeight="SemiBold" FontSize="14"
+                           TextAlignment="Right" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8" />
+                <CheckBox x:Name="NoActivateWhenStoppedBox"
+                          Content="وقتی اسکریپت متوقف شد پنجره‌ی اصلی فعال نشود"
+                          Foreground="{StaticResource TextPrimaryBrush}" VerticalContentAlignment="Center" />
+                <TextBlock Text="این گزینه فقط رفتار پنجره‌ی برنامه را تغییر می‌دهد و روی AutoCycle یا خروجی پیکو اثر ندارد."
+                           TextWrapping="Wrap" TextAlignment="Right" FontSize="11" Margin="0,6,0,0"
+                           Foreground="{StaticResource TextTertiaryBrush}" />
             </StackPanel>
 
             <!-- Hotkeys — auto-capture mode -->

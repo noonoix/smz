@@ -8,6 +8,7 @@ from runtime_policy import RuntimeOptions
 
 RUNFOR_OP = "RUNFOR"
 AUTORESUME_OP = "AUTORESUME"
+POSTLAUNCH_OP = "POSTLAUNCH"
 
 
 class CycleExportPolicy:
@@ -25,6 +26,15 @@ class CycleExportPolicy:
                 o.resume_min_seconds,
                 o.resume_max_seconds,
             ),
+            "%s|%d,%d,%d,%d,%d,%d" % (
+                POSTLAUNCH_OP,
+                1 if o.post_launch_enabled else 0,
+                o.post_launch_slot,
+                o.launch_before_seconds[0],
+                o.launch_before_seconds[1],
+                o.launch_after_seconds[0],
+                o.launch_after_seconds[1],
+            ),
         ]
 
     def include_plan_lines(self):
@@ -37,6 +47,10 @@ class CycleExportPolicy:
             "restartSeconds": [o.restart_min_seconds, o.restart_max_seconds],
             "autoResumeEnabled": o.auto_resume,
             "resumeSeconds": [o.resume_min_seconds, o.resume_max_seconds],
+            "postRestartLaunchEnabled": o.post_launch_enabled,
+            "postRestartTaskbarSlot": o.post_launch_slot,
+            "postRestartLaunchBeforeSeconds": list(o.launch_before_seconds),
+            "postRestartLaunchAfterSeconds": list(o.launch_after_seconds),
             "buzzerPin": o.buzzer_pin,
         }
 

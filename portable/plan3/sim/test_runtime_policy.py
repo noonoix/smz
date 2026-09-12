@@ -13,6 +13,9 @@ o = rp.RuntimeOptions()
 assert o.as_settings() == {
     "RestartMinMinutes": 110, "RestartMaxMinutes": 130,
     "AutoResumeMinMinutes": 3, "AutoResumeMaxMinutes": 5,
+    "PostRestartLaunchEnabled": True, "PostRestartTaskbarSlot": 1,
+    "PostRestartLaunchBeforeMinSeconds": 1, "PostRestartLaunchBeforeMaxSeconds": 3,
+    "PostRestartLaunchAfterMinSeconds": 20, "PostRestartLaunchAfterMaxSeconds": 40,
     "AutoResumeEnabled": True, "BuzzerPin": "GP6"}
 c = Clock(); cycle = rp.AutoCycle(c.now, o, random.Random(7))
 assert 6600 <= cycle.runtime_seconds <= 7800
@@ -27,6 +30,7 @@ custom = rp.RuntimeOptions(75, 95, 6, 4, True, "gp6")
 assert (custom.restart_min_seconds, custom.restart_max_seconds) == (4500, 5700)
 assert (custom.resume_min_seconds, custom.resume_max_seconds) == (240, 360)
 assert custom.buzzer_pin == "GP6"
+assert custom.post_launch_enabled and custom.post_launch_slot == 1
 assert rp.RuntimeOptions.from_settings(custom.as_settings()).as_settings() == custom.as_settings()
 off = rp.RuntimeOptions(auto_resume=False)
 assert rp.AutoCycle(c.now, off, random.Random(1)).arm_resume() is None
@@ -57,4 +61,4 @@ for invalid_pin in ("GP4", "GP5"):
     except ValueError: pass
     else: raise AssertionError("non-GP6 buzzer pin accepted")
 
-print("runtime policy: 30 passed, 0 failed")
+print("runtime policy: 37 passed, 0 failed")

@@ -61,6 +61,14 @@
     {
       "old": "                except Exception:\n                    _serial_write_line(\"ERR|EXC|\" + line.split(\"|\")[0])\n        else:\n            poll_keypad()\n            host_quiet = time.monotonic() - last_host_cmd >= 3   # no double-fire after host runs\n            if engine_on and not engine_paused and host_quiet and loop_due():\n",
       "new": "                except Exception:\n                    _serial_write_line(\"ERR|EXC|\" + line.split(\"|\")[0])\n        else:\n            _resume_boot.tick()\n            poll_keypad()\n            host_quiet = time.monotonic() - last_host_cmd >= 3   # no double-fire after host runs\n            if engine_on and not engine_paused and host_quiet and loop_due():\n"
+    },
+    {
+      "old": "                    if _plan_result == \"done\":\n",
+      "new": "                    if _plan_result in (\"done\", \"expired\"):\n"
+    },
+    {
+      "old": "                        release_all_buttons()\n                        tap_key(Keycode.KEYPAD_NUMLOCK)\n                elif states:\n",
+      "new": "                        release_all_buttons()\n                        if _plan_result == \"done\":\n                            tap_key(Keycode.KEYPAD_NUMLOCK)\n                        else:\n                            print(\"cycle: restart armed; waiting for host reboot\")\n                elif states:\n"
     }
   ]
 }

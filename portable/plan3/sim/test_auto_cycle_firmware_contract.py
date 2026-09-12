@@ -26,6 +26,6 @@ for index, edit in enumerate(manifest['edits'], 1):
     assert actual.count(edit['old']) == 1, 'anchor %d is not unique' % index
     actual = actual.replace(edit['old'], edit['new'], 1)
 assert actual == expected
-for marker in ('AUTO_CYCLE_PATCH_0967_H6','import supervisor','import plan_cycle as _pc','EVT|HOSTUSB|','usb_down=_usb_host_down','_resume_boot.tick()','keypad: GP4 START accepted','0x10: Keycode.LEFT_SHIFT'):
+for marker in ('AUTO_CYCLE_PATCH_0967_H6','import supervisor','import plan_cycle as _pc','EVT|HOSTUSB|','usb_down=_usb_host_down','_resume_boot.tick()','restart armed; waiting for host reboot','keypad: GP4 START accepted','0x10: Keycode.LEFT_SHIFT'):
     assert marker in actual and marker in helper
-print('auto-cycle firmware integration + byte parity: 25 passed, 0 failed')
+print('auto-cycle firmware integration + byte parity: 26 passed, 0 failed')

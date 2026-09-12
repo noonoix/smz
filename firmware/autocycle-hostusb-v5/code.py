@@ -1169,12 +1169,15 @@ while True:
                 _plan_result = plan_pass()  # portable plan takes precedence
                 if _plan_result:
                     passes += 1
-                    if _plan_result == "done":
+                    if _plan_result in ("done", "expired"):
                         # PLAN2_H6_CONTROL_FIX: finite plan completion is a real Stop.
                         engine_on = False
                         engine_paused = False
                         release_all_buttons()
-                        tap_key(Keycode.KEYPAD_NUMLOCK)
+                        if _plan_result == "done":
+                            tap_key(Keycode.KEYPAD_NUMLOCK)
+                        else:
+                            print("cycle: restart armed; waiting for host reboot")
                 elif states:
                     standalone_pass()
                     passes += 1

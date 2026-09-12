@@ -75,6 +75,7 @@ public static class AutoCycleFirmwareBundle
         "EVT|HOSTUSB|",
         "usb_down=_usb_host_down",
         "_resume_boot.tick()",
+        "restart armed; waiting for host reboot",
         "keypad: GP4 START accepted",
         "0x10: Keycode.LEFT_SHIFT",
     };

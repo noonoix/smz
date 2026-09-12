@@ -10,8 +10,9 @@ import plan_cycle
 from cycle_runtime import ResumeArmStore
 
 ops, policy = plan_cycle.parse_cycle_plan(
-    "PLAN|2\nRUNFOR|130,110\nAUTORESUME|1,5,3\nDELAY|10\n")
-assert policy == {"run": (110, 130), "auto": True, "resume": (3, 5)}
+    "PLAN|2\nRUNFOR|130,110\nAUTORESUME|1,5,3\nPOSTLAUNCH|1,1,3,1,40,20\nDELAY|10\n")
+assert policy == {"run": (110, 130), "auto": True, "resume": (3, 5),
+                  "launch": (True, 1, (1, 3), (20, 40))}
 assert [x[0] for x in ops] == ["PLAN", "DELAY"]
 assert plan_cycle.parse_cycle_plan("PLAN|2\nDELAY|1\n")[1] is None
 
@@ -20,6 +21,8 @@ for bad in (
     "PLAN|2\nAUTORESUME|1,3,5\nDELAY|1\n",
     "PLAN|2\nDELAY|1\nRUNFOR|1,2\nAUTORESUME|1,3,5\n",
     "PLAN|2\nRUNFOR|0,2\nAUTORESUME|1,3,5\n",
+    "PLAN|2\nRUNFOR|1,2\nAUTORESUME|1,3,5\nPOSTLAUNCH|1,0,1,3,20,40\n",
+    "PLAN|2\nPOSTLAUNCH|1,1,1,3,20,40\nDELAY|1\n",
 ):
     try: plan_cycle.parse_cycle_plan(bad)
     except ValueError: pass
@@ -51,4 +54,4 @@ with tempfile.TemporaryDirectory() as td:
 
 assert (base / "CIRCUITPY/plan_cycle.py").read_bytes() == (base / "CIRCUITPY-SPLIT/plan_cycle.py").read_bytes()
 assert (base / "CIRCUITPY/cycle_runtime.py").read_bytes() == (base / "CIRCUITPY-SPLIT/cycle_runtime.py").read_bytes()
-print("plan cycle adapter: 14 passed, 0 failed")
+print("plan cycle adapter: 17 passed, 0 failed")

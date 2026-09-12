@@ -1,0 +1,47 @@
+name: finalize custom GP6 buzzer patch
+on:
+  push:
+    branches: [feat/custom-gp6-buzzer]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/custom-gp6-buzzer
+      - name: Prepare and apply
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          x=Path('ams-shell/src/Ams.UI/MainWindow.xaml')
+          s=x.read_text(encoding='utf-8')
+          if s.count('CommandParameter="buzzer"') != 3: raise SystemExit('expected staged buzzer surfaces')
+          x.write_text(s.replace('CommandParameter="buzzer"','CommandParameter="playAudio"'),encoding='utf-8')
+          p=Path('tools/apply_custom_buzzer.py')
+          s=p.read_text(encoding='utf-8')
+          start="marker2='    public static StepDefinition Get(string type)\\n'"
+          if start not in s: raise SystemExit('Get anchor literal not found')
+          p.write_text(s.replace(start,"marker2='    public static StepDefinition Get'"),encoding='utf-8')
+          PY
+          python tools/apply_custom_buzzer.py
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('ams-shell/src/Ams.UI/MainWindow.xaml')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('_Play Audio (wav/mp3)','_Buzzer Beep')
+          s=s.replace('Play Audio (wav/mp3)','Buzzer Beep')
+          s=s.replace('پخش صدا — فایل wav/mp3 (تکرار اختیاری)','بوق بازر Pico GP6 — preset یا الگوی سفارشی')
+          p.write_text(s,encoding='utf-8')
+          for f in ['patch-custom-buzzer.log','.github/workflows/retry-custom-buzzer.yml','.github/workflows/finalize-custom-buzzer.yml']:
+              Path(f).unlink(missing_ok=True)
+          PY
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: replace Play Audio insertion with custom GP6 buzzer"
+          git push

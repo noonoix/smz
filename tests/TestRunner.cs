@@ -734,6 +734,33 @@ class TestRunner
         Assert(vm2.FlatSteps[1].Number == "1.1", $"child numbering intact (got {vm2.FlatSteps[1].Number})");
         Assert(vm2.FlatSteps[0].ToggleGlyph == "▾", "expanded row shows ▾");
 
+        // ── orphan conditional markers: repair after move/delete and legacy load ──
+        var orphanHead = new StepNode
+        {
+            Type = "waitForLight",
+            Props = new Dictionary<string, object?> { ["insertIfElse"] = true },
+        };
+        var ownedElse = MkComment("Else");
+        var ownedEnd = MkComment("End If");
+        var orphanElse = MkComment("Else");
+        var preservedChild = MkComment("preserve me");
+        orphanElse.Children.Add(preservedChild);
+        orphanElse.Children.Add(MkComment("Else"));
+        orphanElse.Children.Add(MkComment("End If"));
+        var orphanEnd = MkComment("End If");
+        var brokenConditionalRows = new List<StepNode>
+            { orphanHead, ownedElse, ownedEnd, orphanElse, orphanEnd };
+        int orphanRemoved = MainViewModel.RepairOrphanConditionalMarkers(brokenConditionalRows);
+        Assert(orphanRemoved == 4,
+            $"orphan repair removes duplicate and nested Else/End If rows (got {orphanRemoved})");
+        Assert(brokenConditionalRows.Count == 4
+               && ReferenceEquals(brokenConditionalRows[1], ownedElse)
+               && ReferenceEquals(brokenConditionalRows[2], ownedEnd)
+               && ReferenceEquals(brokenConditionalRows[3], preservedChild),
+            "valid owned markers survive and orphan-Else children are lifted without data loss");
+        Assert(ReferenceEquals(preservedChild.Parent, orphanHead.Parent),
+            "lifted orphan-marker child receives the repaired sibling parent");
+
         // ── Step 14: v0.8.2 — native embedded-picture extraction (.amk BMPN) ──
         Console.WriteLine();
         Console.WriteLine("--- v0.8.2: native image extraction ---");

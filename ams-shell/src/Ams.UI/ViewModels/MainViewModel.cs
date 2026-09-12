@@ -686,6 +686,10 @@ public partial class MainViewModel : ObservableObject
 
         DocumentService.LiftOrphanChildren(Steps);   // v0.9.42 — unchecking Insert If-Else releases the former branch
 
+        RepairOrphanConditionalMarkers(Steps);
+
+        HealMissingElseMarkers(Steps);
+
         Renumber();
 
         MarkDirty();
@@ -847,6 +851,10 @@ public partial class MainViewModel : ObservableObject
         SelectedNodes = new();
 
         SelectedNode = null;
+
+        RepairOrphanConditionalMarkers(Steps);
+
+        HealMissingElseMarkers(Steps);
 
         Renumber();
 
@@ -1018,6 +1026,10 @@ public partial class MainViewModel : ObservableObject
 
         SelectedNode = null;
 
+        RepairOrphanConditionalMarkers(Steps);
+
+        HealMissingElseMarkers(Steps);
+
         Renumber();
 
         MarkDirty();
@@ -1147,6 +1159,10 @@ public partial class MainViewModel : ObservableObject
         foreach (var loop in nodes.Where(n => OwnsNextMarker(n)))
 
             EnsureLoopMarker(loop);   // v0.9.45 — old/single-node clipboards receive # Next too
+
+        RepairOrphanConditionalMarkers(Steps);
+
+        HealMissingElseMarkers(Steps);
 
         Renumber();
 
@@ -1440,6 +1456,8 @@ public partial class MainViewModel : ObservableObject
         }
 
         if (OwnsNextMarker(node)) EnsureLoopMarker(node);   // v0.9.48 — a moved block always keeps its # Next row
+        RepairOrphanConditionalMarkers(Steps);
+        HealMissingElseMarkers(Steps);
         Renumber();
         MarkDirty();
         Log(moveSet.Count > 1
@@ -1503,6 +1521,8 @@ public partial class MainViewModel : ObservableObject
 
             Renumber();
 
+            int orphaned = RepairOrphanConditionalMarkers(Steps);   // remove stuck orphan Else/End If rows and lift their children
+
             int sanitized = SanitizeAllElseMarkers();   // v0.9.36 — a repaired file must remain dirty until saved
 
             int healed = HealAllElseMarkers();   // v0.9.37 — an If without Else/End If is invalid; repair on open
@@ -1515,7 +1535,7 @@ public partial class MainViewModel : ObservableObject
 
             _currentFile = dlg.FileName;
 
-            _dirty = sanitized > 0 || healed > 0 || loopHealed > 0 || lifted > 0;
+            _dirty = orphaned > 0 || sanitized > 0 || healed > 0 || loopHealed > 0 || lifted > 0;
 
             UpdateFileText();
 
@@ -1622,6 +1642,8 @@ public partial class MainViewModel : ObservableObject
             foreach (var n in res.Roots) Steps.Add(n);
 
             Renumber();
+
+            RepairOrphanConditionalMarkers(Steps);   // clean stuck orphan markers before healing active conditions
 
             SanitizeAllElseMarkers();   // v0.9.35 — clean v0.9.33-era duplicate pairs on import
 
@@ -2862,6 +2884,86 @@ public partial class MainViewModel : ObservableObject
         }
 
         if (removed > 0) log?.Invoke($"removed {removed} orphan duplicate Else/End If pair(s) (v0.9.35)");
+
+        return removed;
+
+    }
+
+
+
+    /// <summary>Repairs a sibling tree after structural edits or legacy-file load.
+
+    /// Only marker objects owned by a live insertIfElse head survive. Children of an orphan
+
+    /// Else are lifted into the same sibling list at the marker's position, so repair never
+
+    /// destroys user steps. Returns the number of removed marker rows.</summary>
+
+    public static int RepairOrphanConditionalMarkers(IList<StepNode> list)
+
+    {
+
+        int removed = 0;
+
+        foreach (var n in list.ToList())
+
+            if (n.Children.Count > 0) removed += RepairOrphanConditionalMarkers(n.Children);
+
+        var owned = new HashSet<StepNode>();
+
+        for (int i = 0; i < list.Count; i++)
+
+        {
+
+            var head = list[i];
+
+            if (!IsIfElseHead(head)) continue;
+
+            var (elseIndex, endIfIndex) = LocateElseMarkersForUi(list, i);
+
+            if (elseIndex >= 0 && endIfIndex > elseIndex)
+
+            {
+
+                owned.Add(list[elseIndex]);
+
+                owned.Add(list[endIfIndex]);
+
+            }
+
+        }
+
+        for (int i = 0; i < list.Count;)
+
+        {
+
+            var marker = list[i];
+
+            bool isConditionalMarker = IsElseMarker(marker) || IsEndIfMarker(marker);
+
+            if (!isConditionalMarker || owned.Contains(marker)) { i++; continue; }
+
+            list.RemoveAt(i);
+
+            var parent = marker.Parent;
+
+            var children = marker.Children.ToList();
+
+            marker.Children.Clear();
+
+            foreach (var child in children)
+
+            {
+
+                child.Parent = parent;
+
+                list.Insert(i++, child);
+
+            }
+
+            removed++;
+
+        }
 
         return removed;
 

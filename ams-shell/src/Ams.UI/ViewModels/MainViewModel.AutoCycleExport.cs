@@ -28,7 +28,7 @@ public partial class MainViewModel
             MessageBox.Show(
                 $"بسته‌ی چرخه‌ی خودکار ساخته شد ({written.Count} فایل).\n"
                 + "RUNFOR و AUTORESUME فقط در plan.txt اصلی نوشته شدند.\n"
-                + "plan_cycle.py، cycle_runtime.py و restart_windows.py نیز کنار پلن قرار گرفتند.\n"
+                + "resume_essentials.txt و همه‌ی runtimeهای چرخه نیز کنار پلن قرار گرفتند.\n"
                 + "همه‌ی فایل‌های خروجی را در ریشه‌ی CIRCUITPY نگه دار.",
                 "Export automatic-cycle Pico plan", MessageBoxButton.OK, MessageBoxImage.Information);
         }

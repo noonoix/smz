@@ -21,16 +21,15 @@ internal static class AutoCycleFirmwareExportUiBootstrap
         if (sender is not MainWindow window || window.GetValue(InstalledProperty) is true) return;
         if (window.FindName("PlayOptBody") is not StackPanel body) return;
         window.SetValue(InstalledProperty, true);
-        var button = new Button
-        {
-            Content = "۲) ساخت Firmware چرخه‌ی خودکار (AutoCycle؛ جایگزین Export Pico Firmware)…",
-            ToolTip = "code.py و runtimeهای چرخه را می‌سازد؛ در همان پوشه‌ی مرحله ۱ ذخیره کن تا code.py عادی جایگزین شود.",
-            Padding = new Thickness(10, 5, 10, 5),
-            Margin = new Thickness(0, 6, 0, 0),
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-        };
+
+        var panel = AutoCycleUiKit.EnsureExportCard(body);
+        var button = AutoCycleUiKit.Action("۲  ·  ساخت Firmware چرخه‌ی خودکار");
+        button.Tag = AutoCycleUiKit.FirmwareStepTag;
+        button.ToolTip = "code.py و runtimeهای firmware را می‌سازد؛ در همان پوشه‌ی مرحله‌ی ۱ ذخیره کن.";
         button.SetBinding(Button.CommandProperty,
             new Binding(nameof(MainViewModel.ExportAutoCyclePicoFirmwareCommand)));
-        body.Children.Add(button);
+        panel.Children.Add(button);
+        AutoCycleUiKit.ReorderExportSteps(panel);
+        AutoCycleUiKit.Reorder(body);
     }
 }

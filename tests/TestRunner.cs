@@ -4028,6 +4028,51 @@ class TestRunner
         }
         finally { if (Directory.Exists(cycleFwTmp)) Directory.Delete(cycleFwTmp, true); }
 
+        // ci-36 follow-up: the UI-selected Random Package must become a real
+        // resume_essentials.txt PLAN|2 pre-pass, never an empty silent manager.
+        var essentialsTmp = Path.Combine(Path.GetTempPath(), "essentials_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(essentialsTmp);
+        try
+        {
+            var package = new StepNode
+            {
+                Type = "randomPackage",
+                Props = new Dictionary<string, object?>
+                {
+                    ["mode"] = "shuffleAll", ["minCount"] = 1, ["maxCount"] = 1,
+                },
+            };
+            package.Children.Add(new StepNode
+            {
+                Type = "typeText",
+                Props = new Dictionary<string, object?>
+                {
+                    ["text"] = " resume essential", ["mode"] = "keystrokes",
+                    ["hmin"] = 80, ["hmax"] = 120,
+                },
+            });
+            var essentialRoots = new List<StepNode> { package };
+            ResumeEssentialsContract.Mark(essentialRoots, package);
+            var essentialSettings = new AppSettings
+            {
+                PlayRepeatMode = "times", PlayRepeatTimes = 3,
+                RestartMinMinutes = 2, RestartMaxMinutes = 3,
+                AutoResumeEnabled = true, AutoResumeMinMinutes = 1, AutoResumeMaxMinutes = 2,
+            };
+            var essentialWritten = AutoCyclePlanBundle.Export(Path.Combine(essentialsTmp, "plan.txt"),
+                essentialRoots, essentialSettings, 1920, 1080, "essential.amsj", "TESTPC");
+            var essentialText = File.ReadAllText(Path.Combine(essentialsTmp, "resume_essentials.txt"));
+            Assert(essentialWritten.Count == 11
+                   && File.Exists(Path.Combine(essentialsTmp, "resume_essentials_runtime.py")),
+                "v0.9.67: AutoCycle plan bundle writes runtime plus resume_essentials.txt");
+            Assert(essentialText.StartsWith("PLAN|2\n")
+                   && essentialText.Contains("RPKG|all,1,1")
+                   && essentialText.Contains("TYPE|text= resume essential")
+                   && !essentialText.Contains("LOOP|3"),
+                "v0.9.67: selected Random Package is compiled once as the Resume Essentials pre-pass");
+        }
+        finally { if (Directory.Exists(essentialsTmp)) Directory.Delete(essentialsTmp, true); }
+
         Console.WriteLine($"=== Results: {passed} passed, {failed} failed ===");
         Environment.Exit(failed > 0 ? 1 : 0);
     }

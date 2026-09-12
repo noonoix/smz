@@ -56,4 +56,26 @@ else:
     raise AssertionError("aborted hold was accepted")
 assert events[-1] == ("up", 55)
 assert (base / "CIRCUITPY/resume_essentials_runtime.py").read_bytes() == (base / "CIRCUITPY-SPLIT/resume_essentials_runtime.py").read_bytes()
-print("resume essentials runtime: 29 passed, 0 failed")
+
+# The app-selected Random Package is exported as a standalone PLAN|2 pre-pass.
+import tempfile
+from pathlib import Path as _Path
+plan_events = []
+class PlanCtx:
+    screen_w = 1920; screen_h = 1080; speed_min = 0; speed_max = 0
+    def now(self): return 0
+    def gate(self): return True
+    def sleep_ms(self, ms): plan_events.append(("sleep", ms)); return True
+plan_file = _Path(tempfile.gettempdir()) / "resume-essentials-plan2-test.txt"
+plan_file.write_text("PLAN|2\nDELAY|7\n", encoding="utf-8")
+try:
+    plan_mgr = rer.Manager.from_file(str(plan_file), resume_pending=True)
+    assert isinstance(plan_mgr, rer.PlanManager)
+    assert plan_mgr.run_resume(PlanCtx()) == 1
+    assert plan_mgr.resume_pending is False and plan_mgr.initialized
+    assert plan_mgr.run_due(PlanCtx()) == 0
+    assert plan_events == [("sleep", 7)]
+finally:
+    plan_file.unlink(missing_ok=True)
+
+print("resume essentials runtime: 35 passed, 0 failed")

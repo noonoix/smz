@@ -379,11 +379,14 @@ public static class PicoFirmwareExporter
         states = load_states()
         window = []
 
-        # v0.9.61-plan1 - optional plan engine module (absent file = bridge-only firmware)
+        # PLAN2 hotfix h1 - optional engine, but import failures must never be silent.
+        _pe_import_error = None
         try:
             import plan_engine as _pe
-        except Exception:
+        except Exception as exc:
             _pe = None
+            _pe_import_error = exc
+            print("plan: engine import failed:", exc)
 
         # v0.9.60 - the light sensor is OPTIONAL. A loose SDA/SCL wire must never kill the brain
         # before its command loop (that was the silent boot death): without the sensor the light
@@ -1023,6 +1026,103 @@ public static class PicoFirmwareExporter
 
             def key(self, vk, hold_ms):
                 press(vk, hold_ms)
+
+            # PLAN|2 firmware contract. Keep transport behavior byte-for-byte on the
+            # accepted 0.9.64f line; these methods only adapt new plan operations to it.
+            plan_api = 3
+
+            def gate(self):
+                global last_host_cmd
+                while True:
+                    pump_arm()
+                    poll_keypad()
+                    if not engine_on:
+                        return False
+                    if serial is not None and serial.in_waiting:
+                        last_host_cmd = time.monotonic()
+                        return False
+                    if not engine_paused:
+                        return True
+                    time.sleep(0.01)
+
+            def _ok(self, reply, what):
+                if reply is None or str(reply).startswith("ERR|"):
+                    raise RuntimeError("%s failed: %s" % (what, reply))
+                return reply
+
+            def setres(self, w, h):
+                reply = forward_to_arm("SETRES|%d,%d" % (int(w), int(h)), 5, 1)
+                return self._ok(reply, "SETRES")
+
+            def key_combo(self, vks, hmin, hmax):
+                body = "+".join(str(int(v)) for v in vks)
+                reply = handle_keyboard("KCOMBO|%s,%d,%d" % (body, int(hmin), int(hmax)), "KCOMBO")
+                return self._ok(reply, "KCOMBO")
+
+            def kdown(self, vk):
+                return self._ok(handle_keyboard("KDOWN|%d" % int(vk), "KDOWN"), "KDOWN")
+
+            def kup(self, vk):
+                return self._ok(handle_keyboard("KUP|%d" % int(vk), "KUP"), "KUP")
+
+            def wheel(self, delta):
+                return self._ok(forward_fast("MWHEEL|%d" % int(delta)), "MWHEEL")
+
+            def raw(self, line):
+                reply = handle(str(line))
+                if reply is None:
+                    return "OK|RAW"
+                return self._ok(reply, "RAW")
+
+            def read_plan_file(self, name):
+                # parse_plan already rejects traversal; repeat the guard at the filesystem boundary.
+                if not name or "/" in name or "\\" in name or ":" in name or not name.lower().endswith(".txt"):
+                    raise ValueError("unsafe include file name")
+                with open("/" + name, "r") as fh:
+                    return fh.read()
+
+            def wait_sound(self, threshold, min_ms, timeout_ms):
+                reply = forward_to_arm(
+                    "WSND|%d,%d,%d" % (int(threshold), int(min_ms), int(timeout_ms)),
+                    max(5.0, int(timeout_ms) / 1000.0 + 2.0))
+                if reply.startswith("OK|WSND|DETECTED"):
+                    return True
+                if reply.startswith("ERR|TIMEOUT|WSND"):
+                    return False
+                if "ABORTED" in reply:
+                    return None
+                raise RuntimeError("WSND failed: " + reply)
+
+            def trg_sound(self, threshold, min_ms, timeout_ms, action,
+                          react_min, react_max, hold_min, hold_max):
+                reply = forward_to_arm(
+                    "TRGSND|%d,%d,%d,%d,%d,%d,%d,%d" %
+                    (int(threshold), int(min_ms), int(timeout_ms), int(action),
+                     int(react_min), int(react_max), int(hold_min), int(hold_max)),
+                    max(5.0, int(timeout_ms) / 1000.0 + 3.0))
+                if reply.startswith("OK|TRGSND"):
+                    return None if "ABORTED" in reply else True
+                if reply.startswith("ERR|TIMEOUT|TRGSND"):
+                    return False
+                raise RuntimeError("TRGSND failed: " + reply)
+
+            def beep(self, freq, ms):
+                # PLAN|2 v3 buzzer contract. Import pwmio lazily to keep boot RAM low.
+                import pwmio
+                tone = None
+                try:
+                    tone = pwmio.PWMOut(board.GP5, duty_cycle=0,
+                                        frequency=int(freq), variable_frequency=True)
+                    tone.duty_cycle = 32768
+                    if not _plan_sleep_ms(int(ms)):
+                        raise _pe.PlanAbort()
+                finally:
+                    if tone is not None:
+                        try:
+                            tone.duty_cycle = 0
+                            tone.deinit()
+                        except Exception:
+                            pass
 
 
         def plan_pass():

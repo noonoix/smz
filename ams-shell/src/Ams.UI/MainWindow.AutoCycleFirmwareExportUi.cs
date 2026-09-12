@@ -23,7 +23,8 @@ internal static class AutoCycleFirmwareExportUiBootstrap
         window.SetValue(InstalledProperty, true);
         var button = new Button
         {
-            Content = "خروجی Firmware چرخه‌ی خودکار برای Pico…",
+            Content = "۲) ساخت Firmware AutoCycle (جایگزین Export Pico Firmware)…",
+            ToolTip = "code.py و runtimeهای چرخه را می‌سازد؛ در همان پوشه‌ی مرحله ۱ ذخیره کن تا code.py عادی جایگزین شود.",
             Padding = new Thickness(10, 5, 10, 5),
             Margin = new Thickness(0, 6, 0, 0),
             HorizontalAlignment = HorizontalAlignment.Stretch,

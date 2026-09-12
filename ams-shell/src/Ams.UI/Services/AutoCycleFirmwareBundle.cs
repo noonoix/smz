@@ -41,8 +41,13 @@ public static class AutoCycleFirmwareBundle
         var block=code[start..end];
         code=code.Remove(start,end-start);
         destination=code.IndexOf(trigger,StringComparison.Ordinal);
-        return code.Insert(destination,block);
+        code=code.Insert(destination,block);
+        const string planGp6="tone = pwmio.PWMOut(board.GP6, duty_cycle=0,\n                                frequency=int(freq)";
+        const string planGp5="tone = pwmio.PWMOut(board.GP5, duty_cycle=0,\n                                frequency=int(freq)";
+        if(code.CountOccurrences(planGp6)!=1)throw new InvalidDataException("قالب GP6 plan beep قابل همگام‌سازی نیست.");
+        return code.Replace(planGp6,planGp5,StringComparison.Ordinal);
     }
+    private static int CountOccurrences(this string text,string value){var count=0;var at=0;while((at=text.IndexOf(value,at,StringComparison.Ordinal))>=0){count++;at+=value.Length;}return count;}
     private static readonly string[] RequiredMarkers={"AUTO_CYCLE_PATCH_0967_H6","import supervisor","import plan_cycle as _pc","from auto_resume_boot import AutoResumeBoot","EVT|HOSTUSB|","usb_down=_usb_host_down","_resume_boot.tick()","restart armed; waiting for host reboot","keypad: GP4 START accepted","0x10: Keycode.LEFT_SHIFT"};
     private static string ReplaceOnce(string text,string oldText,string newText){if(string.IsNullOrEmpty(oldText))throw new InvalidDataException("anchor خالی در manifest چرخه.");var first=text.IndexOf(oldText,StringComparison.Ordinal);if(first<0||text.IndexOf(oldText,first+oldText.Length,StringComparison.Ordinal)>=0)throw new InvalidDataException("قالب firmware با قرارداد چرخه همگام نیست: "+oldText.Split('\n')[0]);return text[..first]+newText+text[(first+oldText.Length)..];}
     private sealed class PatchDocument{public int Version{get;set;}public string Baseline{get;set;}="";public List<PatchEdit> Edits{get;set;}=new();}

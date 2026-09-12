@@ -927,6 +927,22 @@ public static class PicoFirmwareExporter
                 time.sleep(max(0, a[6]) / 1000)   # reaction delay (reactMin)
                 press(a[5], a[8] or 40)           # board-side keypress (holdMin)
                 return "EVT|TRGLUX|lux=%d|vk=%d" % (int(got), a[5])
+            if line.startswith("BEEP|"):
+                try:
+                    import pwmio
+                    a = ints(line.split("|", 1)[1].split(","), 2)
+                    if not 30 <= a[0] <= 20000 or a[1] <= 0:
+                        return "ERR|RANGE|BEEP"
+                    tone = pwmio.PWMOut(board.GP6, duty_cycle=0, frequency=a[0], variable_frequency=True)
+                    try:
+                        tone.duty_cycle = 32768
+                        time.sleep(a[1] / 1000)
+                    finally:
+                        tone.duty_cycle = 0
+                        tone.deinit()
+                    return "OK|BEEP"
+                except Exception:
+                    return "ERR|BUZZER|BEEP"
             if line in ("HALT", "BYE"):
                 _flow_reset()                # v0.9.60e - stop wipes the mouse flow ledger
                 release_all_buttons(force=True)  # v0.9.64b - full shield on host HALT/BYE
@@ -1111,7 +1127,7 @@ public static class PicoFirmwareExporter
                 import pwmio
                 tone = None
                 try:
-                    tone = pwmio.PWMOut(board.GP5, duty_cycle=0,
+                    tone = pwmio.PWMOut(board.GP6, duty_cycle=0,
                                         frequency=int(freq), variable_frequency=True)
                     tone.duty_cycle = 32768
                     if not _plan_sleep_ms(int(ms)):

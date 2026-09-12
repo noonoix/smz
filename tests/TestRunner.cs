@@ -3475,6 +3475,23 @@ class TestRunner
         Assert(p58xaml.Contains("SerialLogList") && p58xaml.Contains("کپی کل لاگ")
                && p58cs.Contains("CopyAllLog_Click") && p58cs.Contains("Clipboard.SetText"),
             "v0.9.58d: serial log has selected/all clipboard copy actions");
+        // custom GP6 buzzer: replaces only insertion UI; legacy playAudio remains loadable.
+        var buzDef = StepDefinitions.Get("buzzer");
+        var buzCustom = new Dictionary<string, object?> { ["preset"] = "custom", ["pattern"] = "900:150,80;1200:250" };
+        Assert(buzDef.Label == "Buzzer Beep" && StepDefinitions.Get("playAudio").Label == "Play Audio",
+            "custom buzzer: new action exists and legacy playAudio remains registered");
+        Assert(StepDefinitions.BuildBuzzerCommands(buzCustom).SequenceEqual(new[] { "BEEP|900,150", "DLY|80", "BEEP|1200,250" }),
+            "custom buzzer: custom sequence compiles to BEEP/DLY commands");
+        bool badBuzzer = false;
+        try { StepDefinitions.BuildBuzzerCommands(new Dictionary<string, object?> { ["preset"]="custom", ["pattern"]="25000:10" }); }
+        catch (FormatException) { badBuzzer = true; }
+        Assert(badBuzzer, "custom buzzer: out-of-range frequency is rejected");
+        Assert(p58xaml.Contains("CommandParameter=\"buzzer\"") && !p58xaml.Contains("CommandParameter=\"playAudio\""),
+            "custom buzzer: all insertion surfaces use buzzer instead of Play Audio");
+        var buzFw = V27ReadSrc(Path.Combine("Services", "PicoFirmwareExporter.cs"));
+        Assert(buzFw.Contains("PWMOut(board.GP6") && !buzFw.Contains("PWMOut(board.GP5") && !buzFw.Contains("board.D9"),
+            "custom buzzer: passive PWM is Pico GP6 only");
+
         // (c) meta guard: every version PIN in this file matches the current release.
         // Pin lines are the assertions that check the csproj Version tag, the app banner or
         // the Pico bundle version. Version strings inside test DATA (PONG replies like

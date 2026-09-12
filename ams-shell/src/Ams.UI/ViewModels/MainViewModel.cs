@@ -1731,7 +1731,9 @@ public partial class MainViewModel : ObservableObject
 
                                       _settings.KeyboardBoard,   // v0.9.44 — which board executes the keyboard
 
-                                      _settings.TypeKeyMinMs, _settings.TypeKeyMaxMs)
+                                      _settings.TypeKeyMinMs, _settings.TypeKeyMaxMs,
+
+                                      _settings.NoActivateWhenStopped)
 
         {
 
@@ -1766,6 +1768,8 @@ public partial class MainViewModel : ObservableObject
             _settings.TypeKeyMinMs = dlg.TypeKeyMinMs;                              // v0.9.23
 
             _settings.TypeKeyMaxMs = Math.Max(dlg.TypeKeyMinMs, dlg.TypeKeyMaxMs);
+
+            _settings.NoActivateWhenStopped = dlg.NoActivateWhenStopped;
 
             StepDefinitions.TypingFallbackMinMs = _settings.TypeKeyMinMs;           // live update
 
@@ -2045,15 +2049,6 @@ public partial class MainViewModel : ObservableObject
 
             Log("run finished");
 
-            if (_settings.ShutdownWhenFinished)
-
-            {
-
-                Log("⚠ Play Options: shutting down the computer in 30s — cancel with: shutdown /a");
-
-                System.Diagnostics.Process.Start("shutdown", "/s /t 30");
-
-            }
 
         }
 

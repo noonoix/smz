@@ -25,6 +25,7 @@ public partial class OptionsDialog : Window
     public string PauseResumeHotkey { get; private set; } = "Shift+F3";
     // v0.9.44 — which board executes the keyboard ("pico" = brain, "promicro" = arm)
     public string KeyboardBoard { get; private set; } = "pico";
+    public bool NoActivateWhenStopped { get; private set; }
 
     // v0.9.55 - embedded mode: the settings live inside the main window, so this Window is
     // never shown. Its content is detached once and hosted by MainWindow; Ok/Cancel raise
@@ -62,7 +63,8 @@ public partial class OptionsDialog : Window
                          int mouseMoveSpeedMin = 300, int mouseMoveSpeedMax = 2000,
                          string runStopHotkey = "Shift+F1", string pauseResumeHotkey = "Shift+F3",   // v0.9.43 — paired
                          string keyboardBoard = "pico",   // v0.9.44 — which board executes the keyboard
-                         int typeKeyMinMs = 80, int typeKeyMaxMs = 220)
+                         int typeKeyMinMs = 80, int typeKeyMaxMs = 220,
+                         bool noActivateWhenStopped = false)
     {
         InitializeComponent();
         PortBox.Text = port;
@@ -81,6 +83,8 @@ public partial class OptionsDialog : Window
         KeyboardBoard = keyboardBoard;   // v0.9.44
         KbdArmRadio.IsChecked = keyboardBoard == "promicro";
         KbdPicoRadio.IsChecked = keyboardBoard != "promicro";
+        NoActivateWhenStoppedBox.IsChecked = noActivateWhenStopped;
+        NoActivateWhenStopped = noActivateWhenStopped;
 
         Port = port;
         PythonDir = pythonDir;
@@ -104,10 +108,12 @@ public partial class OptionsDialog : Window
         PlaybackPanel.Visibility = tab == 1 ? Visibility.Visible : Visibility.Collapsed;
         HotkeysPanel.Visibility = tab == 2 ? Visibility.Visible : Visibility.Collapsed;
         RolesPanel.Visibility = tab == 3 ? Visibility.Visible : Visibility.Collapsed;   // v0.9.45
+        BehaviorPanel.Visibility = tab == 4 ? Visibility.Visible : Visibility.Collapsed;
         TabSerial.IsChecked = tab == 0;
         TabPlayback.IsChecked = tab == 1;
         TabHotkeys.IsChecked = tab == 2;
         TabRoles.IsChecked = tab == 3;
+        TabBehavior.IsChecked = tab == 4;
     }
 
     /// <summary>v0.9.49 — dock to the owner's right edge at full height instead of floating in the
@@ -129,6 +135,7 @@ public partial class OptionsDialog : Window
     private void TabPlayback_Click(object sender, RoutedEventArgs e) => SelectTab(1);
     private void TabHotkeys_Click(object sender, RoutedEventArgs e) => SelectTab(2);
     private void TabRoles_Click(object sender, RoutedEventArgs e) => SelectTab(3);   // v0.9.45
+    private void TabBehavior_Click(object sender, RoutedEventArgs e) => SelectTab(4);
     private void TabSerial_ClickRestore(object sender, RoutedEventArgs e) => SelectTab(0);
 
     // v0.9.23 — "Measure from my hand": a 20 s in-app capture derives the user's own
@@ -363,6 +370,7 @@ public partial class OptionsDialog : Window
         if (string.IsNullOrWhiteSpace(PortBox.Text)) return;
         Port = PortBox.Text.Trim();
         KeyboardBoard = KbdArmRadio.IsChecked == true ? "promicro" : "pico";   // v0.9.44
+        NoActivateWhenStopped = NoActivateWhenStoppedBox.IsChecked == true;
         PythonDir = DirBox.Text.Trim();
         ToolkitDir = ToolkitBox.Text.Trim();
 

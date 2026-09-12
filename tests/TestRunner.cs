@@ -414,6 +414,11 @@ class TestRunner
         var loaded = JsonSerializer.Deserialize<AppSettings>(json);
         Assert(loaded != null && loaded.Port == "COM3" && loaded.ToolkitDir == @"C:\test\tk",
             "AppSettings round-trip preserves ToolkitDir");
+        var legacyPlayback = JsonSerializer.Deserialize<AppSettings>("{\"PlayRepeatMode\":\"times\",\"PlayRepeatTimes\":7,\"ShutdownWhenFinished\":true,\"NoActivateWhenStopped\":true}");
+        Assert(legacyPlayback != null && legacyPlayback.PlayRepeatMode == "times"
+               && legacyPlayback.PlayRepeatTimes == 7 && legacyPlayback.ShutdownWhenFinished
+               && legacyPlayback.NoActivateWhenStopped,
+            "legacy playback settings still deserialize after the UI cleanup");
 
         // ── Step 5: StepDefinitions summarization ────────────────────
         var loop = new StepNode

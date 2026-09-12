@@ -139,10 +139,19 @@ def _run_launch_steps(ctx,path="/launch_steps.txt"):
     ctx.log("cycle: Launch Steps complete"); return 1
 
 
+def _signal_restart_limit(ctx):
+    ctx.log("cycle: restart limit reached; cycle stopped")
+    beep=getattr(ctx,"beep",None)
+    if beep is not None: beep(1800,900)
+
+
 def run_root(text,ctx,rng=None,arm_store=None):
     ops,policy=parse_cycle_plan(text)
     if policy is None: plan_engine.run_plan(ops,ctx); return "finished"
     cycle=RootCycle(getattr(ctx,"now",None),rng,arm_store)
+    # AutoResumeBoot keeps the marker armed until start_root succeeds. No marker means
+    # this is a new manual session, so only then may the persistent restart count reset.
+    if not cycle.arm_store.is_armed(): cycle.reset_restart_session()
     cycle.configure(policy["run"][0],policy["run"][1],policy["auto"],policy["resume"][0],policy["resume"][1])
     essentials=getattr(ctx,"resume_essentials",None); wrapped=_CycleContext(ctx,cycle,essentials)
     try:
@@ -161,7 +170,10 @@ def run_root(text,ctx,rng=None,arm_store=None):
     except PlanDeadline:
         release=getattr(ctx,"release_all",None) or getattr(ctx,"halt",None)
         if release is None: raise RuntimeError("cycle expiry requires release_all/halt")
-        if not cycle.arm_natural_restart(release): raise
+        if not cycle.arm_natural_restart(release):
+            if cycle.restart_limit_reached:
+                _signal_restart_limit(ctx); return "restart-limit"
+            raise
         restart=getattr(ctx,"restart_windows",None)
         if restart is not None: restart()
         else:

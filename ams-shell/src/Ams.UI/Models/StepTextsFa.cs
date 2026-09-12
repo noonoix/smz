@@ -141,6 +141,8 @@ public static class StepTextsFa
 
         // "path" — openFile / playAudio / runExe / playScript
         ["openFile:path"] = "مسیر فایل",
+        ["buzzer:preset"] = "نوع صدای بوق (short / double / warning / success / custom)",
+        ["buzzer:pattern"] = "الگوی سفارشی — فرکانس:مدت,مکث;... نمونه: 900:150,80;1200:250",
         ["playAudio:path"] = "فایل صوتی (wav / mp3)",
         ["playAudio:loop"] = "تکرار تا توقف دستی",
         ["playAudio:outputDevice"] = "دستگاه خروجی صدا — انتخاب از فهرست (۰=پیش‌فرض، -۱=خودکار)",   // v0.9.43 — dropdown of real devices

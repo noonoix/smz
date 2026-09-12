@@ -5,6 +5,10 @@ using System.Windows.Input;
 using System.Windows.Media;
 using Ams.UI.Models;
 using Ams.UI.ViewModels;
+using WpfColor = System.Windows.Media.Color;
+using WpfColorConverter = System.Windows.Media.ColorConverter;
+using WpfCursors = System.Windows.Input.Cursors;
+using WpfListBox = System.Windows.Controls.ListBox;
 
 namespace Ams.UI;
 
@@ -22,7 +26,7 @@ internal static class PipelineTabsUiBootstrap
     private static void OnLoaded(object sender, RoutedEventArgs e)
     {
         if (sender is not MainWindow window || window.GetValue(InstalledProperty) is true) return;
-        if (window.FindName("StepsList") is not ListBox steps || steps.Parent is not Grid host) return;
+        if (window.FindName("StepsList") is not WpfListBox steps || steps.Parent is not Grid host) return;
         if (window.DataContext is not MainViewModel vm) return;
         window.SetValue(InstalledProperty, true);
         vm.InitializePipelineTabs();
@@ -34,7 +38,7 @@ internal static class PipelineTabsUiBootstrap
         var strip = new DockPanel
         {
             LastChildFill = true,
-            Background = new SolidColorBrush(Color.FromRgb(31, 35, 40)),
+            Background = new SolidColorBrush(WpfColor.FromRgb(31, 35, 40)),
             Margin = new Thickness(0, 0, 0, 4),
         };
         var tools = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
@@ -55,7 +59,7 @@ internal static class PipelineTabsUiBootstrap
                 Padding = new Thickness(12, 7, 12, 7),
                 Margin = new Thickness(0, 2, 3, 0),
                 BorderThickness = new Thickness(1),
-                Cursor = Cursors.Hand,
+                Cursor = WpfCursors.Hand,
                 ToolTip = tab.FileName,
             };
             button.Click += (_, _) =>
@@ -91,9 +95,9 @@ internal static class PipelineTabsUiBootstrap
         foreach (var button in buttons)
         {
             var selected = ReferenceEquals(button.Tag, active);
-            button.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(selected ? "#5E9FE8" : "#333740"));
-            button.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(selected ? "#10151C" : "#F5F7FA"));
-            button.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(selected ? "#5E9FE8" : "#444A55"));
+            button.Background = new SolidColorBrush((WpfColor)WpfColorConverter.ConvertFromString(selected ? "#5E9FE8" : "#333740"));
+            button.Foreground = new SolidColorBrush((WpfColor)WpfColorConverter.ConvertFromString(selected ? "#10151C" : "#F5F7FA"));
+            button.BorderBrush = new SolidColorBrush((WpfColor)WpfColorConverter.ConvertFromString(selected ? "#5E9FE8" : "#444A55"));
             button.FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal;
         }
     }

@@ -27,32 +27,34 @@ internal static class ResumeEssentialsUiBootstrap
         var head = new Grid();
         head.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var title = AutoCycleUiKit.Title("بسته‌ی ضروری پس از بازگشت");
-        var badge = AutoCycleUiKit.Badge("Resume Essentials", AutoCycleUiKit.Success, AutoCycleUiKit.Raised);
+        var title = AutoCycleUiKit.Title("بسته‌ی ضروری پس از راه‌اندازی مجدد");
+        var badge = AutoCycleUiKit.Badge("Resume Essentials");
         Grid.SetColumn(title, 0);
         Grid.SetColumn(badge, 1);
         head.Children.Add(title);
         head.Children.Add(badge);
         panel.Children.Add(head);
         panel.Children.Add(AutoCycleUiKit.Helper(
-            "یک Random Package را انتخاب و ثبت کن. پس از Auto Resume، تمام آیتم‌های فعال آن یک‌بار با ترتیب تصادفی اجرا می‌شوند."));
+            "یک Random Package را انتخاب و ثبت کن. پس از Auto Resume، تمام آیتم‌های فعال آن یک‌بار در حالت Shuffle All اجرا می‌شوند."));
 
-        var row = new Grid { FlowDirection = FlowDirection.RightToLeft };
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
+        var actions = new Grid();
+        actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
+        actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
         var mark = AutoCycleUiKit.Action("ثبت بسته‌ی انتخاب‌شده", true);
-        mark.Margin = new Thickness(0);
+        mark.ToolTip = "بسته‌ی انتخاب‌شده را به‌عنوان پیش‌اجرای یک‌باره پس از Auto Resume ثبت می‌کند.";
         mark.SetBinding(Button.CommandProperty, new Binding(nameof(MainViewModel.MarkResumeEssentialsCommand)));
-        var clear = AutoCycleUiKit.Action("پاک‌کردن انتخاب");
-        clear.Margin = new Thickness(0);
-        clear.SetBinding(Button.CommandProperty, new Binding(nameof(MainViewModel.ClearResumeEssentialsCommand)));
         Grid.SetColumn(mark, 0);
-        Grid.SetColumn(clear, 2);
-        row.Children.Add(mark);
-        row.Children.Add(clear);
-        panel.Children.Add(row);
 
+        var clear = AutoCycleUiKit.Action("پاک‌کردن انتخاب");
+        clear.ToolTip = "انتخاب Resume Essentials را پاک می‌کند.";
+        clear.SetBinding(Button.CommandProperty, new Binding(nameof(MainViewModel.ClearResumeEssentialsCommand)));
+        Grid.SetColumn(clear, 2);
+
+        actions.Children.Add(mark);
+        actions.Children.Add(clear);
+        panel.Children.Add(actions);
         body.Children.Add(AutoCycleUiKit.Card(AutoCycleUiKit.EssentialsTag, panel));
         AutoCycleUiKit.Reorder(body);
     }

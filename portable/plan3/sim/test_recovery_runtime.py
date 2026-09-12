@@ -13,7 +13,8 @@ assert out.count("KEY|combo=13") == 5
 assert ["DELAY|5000", "DELAY|10000", "DELAY|20000", "DELAY|40000", "DELAY|80000"] == [
     line for line in out.splitlines() if line.startswith("DELAY|")]
 assert out.count("IFLUX|1200,1300,500,900,0") == 5
-assert "BEEP|1800,900" in out
+assert "BEEP|" not in out
+assert "final failure: no-crash continuation" in out
 assert "GOTO|__MAIN_DC_RECOVERY_OK" in out
 assert recovery_runtime.wrap(source, None, "ordinary.txt") == source
 try:
@@ -23,4 +24,4 @@ except ValueError as exc:
 else:
     raise AssertionError("recovery call outside light If was accepted")
 assert (base / "CIRCUITPY/recovery_runtime.py").read_bytes() == (base / "CIRCUITPY-SPLIT/recovery_runtime.py").read_bytes()
-print("bounded DC recovery runtime: 9 passed, 0 failed")
+print("bounded DC recovery runtime: 10 passed, 0 failed")

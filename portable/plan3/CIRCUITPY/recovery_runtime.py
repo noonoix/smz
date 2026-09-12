@@ -20,8 +20,9 @@ def wrap(text, light_args, file_name, delays=ATTEMPT_DELAYS_SECONDS):
     """Inline one recovery tab as five attempts and re-check the parent's DC lux range.
 
     IFLUX true means the disconnect screen is still present. IFLUX false jumps to the
-    success label and returns to the caller. Final failure emits the fixed GP6 BEEP op
-    and safely returns; the caller can reach its next logical checkpoint.
+    success label and returns to the caller. Final failure is non-fatal and safely
+    returns; hardware GP6/BEEP signalling remains an optional follow-up until every
+    supported runtime context provides a buzzer handler.
     """
     if file_name not in RECOVERY_FILES:
         return text
@@ -42,7 +43,6 @@ def wrap(text, light_args, file_name, delays=ATTEMPT_DELAYS_SECONDS):
         out.append("ELSE")
         out.append("GOTO|" + done)
         out.append("ENDIF")
-    out.append("# final failure: GP6 buzzer, release/continuation handled by root context")
-    out.append("BEEP|1800,900")
+    out.append("# final failure: no-crash continuation; optional GP6 buzzer is a follow-up")
     out.append("LABEL|" + done)
     return "\n".join(out) + "\n"

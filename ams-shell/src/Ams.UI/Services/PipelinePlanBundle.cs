@@ -47,7 +47,7 @@ public static class PipelinePlanBundle
             var normalized = NormalizeRecoveryCalls(workspace[kind].Steps);
             var text = normalized.Count == 0 ? "PLAN|2\n" : PlanExporter.CompileOnce(normalized, settings, screenW, screenH, sourceName + "#" + kind, machine).Text;
             text = ExpandRecoveryCalls(text);
-            if (text.Contains("RUNFOR|", StringComparison.Ordinal) || text.Contains("AUTORESUME|", StringComparison.Ordinal) || text.Contains("POSTLAUNCH|", StringComparison.Ordinal))
+            if (text.Contains("RUNFOR|", StringComparison.Ordinal) || text.Contains("AUTORESUME|", StringComparison.Ordinal) || text.Contains("POSTLAUNCH|", StringComparison.Ordinal) || text.Contains("LAUNCH|", StringComparison.Ordinal))
                 throw new PlanExporter.PlanBlockedException(new[] { name + ": directive چرخه فقط در plan.txt مجاز است." });
             return (name, new UTF8Encoding(false).GetBytes(text));
         }

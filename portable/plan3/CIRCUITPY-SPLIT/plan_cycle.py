@@ -30,8 +30,17 @@ def _nonnegative_pair(body, line_no, name):
     return lo, hi
 
 
+def _parse_launch_directive(body, line_no, name):
+    p=body.split(",")
+    if len(p)!=6 or p[0] not in ("0","1"): raise ValueError("line %d: %s needs 0|1,slot,beforeMin,beforeMax,afterMin,afterMax" % (line_no,name))
+    try: slot=int(p[1])
+    except Exception: raise ValueError("line %d: bad %s taskbar slot" % (line_no,name))
+    if not 1<=slot<=9: raise ValueError("line %d: %s taskbar slot must be 1..9" % (line_no,name))
+    return (p[0]=="1",slot,_nonnegative_pair(",".join(p[2:4]),line_no,name+" before"),_nonnegative_pair(",".join(p[4:6]),line_no,name+" after"))
+
+
 def parse_cycle_plan(text):
-    kept=[]; runfor=None; autoresume=None; postlaunch=None; seen_plan=False; seen_work=False
+    kept=[]; runfor=None; autoresume=None; launch=None; seen_plan=False; seen_work=False
     for line_no, raw in enumerate(text.split("\n"), 1):
         line=raw.strip()
         if not line or line.startswith("#"): kept.append(raw); continue
@@ -39,7 +48,7 @@ def parse_cycle_plan(text):
         if op=="PLAN":
             if seen_plan: raise ValueError("line %d: duplicate PLAN" % line_no)
             seen_plan=True; kept.append(raw); continue
-        if op in ("RUNFOR","AUTORESUME","POSTLAUNCH"):
+        if op in ("RUNFOR","AUTORESUME","POSTLAUNCH","LAUNCH"):
             if not seen_plan or seen_work: raise ValueError("line %d: %s must be a root header directive" % (line_no,op))
             if op=="RUNFOR":
                 if runfor is not None: raise ValueError("line %d: duplicate RUNFOR" % line_no)
@@ -50,18 +59,13 @@ def parse_cycle_plan(text):
                 if len(p)!=3 or p[0] not in ("0","1"): raise ValueError("line %d: AUTORESUME needs 0|1,min,max seconds" % line_no)
                 autoresume=(p[0]=="1",)+_pair(",".join(p[1:]),line_no,op)
             else:
-                if postlaunch is not None: raise ValueError("line %d: duplicate POSTLAUNCH" % line_no)
-                p=body.split(",")
-                if len(p)!=6 or p[0] not in ("0","1"): raise ValueError("line %d: POSTLAUNCH needs 0|1,slot,beforeMin,beforeMax,afterMin,afterMax" % line_no)
-                try: slot=int(p[1])
-                except Exception: raise ValueError("line %d: bad POSTLAUNCH taskbar slot" % line_no)
-                if not 1<=slot<=9: raise ValueError("line %d: POSTLAUNCH taskbar slot must be 1..9" % line_no)
-                postlaunch=(p[0]=="1",slot,_nonnegative_pair(",".join(p[2:4]),line_no,"POSTLAUNCH before"),_nonnegative_pair(",".join(p[4:6]),line_no,"POSTLAUNCH after"))
+                if launch is not None: raise ValueError("line %d: duplicate LAUNCH/POSTLAUNCH" % line_no)
+                launch=_parse_launch_directive(body,line_no,op)
             continue
         seen_work=True; kept.append(raw)
-    if runfor is None and autoresume is None and postlaunch is None: return plan_engine.parse_plan(text),None
+    if runfor is None and autoresume is None and launch is None: return plan_engine.parse_plan(text),None
     if runfor is None or autoresume is None: raise ValueError("RUNFOR and AUTORESUME must be specified together")
-    return plan_engine.parse_plan("\n".join(kept)),{"run":runfor,"auto":autoresume[0],"resume":autoresume[1:],"launch":postlaunch or (False,1,(0,0),(0,0))}
+    return plan_engine.parse_plan("\n".join(kept)),{"run":runfor,"auto":autoresume[0],"resume":autoresume[1:],"launch":launch or (False,1,(0,0),(0,0))}
 
 
 class _CycleContext:
@@ -129,10 +133,16 @@ def _launch_pinned_app(ctx,rng,policy):
     if not ctx.sleep_ms(rng.randint(after[0],after[1])*1000): raise plan_engine.PlanAbort()
 
 
-def _run_launch_steps(ctx,path="/launch_steps.txt"):
+def _run_launch_steps(ctx,name="launch_steps.txt"):
+    reader=getattr(ctx,"read_plan_file",None)
     try:
-        with open(path,"r") as fh: text=fh.read()
-    except OSError: return 0
+        if reader is not None: text=reader(name)
+        else:
+            with open("/"+name,"r") as fh: text=fh.read()
+    except OSError:
+        log=getattr(ctx,"log",None)
+        if log is not None: log("cycle: Launch Steps missing - skipped")
+        return 0
     if not text.strip(): return 0
     if not text.lstrip().startswith("PLAN|2"): raise ValueError("launch_steps.txt must start with PLAN|2")
     ctx.log("cycle: Launch Steps start"); plan_engine.run_plan(plan_engine.parse_plan(text),ctx)

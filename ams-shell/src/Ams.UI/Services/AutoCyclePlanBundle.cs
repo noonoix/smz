@@ -90,7 +90,8 @@ public static class AutoCyclePlanBundle
             throw new PlanExporter.PlanBlockedException(new[] { "PlanExporter BUG: خروجی Root با PLAN|2 شروع نشده است." });
         if (lines.Skip(1).Any(line => line.StartsWith("RUNFOR|", StringComparison.Ordinal)
                                    || line.StartsWith("AUTORESUME|", StringComparison.Ordinal)
-                                   || line.StartsWith("POSTLAUNCH|", StringComparison.Ordinal)))
+                                   || line.StartsWith("POSTLAUNCH|", StringComparison.Ordinal)
+                                   || line.StartsWith("LAUNCH|", StringComparison.Ordinal)))
             throw new PlanExporter.PlanBlockedException(new[] { "PlanExporter BUG: directive چرخه در Root تکراری است." });
 
         var (restartMin, restartMax) = AppSettings.NormalizeMinuteRange(
@@ -108,7 +109,7 @@ public static class AutoCyclePlanBundle
             "AUTORESUME|" + (settings.AutoResumeEnabled ? "1" : "0") + ","
                 + (resumeMin * 60).ToString(CultureInfo.InvariantCulture) + ","
                 + (resumeMax * 60).ToString(CultureInfo.InvariantCulture),
-            "POSTLAUNCH|" + (settings.PostRestartLaunchEnabled ? "1" : "0") + ","
+            "LAUNCH|" + (settings.PostRestartLaunchEnabled ? "1" : "0") + ","
                 + launchSlot.ToString(CultureInfo.InvariantCulture) + ","
                 + launchBeforeMin.ToString(CultureInfo.InvariantCulture) + ","
                 + launchBeforeMax.ToString(CultureInfo.InvariantCulture) + ","

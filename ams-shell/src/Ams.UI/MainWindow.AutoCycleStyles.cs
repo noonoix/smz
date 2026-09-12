@@ -2,6 +2,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using Brush = System.Windows.Media.Brush;
 
 namespace Ams.UI;
 

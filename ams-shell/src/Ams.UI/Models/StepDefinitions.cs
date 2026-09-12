@@ -411,6 +411,20 @@ public static class StepDefinitions
             Summarize = s => "Open: " + (PropEx.GetString(s.Props, "path", "") ?? ""),
             // PC-side — no board command; ScriptGenerator emits Start-Process
         },
+        ["buzzer"] = new StepDefinition
+        {
+            Label = "Buzzer Beep", ColorResourceKey = "StepFlowBrush", DefaultDelay = 0,
+            Fields = new FieldDef[]
+            {
+                new("preset", "Tone pattern", FieldKind.Combo, "short", new[] { "short", "double", "warning", "success", "custom" }),
+                new("pattern", "Custom sequence — freq:duration,pause;... (example 900:150,80;1200:250)", FieldKind.Text,
+                    "900:150,80;1200:250", HideWhenKey: "preset", HideUnlessValue: "custom"),
+            },
+            Summarize = s => "Buzzer · " + (PropEx.GetString(s.Props, "preset", "short") == "custom"
+                ? PropEx.GetString(s.Props, "pattern", "900:150")
+                : PropEx.GetString(s.Props, "preset", "short")),
+            Commands = s => BuildBuzzerCommands(s.Props),
+        },
         ["playAudio"] = new StepDefinition
         {
             Label = "Play Audio", ColorResourceKey = "StepFindImageBrush", DefaultDelay = 0,
@@ -475,6 +489,39 @@ public static class StepDefinitions
             // App-side jump — RunEngine throws GotoSignal; the level holding the label catches it.
         },
     };
+
+    /// <summary>Builds the GP6 passive-buzzer contract. Custom syntax is
+    /// freq:duration,pause;freq:duration (Hz/ms); pause is optional after each tone.</summary>
+    public static IReadOnlyList<string> BuildBuzzerCommands(IReadOnlyDictionary<string, object?> p)
+    {
+        string preset = PropEx.GetString(p, "preset", "short");
+        string pattern = preset switch
+        {
+            "short" => "1000:180",
+            "double" => "1000:140,100;1000:140",
+            "warning" => "700:180,90;700:180,90;700:300",
+            "success" => "900:120,70;1300:220",
+            "custom" => PropEx.GetString(p, "pattern", "900:150"),
+            _ => throw new FormatException("unknown buzzer preset '" + preset + "'"),
+        };
+        var commands = new List<string>();
+        foreach (var raw in pattern.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var sides = raw.Split(':', 2, StringSplitOptions.TrimEntries);
+            var timing = sides.Length == 2 ? sides[1].Split(',', StringSplitOptions.TrimEntries) : Array.Empty<string>();
+            if (sides.Length != 2 || timing.Length is < 1 or > 2
+                || !int.TryParse(sides[0], out int freq) || !int.TryParse(timing[0], out int duration)
+                || (timing.Length == 2 && !int.TryParse(timing[1], out _)))
+                throw new FormatException("buzzer pattern must be freq:duration,pause;... (Hz/ms)");
+            int pause = timing.Length == 2 ? int.Parse(timing[1]) : 0;
+            if (freq is < 30 or > 20000) throw new FormatException("buzzer frequency must be 30..20000 Hz");
+            if (duration <= 0 || pause < 0) throw new FormatException("buzzer duration must be positive and pause non-negative");
+            commands.Add($"BEEP|{freq},{duration}");
+            if (pause > 0) commands.Add($"DLY|{pause}");
+        }
+        if (commands.Count == 0) throw new FormatException("buzzer pattern is empty");
+        return commands;
+    }
 
     public static StepDefinition Get(string type) => Defs[type];
     public static string Summarize(StepNode s)

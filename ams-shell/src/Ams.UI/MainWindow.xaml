@@ -156,7 +156,7 @@
                 <MenuItem Header="Wait For _Light (BH1750)" Command="{Binding AddStepCommand}" CommandParameter="waitForLight" />
                 <Separator />
                 <MenuItem Header="Open _File / Program" Command="{Binding AddStepCommand}" CommandParameter="openFile" />
-                <MenuItem Header="_Play Audio (wav/mp3)" Command="{Binding AddStepCommand}" CommandParameter="playAudio" />
+                <MenuItem Header="_Buzzer Beep" Command="{Binding AddStepCommand}" CommandParameter="buzzer" />
                 <MenuItem Header="_Run Exe" Command="{Binding AddStepCommand}" CommandParameter="runExe" />
                 <MenuItem Header="_Play Script (.amsj)" Command="{Binding AddStepCommand}" CommandParameter="playScript" />
                 <MenuItem Header="Insert _Label" Command="{Binding AddStepCommand}" CommandParameter="label" />
@@ -300,11 +300,11 @@
                                            PreviewMouseLeftButtonDown="RailSubmenu_PreviewMouseLeftButtonDown" />
                             </StackPanel>
                         </Button>
-                        <Button Style="{StaticResource RailButton}" Command="{Binding AddStepCommand}" CommandParameter="playAudio"
-                                ToolTip="پخش صدا — فایل wav/mp3 (تکرار اختیاری)">
+                        <Button Style="{StaticResource RailButton}" Command="{Binding AddStepCommand}" CommandParameter="buzzer"
+                                ToolTip="بوق بازر Pico GP6 — preset یا الگوی سفارشی">
                             <StackPanel>
                                 <TextBlock Text="🔈" FontSize="15" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center" Foreground="{StaticResource StepAudioBrush}" />
-                                <TextBlock Text="Audio" FontSize="8" HorizontalAlignment="Center" Foreground="#FFFFFF" Margin="0,1,0,0" />
+                                <TextBlock Text="Buzzer" FontSize="8" HorizontalAlignment="Center" Foreground="#FFFFFF" Margin="0,1,0,0" />
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource RailButton}" Command="{Binding AddStepCommand}" CommandParameter="runExe"
@@ -416,7 +416,7 @@
                                       Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                             <Separator />
                             <!-- v0.9.43 — these two were missing from the right-click menu -->
-                            <MenuItem Header="Play Audio (wav/mp3)" CommandParameter="playAudio"
+                            <MenuItem Header="Buzzer Beep" CommandParameter="buzzer"
                                       Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                             <MenuItem Header="Run Exe" CommandParameter="runExe"
                                       Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />

@@ -6,12 +6,14 @@ using Brush = System.Windows.Media.Brush;
 
 namespace Ams.UI;
 
-/// <summary>Shared dark-dashboard primitives for the AutoCycle workflow.</summary>
+/// <summary>Compact dark-dashboard primitives for AutoCycle inside Play Options.</summary>
 internal static class AutoCycleUiKit
 {
     internal const string ExportTag = "AutoCycle.Export";
+    internal const string AdvancedTag = "AutoCycle.Advanced";
     internal const string EssentialsTag = "AutoCycle.Essentials";
     internal const string ScheduleTag = "AutoCycle.Schedule";
+    internal const string ExportActionsTag = "AutoCycle.ExportActions";
     internal const string PlanStepTag = "AutoCycle.PlanStep";
     internal const string FirmwareStepTag = "AutoCycle.FirmwareStep";
 
@@ -35,9 +37,9 @@ internal static class AutoCycleUiKit
             Background = Surface,
             BorderBrush = BorderBrush,
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(16),
-            Margin = new Thickness(0, 12, 0, 0),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(10, 8, 10, 8),
+            Margin = new Thickness(0, 6, 0, 0),
             HorizontalAlignment = HorizontalAlignment.Stretch,
             Child = content,
         };
@@ -46,29 +48,31 @@ internal static class AutoCycleUiKit
     {
         Text = text,
         Foreground = Text,
-        FontSize = 14,
+        FontSize = 13,
         FontWeight = FontWeights.SemiBold,
-        Margin = new Thickness(0, 0, 0, 4),
+        VerticalAlignment = VerticalAlignment.Center,
     };
 
     internal static TextBlock Helper(string text) => new()
     {
         Text = text,
         Foreground = Muted,
-        FontSize = 12,
-        LineHeight = 18,
+        FontSize = 11,
+        LineHeight = 16,
         TextWrapping = TextWrapping.Wrap,
-        Margin = new Thickness(0, 0, 0, 12),
+        Margin = new Thickness(0, 3, 0, 6),
     };
 
     internal static Button Action(string text, bool primary = false) => new()
     {
         Content = text,
-        MinHeight = 44,
-        Padding = new Thickness(14, 8, 14, 8),
-        Margin = new Thickness(0, 6, 0, 0),
-        HorizontalAlignment = HorizontalAlignment.Stretch,
+        MinWidth = 188,
+        MinHeight = 34,
+        Padding = new Thickness(12, 4, 12, 4),
+        Margin = new Thickness(8, 0, 0, 0),
+        HorizontalAlignment = HorizontalAlignment.Right,
         HorizontalContentAlignment = HorizontalAlignment.Center,
+        FontSize = 12,
         FontWeight = FontWeights.SemiBold,
         Foreground = primary ? OnPrimary : Text,
         Background = primary ? Primary : Raised,
@@ -80,22 +84,27 @@ internal static class AutoCycleUiKit
         => new()
         {
             Background = background ?? PrimarySoft,
-            CornerRadius = new CornerRadius(6),
-            Padding = new Thickness(8, 3, 8, 3),
+            CornerRadius = new CornerRadius(5),
+            Padding = new Thickness(7, 2, 7, 2),
             VerticalAlignment = VerticalAlignment.Center,
             Child = new TextBlock
             {
                 Text = text,
                 Foreground = foreground ?? Primary,
-                FontSize = 11,
+                FontSize = 10,
                 FontWeight = FontWeights.SemiBold,
             },
         };
 
-    internal static StackPanel EnsureExportCard(StackPanel body)
+    internal static WrapPanel EnsureExportCard(StackPanel body)
     {
         var existing = FindCard(body, ExportTag);
-        if (existing?.Child is StackPanel found) return found;
+        if (existing?.Child is StackPanel oldPanel)
+        {
+            var found = oldPanel.Children.OfType<WrapPanel>()
+                .FirstOrDefault(x => Equals(x.Tag, ExportActionsTag));
+            if (found is not null) return found;
+        }
 
         var panel = new StackPanel { FlowDirection = FlowDirection.RightToLeft };
         var head = new Grid();
@@ -108,8 +117,35 @@ internal static class AutoCycleUiKit
         head.Children.Add(title);
         head.Children.Add(badge);
         panel.Children.Add(head);
-        panel.Children.Add(Helper("هر دو مرحله را در یک پوشه اجرا کن. خروجی‌های AutoCycle جای فایل‌های عادی Plan و Firmware را می‌گیرند."));
+        panel.Children.Add(Helper("هر دو خروجی را در یک پوشه بساز؛ جای Plan و Firmware عادی را می‌گیرند."));
+        var actions = new WrapPanel
+        {
+            Tag = ExportActionsTag,
+            FlowDirection = FlowDirection.RightToLeft,
+            HorizontalAlignment = HorizontalAlignment.Right,
+        };
+        panel.Children.Add(actions);
         body.Children.Add(Card(ExportTag, panel));
+        Reorder(body);
+        return actions;
+    }
+
+    internal static StackPanel EnsureAdvancedPanel(StackPanel body)
+    {
+        var existing = FindCard(body, AdvancedTag);
+        if (existing?.Child is Expander oldExpander && oldExpander.Content is StackPanel found)
+            return found;
+
+        var panel = new StackPanel { FlowDirection = FlowDirection.RightToLeft };
+        var expander = new Expander
+        {
+            Header = "تنظیمات AutoCycle — Resume Essentials و زمان‌بندی",
+            IsExpanded = false,
+            Foreground = Text,
+            FontWeight = FontWeights.SemiBold,
+            Content = panel,
+        };
+        body.Children.Add(Card(AdvancedTag, expander));
         Reorder(body);
         return panel;
     }
@@ -117,7 +153,7 @@ internal static class AutoCycleUiKit
     internal static Border? FindCard(StackPanel body, string tag)
         => body.Children.OfType<Border>().FirstOrDefault(x => Equals(x.Tag, tag));
 
-    internal static void ReorderExportSteps(StackPanel panel)
+    internal static void ReorderExportSteps(WrapPanel panel)
     {
         var steps = new[] { PlanStepTag, FirmwareStepTag }
             .Select(tag => panel.Children.OfType<Button>().FirstOrDefault(x => Equals(x.Tag, tag)))
@@ -126,9 +162,17 @@ internal static class AutoCycleUiKit
         foreach (var step in steps) panel.Children.Add(step);
     }
 
+    internal static void ReorderAdvanced(StackPanel panel)
+    {
+        var sections = new[] { EssentialsTag, ScheduleTag }
+            .Select(tag => FindCard(panel, tag)).Where(x => x is not null).Cast<Border>().ToList();
+        foreach (var section in sections) panel.Children.Remove(section);
+        foreach (var section in sections) panel.Children.Add(section);
+    }
+
     internal static void Reorder(StackPanel body)
     {
-        var cards = new[] { ExportTag, EssentialsTag, ScheduleTag }
+        var cards = new[] { ExportTag, AdvancedTag }
             .Select(tag => FindCard(body, tag)).Where(x => x is not null).Cast<Border>().ToList();
         foreach (var card in cards) body.Children.Remove(card);
         foreach (var card in cards) body.Children.Add(card);

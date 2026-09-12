@@ -1,6 +1,6 @@
 # Custom GP6 buzzer step
 
-`Buzzer Beep` replaces `Play Audio` in the insertion UI. Existing `playAudio` rows remain readable and executable in PC mode for backward compatibility.
+`Buzzer Beep` replaces `Play Audio` in the Insert menu, left rail, and right-click Add Action menu. Existing `playAudio` rows remain readable and executable in PC mode for backward compatibility.
 
 The buzzer is passive and is driven only by Pico `GP6` through the hardware contract in issue #32. Presets are `short`, `double`, `warning`, `success`, and `custom`.
 

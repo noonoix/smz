@@ -4,7 +4,7 @@ using Ams.UI.Models;
 namespace Ams.UI.Services;
 public static class AutoCycleFirmwareBundle
 {
-    private const string PatchManifest="autocycle_h6_patch.json";
+    private const string PatchManifest = "autocycle_h6_patch.json";
     private static readonly string[] RuntimeFiles={"plan_cycle.py","cycle_runtime.py","restart_windows.py","auto_resume_boot.py","resume_essentials_runtime.py"};
     public static IReadOnlyList<string> Export(string codePyPath,IEnumerable<StepNode> steps,string machine,string loopMode,int loopCount,int loopSeconds,bool keyboardOnArm)
     {
@@ -20,7 +20,7 @@ public static class AutoCycleFirmwareBundle
     public static string PatchCode(string code,string manifestPath)
     {
         code=code.Replace("\r\n","\n").Replace('\r','\n');
-        var manifest=JsonSerializer.Deserialize<PatchDocument>(File.ReadAllText(manifestPath),new JsonSerializerOptions{PropertyNameCaseInsensitive=true})??throw new InvalidDataException("manifest چرخه قابل خواندن نیست.");
+        var manifest=JsonSerializer.Deserialize<PatchDocument>(File.ReadAllText(manifestPath),new JsonSerializerOptions { PropertyNameCaseInsensitive = true })??throw new InvalidDataException("manifest چرخه قابل خواندن نیست.");
         if(manifest.Version!=1||manifest.Edits.Count==0)throw new InvalidDataException("نسخه یا محتوای manifest چرخه معتبر نیست.");
         if(!code.Contains(manifest.Baseline,StringComparison.Ordinal))throw new InvalidDataException("Firmware پایه h6 مورد انتظار پیدا نشد: "+manifest.Baseline);
         foreach(var edit in manifest.Edits)code=ReplaceOnce(code,edit.Old,edit.New);

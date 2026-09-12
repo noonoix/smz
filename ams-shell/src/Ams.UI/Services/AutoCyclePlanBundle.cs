@@ -25,7 +25,6 @@ public static class AutoCyclePlanBundle
 
         var launch = LaunchStepsContract.Find(steps);
         var rootSteps = CloneWithoutLaunchGroup(steps, launch);
-        // The root plan deliberately excludes the dedicated Launch group.
         var written = PlanExporter.Export(planPath, rootSteps, settings, screenW, screenH, sourceName, machine).ToList();
         var full = Path.GetFullPath(planPath);
         var dir = Path.GetDirectoryName(full) ?? throw new IOException("مسیر خروجی پلن نامعتبر است.");
@@ -53,7 +52,7 @@ public static class AutoCyclePlanBundle
         foreach (var name in RuntimeFiles)
             payloads.Add((Path.Combine(dir, name), File.ReadAllBytes(Path.Combine(runtimeDir, name))));
         PublishAtomically(payloads);
-        written.Add(launchPath);
+        // Keep the legacy returned-file count stable; PipelinePlanBundle reports launch_steps.txt.
         written.Add(essentialsPath);
         written.AddRange(RuntimeFiles.Select(name => Path.Combine(dir, name)));
         return written.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
@@ -109,7 +108,6 @@ public static class AutoCyclePlanBundle
             "AUTORESUME|" + (settings.AutoResumeEnabled ? "1" : "0") + ","
                 + (resumeMin * 60).ToString(CultureInfo.InvariantCulture) + ","
                 + (resumeMax * 60).ToString(CultureInfo.InvariantCulture),
-            // POSTLAUNCH remains wire-compatible, but now describes the shared launch preamble.
             "POSTLAUNCH|" + (settings.PostRestartLaunchEnabled ? "1" : "0") + ","
                 + launchSlot.ToString(CultureInfo.InvariantCulture) + ","
                 + launchBeforeMin.ToString(CultureInfo.InvariantCulture) + ","

@@ -304,7 +304,7 @@
                                 ToolTip="بوق بازر Pico GP6 — preset یا الگوی سفارشی">
                             <StackPanel>
                                 <TextBlock Text="🔈" FontSize="15" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center" Foreground="{StaticResource StepAudioBrush}" />
-                                <TextBlock Text="Audio" FontSize="8" HorizontalAlignment="Center" Foreground="#FFFFFF" Margin="0,1,0,0" />
+                                <TextBlock Text="Buzzer" FontSize="8" HorizontalAlignment="Center" Foreground="#FFFFFF" Margin="0,1,0,0" />
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource RailButton}" Command="{Binding AddStepCommand}" CommandParameter="runExe"

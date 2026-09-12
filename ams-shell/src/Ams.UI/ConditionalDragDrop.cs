@@ -18,7 +18,7 @@ internal static class ConditionalDragDropBootstrap
         => EventManager.RegisterClassHandler(typeof(ListBox), UIElement.DropEvent,
             new DragEventHandler(OnDrop), true);
 
-    private static void OnDrop(object sender, DragEventArgs e)
+    private static void OnDrop(object sender, System.Windows.DragEventArgs e)
     {
         if (sender is not ListBox list || list.Name != "StepsList") return;
         if (e.Data.GetData(typeof(StepNode)) is not StepNode node) return;

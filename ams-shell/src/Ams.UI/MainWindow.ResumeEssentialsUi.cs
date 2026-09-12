@@ -6,7 +6,7 @@ using Ams.UI.ViewModels;
 
 namespace Ams.UI;
 
-/// <summary>Accessible card for selecting the resume-only Random Package pre-pass.</summary>
+/// <summary>Compact Resume Essentials controls, hidden with advanced AutoCycle settings by default.</summary>
 internal static class ResumeEssentialsUiBootstrap
 {
     private static readonly DependencyProperty InstalledProperty = DependencyProperty.RegisterAttached(
@@ -23,39 +23,38 @@ internal static class ResumeEssentialsUiBootstrap
         if (window.FindName("PlayOptBody") is not StackPanel body) return;
         window.SetValue(InstalledProperty, true);
 
-        var panel = new StackPanel { FlowDirection = FlowDirection.RightToLeft };
-        var head = new Grid();
-        head.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var title = AutoCycleUiKit.Title("بسته‌ی ضروری پس از راه‌اندازی مجدد");
-        var badge = AutoCycleUiKit.Badge("Resume Essentials");
-        Grid.SetColumn(title, 0);
-        Grid.SetColumn(badge, 1);
-        head.Children.Add(title);
-        head.Children.Add(badge);
-        panel.Children.Add(head);
-        panel.Children.Add(AutoCycleUiKit.Helper(
-            "یک Random Package را انتخاب و ثبت کن. پس از Auto Resume، تمام آیتم‌های فعال آن یک‌بار در حالت Shuffle All اجرا می‌شوند."));
+        var advanced = AutoCycleUiKit.EnsureAdvancedPanel(body);
+        var row = new Grid { FlowDirection = FlowDirection.RightToLeft };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var actions = new Grid();
-        actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
-        actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        text.Children.Add(AutoCycleUiKit.Title("Resume Essentials"));
+        text.Children.Add(AutoCycleUiKit.Helper(
+            "Random Package انتخابی پس از Auto Resume یک‌بار در حالت Shuffle All اجرا می‌شود."));
 
-        var mark = AutoCycleUiKit.Action("ثبت بسته‌ی انتخاب‌شده", true);
-        mark.ToolTip = "بسته‌ی انتخاب‌شده را به‌عنوان پیش‌اجرای یک‌باره پس از Auto Resume ثبت می‌کند.";
+        var actions = new WrapPanel
+        {
+            FlowDirection = FlowDirection.RightToLeft,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        var mark = AutoCycleUiKit.Action("ثبت بسته", true);
+        mark.ToolTip = "بسته‌ی انتخاب‌شده را به‌عنوان پیش‌اجرای یک‌باره ثبت می‌کند.";
         mark.SetBinding(Button.CommandProperty, new Binding(nameof(MainViewModel.MarkResumeEssentialsCommand)));
-        Grid.SetColumn(mark, 0);
-
-        var clear = AutoCycleUiKit.Action("پاک‌کردن انتخاب");
+        var clear = AutoCycleUiKit.Action("پاک‌کردن");
+        clear.MinWidth = 110;
         clear.ToolTip = "انتخاب Resume Essentials را پاک می‌کند.";
         clear.SetBinding(Button.CommandProperty, new Binding(nameof(MainViewModel.ClearResumeEssentialsCommand)));
-        Grid.SetColumn(clear, 2);
-
         actions.Children.Add(mark);
         actions.Children.Add(clear);
-        panel.Children.Add(actions);
-        body.Children.Add(AutoCycleUiKit.Card(AutoCycleUiKit.EssentialsTag, panel));
+
+        Grid.SetColumn(text, 0);
+        Grid.SetColumn(actions, 1);
+        row.Children.Add(text);
+        row.Children.Add(actions);
+        advanced.Children.Add(AutoCycleUiKit.Card(AutoCycleUiKit.EssentialsTag, row));
+        AutoCycleUiKit.ReorderAdvanced(advanced);
         AutoCycleUiKit.Reorder(body);
     }
 }

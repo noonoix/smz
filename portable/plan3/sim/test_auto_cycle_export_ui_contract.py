@@ -16,11 +16,16 @@ assert "PlanExporter.PlanBlockedException" in vm
 assert "ExportAutoCyclePicoPlanCommand" in ui
 assert "PlayOptBody" in ui
 assert "چرخه‌ی خودکار" in vm and "چرخه‌ی خودکار" in ui
-assert "MinHeight = 44" in kit and "CornerRadius = new CornerRadius(10)" in kit
+assert "MinHeight = 34" in kit and "MinWidth = 188" in kit
+assert "Padding = new Thickness(10, 8, 10, 8)" in kit and "CornerRadius = new CornerRadius(8)" in kit
 assert "#5E9FE8" in kit and "#B5BBC5" in kit and "Reorder(body)" in kit
 assert "#10151C" in kit and "primary ? OnPrimary : Text" in kit
 assert "ReorderExportSteps" in kit and "PlanStepTag" in ui and "FirmwareStepTag" in firmware_ui
+assert "WrapPanel EnsureExportCard" in kit and "HorizontalAlignment = HorizontalAlignment.Right" in kit
+assert "EnsureAdvancedPanel" in kit and "IsExpanded = false" in kit
+assert "EnsureAdvancedPanel(body)" in essentials_ui and "EnsureAdvancedPanel(body)" in schedule_ui
+assert "ReorderAdvanced" in essentials_ui and "ReorderAdvanced" in schedule_ui
 assert "۱  ·" in ui and "۲  ·" in firmware_ui
 assert "ToolTip" in ui and "ToolTip" in firmware_ui
 assert "GridUnitType.Star" in essentials_ui and "GridUnitType.Star" in schedule_ui
-print("auto-cycle export UI: 15 passed, 0 failed")
+print("auto-cycle compact UI: 20 passed, 0 failed")

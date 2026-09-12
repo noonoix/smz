@@ -2388,8 +2388,8 @@ class TestRunner
         var v43rail   = V43Params(V43Between(v43mw, "<!-- Icon rail", "<!-- Steps column"));
         var v43ctx    = V43Params(V43Between(v43mw, "Header=\"Add Action\"", "InputGestureText=\"Ctrl+X\""));
 
-        Assert(v43insert.Count == 23,
-            $"v0.9.43: the Insert tab still lists 23 step types (got {v43insert.Count})");
+        Assert(v43insert.Count == 24,
+            $"the Insert menu lists all 24 step types, including Launch DC Recovery (got {v43insert.Count})");
         Assert(v43insert.SetEquals(v43rail),
             "v0.9.43: the vertical rail covers EVERY Insert-tab item (missing: " + string.Join(",", v43insert.Except(v43rail)) + ")");
         Assert(v43insert.SetEquals(v43ctx),

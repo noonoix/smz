@@ -26,7 +26,7 @@ internal static class AutoCycleUiKit
     internal static readonly Brush Success = MakeBrush("#72BC8F");
 
     private static SolidColorBrush MakeBrush(string value)
-        => new((Color)ColorConverter.ConvertFromString(value));
+        => new((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(value));
 
     internal static Border Card(string tag, UIElement content)
         => new()

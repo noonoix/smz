@@ -4006,6 +4006,28 @@ class TestRunner
             }
             finally { if (Directory.Exists(pexTmp)) Directory.Delete(pexTmp, true); }
         }
+        // v0.9.67 hotfix regression: exercise the real per-system exporter before
+        // applying the AutoCycle manifest. The old parity fixture alone missed template drift.
+        var cycleFwTmp = Path.Combine(Path.GetTempPath(), "cyclefw_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(cycleFwTmp);
+        try
+        {
+            var cycleCode = Path.Combine(cycleFwTmp, "code.py");
+            var cycleWritten = AutoCycleFirmwareBundle.Export(cycleCode, Array.Empty<StepNode>(),
+                "REAL-EXPORT-REGRESSION", "once", 1, 0, false);
+            var cycleText = File.ReadAllText(cycleCode);
+            Assert(cycleWritten.Count == 9
+                   && File.Exists(Path.Combine(cycleFwTmp, "resume_essentials_runtime.py")),
+                "v0.9.67: real Pico exporter + AutoCycle writes the complete nine-file firmware bundle");
+            Assert(cycleText.Contains("AUTO_CYCLE_PATCH_0967_H6")
+                   && cycleText.Contains("import plan_cycle as _pc")
+                   && cycleText.Contains("_resume_boot.tick()")
+                   && cycleText.Contains("board.GP6")
+                   && cycleText.Contains("0x10: Keycode.LEFT_SHIFT"),
+                "v0.9.67: AutoCycle manifest patches the real per-system firmware output");
+        }
+        finally { if (Directory.Exists(cycleFwTmp)) Directory.Delete(cycleFwTmp, true); }
+
         Console.WriteLine($"=== Results: {passed} passed, {failed} failed ===");
         Environment.Exit(failed > 0 ? 1 : 0);
     }

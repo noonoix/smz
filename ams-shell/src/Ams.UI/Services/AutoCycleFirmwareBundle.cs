@@ -44,6 +44,10 @@ public static class AutoCycleFirmwareBundle
 
     public static string PatchCode(string code, string manifestPath)
     {
+        // PicoFirmwareExporter is compiled from a raw string. On Windows its generated
+        // code.py can carry CRLF while the canonical JSON manifest intentionally uses LF.
+        // Normalize before byte-unique anchor matching and publish one stable LF artifact.
+        code = code.Replace("\r\n", "\n").Replace('\r', '\n');
         var manifest = JsonSerializer.Deserialize<PatchDocument>(
             File.ReadAllText(manifestPath),
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true })

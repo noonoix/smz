@@ -25,7 +25,8 @@ internal static class AutoCycleExportUiBootstrap
 
         var button = new Button
         {
-            Content = "خروجی بسته‌ی چرخه‌ی خودکار برای Pico…",
+            Content = "۱) ساخت پلن چرخه‌ی خودکار (AutoCycle؛ جایگزین Export Pico Plan)…",
+            ToolTip = "plan.txt و runtimeهای PLAN را برای AutoCycle می‌سازد؛ خروجی عادی پلن را در همان پوشه جایگزین می‌کند.",
             Padding = new Thickness(10, 5, 10, 5),
             Margin = new Thickness(0, 10, 0, 0),
             HorizontalAlignment = HorizontalAlignment.Stretch,

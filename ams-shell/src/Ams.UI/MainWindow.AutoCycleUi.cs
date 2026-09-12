@@ -40,7 +40,23 @@ public partial class MainWindow
         head.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var title = AutoCycleUiKit.Title("زمان‌بندی Restart و Auto Resume");
-        var status = AutoCycleUiKit.Badge("GP6", AutoCycleUiKit.Success, AutoCycleUiKit.Raised);
+        var buzzerValue = new TextBlock
+        {
+            Foreground = AutoCycleUiKit.Success,
+            FontSize = 10,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        buzzerValue.SetBinding(TextBlock.TextProperty,
+            new WpfBinding(nameof(MainViewModel.PortableBuzzerPinText)));
+        var status = new Border
+        {
+            Background = AutoCycleUiKit.Raised,
+            CornerRadius = new CornerRadius(5),
+            Padding = new Thickness(7, 2, 7, 2),
+            ToolTip = "پایه‌ی ثابت خروجی صوتی پرتابل",
+            Child = buzzerValue,
+        };
         Grid.SetColumn(title, 0);
         Grid.SetColumn(status, 1);
         head.Children.Add(title);

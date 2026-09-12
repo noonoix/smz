@@ -49,7 +49,32 @@ public static class AutoCycleFirmwareBundle
     }
     private static int CountOccurrences(this string text,string value){var count=0;var at=0;while((at=text.IndexOf(value,at,StringComparison.Ordinal))>=0){count++;at+=value.Length;}return count;}
     private static readonly string[] RequiredMarkers={"AUTO_CYCLE_PATCH_0967_H6","import supervisor","import plan_cycle as _pc","from auto_resume_boot import AutoResumeBoot","EVT|HOSTUSB|","usb_down=_usb_host_down","_resume_boot.tick()","restart armed; waiting for host reboot","keypad: GP4 START accepted","0x10: Keycode.LEFT_SHIFT"};
-    private static string ReplaceOnce(string text,string oldText,string newText){if(string.IsNullOrEmpty(oldText))throw new InvalidDataException("anchor خالی در manifest چرخه.");var first=text.IndexOf(oldText,StringComparison.Ordinal);if(first<0||text.IndexOf(oldText,first+oldText.Length,StringComparison.Ordinal)>=0)throw new InvalidDataException("قالب firmware با قرارداد چرخه همگام نیست: "+oldText.Split('\n')[0]);return text[..first]+newText+text[(first+oldText.Length)..];}
+    private static string ReplaceOnce(string text,string oldText,string newText)
+    {
+        if(string.IsNullOrEmpty(oldText))throw new InvalidDataException("anchor خالی در manifest چرخه.");
+        var first=text.IndexOf(oldText,StringComparison.Ordinal);
+        var duplicate=first>=0&&text.IndexOf(oldText,first+oldText.Length,StringComparison.Ordinal)>=0;
+        if(!duplicate&&first>=0)return text[..first]+newText+text[(first+oldText.Length)..];
+
+        // The buzzer patch deliberately normalizes the generated firmware before applying
+        // the legacy manifest. If an older template changes only the indentation or the
+        // preceding TRGSND return block, keep the replacement anchored to the unique beep
+        // method instead of silently accepting an arbitrary match.
+        const string beepMarker="    def beep(self, freq, ms):";
+        const string beepEnd="            if not _plan_sleep_ms(int(ms)):\n";
+        var oldBeep=text.IndexOf(beepMarker,StringComparison.Ordinal);
+        var oldBeepEnd=oldBeep>=0?text.IndexOf(beepEnd,oldBeep,StringComparison.Ordinal):-1;
+        var newRelease=newText.IndexOf("    def release_all(self):",StringComparison.Ordinal);
+        var newBeepEnd=newRelease>=0?newText.IndexOf(beepEnd,newRelease,StringComparison.Ordinal):-1;
+        if(oldBeep>=0&&oldBeepEnd>=0&&newRelease>=0&&newBeepEnd>=0
+            &&text.IndexOf(beepMarker,oldBeep+beepMarker.Length,StringComparison.Ordinal)<0)
+        {
+            var replacement=newText[newRelease..(newBeepEnd+beepEnd.Length)];
+            return text[..oldBeep]+replacement+text[(oldBeepEnd+beepEnd.Length)..];
+        }
+        var reason=first<0?"anchor missing":"anchor is not unique";
+        throw new InvalidDataException("قالب firmware با قرارداد چرخه همگام نیست ("+reason+"): "+oldText.Split('\n')[0]);
+    }
     private sealed class PatchDocument{public int Version{get;set;}public string Baseline{get;set;}="";public List<PatchEdit> Edits{get;set;}=new();}
     private sealed class PatchEdit{public string Old{get;set;}="";public string New{get;set;}="";}
     private static void PublishAtomically(IReadOnlyList<(string Path,byte[] Bytes)> payloads){var tx=Guid.NewGuid().ToString("N");var temps=payloads.Select(p=>p.Path+"."+tx+".tmp").ToArray();var backups=payloads.Select(p=>p.Path+"."+tx+".bak").ToArray();var published=new List<int>();try{for(var i=0;i<payloads.Count;i++)File.WriteAllBytes(temps[i],payloads[i].Bytes);for(var i=0;i<payloads.Count;i++){if(File.Exists(payloads[i].Path))File.Move(payloads[i].Path,backups[i]);File.Move(temps[i],payloads[i].Path);published.Add(i);}foreach(var b in backups)if(File.Exists(b))File.Delete(b);}catch{foreach(var i in published.AsEnumerable().Reverse())if(File.Exists(payloads[i].Path))File.Delete(payloads[i].Path);for(var i=0;i<payloads.Count;i++)if(File.Exists(backups[i]))File.Move(backups[i],payloads[i].Path,true);throw;}finally{foreach(var f in temps.Concat(backups))if(File.Exists(f))File.Delete(f);}}

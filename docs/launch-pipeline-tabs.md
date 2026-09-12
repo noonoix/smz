@@ -8,8 +8,7 @@
 4. **Main DC Recovery** — one complete retry attempt during Main.
 5. **Resume Essentials** — resume-only preparation before restoring Main checkpoint.
 
-The tabs are fixed and cannot be closed. Each tab owns an independent ordered step tree, selection,
-scroll position, undo/redo history, dirty state and validation badge. `Ctrl+1` through `Ctrl+5` switch tabs.
+The tabs are fixed and cannot be closed. Each tab owns an independent ordered step tree and dirty/validation state. Switching tabs loads that tab's tree into the editor; transient editor UI state such as current selection, collapsed rows and undo/redo stacks is reset on tab switch in this draft. `Ctrl+1` through `Ctrl+5` switch tabs.
 
 ## Launch order
 
@@ -43,4 +42,4 @@ open/save/export round-trip tests pass.
 
 Both recovery profiles default to five attempts with exponential delays `5, 10, 20, 40, 80` seconds.
 One attempt means one full execution of that recovery tab followed by a stable sensor success check.
-After final failure, GP6 reports the error, all inputs are released, and the current Main/Launch run is passed safely.
+After final failure, recovery returns without crashing; optional GP6 buzzer/error signalling is tracked as a hardware follow-up.

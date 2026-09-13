@@ -4,8 +4,7 @@ on:
   push:
     branches: [phase1/configurable-buzzer-gpio]
     paths:
-      - tools/apply_mouse_reliability_v2.py
-      - ams-shell/src/Ams.UI/MainWindow.PlaybackControlsLayout.cs
+      - tools/prepare_mouse_v2.py
       - .github/workflows/mouse-reliability-one-shot.yml
 
 permissions:
@@ -22,30 +21,47 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-      - name: Apply build test and commit
+      - name: Apply build test package and publish
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Continue'
           $log = 'mouse-patch-result.txt'
-          "mouse reliability v2 $(Get-Date -Format o)" | Set-Content $log
-          python tools/apply_mouse_reliability_v2.py 2>&1 | Tee-Object -FilePath $log -Append
+          "mouse reliability final $(Get-Date -Format o)" | Set-Content $log
+          python tools/prepare_mouse_v2.py 2>&1 | Tee-Object -FilePath $log -Append
           $code = $LASTEXITCODE
+          if ($code -eq 0) { python tools/apply_mouse_reliability_v2.py 2>&1 | Tee-Object -FilePath $log -Append; $code = $LASTEXITCODE }
           if ($code -eq 0) { python -m py_compile ams-shell/bridge/bridge.py 2>&1 | Tee-Object -FilePath $log -Append; $code = $LASTEXITCODE }
           if ($code -eq 0) { dotnet build ams-shell/AMS.sln -c Release 2>&1 | Tee-Object -FilePath $log -Append; $code = $LASTEXITCODE }
           if ($code -eq 0) { dotnet run --project tests/TestRunner.csproj -c Release 2>&1 | Tee-Object -FilePath $log -Append; $code = $LASTEXITCODE }
+          if ($code -eq 0) {
+            dotnet publish ams-shell/src/Ams.UI/Ams.UI.csproj -c Release -r win-x64 --self-contained true -o mouse-test-build 2>&1 | Tee-Object -FilePath $log -Append
+            $code = $LASTEXITCODE
+          }
+          if ($code -eq 0) { Compress-Archive -Path mouse-test-build/* -DestinationPath Classroom-Studio-mouse-stop-test.zip -Force }
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if ($code -eq 0) {
-            Remove-Item tools/apply_mouse_reliability.py,tools/repair_mouse_patch_script.py,tools/apply_mouse_reliability_v2.py -ErrorAction SilentlyContinue
+            Remove-Item tools/apply_mouse_reliability.py,tools/repair_mouse_patch_script.py,tools/apply_mouse_reliability_v2.py,tools/prepare_mouse_v2.py -ErrorAction SilentlyContinue
             Remove-Item .github/workflows/mouse-reliability-one-shot.yml
             Remove-Item $log
+            Remove-Item mouse-test-build -Recurse -Force
             git add -A
             git commit -m "Fix mouse stop completion and host event flood"
+            $tag = 'mouse-stop-test-20260914'
+            git tag -f $tag
             git push origin HEAD:phase1/configurable-buzzer-gpio
-            exit 0
+            git push origin -f $tag
+            gh release delete $tag --yes --cleanup-tag 2>$null
+            git tag -f $tag
+            git push origin -f $tag
+            gh release create $tag Classroom-Studio-mouse-stop-test.zip firmware/arm26/ams_board26.ino --prerelease --title "Mouse Stop Test 2026-09-14" --notes "Test build for persistent Run/Stop controls, global unfocused hotkeys, serialized MCLICK completion, immediate HALT release, and HOSTUSB event deduplication. Flash the included arm26 firmware to the Pro Micro before running test 04."
+            exit $LASTEXITCODE
           }
           "FAILED exit=$code" | Add-Content $log
           git add $log
-          git commit -m "Record mouse patch v2 failure diagnostics"
+          git commit -m "Record final mouse patch diagnostics"
           git push origin HEAD:phase1/configurable-buzzer-gpio
           exit $code

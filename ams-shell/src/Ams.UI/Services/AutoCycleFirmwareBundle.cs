@@ -26,6 +26,7 @@ public static class AutoCycleFirmwareBundle
         if(!code.Contains(manifest.Baseline,StringComparison.Ordinal))throw new InvalidDataException("Firmware پایه h6 مورد انتظار پیدا نشد: "+manifest.Baseline);
         foreach(var edit in manifest.Edits)code=ReplaceOnce(code,edit.Old,edit.New);
         foreach(var marker in RequiredMarkers)if(!code.Contains(marker,StringComparison.Ordinal))throw new InvalidDataException("پست‌کاندیشن Firmware چرخه پیدا نشد: "+marker);
+        code=code.Replace("tone = pwmio.PWMOut(board.GP6,","tone = pwmio.PWMOut(board."+BuzzerGpioPolicy.Require(AppSettings.Load().BuzzerGpio)+",",StringComparison.Ordinal);
         return code;
     }
     private static string NormalizeBuzzerForManifest(string code)
@@ -42,7 +43,7 @@ public static class AutoCycleFirmwareBundle
         code=code.Remove(start,end-start);
         destination=code.IndexOf(trigger,StringComparison.Ordinal);
         code=code.Insert(destination,block);
-        const string planGp6="tone = pwmio.PWMOut(board.GP6, duty_cycle=0,\n                                frequency=int(freq)";
+        var planGp6="tone = pwmio.PWMOut(board."+BuzzerGpioPolicy.Require(AppSettings.Load().BuzzerGpio)+", duty_cycle=0,\n                                frequency=int(freq)";
         const string planGp5="tone = pwmio.PWMOut(board.GP5, duty_cycle=0,\n                                frequency=int(freq)";
         if(code.CountOccurrences(planGp6)!=1)throw new InvalidDataException("قالب GP6 plan beep قابل همگام‌سازی نیست.");
         return code.Replace(planGp6,planGp5,StringComparison.Ordinal);

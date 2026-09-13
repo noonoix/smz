@@ -1,0 +1,3 @@
+planGp6 matches=1
+selected-pin anchor matches=1
+SUCCESS

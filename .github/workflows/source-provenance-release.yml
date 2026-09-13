@@ -1,0 +1,88 @@
+name: phase1-source-provenance-release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [phase1/configurable-buzzer-gpio]
+    paths:
+      - '.github/workflows/source-provenance-release.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-test-tag-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Compile-check bridge stack
+        run: python -m py_compile ams-shell/bridge/bridge.py ams-shell/bridge/ams_serial.py ams-shell/bridge/ams_crypto.py
+      - name: Restore
+        run: dotnet restore ams-shell/AMS.sln
+      - name: Build Release
+        run: dotnet build ams-shell/AMS.sln -c Release --no-restore
+      - name: Build TestRunner
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force tests/bin, tests/obj -ErrorAction SilentlyContinue
+          dotnet build tests/TestRunner.csproj -c Release
+      - name: Run TestRunner
+        shell: pwsh
+        run: |
+          dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object ci-test-output.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (Select-String -Path ci-test-output.txt -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
+      - name: Package prerelease
+        shell: pwsh
+        run: |
+          $out = 'ams-shell/src/Ams.UI/bin/Release/net8.0-windows'
+          Remove-Item -Recurse -Force "$out/bridge/__pycache__" -ErrorAction SilentlyContinue
+          Compress-Archive -Path "$out/*" -DestinationPath 'Classroom-Studio-phase1-keyboard-accepted.zip' -Force
+          (Get-FileHash Classroom-Studio-phase1-keyboard-accepted.zip -Algorithm SHA256).Hash | Out-File sha256.txt -Encoding ascii
+      - name: Remove one-shot workflow and tag final source
+        id: source
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/source-provenance-release.yml
+          git commit -m 'Remove one-shot provenance release workflow'
+          git push origin HEAD:phase1/configurable-buzzer-gpio
+          $sha = (git rev-parse HEAD).Trim()
+          git tag -a 'phase1-keyboard-accepted-20260913' -m 'Phase 1 keyboard guard hardware accepted'
+          git push origin 'refs/tags/phase1-keyboard-accepted-20260913'
+          "sha=$sha" >> $env:GITHUB_OUTPUT
+      - name: Prepare release notes
+        shell: pwsh
+        run: |
+          $results = (Select-String -Path ci-test-output.txt -Pattern '=== Results' | Select-Object -Last 1).Line
+          @(
+            '**Purpose:** provenance-correct Phase 1 keyboard-accepted prerelease',
+            '',
+            "**Source SHA:** ${{ steps.source.outputs.sha }}",
+            '',
+            '**Hardware:** held-key cleanup and randomized Down/Up timing accepted on Windows',
+            '',
+            '**Compatibility:** legacy .amsj pipeline migration fixed and regression-covered',
+            '',
+            "**Tests:** $results",
+            '',
+            "**SHA256:** $(Get-Content sha256.txt -Raw)"
+          ) | Out-File release_body.md -Encoding utf8
+      - name: Publish provenance-correct prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: phase1-keyboard-accepted-20260913
+          name: 'Phase 1 keyboard accepted — 2026-09-13'
+          body_path: release_body.md
+          prerelease: true
+          files: |
+            Classroom-Studio-phase1-keyboard-accepted.zip
+            sha256.txt
+            ci-test-output.txt

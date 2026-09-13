@@ -1,11 +1,12 @@
-mouse reliability v2 2026-09-13T21:12:25.4357793+00:00
+mouse reliability final 2026-09-13T21:16:07.6958940+00:00
+firmware compatibility version preserved
 mouse reliability patch v2 applied
   Determining projects to restore...
-  Restored D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI.csproj (in 5.69 sec).
-D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_uayvuwxr_wpftmp.csproj]
-D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_uayvuwxr_wpftmp.csproj]
-D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_uayvuwxr_wpftmp.csproj]
-D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2576,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_uayvuwxr_wpftmp.csproj]
+  Restored D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI.csproj (in 5.9 sec).
+D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_ew5x5zpa_wpftmp.csproj]
+D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_ew5x5zpa_wpftmp.csproj]
+D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_ew5x5zpa_wpftmp.csproj]
+D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2576,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_ew5x5zpa_wpftmp.csproj]
 D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI.csproj]
@@ -14,10 +15,10 @@ D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2576,52): warn
 
 Build succeeded.
 
-D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_uayvuwxr_wpftmp.csproj]
-D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_uayvuwxr_wpftmp.csproj]
-D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_uayvuwxr_wpftmp.csproj]
-D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2576,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_uayvuwxr_wpftmp.csproj]
+D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_ew5x5zpa_wpftmp.csproj]
+D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_ew5x5zpa_wpftmp.csproj]
+D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_ew5x5zpa_wpftmp.csproj]
+D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2576,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_ew5x5zpa_wpftmp.csproj]
 D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI.csproj]
 D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI.csproj]
@@ -25,7 +26,7 @@ D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2576,52): warn
     8 Warning(s)
     0 Error(s)
 
-Time Elapsed 00:00:36.60
+Time Elapsed 00:00:29.65
 D:\a\smc-1\smc-1\tests\TestRunner.cs(585,27): warning CS8602: Dereference of a possibly null reference. [D:\a\smc-1\smc-1\tests\TestRunner.csproj]
 PASS: raiseError definition exists with a message field
 PASS: waitForSound exposes a per-step timeout policy
@@ -38,8 +39,8 @@ PASS: Launch recovery action becomes available in the Launch tab
 PASS: mouseClick command correct (got: MCLICK|left,1)
 PASS: mouseMove command correct (got: MMOVE|100,200,abs,1)
 PASS: typeText secret produces CLIPBOARD cmd (got: CLIPBOARD:secret123, KCOMBO|162+86)
-PASS: typeText word humanize inserts DLY (got: KTEXT|25,70,hello , DLY|112, KTEXT|25,70,world , DLY|121, KTEXT|25,70,foo)
-PASS: typeText 'hello world foo': 3 KTEXT + 2 DLY (got 3KTEXT/2DLY, cmds: KTEXT|25,70,hello  | DLY|112 | KTEXT|25,70,world  | DLY|121 | KTEXT|25,70,foo)
+PASS: typeText word humanize inserts DLY (got: KTEXT|25,70,hello , DLY|150, KTEXT|25,70,world , DLY|108, KTEXT|25,70,foo)
+PASS: typeText 'hello world foo': 3 KTEXT + 2 DLY (got 3KTEXT/2DLY, cmds: KTEXT|25,70,hello  | DLY|150 | KTEXT|25,70,world  | DLY|108 | KTEXT|25,70,foo)
 PASS: typeText no word humanize: no DLY (got: KTEXT|25,70,hello world)
 PASS: punctuation pauses fire after ',' and '.' mid-line (got 2×DLY|200)
 PASS: punctuation splitting preserves the exact source text (got "Hi, ok. Bye")
@@ -67,9 +68,9 @@ PASS: Find Image and Mouse Position carry the tunable human-move fields with hid
 PASS: 150 fuzzed humanized moves all land EXACTLY on the chosen target (0 missed)
 PASS: all fuzzed paths stay on screen (0 escapes)
 INFO(CI): two 300ms branches overlapped, elapsed 404ms
-PASS: parallel group join blocks until the longest branch finishes (elapsed 568ms, floor 400)
-INFO(CI): longest-branch join elapsed 568ms (≈450 nominal)
-PASS: the step AFTER a parallel group runs only after the join (elapsed 447ms)
+PASS: parallel group join blocks until the longest branch finishes (elapsed 740ms, floor 400)
+INFO(CI): longest-branch join elapsed 740ms (≈450 nominal)
+PASS: the step AFTER a parallel group runs only after the join (elapsed 424ms)
 PASS: two branches truly overlapped on the bridge (max in-flight 2 ≥ 2)
 PASS: outside a parallel group commands stay strictly sequential
 PASS: inside a parallel group the mouse is app-paced per-point (interleaves with typing)
@@ -160,7 +161,7 @@ PASS: move time bounded (worst 2775 ms over 500 draws)
 PASS: speed max 0 = firmware-paced move (no app delays)
 PASS: legacy randomMousePosition props get the human defaults
 PASS: legacy/default fixed curve 30 migrates automatically to dynamic 15–45 range
-PASS: word chunk keeps its trailing space (got: KTEXT|25,70,hello  | DLY|158 | KTEXT|25,70,world)
+PASS: word chunk keeps its trailing space (got: KTEXT|25,70,hello  | DLY|132 | KTEXT|25,70,world)
 PASS: typeText Persian auto-fallback (got: CLIPBOARD:آمار دست واقع شما, KCOMBO|162+86)
 PASS: curvePct=0 path is nearly straight (max perp dev 0.00% < 2%)
 PASS: curvePct=100 is visibly curvier (0.33% vs 0.00%)
@@ -234,8 +235,8 @@ PASS: generated script carries the per-step duration range
 PASS: generated script samples a fresh duration target per move
 PASS: generated script emits word pauses as app-side Step-Delay
 PASS: generated script never sends app-side DLY to the board
-PASS: randomMousePosition streams one dense path (calls=1, pts=86)
-PASS: stream ends inside the region (got 358,223)
+PASS: randomMousePosition streams one dense path (calls=1, pts=58)
+PASS: stream ends inside the region (got 372,355)
 PASS: old bridge falls back to human=1 control points
 
 --- v0.9.16: seeded GetCommands ---
@@ -588,7 +589,7 @@ PASS: v0.9.45: nested loops receive their own Next recursively
 PASS: v0.9.45: add/edit/open/import/paste paths create or heal Next markers
 PASS: v0.9.45: the loop vein closes on its visible Next row
 PASS: v0.9.45: loop + Next are atomic for delete/cut/copy; Next cannot be orphaned
-FAIL: v0.9.45: app version, banner and Pico bundle version match
+PASS: v0.9.45: app version, banner and Pico bundle version match
 
 --- Step 46: v0.9.46 cursor geometry · per-step keyboard routing · Next inset ---
 PASS: v0.9.46: rail watcher compares the real cursor with host/popup screen rectangles
@@ -608,7 +609,7 @@ PASS: v0.9.46→47→55: the summary inset is back, marker rows only (Step 55)
 PASS: v0.9.46: Next label leaves row depth/numbering and the red vein hierarchy unchanged
 PASS: v0.9.46: RunEngine routes per step using the live board identity
 PASS: v0.9.46: all four new step fields have Persian labels
-FAIL: v0.9.46: app version, banner and Pico bundle version match
+PASS: v0.9.46: app version, banner and Pico bundle version match
 
 --- Step 47: v0.9.47 Next label alignment with the scope head ---
 PASS: v0.9.47→55: FlatStepRow defines a marker-only summary inset again
@@ -619,7 +620,7 @@ PASS: v0.9.47: the 14px toggle column is fixed, so every summary text starts at 
 PASS: v0.9.47: Next is still the loop's own sibling closing row, not a child
 PASS: v0.9.47: the red vein still closes on the visible Next row
 PASS: v0.9.47: row numbering and depth model are unchanged
-FAIL: v0.9.47: app version, banner and Pico bundle version match
+PASS: v0.9.47: app version, banner and Pico bundle version match
 
 --- Step 48: v0.9.48 Next everywhere, atomic drag unit, edge auto-scroll, collapsed Options tabs ---
 PASS: v0.9.48: a Parallel Group without a closing row receives its # Next
@@ -634,7 +635,7 @@ PASS: v0.9.48: a drag moves the container together with its # Next row — never
 PASS: v0.9.48: drops onto marker rows resolve inside the block, so no marker can be detached by a drop
 PASS: v0.9.48: the list auto-scrolls near its edges during a drag, so a bottom row can reach the top
 PASS: v0.9.48: inactive Options tabs are Collapsed — Hidden kept reserving their height and stretched the dialog
-FAIL: v0.9.48: app version, banner and Pico bundle version match
+PASS: v0.9.48: app version, banner and Pico bundle version match
 
 --- Step 49: v0.9.49 direction-aware plain-row drops + docked Options dialog ---
 PASS: v0.9.49: the reported case — the row below dropped onto the middle of the row above inserts BEFORE it (no silent no-op)
@@ -646,7 +647,7 @@ PASS: v0.9.49: MoveNode decides a plain-row middle drop by drag direction
 PASS: v0.9.49: plain rows split the drop band 50/50 — only containers and Else rows keep the middle band
 PASS: v0.9.49: the Options dialog docks to the owner's right edge instead of floating
 PASS: v0.9.49: the Options layout pins the buttons to the bottom of the docked dialog
-FAIL: v0.9.49: app version, banner and Pico bundle version match
+PASS: v0.9.49: app version, banner and Pico bundle version match
 PASS: v0.9.50: bundled Caterina.hex parses to a 32 KB image carrying the stock AMS identity 0x1D50
 PASS: v0.9.50: patched HEX is byte-identical to the original tool (golden sha256, Microchip identity)
 PASS: v0.9.50: device descriptor carries VID 04D8 / PID 000A with CDC class and string indexes
@@ -663,7 +664,7 @@ PASS: v0.9.50: Caterina.hex and isp_flash.py are bundled and locatable from the 
 PASS: v0.9.50: the three board-preparation services exist with their core APIs
 PASS: v0.9.50: the board preparation window has the Persian tabs
 PASS: v0.9.50: the Tools menu opens the board preparation window
-FAIL: v0.9.50→51: app version, banner and Pico bundle version match
+PASS: v0.9.50→51: app version, banner and Pico bundle version match
 PASS: v0.9.51: PortNumber parses COM names case-insensitively
 PASS: v0.9.51: PortNumber rejects empty, zero and non-COM names
 PASS: v0.9.51: ComDB bit for COM17 cleared, COM1/COM2 untouched
@@ -696,7 +697,7 @@ PASS: v0.9.52: board specs are entered once in step 1 and mirrored into step 2
 PASS: v0.9.52: the identity list carries the six classroom devices schools hand to students
 PASS: v0.9.52: Pico, LEGO SPIKE and Circuit Playground use their real USB identities
 PASS: v0.9.52: checkup recognises the new devices in both bootloader and application mode
-FAIL: v0.9.52: version pins for this release (csproj + banner + bundle)
+PASS: v0.9.52: version pins for this release (csproj + banner + bundle)
 --- Step 53: PnP presence detection + COM-history deletion ladder ---
 PASS: v0.9.53: a scan row is turned into the PnP device instance id cfgmgr32 and pnputil expect
 PASS: v0.9.53: an incomplete row yields no instance id instead of a broken one
@@ -762,7 +763,7 @@ PASS: v0.9.55: the port scan lists attached ports only, like the reference tool
 PASS: v0.9.55: history rows are still available behind the switch
 PASS: v0.9.55: the scan log line counts attached ports and hidden history separately
 PASS: v0.9.55: the checkup tab has a history switch and re-renders without a new scan
-FAIL: v0.9.55: version pins for this release (csproj + banner + bundle)
+PASS: v0.9.55: version pins for this release (csproj + banner + bundle)
 PASS: v0.9.55: all twenty keyboard identities are selectable device modes
 PASS: v0.9.55: every keyboard preset keeps its researched VID/PID and stays CDC (class 0x02)
 PASS: v0.9.55: selecting a keyboard prefills the board-spec defaults (product + manufacturer)
@@ -782,14 +783,14 @@ PASS: v0.9.55: a renamed head shows icon + custom title and keeps its informativ
 PASS: v0.9.55: the group-title field has a Persian label
 PASS: v0.9.55: markers render as bare lowercase next/else while real comments keep the # prefix
 PASS: v0.9.55: marker rows reclaim the toggle gutter and sit tighter against the red vein
-FAIL: v0.9.55: version pins for this release (csproj + banner + bundle)
+PASS: v0.9.55: version pins for this release (csproj + banner + bundle)
 
 --- Step 56: v0.9.56 UART GP0/GP1 -> GP16/GP17 ---
 PASS: v0.9.56: firmware uses GP16/GP17 for UART arm
 PASS: v0.9.56: old GP0/GP1 UART pins are gone from firmware exporter
 PASS: v0.9.56: generated header comment mentions GP16 = TX and GP17 = RX
 PASS: v0.9.56: BH1750 I2C pins untouched (GP21/GP20)
-FAIL: v0.9.56: BundleVersion is 0.9.64f
+PASS: v0.9.56: BundleVersion is 0.9.64f
 PASS: v0.9.56: exported code.py carries GP16/GP17
 PASS: v0.9.56: exported code.py does not contain board.GP0
 PASS: v0.9.56: boot.py still enables CDC console+data
@@ -824,14 +825,14 @@ PASS: v0.9.58: all app version pins match current release 0.9.67 (found: 67)
 PASS: v0.9.58: all bundle pins stay on the untouched firmware line 0.9.64b (found: 64)
 
 --- Step 58: v0.9.60 firmware consolidation + transport hardening ---
-FAIL: v0.9.60: version pins (firmware bundle, csproj, app banner)
+PASS: v0.9.60: version pins (firmware bundle, csproj, app banner)
 PASS: v0.9.60: WLUX/TRGLUX/LCAL answer ERR|NOSENSOR when the BH1750 is unplugged
 PASS: v0.9.60: the standalone engine never autoruns on boot (AUTOSTART=False)
 PASS: v0.9.60: fixed keypad GP4 = Num Lock start/stop, GP3 = Scroll Lock pause/resume
 PASS: v0.9.60: serial RX uses a bounded byte buffer, not string concatenation
 PASS: v0.9.60: permanent arm pump + fire-and-ack mouse path
 PASS: v0.9.60: keyboard always on the Pico; both legacy envelopes are consumed locally
-FAIL: v0.9.60: exported code.py is fully baked with the fixed control contract
+PASS: v0.9.60: exported code.py is fully baked with the fixed control contract
 PASS: v0.9.60: bridge stdio is forced to UTF-8 with an ASCII-safe emit fallback
 PASS: v0.9.60: the C# side reads the bridge as UTF-8 too
 PASS: v0.9.60: the serial log allows Ctrl/Shift multi-selection for copy-selected
@@ -909,8 +910,9 @@ PASS: v0.9.66: all embedded split runtime modules are byte-identical to generate
 PASS: v0.9.65: the plan exporter targets the current firmware bundle line (PLAN|2)
 PASS: v0.9.65: Export writes plan.txt + plan_engine.py + README-PLAN.md
 PASS: v0.9.65: the written bundle carries the plan and the real engine
-Unhandled exception. System.IO.InvalidDataException: Firmware پایه h6 مورد انتظار پیدا نشد: pico-light 0.9.64f
-   at Ams.UI.Services.AutoCycleFirmwareBundle.PatchCode(String code, String manifestPath) in D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\AutoCycleFirmwareBundle.cs:line 26
+Unhandled exception. System.IO.InvalidDataException: قالب firmware با قرارداد چرخه همگام نیست (anchor missing):         line = raw.decode("utf-8", "replace").strip()
+   at Ams.UI.Services.AutoCycleFirmwareBundle.ReplaceOnce(String text, String oldText, String newText) in D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\AutoCycleFirmwareBundle.cs:line 82
+   at Ams.UI.Services.AutoCycleFirmwareBundle.PatchCode(String code, String manifestPath) in D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\AutoCycleFirmwareBundle.cs:line 27
    at Ams.UI.Services.AutoCycleFirmwareBundle.Export(String codePyPath, IEnumerable`1 steps, String machine, String loopMode, Int32 loopCount, Int32 loopSeconds, Boolean keyboardOnArm) in D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\AutoCycleFirmwareBundle.cs:line 15
    at TestRunner.Main() in D:\a\smc-1\smc-1\tests\TestRunner.cs:line 4063
 FAILED exit=-532462766

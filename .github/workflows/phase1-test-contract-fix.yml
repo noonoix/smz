@@ -1,6 +1,6 @@
 name: phase1-test-contract-fix
 
-# trigger PR-based fixer installed on main
+# trigger corrected PR fixer installed on main
 on: [push]
 
 permissions:

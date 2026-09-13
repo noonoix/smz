@@ -1,0 +1,53 @@
+name: Phase 1 migration v6
+
+on:
+  push:
+    branches: [phase1/configurable-buzzer-gpio]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply AutoCycle buzzer propagation
+        shell: bash
+        run: |
+          set +e
+          python3 - <<'PY'
+          from pathlib import Path
+          log=[]
+          def note(x): print(x); log.append(x)
+          try:
+              p=Path('ams-shell/src/Ams.UI/Services/AutoCycleFirmwareBundle.cs')
+              s=p.read_text(encoding='utf-8')
+              old='        const string planGp6="tone = pwmio.PWMOut(board.GP6, duty_cycle=0,\\n                                frequency=int(freq)";'
+              new='        var planGp6="tone = pwmio.PWMOut(board."+BuzzerGpioPolicy.Require(AppSettings.Load().BuzzerGpio)+", duty_cycle=0,\\n                                frequency=int(freq)";'
+              note('planGp6 matches='+str(s.count(old)))
+              if s.count(old)!=1: raise RuntimeError('planGp6 anchor mismatch')
+              s=s.replace(old,new,1)
+              anchor='        return code;\n    }\n    private static string NormalizeBuzzerForManifest'
+              replacement='        code=code.Replace("tone = pwmio.PWMOut(board.GP6,","tone = pwmio.PWMOut(board."+BuzzerGpioPolicy.Require(AppSettings.Load().BuzzerGpio)+",",StringComparison.Ordinal);\n        return code;\n    }\n    private static string NormalizeBuzzerForManifest'
+              note('selected-pin anchor matches='+str(s.count(anchor)))
+              if s.count(anchor)!=1: raise RuntimeError('selected-pin anchor mismatch')
+              s=s.replace(anchor,replacement,1)
+              p.write_text(s,encoding='utf-8')
+              note('SUCCESS')
+              Path('phase1-v6-debug.txt').write_text('\n'.join(log)+'\n',encoding='utf-8')
+              raise SystemExit(0)
+          except Exception as e:
+              note('ERROR '+repr(e))
+              Path('phase1-v6-debug.txt').write_text('\n'.join(log)+'\n',encoding='utf-8')
+              raise
+          PY
+          rc=$?
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add phase1-v6-debug.txt
+          if [ "$rc" -eq 0 ]; then git add ams-shell/src/Ams.UI/Services/AutoCycleFirmwareBundle.cs; git commit -m "feat: propagate selected buzzer GPIO through AutoCycle"; else git commit -m "ci: record AutoCycle phase one diagnostics" || true; fi
+          git push origin HEAD:phase1/configurable-buzzer-gpio || true
+          exit $rc

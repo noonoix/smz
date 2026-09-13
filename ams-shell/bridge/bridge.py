@@ -281,6 +281,24 @@ def _ktext_timeout(cmd, default):
         return default
 
 
+def _mclick_timeout(cmd, default):
+    """Allow completion of count x randomized physical holds."""
+    if not cmd.startswith("MCLICK|"):
+        return default
+    try:
+        fields = cmd.split("|", 1)[1].split(",")
+        count = max(1, int(fields[1])) if len(fields) > 1 else 1
+        hmin = max(0, int(fields[2])) if len(fields) > 2 else 45
+        hmax = max(hmin, int(fields[3])) if len(fields) > 3 else hmin
+        return max(default, 2.0 + (count * hmax + max(0, count - 1) * 140) / 1000.0)
+    except Exception:
+        return default
+
+
+def _command_timeout(cmd, default):
+    return max(_ktext_timeout(cmd, default), _mclick_timeout(cmd, default))
+
+
 def open_link(port):
     """v0.9.59 — مغز پیکو اول، بازوی رمزشده به‌عنوان fallback.
 
@@ -378,7 +396,7 @@ def main():
                         link._send(cmd)
                         reply = "OK|MMOVE"      # local ack, same contract as send_path
                     else:
-                        reply = link.command(cmd, timeout=_ktext_timeout(cmd, req.get("timeout", 5.0)))
+                        reply = link.command(cmd, timeout=_command_timeout(cmd, req.get("timeout", 5.0)))
                     if abort_flag.is_set():
                         # پاسخِ فرمانِ متوقف‌شده reply نمی‌شود تا جفت‌کردن
                         # پاسخ‌ها در سمت WPF به‌هم نریزد (انتظار قبلی cancel شده).

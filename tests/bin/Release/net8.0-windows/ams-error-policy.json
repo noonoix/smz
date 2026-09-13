@@ -1,0 +1,16 @@
+{
+  "FatalAlarmEnabled": true,
+  "AlarmSource": "both",
+  "RepeatAlarm": true,
+  "AlarmDurationSeconds": 0,
+  "TimeoutPolicy": "stopWithAlarm",
+  "ErrorHistoryLimit": 20,
+  "ErrorHistory": [
+    {
+      "Time": "2026-09-13T21:52:04.4221996+00:00",
+      "Source": "step",
+      "Message": "fixture",
+      "Tab": ""
+    }
+  ]
+}

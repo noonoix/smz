@@ -21,14 +21,55 @@ public static class AutoCycleFirmwareBundle
     {
         code=code.Replace("\r\n","\n").Replace('\r','\n');
         code=NormalizeBuzzerForManifest(code);
+        code=NormalizeMouseReliabilityForManifest(code);
         var manifest=JsonSerializer.Deserialize<PatchDocument>(File.ReadAllText(manifestPath),new JsonSerializerOptions { PropertyNameCaseInsensitive = true })??throw new InvalidDataException("manifest چرخه قابل خواندن نیست.");
         if(manifest.Version!=1||manifest.Edits.Count==0)throw new InvalidDataException("نسخه یا محتوای manifest چرخه معتبر نیست.");
         if(!code.Contains(manifest.Baseline,StringComparison.Ordinal))throw new InvalidDataException("Firmware پایه h6 مورد انتظار پیدا نشد: "+manifest.Baseline);
         foreach(var edit in manifest.Edits)code=ReplaceOnce(code,edit.Old,edit.New);
         code=PreserveKtextWhitespace(code);
+        code=ApplyMouseReliabilityAfterManifest(code);
         foreach(var marker in RequiredMarkers)if(!code.Contains(marker,StringComparison.Ordinal))throw new InvalidDataException("پست‌کاندیشن Firmware چرخه پیدا نشد: "+marker);
         code=code.Replace("tone = pwmio.PWMOut(board.GP6,","tone = pwmio.PWMOut(board."+BuzzerGpioPolicy.Require(AppSettings.Load().BuzzerGpio)+",",StringComparison.Ordinal);
         return code;
+    }
+    // The AutoCycle manifest intentionally targets the accepted 0.9.64f baseline.
+    // Normal export now hardens MCLICK/HOSTUSB first, so temporarily normalize only those
+    // fragments, apply the manifest, then reapply the reliability contract to its output.
+    private static string NormalizeMouseReliabilityForManifest(string code)
+    {
+        code=code.Replace("FAST_MOUSE_PREFIXES = (\"MMOVE\", \"MWHEEL\", \"MDOWN\", \"MUP\")",
+                          "MOUSE_PREFIXES = (\"MMOVE\", \"MCLICK\", \"MWHEEL\", \"MDOWN\", \"MUP\")",StringComparison.Ordinal);
+        code=RequireReplace(code,"parts[1] in FAST_MOUSE_PREFIXES","parts[1] in MOUSE_PREFIXES","normal mouse ACK filter");
+        code=code.Replace("_last_hostusb_event = [None]  # forward identical HOSTUSB heartbeats once\n","",StringComparison.Ordinal);
+        const string reliableEvent="        if line.startswith(\"EVT|\"):\n            if line.startswith(\"EVT|HOSTUSB|\"):\n                if line == _last_hostusb_event[0]:\n                    continue\n                _last_hostusb_event[0] = line\n            _serial_write_line(line)              # changed events reach the PC once\n            continue";
+        const string legacyEvent="        if line.startswith(\"EVT|\"):\n            _serial_write_line(line)              # arm events reach the PC live\n            continue";
+        code=RequireReplace(code,reliableEvent,legacyEvent,"normal HOSTUSB baseline");
+        var helperStart=code.IndexOf("def _mclick_timeout(line):",StringComparison.Ordinal);
+        var sampleStart=helperStart>=0?code.IndexOf("def sample():",helperStart,StringComparison.Ordinal):-1;
+        if(helperStart<0||sampleStart<0)throw new InvalidDataException("MCLICK timeout helper baseline پیدا نشد.");
+        code=code.Remove(helperStart,sampleStart-helperStart);
+        const string reliableDispatch="    if head == \"MCLICK\":\n        return forward_to_arm(line, _mclick_timeout(line))\n    if head in FAST_MOUSE_PREFIXES:\n        return forward_fast(line)\n    if head in ARM_PREFIXES:";
+        const string legacyDispatch="    if head in MOUSE_PREFIXES:\n        return forward_fast(line)\n    if head in ARM_PREFIXES:";
+        code=RequireReplace(code,reliableDispatch,legacyDispatch,"normal MCLICK dispatch");
+        return code;
+    }
+    private static string ApplyMouseReliabilityAfterManifest(string code)
+    {
+        code=RequireReplace(code,
+            "MOUSE_PREFIXES = (\"MMOVE\", \"MCLICK\", \"MWHEEL\", \"MDOWN\", \"MUP\")",
+            "FAST_MOUSE_PREFIXES = (\"MMOVE\", \"MWHEEL\", \"MDOWN\", \"MUP\")","cycle mouse prefixes");
+        code=RequireReplace(code,"parts[1] in MOUSE_PREFIXES","parts[1] in FAST_MOUSE_PREFIXES","cycle mouse ACK filter");
+        const string helper="def _mclick_timeout(line):\n    \"\"\"Physical-completion timeout for all randomized holds and inter-click gaps.\"\"\"\n    try:\n        fields = line.split(\"|\", 1)[1].split(\",\")\n        count = max(1, int(fields[1])) if len(fields) > 1 else 1\n        hmin = max(0, int(fields[2])) if len(fields) > 2 else 45\n        hmax = max(hmin, int(fields[3])) if len(fields) > 3 else hmin\n        return max(5.0, 2.0 + (count * hmax + max(0, count - 1) * 140) / 1000.0)\n    except Exception:\n        return 5.0\n\n\n";
+        code=RequireReplace(code,"def sample():",helper+"def sample():","cycle MCLICK timeout helper");
+        const string legacyDispatch="    if head in MOUSE_PREFIXES:\n        return forward_fast(line)\n    if head in ARM_PREFIXES:";
+        const string reliableDispatch="    if head == \"MCLICK\":\n        return forward_to_arm(line, _mclick_timeout(line))\n    if head in FAST_MOUSE_PREFIXES:\n        return forward_fast(line)\n    if head in ARM_PREFIXES:";
+        code=RequireReplace(code,legacyDispatch,reliableDispatch,"cycle MCLICK dispatch");
+        return code;
+    }
+    private static string RequireReplace(string text,string oldText,string newText,string label)
+    {
+        if(text.CountOccurrences(oldText)!=1)throw new InvalidDataException("قرارداد "+label+" یکتا نیست.");
+        return text.Replace(oldText,newText,StringComparison.Ordinal);
     }
     // A KTEXT payload may intentionally end with a literal space: in typo-correction
     // mode the planner flushes the text before the slip and then retypes the remainder.

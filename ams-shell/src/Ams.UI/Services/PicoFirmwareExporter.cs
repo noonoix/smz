@@ -401,7 +401,7 @@ public static class PicoFirmwareExporter
         # Commands that are not the brain's own job: forwarded to the Pro Micro arm.
         ARM_PREFIXES = ("MMOVE", "MCLICK", "MWHEEL", "MDOWN", "MUP", "SETRES", "WSND", "TRGSND", "SCAL")
         # v0.9.60 - mouse goes fire-and-ack (smooth dense paths); the rest waits for the arm reply.
-        MOUSE_PREFIXES = ("MMOVE", "MCLICK", "MWHEEL", "MDOWN", "MUP")
+        FAST_MOUSE_PREFIXES = ("MMOVE", "MWHEEL", "MDOWN", "MUP")
         # Keyboard commands: ALWAYS typed locally by this Pico (final contract).
         KBD_PREFIXES = ("KTEXT", "KCOMBO", "KDOWN", "KUP")
 
@@ -451,6 +451,7 @@ public static class PicoFirmwareExporter
 
 
         _arm_buf = bytearray()
+        _last_hostusb_event = [None]  # forward identical HOSTUSB heartbeats once
         _arm_lag = 0          # v0.9.60c - MMOVEs written to the arm minus the arm's OK|MMOVE acks
         _pending_move = None  # v0.9.60c - newest coalesced absolute MMOVE while the arm is behind
         _held_buttons = set()  # v0.9.64b - mouse buttons the Pico itself drove down and has not released
@@ -509,7 +510,11 @@ public static class PicoFirmwareExporter
                 if not line:
                     continue
                 if line.startswith("EVT|"):
-                    _serial_write_line(line)              # arm events reach the PC live
+                    if line.startswith("EVT|HOSTUSB|"):
+                        if line == _last_hostusb_event[0]:
+                            continue
+                        _last_hostusb_event[0] = line
+                    _serial_write_line(line)              # changed events reach the PC once
                     continue
                 if line.startswith("ERR|NOFRAME"):
                     # v0.9.64e - arm fw 2.4 refused a line with no integrity frame. This is
@@ -530,7 +535,7 @@ public static class PicoFirmwareExporter
                     print("arm: CKSUM drop #%d (line rejected, not executed)" % _cksum_errors)
                     continue
                 parts = line.split("|")
-                if len(parts) > 1 and parts[0] == "OK" and parts[1] in MOUSE_PREFIXES:
+                if len(parts) > 1 and parts[0] == "OK" and parts[1] in FAST_MOUSE_PREFIXES:
                     if parts[1] == "MMOVE":               # v0.9.60c - the arm caught up one move
                         _arm_last_ack = time.monotonic()  # v0.9.62 - feed the ack watchdog
                         if _arm_lag > 0:
@@ -711,6 +716,18 @@ public static class PicoFirmwareExporter
             return reply
 
 
+        def _mclick_timeout(line):
+            """Physical-completion timeout for all randomized holds and inter-click gaps."""
+            try:
+                fields = line.split("|", 1)[1].split(",")
+                count = max(1, int(fields[1])) if len(fields) > 1 else 1
+                hmin = max(0, int(fields[2])) if len(fields) > 2 else 45
+                hmax = max(hmin, int(fields[3])) if len(fields) > 3 else hmin
+                return max(5.0, 2.0 + (count * hmax + max(0, count - 1) * 140) / 1000.0)
+            except Exception:
+                return 5.0
+        
+        
         def sample():
             window.append(sensor.lux())
             if len(window) > 5:
@@ -960,7 +977,9 @@ public static class PicoFirmwareExporter
             head = line.split("|")[0]
             if head in KBD_PREFIXES:
                 return handle_keyboard(line, head)
-            if head in MOUSE_PREFIXES:
+            if head == "MCLICK":
+                return forward_to_arm(line, _mclick_timeout(line))
+            if head in FAST_MOUSE_PREFIXES:
                 return forward_fast(line)
             if head in ARM_PREFIXES:
                 if head == "SETRES":
@@ -1026,7 +1045,7 @@ public static class PicoFirmwareExporter
                 line = "MCLICK|%s,%d" % (btn, count)
                 if hmax > 0:
                     line += ",%d,%d" % (hmin, hmax)
-                forward_fast(line)
+                return self._ok(forward_to_arm(line, _mclick_timeout(line)), "MCLICK")
 
             def ktext(self, hmin, hmax, text):
                 _typed = handle_keyboard("KTEXT|%d,%d,%s" % (hmin, hmax, text), "KTEXT", True)

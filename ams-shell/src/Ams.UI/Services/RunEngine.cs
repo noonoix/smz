@@ -188,6 +188,17 @@ public sealed class RunEngine
                     _log("# " + PropEx.GetString(s.Props, "text"));
                     break;
 
+                case "raiseError":
+                {
+                    var message = PropEx.GetString(s.Props, "message", "A deliberate error stopped the macro.").Trim();
+                    if (message.Length == 0) message = "A deliberate error stopped the macro.";
+                    var error = new InvalidOperationException(message);
+                    ErrorPolicyBootstrap.Handle(error, "step", s.Name,
+                        () => Send("BEEP|880,180", ct, quiet: true), forceAlarm: true);
+                    _log("⛔ error step: " + message + " — stopping immediately with alarm");
+                    throw new PolicyStop(alarmed: true);
+                }
+
                 case "findImage":
                 {
                     // v0.7.9 + v0.9.30 — If/Else for Find Image (§3.3.1 completed): found → children
@@ -696,11 +707,17 @@ public sealed class RunEngine
 
     /// <summary>v0.9.39 - WLUX/TRGLUX round trip: the board answers once the lux range held stable
     /// for the configured seconds; ERR|TIMEOUT means the window expired (Else branch).</summary>
+    private static string? StepTimeoutPolicy(StepNode s)
+    {
+        var policy = PropEx.GetString(s.Props, "onTimeout", "global");
+        return policy is "stopWithAlarm" or "stopQuiet" or "continue" ? policy : null;
+    }
+
     private async Task<bool> RunWaitForLightAsync(StepNode s, CancellationToken ct)
     {
         var cmd = StepDefinitions.GetCommands(s)[0];   // WLUX|lo,hi,stableMs,timeout,mode or TRGLUX|...
         int timeoutMs = PropEx.GetInt(s.Props, "timeoutMs", 20000);
-        var reply = await Send(cmd, ct, allowTimeout: true, timeoutSeconds: timeoutMs / 1000.0 + 10);
+        var reply = await Send(cmd, ct, allowTimeout: true, timeoutSeconds: timeoutMs / 1000.0 + 10, timeoutPolicy: StepTimeoutPolicy(s));
         if (reply.StartsWith("EVT|TRGLUX", StringComparison.Ordinal))
             _log("light trigger fired: " + reply);   // armed board-side keypress happened
         bool matched = !reply.StartsWith("ERR|TIMEOUT", StringComparison.Ordinal);
@@ -715,7 +732,7 @@ public sealed class RunEngine
         int timeoutMs = PropEx.GetInt(s.Props, "timeoutMs", 20000);
 
         // command-proportional timeout: window + board overhead (§15.4 rule 4)
-        var reply = await Send(cmd, ct, allowTimeout: true, timeoutSeconds: timeoutMs / 1000.0 + 10);
+        var reply = await Send(cmd, ct, allowTimeout: true, timeoutSeconds: timeoutMs / 1000.0 + 10, timeoutPolicy: StepTimeoutPolicy(s));
         if (reply.StartsWith("EVT|TRG", StringComparison.Ordinal))
             _log("sound trigger fired: " + reply);   // armed board-side click happened (§14.4)
         // v0.9.31 — the If/Else structure needs the outcome: with allowTimeout an ERR|TIMEOUT
@@ -1073,7 +1090,7 @@ public sealed class RunEngine
     }
 
     private async Task<string> Send(string cmd, CancellationToken ct, string? logAs = null,
-                            bool allowTimeout = false, double? timeoutSeconds = null, bool quiet = false)
+                            bool allowTimeout = false, double? timeoutSeconds = null, bool quiet = false, string? timeoutPolicy = null)
     {
         cmd = ResolveKeyboardRouteForTransport(cmd, _picoPresent());
         if (!quiet) _log("→ " + (logAs ?? cmd));
@@ -1084,7 +1101,7 @@ public sealed class RunEngine
             // a sound window expiring is a normal outcome, not a fatal error (§3.3.1 group E)
             if (allowTimeout && reply.StartsWith("ERR|TIMEOUT", StringComparison.Ordinal))
             {
-                var policy = ErrorPolicyBootstrap.Settings.TimeoutPolicy;
+                var policy = timeoutPolicy ?? ErrorPolicyBootstrap.Settings.TimeoutPolicy;
                 if (policy == "continue")
                 {
                     _log("wait window expired (timeout) — continuing by policy");

@@ -53,6 +53,15 @@ public static class StepDefinitions
     private static string StableSecText(StepNode s)
         => PropEx.GetDouble(s.Props, "stableSec", 2).ToString("0.#", CultureInfo.InvariantCulture);
 
+    private static string TimeoutPolicyText(StepNode s)
+        => PropEx.GetString(s.Props, "onTimeout", "global") switch
+        {
+            "stopWithAlarm" => "timeout → alarm + stop",
+            "stopQuiet" => "timeout → quiet stop",
+            "continue" => "timeout → continue",
+            _ => "timeout → global policy",
+        };
+
     private static readonly Dictionary<string, StepDefinition> Defs = new()
     {
         ["mouseClick"] = new StepDefinition
@@ -222,6 +231,21 @@ public static class StepDefinitions
             Summarize = s => $"Delay {PropEx.GetInt(s.Props, "minMs")} to {PropEx.GetInt(s.Props, "maxMs", 333)} ms",
             // PC-side — no board command
         },
+        ["raiseError"] = new StepDefinition
+        {
+            Label = "Raise Error / Stop Macro", ColorResourceKey = "StepErrorBrush", DefaultDelay = 0,
+            Fields = new FieldDef[]
+            {
+                new("message", "Error message", FieldKind.Multiline, "A deliberate error stopped the macro."),
+            },
+            Summarize = s =>
+            {
+                var m = PropEx.GetString(s.Props, "message", "A deliberate error stopped the macro.").Replace('\n', ' ').Trim();
+                if (m.Length > 56) m = m[..56] + "…";
+                return "⛔ Raise Error · " + m;
+            },
+            // PC-side safety step: RunEngine records it, starts the buzzer alarm, and stops immediately.
+        },
         ["forLoop"] = new StepDefinition
         {
             Label = "For Loop", ColorResourceKey = "StepFlowBrush", DefaultDelay = 0, IsContainer = true, IsScopeContainer = true,
@@ -265,6 +289,7 @@ public static class StepDefinitions
                 new("threshold", "Threshold (sensor units — use Calibrate, field default 90)", FieldKind.Int, "90"),
                 new("minDurationMs", "Min duration (ms) — splash is a 1.5–2.2s event, 60–100 is safe (§16.2)", FieldKind.Int, "60"),
                 new("timeoutMs", "Timeout (ms) — legacy system used 20000 (§17.2)", FieldKind.Int, "20000"),
+                new("onTimeout", "On timeout", FieldKind.Combo, "global", new[] { "global", "stopWithAlarm", "stopQuiet", "continue" }),
                 new("insertIfElse", "Insert If-Else (children = Then — heard · Else — not heard; §3.3.1)", FieldKind.Check, "false"),   // v0.9.31
                 new("armed", "Armed reaction: board clicks by itself on detection (TRGSND)", FieldKind.Check, "false", HideWhenKey: "insertIfElse", HideWhenValue: "true"),
                 new("act", "Armed click button", FieldKind.Combo, "left", new[] { "left", "right", "middle" }, HideWhenKey: "insertIfElse", HideWhenValue: "true"),
@@ -274,10 +299,10 @@ public static class StepDefinitions
                 new("holdMax", "Hold max (ms)", FieldKind.Int, "90", HideWhenKey: "insertIfElse", HideWhenValue: "true"),
             },
             Summarize = s => PropEx.GetBool(s.Props, "insertIfElse")
-                ? $"If Sound ≥{PropEx.GetInt(s.Props, "threshold", 90)} · timeout {PropEx.GetInt(s.Props, "timeoutMs", 20000)}ms"   // v0.9.31
+                ? $"If Sound ≥{PropEx.GetInt(s.Props, "threshold", 90)} · timeout {PropEx.GetInt(s.Props, "timeoutMs", 20000)}ms · {TimeoutPolicyText(s)}"   // v0.9.31
                 : PropEx.GetBool(s.Props, "armed")
                     ? $"Sound trigger ≥{PropEx.GetInt(s.Props, "threshold", 90)} → {PropEx.GetString(s.Props, "act", "left")} click (armed)"
-                    : $"Wait for sound ≥{PropEx.GetInt(s.Props, "threshold", 90)} · timeout {PropEx.GetInt(s.Props, "timeoutMs", 20000)}ms",
+                    : $"Wait for sound ≥{PropEx.GetInt(s.Props, "threshold", 90)} · timeout {PropEx.GetInt(s.Props, "timeoutMs", 20000)}ms · {TimeoutPolicyText(s)}",
             Commands = s =>
             {
                 int thr = PropEx.GetInt(s.Props, "threshold", 90);
@@ -307,6 +332,7 @@ public static class StepDefinitions
                 new("stableSec", "Stabilize for N second(s) — may be fractional (e.g. 0.5 = half a second)", FieldKind.Float, "2"),
                 new("sampleMode", "Sensor mode - hires: 1 lux / ~120ms per sample · lowres: 4 lux / ~16ms", FieldKind.Combo, "hires", new[] { "hires", "lowres" }),
                 new("timeoutMs", "Timeout (ms)", FieldKind.Int, "20000"),
+                new("onTimeout", "On timeout", FieldKind.Combo, "global", new[] { "global", "stopWithAlarm", "stopQuiet", "continue" }),
                 new("insertIfElse", "Insert If-Else (children = Then - range matched · Else - not matched)", FieldKind.Check, "false"),
                 new("armed", "Armed reaction: the board presses the key by itself on detection (TRGLUX)", FieldKind.Check, "false", HideWhenKey: "insertIfElse", HideWhenValue: "true"),
                 new("key", "Armed key", FieldKind.Combo, "E", KeyMap.KeyNames.ToArray(), HideWhenKey: "insertIfElse", HideWhenValue: "true"),
@@ -316,10 +342,10 @@ public static class StepDefinitions
                 new("holdMax", "Hold max (ms)", FieldKind.Int, "90", HideWhenKey: "insertIfElse", HideWhenValue: "true"),
             },
             Summarize = s => PropEx.GetBool(s.Props, "insertIfElse")
-                ? $"If Light {LuxLow(s)}-{LuxHigh(s)} lux for {StableSecText(s)}s · timeout {PropEx.GetInt(s.Props, "timeoutMs", 20000)}ms"
+                ? $"If Light {LuxLow(s)}-{LuxHigh(s)} lux for {StableSecText(s)}s · timeout {PropEx.GetInt(s.Props, "timeoutMs", 20000)}ms · {TimeoutPolicyText(s)}"
                 : PropEx.GetBool(s.Props, "armed")
                     ? $"Light trigger {LuxLow(s)}-{LuxHigh(s)} lux -> key {PropEx.GetString(s.Props, "key", "E")} (armed)"
-                    : $"Wait for light {LuxLow(s)}-{LuxHigh(s)} lux for {StableSecText(s)}s · timeout {PropEx.GetInt(s.Props, "timeoutMs", 20000)}ms",
+                    : $"Wait for light {LuxLow(s)}-{LuxHigh(s)} lux for {StableSecText(s)}s · timeout {PropEx.GetInt(s.Props, "timeoutMs", 20000)}ms · {TimeoutPolicyText(s)}",
             Commands = s =>
             {
                 int lo = LuxLow(s), hi = LuxHigh(s);

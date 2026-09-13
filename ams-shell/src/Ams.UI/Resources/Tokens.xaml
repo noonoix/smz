@@ -33,6 +33,7 @@
     <Color x:Key="StepPackageColor">#FFF778BA</Color>
     <!-- playAudio brush — between keyboard (purple) and package (pink) -->
     <Color x:Key="StepAudioColor">#FFB158FF</Color>
+    <Color x:Key="StepErrorColor">#FFF85149</Color>
 
     <!-- Region Picker overlay (section 13.6) -->
     <Color x:Key="RegionPickerColor">#FFFFDF5D</Color>
@@ -60,6 +61,7 @@
     <SolidColorBrush x:Key="StepDelayBrightBrush" Color="{StaticResource StepDelayBrightColor}" />
     <SolidColorBrush x:Key="StepPackageBrush" Color="{StaticResource StepPackageColor}" />
     <SolidColorBrush x:Key="StepAudioBrush" Color="{StaticResource StepAudioColor}" />
+    <SolidColorBrush x:Key="StepErrorBrush" Color="{StaticResource StepErrorColor}" />
 
     <SolidColorBrush x:Key="RegionPickerBrush" Color="{StaticResource RegionPickerColor}" Opacity="0.3" />
 

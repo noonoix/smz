@@ -154,6 +154,7 @@
                 <MenuItem Header="_Find Image On Screen" Command="{Binding AddStepCommand}" CommandParameter="findImage" />
                 <MenuItem Header="_Wait For Sound" Command="{Binding AddStepCommand}" CommandParameter="waitForSound" />
                 <MenuItem Header="Wait For _Light (BH1750)" Command="{Binding AddStepCommand}" CommandParameter="waitForLight" />
+                <MenuItem Header="⛔ Raise Error / Stop Macro" Command="{Binding AddStepCommand}" CommandParameter="raiseError" />
                 <Separator />
                 <MenuItem Header="Open _File / Program" Command="{Binding AddStepCommand}" CommandParameter="openFile" />
                 <MenuItem Header="_Buzzer Beep" Command="{Binding AddStepCommand}" CommandParameter="buzzer" />
@@ -253,6 +254,13 @@
                             <StackPanel>
                                 <TextBlock Text="💡" FontSize="15" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center" Foreground="{StaticResource StepFindImageBrush}" />
                                 <TextBlock Text="Light" FontSize="8" HorizontalAlignment="Center" Foreground="#FFFFFF" Margin="0,1,0,0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource RailButton}" Command="{Binding AddStepCommand}" CommandParameter="raiseError"
+                                ToolTip="⛔ خطای عمدی — ثبت خطا، توقف فوری و هشدار ممتد با بازر">
+                            <StackPanel>
+                                <TextBlock Text="⛔" FontSize="15" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center" Foreground="{StaticResource ErrorBrush}" />
+                                <TextBlock Text="Error" FontSize="8" HorizontalAlignment="Center" Foreground="#FFFFFF" Margin="0,1,0,0" />
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource RailButton}" Command="{Binding AddStepCommand}" CommandParameter="forLoop"
@@ -421,6 +429,8 @@
                             <MenuItem Header="Wait For Sound" CommandParameter="waitForSound"
                                       Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                             <MenuItem Header="Wait For Light (BH1750)" CommandParameter="waitForLight"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="⛔ Raise Error / Stop Macro" CommandParameter="raiseError"
                                       Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                             <Separator />
                             <!-- v0.9.43 — these two were missing from the right-click menu -->

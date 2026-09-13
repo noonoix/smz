@@ -1,23 +1,18 @@
 name: phase1-test-contract-fix
 
-# one-shot trigger after workflow installation
-on:
-  push:
-    branches:
-      - phase1/configurable-buzzer-gpio
+on: [push]
+
+permissions:
+  contents: write
 
 jobs:
   fix:
-    if: "!contains(github.event.head_commit.message, 'fix: update buzzer contract test')"
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Update configurable buzzer assertion
-        shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -41,11 +36,8 @@ jobs:
           p.write_text(s.replace(old, new, 1))
           PY
       - name: Commit fix
-        shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add tests/TestRunner.cs
-          git diff --cached --quiet && exit 0
-          git commit -m "fix: update buzzer contract test"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git diff --cached --quiet || (git commit -m "fix: update buzzer contract test" && git push origin HEAD:${GITHUB_REF_NAME})

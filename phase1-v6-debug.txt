@@ -1,3 +1,2 @@
-planGp6 matches=1
-selected-pin anchor matches=1
-SUCCESS
+planGp6 matches=0
+ERROR RuntimeError('planGp6 anchor mismatch')

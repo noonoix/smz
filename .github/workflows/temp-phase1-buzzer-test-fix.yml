@@ -22,23 +22,23 @@ jobs:
             const branch = context.payload.pull_request.head.ref;
             const path = 'tests/TestRunner.cs';
             const oldText = `        var buzFw = V27ReadSrc(Path.Combine("Services", "PicoFirmwareExporter.cs"));
-            Assert(buzFw.Contains("PWMOut(board.GP6") && !buzFw.Contains("PWMOut(board.GP5") && !buzFw.Contains("board.D9"),
-                "custom buzzer: passive PWM is Pico GP6 only");`;
+        Assert(buzFw.Contains("PWMOut(board.GP6") && !buzFw.Contains("PWMOut(board.GP5") && !buzFw.Contains("board.D9"),
+            "custom buzzer: passive PWM is Pico GP6 only");`;
             const newText = `        var buzFw = V27ReadSrc(Path.Combine("Services", "PicoFirmwareExporter.cs"));
-            var buzGp6 = PicoFirmwareExporter.BuildCodePy(Array.Empty<PicoFirmwareExporter.LightState>(), "TEST", buzzerGpio: "GP6");
-            var buzGp7 = PicoFirmwareExporter.BuildCodePy(Array.Empty<PicoFirmwareExporter.LightState>(), "TEST", buzzerGpio: "GP7");
-            Assert(buzFw.Contains("PWMOut(board.__BUZZER_GPIO__")
-                   && buzGp6.Contains("PWMOut(board.GP6")
-                   && buzGp7.Contains("PWMOut(board.GP7")
-                   && !buzGp7.Contains("PWMOut(board.GP6")
-                   && !buzFw.Contains("PWMOut(board.GP5")
-                   && !buzFw.Contains("board.D9"),
-                "custom buzzer: passive PWM uses the selected Pico GPIO (GP6 default, GP7 supported)");`;
+        var buzGp6 = PicoFirmwareExporter.BuildCodePy(Array.Empty<PicoFirmwareExporter.LightState>(), "TEST", buzzerGpio: "GP6");
+        var buzGp7 = PicoFirmwareExporter.BuildCodePy(Array.Empty<PicoFirmwareExporter.LightState>(), "TEST", buzzerGpio: "GP7");
+        Assert(buzFw.Contains("PWMOut(board.__BUZZER_GPIO__")
+               && buzGp6.Contains("PWMOut(board.GP6")
+               && buzGp7.Contains("PWMOut(board.GP7")
+               && !buzGp7.Contains("PWMOut(board.GP6")
+               && !buzFw.Contains("PWMOut(board.GP5")
+               && !buzFw.Contains("board.D9"),
+            "custom buzzer: passive PWM uses the selected Pico GPIO (GP6 default, GP7 supported)");`;
             const file = await github.rest.repos.getContent({owner, repo, path, ref: branch});
             if (Array.isArray(file.data) || !file.data.content) core.setFailed('TestRunner.cs content was not returned');
             const current = Buffer.from(file.data.content, 'base64').toString('utf8');
             if (!current.includes(oldText)) {
-              core.info('Buzzer contract assertion already updated or exact text not found; no write performed.');
+              core.info('Buzzer assertion already updated or exact text not found; no write performed.');
               return;
             }
             const updated = current.replace(oldText, newText);

@@ -40,7 +40,7 @@ public partial class MainWindow
             if (current is Border border && border.Child is ScrollViewer)
             {
                 var parent = VisualTreeHelper.GetParent(border);
-                if (parent is Grid grid && Grid.GetRow(border) == 0 && Grid.GetColumn(border) == 0)
+                if (parent is Grid && Grid.GetRow(border) == 0 && Grid.GetColumn(border) == 0)
                     return true;
             }
             current = VisualTreeHelper.GetParent(current);

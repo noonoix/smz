@@ -1,0 +1,26 @@
+name: Correct stale step-count assertion
+on:
+  push:
+    branches: [feature/error-step-timeout-ui]
+    paths:
+      - .github/workflows/fix-step-count-assertion.yml
+      - tools/fix-step-count-assertion.py
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Correct assertion
+        run: python3 tools/fix-step-count-assertion.py
+      - name: Commit correction and remove helper
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add tests/TestRunner.cs
+          git rm .github/workflows/fix-step-count-assertion.yml tools/fix-step-count-assertion.py ams-shell/.ci-trigger
+          git commit -m "Correct insertion-surface step-count assertion"
+          git push

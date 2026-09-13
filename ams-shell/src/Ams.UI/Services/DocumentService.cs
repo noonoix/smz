@@ -84,6 +84,8 @@ public static class DocumentService
 /// </summary>
 public sealed class AppSettings
 {
+    public string BuzzerGpio { get; set; } = "GP6";
+
     /// <summary>Default AUTO: BoardLink scans KNOWN_VIDS and finds the board on any COM (§14.3 / §15.5).</summary>
     public string Port { get; set; } = "AUTO";
     public string PythonDir { get; set; } = "";

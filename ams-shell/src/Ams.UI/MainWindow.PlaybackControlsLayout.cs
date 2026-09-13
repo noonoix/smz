@@ -30,6 +30,8 @@ internal static class PlaybackControlsLayoutBootstrap
         if (sender is not MainWindow window || window.GetValue(InstalledProperty) is true) return;
         if (window.DataContext is not MainViewModel vm) return;
 
+        vm.InstallPlaybackStateGuard();
+
         var runButton = FindDescendants<ButtonBase>(window)
             .FirstOrDefault(button => ReferenceEquals(button.Command, vm.RunCommand));
         if (runButton?.Parent is not StackPanel playback || playback.Parent is not DockPanel host) return;

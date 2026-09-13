@@ -6,61 +6,66 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Threading;
 
 namespace Ams.UI.Services;
 
 /// <summary>
-/// v0.9.3 — OS-level global hotkeys for Run / Stop / Pause / Resume (fire even when the
-/// app window has no focus), via RegisterHotKey + WPF's HwndSource.AddHook.
-///
-/// STARTUP-CRASH FIX (the v0.9.2 build where "the exe opens and nothing appears"):
-/// the previous implementation subclassed the window with SetWindowLongPtr(GWL_WNDPROC)
-/// using a delegate whose signature had an extra `ref bool handled` parameter. That
-/// `ref bool` is WPF's HwndSourceHook convention — a NATIVE window procedure is
-/// LRESULT(HWND, UINT, WPARAM, LPARAM), four parameters. Windows dispatched the very
-/// first message (during window creation, before anything was shown) through a function
-/// pointer with the wrong signature → stack corruption → the process died instantly.
-/// It also never called the previous WndProc and stored the hook's own pointer as
-/// "previous". HwndSource.AddHook is the supported, safe WPF mechanism — no p/invoke
-/// subclassing at all.
+/// OS-level global playback hotkeys. RegisterHotKey remains the preferred path. Some Windows
+/// installations or controller utilities reserve a numpad key and make RegisterHotKey fail;
+/// those gestures now receive a WH_KEYBOARD_LL fallback instead of silently becoming local-only.
 /// </summary>
 public static class GlobalHotkeyService
 {
     private const int WM_HOTKEY = 0x0312;
+    private const int WM_KEYDOWN = 0x0100, WM_KEYUP = 0x0101;
+    private const int WM_SYSKEYDOWN = 0x0104, WM_SYSKEYUP = 0x0105;
+    private const int WH_KEYBOARD_LL = 13;
     private const int MOD_ALT = 0x1, MOD_CTRL = 0x2, MOD_SHIFT = 0x4, MOD_WIN = 0x8;
-    private const int MOD_NOREPEAT = 0x4000; // one action per press even when the keys are held
-
-    private const int HKID_RUNSTOP = 0x1001, HKID_PAUSERESUME = 0x1002;   // paired playback hotkeys
+    private const int MOD_NOREPEAT = 0x4000;
+    private const int HKID_RUNSTOP = 0x1001, HKID_PAUSERESUME = 0x1002;
 
     private static readonly Dictionary<int, string> _idToName = new();
+    private static readonly Dictionary<string, (int Mods, uint Vk)> _fallbackGestures = new();
+    private static readonly HashSet<uint> _fallbackPressed = new();
     private static readonly List<string> _lastErrors = new();
     private static Func<string, ICommand?>? _getCommand;
     private static HwndSource? _source;
-    private static HwndSourceHook? _hook;   // kept alive for the whole session
+    private static HwndSourceHook? _hook;
     private static IntPtr _hwnd;
+    private static IntPtr _keyboardHook;
+    private static LowLevelKeyboardProc? _keyboardProc;
 
     public static IReadOnlyList<string> LastErrors => _lastErrors;
     public static bool IsInstalled => _hwnd != IntPtr.Zero && _source is not null;
+    public static bool IsLowLevelFallbackActive => _keyboardHook != IntPtr.Zero;
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool RegisterHotKey(IntPtr hWnd, int id, int fsModifiers, uint vk);
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc callback, IntPtr module, uint threadId);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool UnhookWindowsHookEx(IntPtr hook);
+    [DllImport("user32.dll")]
+    private static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int virtualKey);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr GetModuleHandle(string? moduleName);
 
-    /// <summary>Install the message hook — call once from MainWindow.OnSourceInitialized
-    /// (the window handle exists by then).</summary>
+    private delegate IntPtr LowLevelKeyboardProc(int code, IntPtr wParam, IntPtr lParam);
+
     public static void Install(Window window)
     {
-        // Defensive idempotency: SourceInitialized should run once, but never stack hooks if a
-        // host recreates the window or Install is accidentally called again.
         if (_source is not null || _hwnd != IntPtr.Zero) Uninstall();
         _hwnd = new WindowInteropHelper(window).Handle;
         _source = HwndSource.FromHwnd(_hwnd);
         _hook = WndProc;
-        _source?.AddHook(_hook);   // the supported WPF way — safe, no subclassing
+        _source?.AddHook(_hook);
     }
 
-    /// <summary>Remove the hook and every registered hotkey — call from MainWindow.OnClosed.</summary>
     public static void Uninstall()
     {
         UnregisterAll();
@@ -71,11 +76,11 @@ public static class GlobalHotkeyService
         _getCommand = null;
     }
 
-    /// <summary>(Re)registers the two PAIRED playback hotkeys from settings (v0.9.43 — run/stop share
-    /// one key, pause/resume share another; user request, 4 keys → 2). Returns the command
-    /// names that are now GLOBAL — the caller skips their window-local InputBindings so a
-    /// focused keypress does not fire the command twice. A combo the OS refuses (owned by
-    /// another app) keeps its local binding as fallback.</summary>
+    /// <summary>
+    /// Registers the paired playback hotkeys. The returned names are truly global: either owned
+    /// by RegisterHotKey or covered by the low-level fallback. Only gestures that fail both paths
+    /// are omitted so the caller may install a local binding.
+    /// </summary>
     public static HashSet<string> Register(AppSettings settings, Func<string, ICommand?> getCommand)
     {
         UnregisterAll();
@@ -85,88 +90,145 @@ public static class GlobalHotkeyService
         if (_hwnd == IntPtr.Zero || _source is null)
         {
             _lastErrors.Add("window handle/message hook is not ready");
-            return ok;   // local bindings keep working, but the caller now reports why
+            return ok;
         }
 
-        foreach (var (name, hk, id) in new[]
+        foreach (var (name, gesture, id) in new[]
         {
             ("runstop", settings.RunStopHotkey, HKID_RUNSTOP),
             ("pauseresume", settings.PauseResumeHotkey, HKID_PAUSERESUME),
         })
         {
-            if (string.IsNullOrWhiteSpace(hk)) continue;
-            if (!TryParseGesture(hk, out var mods, out var vk))
+            if (string.IsNullOrWhiteSpace(gesture)) continue;
+            if (!TryParseGesture(gesture, out var mods, out var vk))
             {
-                _lastErrors.Add($"{name} ({hk}): unsupported/invalid key gesture");
+                _lastErrors.Add($"{name} ({gesture}): unsupported/invalid key gesture");
                 continue;
             }
+
             if (RegisterHotKey(_hwnd, id, mods | MOD_NOREPEAT, vk))
             {
                 _idToName[id] = name;
                 ok.Add(name);
+                continue;
             }
-            else
+
+            var registerError = Marshal.GetLastWin32Error();
+            _fallbackGestures[name] = (mods, vk);
+            if (EnsureLowLevelHook())
             {
-                int error = Marshal.GetLastWin32Error();
-                string message;
-                try { message = new Win32Exception(error).Message; }
-                catch { message = "unknown Windows error"; }
-                _lastErrors.Add($"{name} ({hk}): RegisterHotKey failed — Win32 {error}: {message}");
+                ok.Add(name);
+                continue;
             }
+
+            _fallbackGestures.Remove(name);
+            var fallbackError = Marshal.GetLastWin32Error();
+            _lastErrors.Add($"{name} ({gesture}): RegisterHotKey Win32 {registerError}; global fallback Win32 {fallbackError}");
         }
         return ok;
     }
 
-    /// <summary>Unregister everything we registered (safe any time, even after close).</summary>
     public static void UnregisterAll()
     {
         if (_hwnd != IntPtr.Zero)
             foreach (var id in _idToName.Keys) UnregisterHotKey(_hwnd, id);
         _idToName.Clear();
+        _fallbackGestures.Clear();
+        _fallbackPressed.Clear();
+        if (_keyboardHook != IntPtr.Zero) UnhookWindowsHookEx(_keyboardHook);
+        _keyboardHook = IntPtr.Zero;
+        _keyboardProc = null;
+    }
+
+    private static bool EnsureLowLevelHook()
+    {
+        if (_keyboardHook != IntPtr.Zero) return true;
+        _keyboardProc = KeyboardProc;
+        _keyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, _keyboardProc, GetModuleHandle(null), 0);
+        return _keyboardHook != IntPtr.Zero;
     }
 
     private static IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if (msg == WM_HOTKEY && _idToName.TryGetValue(wParam.ToInt32(), out var name))
         {
-            handled = true; // this ID belongs to AMS even if the command is currently unavailable
-            var cmd = _getCommand?.Invoke(name);
-            if (cmd?.CanExecute(null) == true)
-                cmd.Execute(null);
+            handled = true;
+            Execute(name);
         }
-        return IntPtr.Zero;   // not ours → normal processing continues
+        return IntPtr.Zero;
     }
 
-    /// <summary>
-    /// Converts the same WPF Key names emitted by OptionsDialog to Win32 virtual-key codes.
-    /// v0.9.9 fixes the old F1..F12/A-Z/0-9-only parser which silently rejected the user's
-    /// Shift+Add, Shift+Subtract, Ctrl+Add and Ctrl+Multiply numpad shortcuts.
-    /// Public for deterministic regression tests; this method does not call user32.
-    /// </summary>
+    private static IntPtr KeyboardProc(int code, IntPtr wParam, IntPtr lParam)
+    {
+        if (code >= 0)
+        {
+            var message = wParam.ToInt32();
+            var vk = unchecked((uint)Marshal.ReadInt32(lParam));
+            if (message is WM_KEYUP or WM_SYSKEYUP)
+            {
+                _fallbackPressed.Remove(vk);
+            }
+            else if (message is WM_KEYDOWN or WM_SYSKEYDOWN && _fallbackPressed.Add(vk))
+            {
+                var currentMods = CurrentModifiers();
+                foreach (var pair in _fallbackGestures)
+                    if (pair.Value.Vk == vk && pair.Value.Mods == currentMods)
+                        Execute(pair.Key);
+            }
+        }
+        return CallNextHookEx(_keyboardHook, code, wParam, lParam);
+    }
+
+    private static void Execute(string name)
+    {
+        void Run()
+        {
+            var command = _getCommand?.Invoke(name);
+            if (command?.CanExecute(null) == true) command.Execute(null);
+        }
+
+        var dispatcher = _source?.Dispatcher;
+        if (dispatcher is null) return;
+        if (dispatcher.CheckAccess()) Run();
+        else dispatcher.BeginInvoke(DispatcherPriority.Send, (Action)Run);
+    }
+
+    private static int CurrentModifiers()
+    {
+        var result = 0;
+        if (Down(0x10) || Down(0xA0) || Down(0xA1)) result |= MOD_SHIFT;
+        if (Down(0x11) || Down(0xA2) || Down(0xA3)) result |= MOD_CTRL;
+        if (Down(0x12) || Down(0xA4) || Down(0xA5)) result |= MOD_ALT;
+        if (Down(0x5B) || Down(0x5C)) result |= MOD_WIN;
+        return result;
+    }
+
+    private static bool Down(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
+
     public static bool TryParseGesture(string gesture, out int mods, out uint vk)
     {
-        mods = 0; vk = 0;
+        mods = 0;
+        vk = 0;
         if (string.IsNullOrWhiteSpace(gesture)) return false;
         var parts = gesture.Split('+');
         if (parts.Length == 0 || parts.Any(string.IsNullOrWhiteSpace)) return false;
-        for (int i = 0; i < parts.Length - 1; i++)
+        for (var i = 0; i < parts.Length - 1; i++)
         {
-            var p = parts[i].Trim();
-            if (p.Equals("Shift", StringComparison.OrdinalIgnoreCase)) mods |= MOD_SHIFT;
-            else if (p.Equals("Ctrl", StringComparison.OrdinalIgnoreCase) ||
-                     p.Equals("Control", StringComparison.OrdinalIgnoreCase)) mods |= MOD_CTRL;
-            else if (p.Equals("Alt", StringComparison.OrdinalIgnoreCase)) mods |= MOD_ALT;
-            else if (p.Equals("Win", StringComparison.OrdinalIgnoreCase) ||
-                     p.Equals("Windows", StringComparison.OrdinalIgnoreCase)) mods |= MOD_WIN;
+            var part = parts[i].Trim();
+            if (part.Equals("Shift", StringComparison.OrdinalIgnoreCase)) mods |= MOD_SHIFT;
+            else if (part.Equals("Ctrl", StringComparison.OrdinalIgnoreCase) || part.Equals("Control", StringComparison.OrdinalIgnoreCase)) mods |= MOD_CTRL;
+            else if (part.Equals("Alt", StringComparison.OrdinalIgnoreCase)) mods |= MOD_ALT;
+            else if (part.Equals("Win", StringComparison.OrdinalIgnoreCase) || part.Equals("Windows", StringComparison.OrdinalIgnoreCase)) mods |= MOD_WIN;
             else return false;
         }
-        string keyName = parts[^1].Trim();
-        if (!Enum.TryParse<Key>(keyName, ignoreCase: true, out var key) ||
-            key is Key.None or Key.System or Key.LeftCtrl or Key.RightCtrl or Key.LeftShift or
-                Key.RightShift or Key.LeftAlt or Key.RightAlt or Key.LWin or Key.RWin)
+
+        var keyName = parts[^1].Trim();
+        if (!Enum.TryParse<Key>(keyName, true, out var key) ||
+            key is Key.None or Key.System or Key.LeftCtrl or Key.RightCtrl or Key.LeftShift or Key.RightShift or
+                Key.LeftAlt or Key.RightAlt or Key.LWin or Key.RWin)
             return false;
 
-        int nativeVk = KeyInterop.VirtualKeyFromKey(key);
+        var nativeVk = KeyInterop.VirtualKeyFromKey(key);
         if (nativeVk <= 0) return false;
         vk = unchecked((uint)nativeVk);
         return true;

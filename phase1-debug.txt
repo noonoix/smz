@@ -1,0 +1,5 @@
+AppSettings files: ams-shell/src/Ams.UI/Services/DocumentService.cs
+AppSettings property inserted
+BuildCodePy signature: matches=1
+base buzzer anchor: matches=2
+ERROR: RuntimeError('base buzzer anchor: expected 1 match, found 2')

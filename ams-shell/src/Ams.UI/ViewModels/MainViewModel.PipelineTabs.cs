@@ -105,17 +105,6 @@ public partial class MainViewModel
             destination.Add(node);
     }
 
-    private static int CountAll(IEnumerable<StepNode> roots)
-    {
-        int count = 0;
-        foreach (var root in roots)
-        {
-            count++;
-            count += CountAll(root.Children);
-        }
-        return count;
-    }
-
     private string PipelineCounts()
         => string.Join(", ", _pipelineWorkspace.Tabs.Select(tab =>
             $"{tab.Kind}={{roots:{tab.Steps.Count},total:{CountAll(tab.Steps)}}}"));

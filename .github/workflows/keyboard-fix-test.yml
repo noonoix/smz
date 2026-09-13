@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 jobs:
-  repair-and-build:
+  repair-patch-build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,20 +23,24 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
-      - name: Restore RunEngine and apply keyboard guard
+      - name: Restore source and apply keyboard guard
         shell: pwsh
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           $p = 'ams-shell/src/Ams.UI/Services/RunEngine.cs'
-          git show a6b709d0b86ad666753732f31bdbcca441ed9820:$p | Set-Content $p -Encoding UTF8
+          $current = Get-Content $p -Raw
+          if ($current.Trim() -eq 'PLACEHOLDER') {
+            git show a6b709d0b86ad666753732f31bdbcca441ed9820:$p | Set-Content $p -Encoding UTF8
+          }
           $s = Get-Content $p -Raw
-          $s = $s.Replace('private readonly HashSet<string> _scriptStack = new(StringComparer.OrdinalIgnoreCase);', 'private readonly HashSet<string> _scriptStack = new(StringComparer.OrdinalIgnoreCase);' + "`r`n" + '    // v0.9.64-keyboard-test — suppress duplicate KDOWN for a key already held in this run.' + "`r`n" + '    private readonly HashSet<int> _heldKeyboardKeys = new();')
-          $s = $s.Replace('_parallelKeySeq = 0; _lastParallelKeyTick = 0; _mouseRestAtSeq = -1;   // v0.9.23 — reset typing signal', '_parallelKeySeq = 0; _lastParallelKeyTick = 0; _mouseRestAtSeq = -1;   // v0.9.23 — reset typing signal' + "`r`n" + '        _heldKeyboardKeys.Clear();')
-          $old = 'await Send(wireCmd, ct,' + "`r`n" + '                                logAs: secret && cmd.StartsWith("KTEXT|") ? MaskKtext(cmd) : null);'
-          $new = 'if (TryHandleKeyboardStateGuard(wireCmd, out var guardedCmd, out var guardLog))' + "`r`n" + '                            {' + "`r`n" + '                                if (guardLog is not null) _log(guardLog);' + "`r`n" + '                                if (guardedCmd is not null)' + "`r`n" + '                                    await Send(guardedCmd, ct, logAs: secret && cmd.StartsWith("KTEXT|") ? MaskKtext(cmd) : null);' + "`r`n" + '                            }' + "`r`n" + '                            else' + "`r`n" + '                            {' + "`r`n" + '                                await Send(wireCmd, ct,' + "`r`n" + '                                    logAs: secret && cmd.StartsWith("KTEXT|") ? MaskKtext(cmd) : null);' + "`r`n" + '                            }'
-          $s = $s.Replace($old, $new)
-          $helper = @'
+          if ($s -notmatch '_heldKeyboardKeys') {
+            $s = $s.Replace('private readonly HashSet<string> _scriptStack = new(StringComparer.OrdinalIgnoreCase);', 'private readonly HashSet<string> _scriptStack = new(StringComparer.OrdinalIgnoreCase);' + "`r`n" + '    // v0.9.64-keyboard-test — suppress duplicate KDOWN for a key already held in this run.' + "`r`n" + '    private readonly HashSet<int> _heldKeyboardKeys = new();')
+            $s = $s.Replace('_parallelKeySeq = 0; _lastParallelKeyTick = 0; _mouseRestAtSeq = -1;   // v0.9.23 — reset typing signal', '_parallelKeySeq = 0; _lastParallelKeyTick = 0; _mouseRestAtSeq = -1;   // v0.9.23 — reset typing signal' + "`r`n" + '        _heldKeyboardKeys.Clear();')
+            $old = 'await Send(wireCmd, ct,' + "`r`n" + '                                logAs: secret && cmd.StartsWith("KTEXT|") ? MaskKtext(cmd) : null);'
+            $new = 'if (TryHandleKeyboardStateGuard(wireCmd, out var guardedCmd, out var guardLog))' + "`r`n" + '                            {' + "`r`n" + '                                if (guardLog is not null) _log(guardLog);' + "`r`n" + '                                if (guardedCmd is not null)' + "`r`n" + '                                    await Send(guardedCmd, ct, logAs: secret && cmd.StartsWith("KTEXT|") ? MaskKtext(cmd) : null);' + "`r`n" + '                            }' + "`r`n" + '                            else' + "`r`n" + '                            {' + "`r`n" + '                                await Send(wireCmd, ct,' + "`r`n" + '                                    logAs: secret && cmd.StartsWith("KTEXT|") ? MaskKtext(cmd) : null);' + "`r`n" + '                            }'
+            $s = $s.Replace($old, $new)
+            $helper = @'
 
     private bool TryHandleKeyboardStateGuard(string cmd, out string? guardedCmd, out string? guardLog)
     {
@@ -67,11 +71,14 @@ jobs:
         return false;
     }
 '@
-          $s = $s.Replace("`r`n    private async Task<string> Send(string cmd", $helper + "`r`n    private async Task<string> Send(string cmd")
-          Set-Content $p $s -Encoding UTF8
-          git add $p
-          git commit -m "Fix duplicate held keyboard key downs" || echo "No RunEngine changes to commit"
-          git push origin HEAD:phase1/configurable-buzzer-gpio
+            $s = $s.Replace("`r`n    private async Task<string> Send(string cmd", $helper + "`r`n    private async Task<string> Send(string cmd")
+            Set-Content $p $s -Encoding UTF8
+          }
+          if ((git status --porcelain $p)) {
+            git add $p
+            git commit -m "Fix duplicate held keyboard key downs"
+            git push origin HEAD:phase1/configurable-buzzer-gpio
+          }
 
       - name: Compile-check bridge stack
         run: python -m py_compile ams-shell/bridge/bridge.py ams-shell/bridge/ams_serial.py ams-shell/bridge/ams_crypto.py

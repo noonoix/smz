@@ -21,21 +21,42 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-      - name: Apply deterministic source patch
-        run: python tools/apply_mouse_reliability.py
-      - name: Validate bridge syntax
-        run: python -m py_compile ams-shell/bridge/bridge.py
-      - name: Build application
-        run: dotnet build ams-shell/AMS.sln -c Release
-      - name: Run regression suite
-        run: dotnet run --project tests/TestRunner.csproj -c Release
-      - name: Commit verified patch and remove one-shot helpers
+      - name: Apply, build, test, and publish result
         shell: pwsh
         run: |
-          Remove-Item tools/apply_mouse_reliability.py
-          Remove-Item .github/workflows/mouse-reliability-one-shot.yml
+          $ErrorActionPreference = 'Continue'
+          $log = 'mouse-patch-result.txt'
+          "mouse reliability run $(Get-Date -Format o)" | Set-Content $log
+
+          python tools/apply_mouse_reliability.py 2>&1 | Tee-Object -FilePath $log -Append
+          $code = $LASTEXITCODE
+          if ($code -eq 0) {
+            python -m py_compile ams-shell/bridge/bridge.py 2>&1 | Tee-Object -FilePath $log -Append
+            $code = $LASTEXITCODE
+          }
+          if ($code -eq 0) {
+            dotnet build ams-shell/AMS.sln -c Release 2>&1 | Tee-Object -FilePath $log -Append
+            $code = $LASTEXITCODE
+          }
+          if ($code -eq 0) {
+            dotnet run --project tests/TestRunner.csproj -c Release 2>&1 | Tee-Object -FilePath $log -Append
+            $code = $LASTEXITCODE
+          }
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "Fix mouse stop completion and host event flood"
+          if ($code -eq 0) {
+            Remove-Item tools/apply_mouse_reliability.py
+            Remove-Item .github/workflows/mouse-reliability-one-shot.yml
+            Remove-Item $log
+            git add -A
+            git commit -m "Fix mouse stop completion and host event flood"
+            git push origin HEAD:phase1/configurable-buzzer-gpio
+            exit 0
+          }
+
+          "FAILED exit=$code" | Add-Content $log
+          git add $log
+          git commit -m "Record mouse patch failure diagnostics"
           git push origin HEAD:phase1/configurable-buzzer-gpio
+          exit $code

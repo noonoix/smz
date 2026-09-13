@@ -1,15 +1,15 @@
 name: temp-phase1-buzzer-test-fix
 
 on:
-  push:
-    branches:
-      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
 
 jobs:
   fix:
+    if: github.event.pull_request.head.ref == 'phase1/configurable-buzzer-gpio'
     runs-on: ubuntu-latest
     steps:
       - name: Patch stale buzzer contract assertion
@@ -19,7 +19,7 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            const branch = 'phase1/configurable-buzzer-gpio';
+            const branch = context.payload.pull_request.head.ref;
             const path = 'tests/TestRunner.cs';
             const oldText = `        var buzFw = V27ReadSrc(Path.Combine("Services", "PicoFirmwareExporter.cs"));
             Assert(buzFw.Contains("PWMOut(board.GP6") && !buzFw.Contains("PWMOut(board.GP5") && !buzFw.Contains("board.D9"),

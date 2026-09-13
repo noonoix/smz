@@ -11,6 +11,13 @@ a key long enough to trigger Windows auto-repeat.
 Keep bridge_core.py completely intact and only reduce the post-handshake Pico
 read timeout to 10 ms. Command ACKs, ordering, error reporting, cancellation,
 and the direct-Pro-Micro encrypted path therefore remain unchanged.
+
+The packaged bridge.py remains a launcher, while these contract markers state
+which proven bridge_core.py behavior it delegates without modification:
+  op == "list_ports"
+  .split(";") if d.strip()
+  reconfigure(encoding="utf-8", errors="replace")
+  ensure_ascii=True
 """
 import bridge_core as core
 

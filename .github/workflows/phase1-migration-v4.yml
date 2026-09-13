@@ -1,0 +1,58 @@
+name: Phase 1 migration v4
+
+on:
+  push:
+    branches: [phase1/configurable-buzzer-gpio]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply core buzzer contract
+        shell: bash
+        run: |
+          set -e
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('.')
+          def once(text,old,new,label):
+              n=text.count(old)
+              if n!=1: raise RuntimeError(f'{label}: expected 1 match, found {n}')
+              return text.replace(old,new,1)
+          app_files=[p for p in (root/'ams-shell/src/Ams.UI').rglob('*.cs') if 'class AppSettings' in p.read_text(encoding='utf-8')]
+          if len(app_files)!=1: raise RuntimeError('AppSettings source discovery failed')
+          app=app_files[0].read_text(encoding='utf-8')
+          if 'BuzzerGpio' not in app:
+              at=app.index('class AppSettings'); brace=app.index('{',at)
+              app=app[:brace+1]+'\n    public string BuzzerGpio { get; set; } = "GP6";\n'+app[brace+1:]
+              app_files[0].write_text(app,encoding='utf-8')
+          policy='''using System;\nnamespace Ams.UI.Services;\npublic static class BuzzerGpioPolicy\n{\n    private static readonly string[] Pins={"GP5","GP6","GP7","GP8","GP9","GP10","GP11","GP12","GP13","GP14","GP15","GP18","GP19","GP22","GP26","GP27","GP28"};\n    public static IReadOnlyList<string> AllowedPins=>Pins;\n    public static string NormalizeOrDefault(string? value)=>TryValidate(value,out var pin,out _)?pin:"GP6";\n    public static bool TryValidate(string? value,out string pin,out string error)\n    {\n        pin=(value??"").Trim().ToUpperInvariant();\n        if(pin.StartsWith("BOARD.",StringComparison.Ordinal))pin=pin[6..];\n        if(pin is "GP3" or "GP4" or "GP16" or "GP17" or "GP20" or "GP21"){error=pin+" is reserved by the board contract.";return false;}\n        if(!Pins.Contains(pin,StringComparer.Ordinal)){error=pin+" is not an allowed free PWM-capable Pico pin.";return false;}\n        error="";return true;\n    }\n    public static string Require(string? value){if(TryValidate(value,out var pin,out var error))return pin;throw new InvalidOperationException("خروجی متوقف شد: "+error);}\n}\n'''
+          (root/'ams-shell/src/Ams.UI/Services/BuzzerGpioPolicy.cs').write_text(policy,encoding='utf-8')
+          pico_path=root/'ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs'; pico=pico_path.read_text(encoding='utf-8')
+          pico=once(pico,'string? pauseResumeHotkey = "Shift+F3")','string? pauseResumeHotkey = "Shift+F3", string buzzerGpio = "GP6")','BuildCodePy signature')
+          if pico.count('tone = pwmio.PWMOut(board.GP6,')!=2: raise RuntimeError('expected two base buzzer anchors')
+          pico=pico.replace('tone = pwmio.PWMOut(board.GP6,','tone = pwmio.PWMOut(board.__BUZZER_GPIO__,')
+          pico=once(pico,'.Replace("__LOOP_SECONDS__", loopSeconds.ToString(CultureInfo.InvariantCulture));','.Replace("__LOOP_SECONDS__", loopSeconds.ToString(CultureInfo.InvariantCulture))\n            .Replace("__BUZZER_GPIO__", buzzerGpio);','BuildCodePy replacement')
+          old='string loopMode = "forever", int loopCount = 0, int loopSeconds = 0, bool keyboardOnArm = false)   // v0.9.44'
+          new='string loopMode = "forever", int loopCount = 0, int loopSeconds = 0, bool keyboardOnArm = false, string buzzerGpio = "GP6")   // v0.9.44'
+          if pico.count(old)!=2: raise RuntimeError('expected two BuildReadme signatures')
+          pico=pico.replace(old,new)
+          pico=once(pico,'var settings = AppSettings.Load();\n        Put(string.IsNullOrWhiteSpace','var settings = AppSettings.Load();\n        var buzzerGpio = BuzzerGpioPolicy.Require(settings.BuzzerGpio);\n        Put(string.IsNullOrWhiteSpace','export setting')
+          pico=once(pico,'settings.RunStopHotkey, settings.PauseResumeHotkey));','settings.RunStopHotkey, settings.PauseResumeHotkey, buzzerGpio));','BuildCodePy call')
+          pico=once(pico,'BuildReadme(states, machine, loopMode, loopCount, loopSeconds, keyboardOnArm));','BuildReadme(states, machine, loopMode, loopCount, loopSeconds, keyboardOnArm, buzzerGpio));','BuildReadme call')
+          pico_path.write_text(pico,encoding='utf-8')
+          test='''using System;\nusing System.Runtime.CompilerServices;\nusing Ams.UI.Services;\nnamespace Ams.Tests;\ninternal static class BuzzerGpioPhase1Tests\n{\n    [ModuleInitializer]\n    internal static void Run()\n    {\n        if(BuzzerGpioPolicy.NormalizeOrDefault(null)!="GP6")throw new Exception("legacy buzzer default is not GP6");\n        if(!BuzzerGpioPolicy.TryValidate("GP7",out var pin,out _)||pin!="GP7")throw new Exception("GP7 was not accepted");\n        if(BuzzerGpioPolicy.TryValidate("GP20",out _,out _)||BuzzerGpioPolicy.TryValidate("GP3",out _,out _))throw new Exception("reserved buzzer pin was accepted");\n        var code=PicoFirmwareExporter.BuildCodePy(Array.Empty<PicoFirmwareExporter.LightState>(),"phase1-test",buzzerGpio:"GP7");\n        if(!code.Contains("PWMOut(board.GP7",StringComparison.Ordinal))throw new Exception("GP7 did not reach generated code.py");\n        if(code.Contains("PWMOut(board.GP6",StringComparison.Ordinal))throw new Exception("generated code.py still contains hardcoded GP6 buzzer output");\n    }\n}\n'''
+          (root/'tests/BuzzerGpioPhase1Tests.cs').write_text(test,encoding='utf-8')
+          (root/'phase1-v4-debug.txt').write_text('core migration completed\n',encoding='utf-8')
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add ams-shell tests phase1-v4-debug.txt
+          git commit -m "feat: add configurable Pico buzzer GPIO core" 
+          git push origin HEAD:phase1/configurable-buzzer-gpio

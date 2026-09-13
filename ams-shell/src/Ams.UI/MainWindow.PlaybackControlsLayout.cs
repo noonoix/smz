@@ -1,7 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using Ams.UI.ViewModels;
 
@@ -32,7 +31,7 @@ internal static class PlaybackControlsLayoutBootstrap
 
         vm.InstallPlaybackStateGuard();
 
-        var runButton = FindDescendants<ButtonBase>(window)
+        var runButton = FindDescendants<System.Windows.Controls.Primitives.ButtonBase>(window)
             .FirstOrDefault(button => ReferenceEquals(button.Command, vm.RunCommand));
         if (runButton?.Parent is not StackPanel playback || playback.Parent is not DockPanel host) return;
 

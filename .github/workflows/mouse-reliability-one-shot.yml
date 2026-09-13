@@ -5,6 +5,7 @@ on:
     branches: [phase1/configurable-buzzer-gpio]
     paths:
       - tools/apply_mouse_reliability_v2.py
+      - ams-shell/src/Ams.UI/MainWindow.PlaybackControlsLayout.cs
       - .github/workflows/mouse-reliability-one-shot.yml
 
 permissions:

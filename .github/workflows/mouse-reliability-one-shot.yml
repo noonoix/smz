@@ -4,7 +4,7 @@ on:
   push:
     branches: [phase1/configurable-buzzer-gpio]
     paths:
-      - tools/prepare_sync_planctx.py
+      - tools/prepare_sync_ack.py
       - .github/workflows/mouse-reliability-one-shot.yml
 
 permissions:
@@ -28,11 +28,12 @@ jobs:
         run: |
           $ErrorActionPreference = 'Continue'
           $log = 'mouse-patch-result.txt'
-          "mouse reliability AutoCycle plan sync $(Get-Date -Format o)" | Set-Content $log
+          "mouse reliability AutoCycle ACK sync $(Get-Date -Format o)" | Set-Content $log
           python tools/prepare_mouse_v2.py 2>&1 | Tee-Object -FilePath $log -Append
           $code = $LASTEXITCODE
           if ($code -eq 0) { python tools/apply_mouse_reliability_v2.py 2>&1 | Tee-Object -FilePath $log -Append; $code = $LASTEXITCODE }
           if ($code -eq 0) { python tools/prepare_sync_planctx.py 2>&1 | Tee-Object -FilePath $log -Append; $code = $LASTEXITCODE }
+          if ($code -eq 0) { python tools/prepare_sync_ack.py 2>&1 | Tee-Object -FilePath $log -Append; $code = $LASTEXITCODE }
           if ($code -eq 0) { python tools/sync_autocycle_mouse.py 2>&1 | Tee-Object -FilePath $log -Append; $code = $LASTEXITCODE }
           if ($code -eq 0) { python -m py_compile ams-shell/bridge/bridge.py 2>&1 | Tee-Object -FilePath $log -Append; $code = $LASTEXITCODE }
           if ($code -eq 0) { dotnet build ams-shell/AMS.sln -c Release 2>&1 | Tee-Object -FilePath $log -Append; $code = $LASTEXITCODE }
@@ -42,7 +43,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if ($code -eq 0) {
-            Remove-Item tools/apply_mouse_reliability.py,tools/repair_mouse_patch_script.py,tools/apply_mouse_reliability_v2.py,tools/prepare_mouse_v2.py,tools/sync_autocycle_mouse.py,tools/prepare_sync_planctx.py -ErrorAction SilentlyContinue
+            Remove-Item tools/apply_mouse_reliability.py,tools/repair_mouse_patch_script.py,tools/apply_mouse_reliability_v2.py,tools/prepare_mouse_v2.py,tools/sync_autocycle_mouse.py,tools/prepare_sync_planctx.py,tools/prepare_sync_ack.py -ErrorAction SilentlyContinue
             Remove-Item .github/workflows/mouse-reliability-one-shot.yml
             Remove-Item $log
             Remove-Item mouse-test-build -Recurse -Force
@@ -60,6 +61,6 @@ jobs:
           }
           "FAILED exit=$code" | Add-Content $log
           git add $log
-          git commit -m "Record AutoCycle plan sync diagnostics"
+          git commit -m "Record AutoCycle ACK sync diagnostics"
           git push origin HEAD:phase1/configurable-buzzer-gpio
           exit $code

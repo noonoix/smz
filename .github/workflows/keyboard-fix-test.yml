@@ -7,7 +7,7 @@ on:
     paths:
       - '.github/workflows/keyboard-fix-test.yml'
       - 'ams-shell/src/Ams.UI/Services/RunEngine.cs'
-      - 'tests/TestRunner.cs'
+      - 'tests/KeyboardHeldKeyGuardTests.cs'
 
 permissions:
   contents: write
@@ -21,128 +21,193 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "8.0.x"
-
-      - name: Commit robust RunEngine keyboard guard if missing
+      - name: Apply and commit RunEngine keyboard guard
+        id: guard
         shell: pwsh
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          $p = 'ams-shell/src/Ams.UI/Services/RunEngine.cs'
-          $current = Get-Content $p -Raw
-          if ($current.Trim() -eq 'PLACEHOLDER') {
-            git show a6b709d0b86ad666753732f31bdbcca441ed9820:$p | Set-Content $p -Encoding UTF8
-          }
-          $s = Get-Content $p -Raw
-          if ($s -notmatch 'TryHandleKeyboardStateGuard') {
-            $s = $s.Replace('private readonly HashSet<string> _scriptStack = new(StringComparer.OrdinalIgnoreCase);', 'private readonly HashSet<string> _scriptStack = new(StringComparer.OrdinalIgnoreCase);' + "`r`n" + '    // v0.9.68-keyboard-test — suppress duplicate explicit KDOWN per route while a key is already held.' + "`r`n" + '    private readonly HashSet<string> _heldKeyboardKeys = new(StringComparer.Ordinal);')
-            $s = $s.Replace('_parallelKeySeq = 0; _lastParallelKeyTick = 0; _mouseRestAtSeq = -1;   // v0.9.23 — reset typing signal', '_parallelKeySeq = 0; _lastParallelKeyTick = 0; _mouseRestAtSeq = -1;   // v0.9.23 — reset typing signal' + "`r`n" + '        _heldKeyboardKeys.Clear();')
-            $old = 'await Send(wireCmd, ct,' + "`r`n" + '                                logAs: secret && cmd.StartsWith("KTEXT|") ? MaskKtext(cmd) : null);'
-            $new = 'if (TryHandleKeyboardStateGuard(wireCmd, out var guardedCmd, out var guardLog))' + "`r`n" + '                            {' + "`r`n" + '                                if (guardLog is not null) _log(guardLog);' + "`r`n" + '                                if (guardedCmd is not null)' + "`r`n" + '                                    await Send(guardedCmd, ct, logAs: secret && cmd.StartsWith("KTEXT|") ? MaskKtext(cmd) : null);' + "`r`n" + '                            }' + "`r`n" + '                            else' + "`r`n" + '                            {' + "`r`n" + '                                await Send(wireCmd, ct,' + "`r`n" + '                                    logAs: secret && cmd.StartsWith("KTEXT|") ? MaskKtext(cmd) : null);' + "`r`n" + '                            }'
-            if (-not $s.Contains($old)) { throw 'RunEngine Send(wireCmd) anchor not found' }
-            $s = $s.Replace($old, $new)
-            $helper = @'
+          @'
+          from pathlib import Path
 
-    private bool TryHandleKeyboardStateGuard(string cmd, out string? guardedCmd, out string? guardLog)
-    {
-        guardedCmd = cmd;
-        guardLog = null;
-        string body = cmd;
-        string prefix = "";
-        string route = "direct";
-        if (body.StartsWith("KBDARM|", StringComparison.Ordinal)) { prefix = "KBDARM|"; route = "arm"; body = body[7..]; }
-        else if (body.StartsWith("KBDPICO|", StringComparison.Ordinal)) { prefix = "KBDPICO|"; route = "pico"; body = body[8..]; }
+          p = Path("ams-shell/src/Ams.UI/Services/RunEngine.cs")
+          s = p.read_text(encoding="utf-8")
+          if s.strip() == "PLACEHOLDER":
+              import subprocess
+              s = subprocess.check_output([
+                  "git", "show", "a6b709d0b86ad666753732f31bdbcca441ed9820:" + str(p).replace("\\", "/")
+              ], text=True, encoding="utf-8")
 
-        if (body.StartsWith("KDOWN|", StringComparison.Ordinal) && int.TryParse(body[6..], out var downVk))
-        {
-            string key = route + ":" + downVk;
-            if (!_heldKeyboardKeys.Add(key))
-            {
-                guardedCmd = null;
-                guardLog = $"keyboard guard: duplicate {body} suppressed ({route})";
-                return true;
-            }
-            guardedCmd = prefix + body;
-            return true;
-        }
+          if "TryHandleKeyboardStateGuard" not in s:
+              field_anchor = "    private readonly HashSet<string> _scriptStack = new(StringComparer.OrdinalIgnoreCase);\n"
+              field_block = field_anchor + """    /// <summary>v0.9.68 — run-scoped explicit key state, isolated per keyboard route.
+              /// Duplicate KDOWN is suppressed until the matching KUP. Access is locked because
+              /// Parallel Group branches can execute keyboard steps concurrently.</summary>
+              private readonly object _heldKeyboardLock = new();
+              private readonly HashSet<string> _heldKeyboardKeys = new(StringComparer.Ordinal);
+          """
+              if s.count(field_anchor) != 1:
+                  raise SystemExit("RunEngine keyboard field anchor mismatch")
+              s = s.replace(field_anchor, field_block, 1)
 
-        if (body.StartsWith("KUP|", StringComparison.Ordinal) && int.TryParse(body[4..], out var upVk))
-        {
-            _heldKeyboardKeys.Remove(route + ":" + upVk);
-            guardedCmd = prefix + body;
-            return true;
-        }
+              reset_anchor = "        _parallelKeySeq = 0; _lastParallelKeyTick = 0; _mouseRestAtSeq = -1;   // v0.9.23 — reset typing signal\n"
+              reset_block = reset_anchor + "        lock (_heldKeyboardLock) _heldKeyboardKeys.Clear();\n"
+              if s.count(reset_anchor) != 1:
+                  raise SystemExit("RunEngine keyboard reset anchor mismatch")
+              s = s.replace(reset_anchor, reset_block, 1)
 
-        return false;
-    }
-'@
-            $s = $s.Replace("`r`n    private async Task<string> Send(string cmd", $helper + "`r`n    private async Task<string> Send(string cmd")
-            Set-Content $p $s -Encoding UTF8
-          }
+              catch_anchor = """        catch (GotoSignal g)   // v0.8.3 — the jump found no label at ANY level: stop cleanly with a tip
+              {
+                  _log($"⚠ go to label \\"{g.Label}\\" — label not found; script stopped");
+              }
+          """
+              catch_block = catch_anchor + """        finally
+              {
+                  await ReleaseHeldKeyboardKeysAsync();
+              }
+          """
+              if s.count(catch_anchor) != 1:
+                  raise SystemExit("RunEngine cleanup anchor mismatch")
+              s = s.replace(catch_anchor, catch_block, 1)
 
-          $t = 'tests/TestRunner.cs'
-          $ts = Get-Content $t -Raw
-          if ($ts -notmatch 'keyboard guard suppresses duplicate explicit keyDown') {
-            $anchor = '        // defaults stay legacy-identical: no extra pauses, no typos'
-            $test = @'
-        // v0.9.68 — explicit keyDown is stateful: a second KDOWN for the same key/route
-        // before KUP is suppressed so Windows cannot auto-repeat a held key cluster.
-        var heldKeyBridge = new FakeBridge();
-        new RunEngine(heldKeyBridge, _ => { }, 1920, 1080).RunAsync(new[]
-        {
-            new StepNode { Type = "keyDown", Props = new Dictionary<string, object?> { { "key", "A" } } },
-            new StepNode { Type = "keyDown", Props = new Dictionary<string, object?> { { "key", "A" } } },
-            new StepNode { Type = "keyUp", Props = new Dictionary<string, object?> { { "key", "A" } } },
-        }, CancellationToken.None).Wait();
-        Assert(heldKeyBridge.Sent.Count(c => c == "KDOWN|65") == 1 && heldKeyBridge.Sent.Count(c => c == "KUP|65") == 1,
-            $"keyboard guard suppresses duplicate explicit keyDown (sent: {string.Join(", ", heldKeyBridge.Sent)})");
+              send_anchor = """                            await Send(wireCmd, ct,
+                                  logAs: secret && cmd.StartsWith("KTEXT|") ? MaskKtext(cmd) : null);
+          """
+              send_block = """                            if (TryHandleKeyboardStateGuard(wireCmd, out var guardedCmd, out var guardLog))
+                              {
+                                  if (guardLog is not null) _log(guardLog);
+                                  if (guardedCmd is not null)
+                                      await Send(guardedCmd, ct,
+                                          logAs: secret && cmd.StartsWith("KTEXT|") ? MaskKtext(cmd) : null);
+                              }
+                              else
+                              {
+                                  await Send(wireCmd, ct,
+                                      logAs: secret && cmd.StartsWith("KTEXT|") ? MaskKtext(cmd) : null);
+                              }
+          """
+              if s.count(send_anchor) != 1:
+                  raise SystemExit("RunEngine guarded send anchor mismatch")
+              s = s.replace(send_anchor, send_block, 1)
 
-        var heldLoopBridge = new FakeBridge();
-        var heldLoop = new StepNode { Type = "forLoop", Props = new Dictionary<string, object?> { { "mode", "count" }, { "count", 20 } } };
-        heldLoop.Children.Add(new StepNode { Type = "keyDown", Props = new Dictionary<string, object?> { { "key", "A" } } });
-        heldLoop.Children.Add(new StepNode { Type = "keyUp", Props = new Dictionary<string, object?> { { "key", "A" } } });
-        heldLoop.Children.Add(new StepNode { Type = "keystroke", Props = new Dictionary<string, object?> { { "key", "B" } } });
-        new RunEngine(heldLoopBridge, _ => { }, 1920, 1080).RunAsync(new[] { heldLoop }, CancellationToken.None).Wait();
-        var held = new HashSet<string>();
-        int repeatDowns = 0;
-        foreach (var sent in heldLoopBridge.Sent)
-        {
-            if (sent == "KDOWN|65" && !held.Add("A")) repeatDowns++;
-            if (sent == "KUP|65") held.Remove("A");
-        }
-        Assert(repeatDowns == 0,
-            $"keyboard fixture pattern has no repeated A downs without A up (repeatDowns={repeatDowns})");
+              helper_anchor = "    private async Task<string> Send(string cmd, CancellationToken ct, string? logAs = null,\n"
+              helper = """    private bool TryHandleKeyboardStateGuard(string cmd, out string? guardedCmd, out string? guardLog)
+              {
+                  guardedCmd = cmd;
+                  guardLog = null;
+                  string body = cmd;
+                  string prefix = "";
+                  string route = "direct";
+                  if (body.StartsWith("KBDARM|", StringComparison.Ordinal))
+                  {
+                      prefix = "KBDARM|"; route = "arm"; body = body[prefix.Length..];
+                  }
+                  else if (body.StartsWith("KBDPICO|", StringComparison.Ordinal))
+                  {
+                      prefix = "KBDPICO|"; route = "pico"; body = body[prefix.Length..];
+                  }
 
-'@
-            if (-not $ts.Contains($anchor)) { throw 'TestRunner anchor not found' }
-            $ts = $ts.Replace($anchor, $test + $anchor)
-            Set-Content $t $ts -Encoding UTF8
-          }
+                  if (body.StartsWith("KDOWN|", StringComparison.Ordinal)
+                      && int.TryParse(body["KDOWN|".Length..], out var downVk))
+                  {
+                      string key = route + ":" + downVk;
+                      lock (_heldKeyboardLock)
+                      {
+                          if (!_heldKeyboardKeys.Add(key))
+                          {
+                              guardedCmd = null;
+                              guardLog = $"keyboard guard: duplicate {body} suppressed ({route})";
+                          }
+                      }
+                      if (guardedCmd is not null) guardedCmd = prefix + body;
+                      return true;
+                  }
 
-          if ((git status --porcelain $p $t)) {
-            git add $p $t
+                  if (body.StartsWith("KUP|", StringComparison.Ordinal)
+                      && int.TryParse(body["KUP|".Length..], out var upVk))
+                  {
+                      lock (_heldKeyboardLock) _heldKeyboardKeys.Remove(route + ":" + upVk);
+                      guardedCmd = prefix + body;
+                      return true;
+                  }
+
+                  return false;
+              }
+
+              private async Task ReleaseHeldKeyboardKeysAsync()
+              {
+                  List<string> held;
+                  lock (_heldKeyboardLock)
+                  {
+                      held = _heldKeyboardKeys.ToList();
+                      _heldKeyboardKeys.Clear();
+                  }
+
+                  foreach (var key in held)
+                  {
+                      int split = key.IndexOf(':');
+                      if (split <= 0 || !int.TryParse(key[(split + 1)..], out var vk)) continue;
+                      string route = key[..split];
+                      string prefix = route == "arm" ? "KBDARM|" : route == "pico" ? "KBDPICO|" : "";
+                      try
+                      {
+                          await Send(prefix + $"KUP|{vk}", CancellationToken.None, quiet: true);
+                          _log($"keyboard guard: released held key {vk} ({route})");
+                      }
+                      catch (Exception ex)
+                      {
+                          _log($"keyboard guard: failed to release held key {vk} ({route}): {ex.Message}");
+                      }
+                  }
+              }
+
+          """
+              if s.count(helper_anchor) != 1:
+                  raise SystemExit("RunEngine helper anchor mismatch")
+              s = s.replace(helper_anchor, helper + helper_anchor, 1)
+
+          required = ["_heldKeyboardKeys", "TryHandleKeyboardStateGuard", "ReleaseHeldKeyboardKeysAsync"]
+          if not all(marker in s for marker in required):
+              raise SystemExit("RunEngine keyboard guard postcondition failed")
+          p.write_text(s, encoding="utf-8", newline="\n")
+          '@ | Set-Content apply_keyboard_guard.py -Encoding UTF8
+          python apply_keyboard_guard.py
+          Remove-Item apply_keyboard_guard.py
+          if (git status --porcelain -- ams-shell/src/Ams.UI/Services/RunEngine.cs) {
+            git add ams-shell/src/Ams.UI/Services/RunEngine.cs
             git commit -m "Fix duplicate held keyboard key downs"
             git push origin HEAD:phase1/configurable-buzzer-gpio
+            "changed=true" >> $env:GITHUB_OUTPUT
+          } else {
+            "changed=false" >> $env:GITHUB_OUTPUT
           }
 
+      - uses: actions/setup-dotnet@v4
+        if: steps.guard.outputs.changed != 'true'
+        with:
+          dotnet-version: '8.0.x'
+
       - name: Compile-check bridge stack
+        if: steps.guard.outputs.changed != 'true'
         run: python -m py_compile ams-shell/bridge/bridge.py ams-shell/bridge/ams_serial.py ams-shell/bridge/ams_crypto.py
 
       - name: Restore
+        if: steps.guard.outputs.changed != 'true'
         run: dotnet restore ams-shell/AMS.sln
 
       - name: Build Release
+        if: steps.guard.outputs.changed != 'true'
         run: dotnet build ams-shell/AMS.sln -c Release --no-restore
 
       - name: Build TestRunner
+        if: steps.guard.outputs.changed != 'true'
         shell: pwsh
         run: |
           Remove-Item -Recurse -Force tests/bin, tests/obj -ErrorAction SilentlyContinue
           dotnet build tests/TestRunner.csproj -c Release
 
       - name: Run TestRunner
+        if: steps.guard.outputs.changed != 'true'
         shell: pwsh
         run: |
           dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object ci-test-output.txt
@@ -150,7 +215,7 @@ jobs:
           if (Select-String -Path ci-test-output.txt -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
 
       - name: Package test release zip
-        if: success()
+        if: steps.guard.outputs.changed != 'true' && success()
         shell: pwsh
         run: |
           $out = "ams-shell/src/Ams.UI/bin/Release/net8.0-windows"
@@ -158,10 +223,10 @@ jobs:
           Compress-Archive -Path "$out/*" -DestinationPath "Classroom-Studio-keyboard-held-key-test.zip" -Force
           (Get-FileHash Classroom-Studio-keyboard-held-key-test.zip -Algorithm SHA256).Hash | Out-File sha256.txt -Encoding ascii
           $results = (Select-String -Path ci-test-output.txt -Pattern '=== Results' | Select-Object -Last 1).Line
-          @("**Purpose:** keyboard duplicate KeyDown test build", "", "**Trigger:** committed RunEngine guard source fix", "", "**Tests:** $results", "", "**SHA256:** $(Get-Content sha256.txt -Raw)") | Out-File release_body.md -Encoding utf8
+          @("**Purpose:** keyboard duplicate KeyDown test build", "", "**Source:** committed RunEngine guard", "", "**Tests:** $results", "", "**SHA256:** $(Get-Content sha256.txt -Raw)") | Out-File release_body.md -Encoding utf8
 
       - name: Publish keyboard test release
-        if: success()
+        if: steps.guard.outputs.changed != 'true' && success()
         uses: softprops/action-gh-release@v2
         with:
           tag_name: keyboard-held-key-test-${{ github.run_number }}

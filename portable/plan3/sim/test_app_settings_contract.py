@@ -28,7 +28,7 @@ assert "public bool PostRestartLaunchEnabled { get; set; } = true;" in settings
 assert "public bool PostRestartLaunchEnabled" in view_model
 assert "nameof(MainViewModel.PostRestartLaunchEnabled)" in ui
 assert "Restart Launch" in ui and "Taskbar" in ui
-assert 'public const string PortableBuzzerPin = "GP6";' in settings
+assert "public static string PortableBuzzerPin => BuzzerGpioPolicy.NormalizeOrDefault(Load().BuzzerGpio);" in settings
 assert "PortableBuzzerPinText" in view_model and "PortableBuzzerPinText" in ui
 assert "NormalizeAutoCycleSettings" in settings
 assert "SaveAutoCycleOptions" in view_model

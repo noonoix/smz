@@ -1,6 +1,7 @@
 name: phase1-test-contract-fix
 
 # trigger pull_request_target patch installed on main
+# CI retrigger after the contract test fix
 on: [push]
 
 permissions:

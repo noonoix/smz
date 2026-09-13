@@ -1,0 +1,118 @@
+name: Phase 1 migration v3
+
+on:
+  push:
+    branches: [phase1/configurable-buzzer-gpio]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply phase one implementation
+        shell: bash
+        run: |
+          set +e
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          root=Path('.')
+          log=[]
+          def note(s): print(s); log.append(s)
+          def once(text, old, new, name):
+              n=text.count(old); note(f'{name}: matches={n}')
+              if n != 1: raise RuntimeError(f'{name}: expected 1 match, found {n}')
+              return text.replace(old,new,1)
+          def write(path,text): Path(path).write_text(text,encoding='utf-8')
+          try:
+              app_files=[p for p in (root/'ams-shell/src/Ams.UI').rglob('*.cs') if 'class AppSettings' in p.read_text(encoding='utf-8')]
+              note('AppSettings files: '+','.join(map(str,app_files)))
+              if len(app_files)!=1: raise RuntimeError('AppSettings source discovery failed')
+              app=app_files[0].read_text(encoding='utf-8')
+              if 'BuzzerGpio' not in app:
+                  at=app.index('class AppSettings'); brace=app.index('{',at)
+                  app=app[:brace+1]+'\n    public string BuzzerGpio { get; set; } = "GP6";\n'+app[brace+1:]
+                  write(app_files[0],app)
+              write(root/'ams-shell/src/Ams.UI/Services/BuzzerGpioPolicy.cs','''using System;
+          namespace Ams.UI.Services;
+          public static class BuzzerGpioPolicy
+          {
+              private static readonly string[] Pins={"GP5","GP6","GP7","GP8","GP9","GP10","GP11","GP12","GP13","GP14","GP15","GP18","GP19","GP22","GP26","GP27","GP28"};
+              public static IReadOnlyList<string> AllowedPins=>Pins;
+              public static string NormalizeOrDefault(string? value)=>TryValidate(value,out var pin,out _)?pin:"GP6";
+              public static bool TryValidate(string? value,out string pin,out string error)
+              {
+                  pin=(value??"").Trim().ToUpperInvariant();
+                  if(pin.StartsWith("BOARD.",StringComparison.Ordinal))pin=pin[6..];
+                  if(pin is "GP3" or "GP4" or "GP16" or "GP17" or "GP20" or "GP21"){error=pin+" is reserved by the board contract.";return false;}
+                  if(!Pins.Contains(pin,StringComparer.Ordinal)){error=pin+" is not an allowed free PWM-capable Pico pin.";return false;}
+                  error="";return true;
+              }
+              public static string Require(string? value){if(TryValidate(value,out var pin,out var error))return pin;throw new InvalidOperationException("خروجی متوقف شد: "+error);}
+          }
+          ''')
+              pico_path=root/'ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs'; pico=pico_path.read_text(encoding='utf-8')
+              pico=once(pico,'string? pauseResumeHotkey = "Shift+F3")','string? pauseResumeHotkey = "Shift+F3", string buzzerGpio = "GP6")','BuildCodePy signature')
+              n=pico.count('tone = pwmio.PWMOut(board.GP6,'); note(f'base buzzer anchors: matches={n}')
+              if n != 2: raise RuntimeError('expected two base buzzer anchors')
+              pico=pico.replace('tone = pwmio.PWMOut(board.GP6,','tone = pwmio.PWMOut(board.__BUZZER_GPIO__,')
+              pico=once(pico,'.Replace("__LOOP_SECONDS__", loopSeconds.ToString(CultureInfo.InvariantCulture));','.Replace("__LOOP_SECONDS__", loopSeconds.ToString(CultureInfo.InvariantCulture))\n            .Replace("__BUZZER_GPIO__", buzzerGpio);','BuildCodePy replacement')
+              pico=once(pico,'string loopMode = "forever", int loopCount = 0, int loopSeconds = 0, bool keyboardOnArm = false)   // v0.9.44','string loopMode = "forever", int loopCount = 0, int loopSeconds = 0, bool keyboardOnArm = false, string buzzerGpio = "GP6")   // v0.9.44','BuildReadme signature')
+              pico=once(pico,'var settings = AppSettings.Load();\n        Put(string.IsNullOrWhiteSpace','var settings = AppSettings.Load();\n        var buzzerGpio = BuzzerGpioPolicy.Require(settings.BuzzerGpio);\n        Put(string.IsNullOrWhiteSpace','export setting')
+              pico=once(pico,'settings.RunStopHotkey, settings.PauseResumeHotkey));','settings.RunStopHotkey, settings.PauseResumeHotkey, buzzerGpio));','BuildCodePy call')
+              pico=once(pico,'BuildReadme(states, machine, loopMode, loopCount, loopSeconds, keyboardOnArm));','BuildReadme(states, machine, loopMode, loopCount, loopSeconds, keyboardOnArm, buzzerGpio));','BuildReadme call')
+              pico_path.write_text(pico,encoding='utf-8')
+              auto_path=root/'ams-shell/src/Ams.UI/Services/AutoCycleFirmwareBundle.cs'; auto=auto_path.read_text(encoding='utf-8')
+              auto=once(auto,'var written=PicoFirmwareExporter.Export(codePyPath,steps,machine,loopMode,loopCount,loopSeconds,keyboardOnArm).ToList();','var buzzerGpio=BuzzerGpioPolicy.Require(AppSettings.Load().BuzzerGpio); var written=PicoFirmwareExporter.Export(codePyPath,steps,machine,loopMode,loopCount,loopSeconds,keyboardOnArm,buzzerGpio).ToList();','AutoCycle export')
+              auto=once(auto,'var patched=PatchCode(File.ReadAllText(full),Path.Combine(runtimeDir,PatchManifest));','var patched=PatchCode(File.ReadAllText(full),Path.Combine(runtimeDir,PatchManifest),buzzerGpio);','AutoCycle patch')
+              auto=once(auto,'public static string PatchCode(string code,string manifestPath)','public static string PatchCode(string code,string manifestPath,string buzzerGpio="GP6")','PatchCode signature')
+              auto=once(auto,'code=NormalizeBuzzerForManifest(code);','code=NormalizeBuzzerForManifest(code,buzzerGpio);','Normalize call')
+              auto=once(auto,'private static string NormalizeBuzzerForManifest(string code)','private static string NormalizeBuzzerForManifest(string code,string buzzerGpio)','Normalize signature')
+              auto=auto.replace('const string planGp6="tone = pwmio.PWMOut(board.GP6, duty_cycle=0,\\n                                frequency=int(freq)"','var planGp6="tone = pwmio.PWMOut(board."+buzzerGpio+", duty_cycle=0,\\n                                frequency=int(freq)"')
+              auto=once(auto,'return code.Replace(planGp6,planGp5,StringComparison.Ordinal);','return code.Replace(planGp6,planGp5,StringComparison.Ordinal);','AutoCycle tone replacement')
+              auto=once(auto,'        return code;\n    }\n    private static string NormalizeBuzzerForManifest','        code=code.Replace("tone = pwmio.PWMOut(board.GP6,","tone = pwmio.PWMOut(board."+buzzerGpio+",",StringComparison.Ordinal);\n        return code;\n    }\n    private static string NormalizeBuzzerForManifest','AutoCycle selected pin')
+              auto_path.write_text(auto,encoding='utf-8')
+              write(root/'tests/BuzzerGpioPhase1Tests.cs','''using System;
+          using System.Runtime.CompilerServices;
+          using Ams.UI.Services;
+          namespace Ams.Tests;
+          internal static class BuzzerGpioPhase1Tests
+          {
+              [ModuleInitializer]
+              internal static void Run()
+              {
+                  if(BuzzerGpioPolicy.NormalizeOrDefault(null)!="GP6")throw new Exception("legacy buzzer default is not GP6");
+                  if(!BuzzerGpioPolicy.TryValidate("GP7",out var pin,out _)||pin!="GP7")throw new Exception("GP7 was not accepted");
+                  if(BuzzerGpioPolicy.TryValidate("GP20",out _,out _)||BuzzerGpioPolicy.TryValidate("GP3",out _,out _))throw new Exception("reserved buzzer pin was accepted");
+                  var code=PicoFirmwareExporter.BuildCodePy(Array.Empty<PicoFirmwareExporter.LightState>(),"phase1-test",buzzerGpio:"GP7");
+                  if(!code.Contains("PWMOut(board.GP7",StringComparison.Ordinal))throw new Exception("GP7 did not reach generated code.py");
+                  if(code.Contains("PWMOut(board.GP6",StringComparison.Ordinal))throw new Exception("generated code.py still contains hardcoded GP6 buzzer output");
+              }
+          }
+          ''')
+              note('SUCCESS')
+              Path('phase1-v3-debug.txt').write_text('\n'.join(log)+'\n',encoding='utf-8')
+              raise SystemExit(0)
+          except Exception as exc:
+              note('ERROR: '+repr(exc))
+              Path('phase1-v3-debug.txt').write_text('\n'.join(log)+'\n',encoding='utf-8')
+              raise
+          PY
+          rc=$?
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          if [ "$rc" -eq 0 ]; then
+            git add ams-shell tests phase1-v3-debug.txt
+            git commit -m "feat: make Pico buzzer GPIO configurable"
+            git push origin HEAD:phase1/configurable-buzzer-gpio
+          else
+            git add phase1-v3-debug.txt
+            git commit -m "ci: record phase one v3 diagnostics" || true
+            git push origin HEAD:phase1/configurable-buzzer-gpio || true
+          fi
+          exit $rc

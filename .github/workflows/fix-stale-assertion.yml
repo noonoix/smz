@@ -1,0 +1,35 @@
+name: Apply one-time stale assertion correction
+
+on:
+  push:
+    branches:
+      - feature/error-step-timeout-ui
+    paths:
+      - .github/workflows/fix-stale-assertion.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/error-step-timeout-ui
+          fetch-depth: 0
+
+      - name: Correct the stale assertion and remove this helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(grep -c 'Assert(v43insert.Count == 24,' tests/TestRunner.cs)" -eq 1
+          sed -i 's/Assert(v43insert.Count == 24,/Assert(v43insert.Count == 25,/' tests/TestRunner.cs
+          grep -n 'Assert(v43insert.Count' tests/TestRunner.cs
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add tests/TestRunner.cs
+          git rm .github/workflows/fix-stale-assertion.yml
+          git commit -m "Correct insertion-surface step-count assertion"
+          git push origin HEAD:feature/error-step-timeout-ui

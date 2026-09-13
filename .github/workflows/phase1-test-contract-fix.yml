@@ -1,6 +1,6 @@
 name: phase1-test-contract-fix
 
-# trigger workflow-run fixer installed on main
+# trigger PR-based fixer installed on main
 on: [push]
 
 permissions:

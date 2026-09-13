@@ -1,11 +1,10 @@
-name: mouse reliability one-shot
+name: mouse reliability one shot
 
 on:
   push:
     branches: [phase1/configurable-buzzer-gpio]
     paths:
-      - tools/apply_mouse_reliability.py
-      - tools/repair_mouse_patch_script.py
+      - tools/apply_mouse_reliability_v2.py
       - .github/workflows/mouse-reliability-one-shot.yml
 
 permissions:
@@ -22,37 +21,21 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-      - name: Apply, build, test, and publish result
+      - name: Apply build test and commit
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Continue'
           $log = 'mouse-patch-result.txt'
-          "mouse reliability run $(Get-Date -Format o)" | Set-Content $log
-
-          python tools/repair_mouse_patch_script.py 2>&1 | Tee-Object -FilePath $log -Append
+          "mouse reliability v2 $(Get-Date -Format o)" | Set-Content $log
+          python tools/apply_mouse_reliability_v2.py 2>&1 | Tee-Object -FilePath $log -Append
           $code = $LASTEXITCODE
-          if ($code -eq 0) {
-            python tools/apply_mouse_reliability.py 2>&1 | Tee-Object -FilePath $log -Append
-            $code = $LASTEXITCODE
-          }
-          if ($code -eq 0) {
-            python -m py_compile ams-shell/bridge/bridge.py 2>&1 | Tee-Object -FilePath $log -Append
-            $code = $LASTEXITCODE
-          }
-          if ($code -eq 0) {
-            dotnet build ams-shell/AMS.sln -c Release 2>&1 | Tee-Object -FilePath $log -Append
-            $code = $LASTEXITCODE
-          }
-          if ($code -eq 0) {
-            dotnet run --project tests/TestRunner.csproj -c Release 2>&1 | Tee-Object -FilePath $log -Append
-            $code = $LASTEXITCODE
-          }
-
+          if ($code -eq 0) { python -m py_compile ams-shell/bridge/bridge.py 2>&1 | Tee-Object -FilePath $log -Append; $code = $LASTEXITCODE }
+          if ($code -eq 0) { dotnet build ams-shell/AMS.sln -c Release 2>&1 | Tee-Object -FilePath $log -Append; $code = $LASTEXITCODE }
+          if ($code -eq 0) { dotnet run --project tests/TestRunner.csproj -c Release 2>&1 | Tee-Object -FilePath $log -Append; $code = $LASTEXITCODE }
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if ($code -eq 0) {
-            Remove-Item tools/apply_mouse_reliability.py
-            Remove-Item tools/repair_mouse_patch_script.py
+            Remove-Item tools/apply_mouse_reliability.py,tools/repair_mouse_patch_script.py,tools/apply_mouse_reliability_v2.py -ErrorAction SilentlyContinue
             Remove-Item .github/workflows/mouse-reliability-one-shot.yml
             Remove-Item $log
             git add -A
@@ -60,9 +43,8 @@ jobs:
             git push origin HEAD:phase1/configurable-buzzer-gpio
             exit 0
           }
-
           "FAILED exit=$code" | Add-Content $log
           git add $log
-          git commit -m "Record mouse patch failure diagnostics"
+          git commit -m "Record mouse patch v2 failure diagnostics"
           git push origin HEAD:phase1/configurable-buzzer-gpio
           exit $code

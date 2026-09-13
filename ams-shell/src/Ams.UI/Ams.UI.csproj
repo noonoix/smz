@@ -26,7 +26,12 @@
   <ItemGroup><Resource Include="Resources\ams.ico" /></ItemGroup>
 
   <ItemGroup>
-    <None Include="..\..\bridge\**"><Link>bridge\%(RecursiveDir)%(Filename)%(Extension)</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <!-- v0.9.67k: keep the proven bridge as bridge_core.py and launch the tiny
+         low-latency wrapper as bridge.py. This preserves every protocol path while
+         reducing Pico DATA's post-handshake read timeout from 200 ms to 10 ms. -->
+    <None Include="..\..\bridge\**" Exclude="..\..\bridge\bridge.py;..\..\bridge\bridge_fast_keyboard.py"><Link>bridge\%(RecursiveDir)%(Filename)%(Extension)</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="..\..\bridge\bridge.py"><Link>bridge\bridge_core.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="..\..\bridge\bridge_fast_keyboard.py"><Link>bridge\bridge.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\caterina\Caterina.hex"><Link>caterina\Caterina.hex</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\tools\isp_flash.py"><Link>tools\isp_flash.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY\plan_cycle.py"><Link>portable-runtime\plan_cycle.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>

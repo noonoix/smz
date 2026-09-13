@@ -25,6 +25,7 @@ public partial class OptionsDialog : Window
     public string PauseResumeHotkey { get; private set; } = "Shift+F3";
     // v0.9.44 — which board executes the keyboard ("pico" = brain, "promicro" = arm)
     public string KeyboardBoard { get; private set; } = "pico";
+    public string BuzzerGpio { get; private set; } = "GP6";
     public bool NoActivateWhenStopped { get; private set; }
 
     // v0.9.55 - embedded mode: the settings live inside the main window, so this Window is
@@ -70,6 +71,10 @@ public partial class OptionsDialog : Window
         PortBox.Text = port;
         DirBox.Text = pythonDir;
         ToolkitBox.Text = toolkitDir;
+        var buzzerSettings = Ams.UI.Services.AppSettings.Load();
+        BuzzerGpioBox.ItemsSource = Ams.UI.Services.BuzzerGpioPolicy.AllowedPins;
+        BuzzerGpio = Ams.UI.Services.BuzzerGpioPolicy.NormalizeOrDefault(buzzerSettings.BuzzerGpio);
+        BuzzerGpioBox.SelectedItem = BuzzerGpio;
         WordDelayMinBox.Text = wordDelayMin.ToString();
         WordDelayMaxBox.Text = wordDelayMax.ToString();
         MouseSpeedMinBox.Text = mouseMoveSpeedMin.ToString();
@@ -394,12 +399,23 @@ public partial class OptionsDialog : Window
         if (dup != null)
         {
             System.Windows.MessageBox.Show(
-                $"کلید ترکیبی «{dup.Key}» در بیش از یک فیلد تکرار شده است.\nهر کلید فقط باید به یک عمل اختصاص یابد.",
+                $"کلید ترکیبی «{dup.Key}» در بیش از یک فیلد تکراری شده است.\nهر کلید فقط باید به یک عمل اختصاص یابد.",
                 "تکراری بودن کلید ترکیبی",
                 System.Windows.MessageBoxButton.OK,
                 System.Windows.MessageBoxImage.Warning);
             return;
         }
+
+        var selectedBuzzer = BuzzerGpioBox.SelectedItem as string;
+        if (!Ams.UI.Services.BuzzerGpioPolicy.TryValidate(selectedBuzzer, out var buzzerPin, out var buzzerError))
+        {
+            MessageBox.Show(buzzerError, "Buzzer GPIO", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        var savedBuzzerSettings = Ams.UI.Services.AppSettings.Load();
+        savedBuzzerSettings.BuzzerGpio = buzzerPin;
+        savedBuzzerSettings.Save();
+        BuzzerGpio = buzzerPin;
 
         Finish(true);
     }

@@ -25,8 +25,19 @@ public static class AutoCycleFirmwareBundle
         if(manifest.Version!=1||manifest.Edits.Count==0)throw new InvalidDataException("نسخه یا محتوای manifest چرخه معتبر نیست.");
         if(!code.Contains(manifest.Baseline,StringComparison.Ordinal))throw new InvalidDataException("Firmware پایه h6 مورد انتظار پیدا نشد: "+manifest.Baseline);
         foreach(var edit in manifest.Edits)code=ReplaceOnce(code,edit.Old,edit.New);
+        code=PreserveKtextWhitespace(code);
         foreach(var marker in RequiredMarkers)if(!code.Contains(marker,StringComparison.Ordinal))throw new InvalidDataException("پست‌کاندیشن Firmware چرخه پیدا نشد: "+marker);
+        code=code.Replace("tone = pwmio.PWMOut(board.GP6,","tone = pwmio.PWMOut(board."+BuzzerGpioPolicy.Require(AppSettings.Load().BuzzerGpio)+",",StringComparison.Ordinal);
         return code;
+    }
+    // A KTEXT payload may intentionally end with a literal space: in typo-correction
+    // mode the planner flushes the text before the slip and then retypes the remainder.
+    // The old line parser used strip(), deleting that trailing separator before HID saw it.
+    private static string PreserveKtextWhitespace(string code)
+    {
+        const string oldLine="line = raw.decode(\"utf-8\", \"replace\").strip()";
+        const string newLine="line = raw.decode(\"utf-8\", \"replace\").rstrip(\"\\r\")";
+        return code.Replace(oldLine,newLine,StringComparison.Ordinal);
     }
     private static string NormalizeBuzzerForManifest(string code)
     {
@@ -42,7 +53,7 @@ public static class AutoCycleFirmwareBundle
         code=code.Remove(start,end-start);
         destination=code.IndexOf(trigger,StringComparison.Ordinal);
         code=code.Insert(destination,block);
-        const string planGp6="tone = pwmio.PWMOut(board.GP6, duty_cycle=0,\n                                frequency=int(freq)";
+        var planGp6="tone = pwmio.PWMOut(board."+BuzzerGpioPolicy.Require(AppSettings.Load().BuzzerGpio)+", duty_cycle=0,\n                                frequency=int(freq)";
         const string planGp5="tone = pwmio.PWMOut(board.GP5, duty_cycle=0,\n                                frequency=int(freq)";
         if(code.CountOccurrences(planGp6)!=1)throw new InvalidDataException("قالب GP6 plan beep قابل همگام‌سازی نیست.");
         return code.Replace(planGp6,planGp5,StringComparison.Ordinal);
@@ -55,11 +66,6 @@ public static class AutoCycleFirmwareBundle
         var first=text.IndexOf(oldText,StringComparison.Ordinal);
         var duplicate=first>=0&&text.IndexOf(oldText,first+oldText.Length,StringComparison.Ordinal)>=0;
         if(!duplicate&&first>=0)return text[..first]+newText+text[(first+oldText.Length)..];
-
-        // The buzzer patch deliberately normalizes the generated firmware before applying
-        // the legacy manifest. If an older template changes only the indentation or the
-        // preceding TRGSND return block, keep the replacement anchored to the unique beep
-        // method instead of silently accepting an arbitrary match.
         const string beepMarker="    def beep(self, freq, ms):";
         const string beepEnd="            if not _plan_sleep_ms(int(ms)):\n";
         var oldBeep=text.IndexOf(beepMarker,StringComparison.Ordinal);

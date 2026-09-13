@@ -144,7 +144,7 @@ public static class PicoFirmwareExporter
     /// <summary>code.py for this system (the placeholders are filled from the current plan).</summary>
     public static string BuildCodePy(IReadOnlyList<LightState> states, string machine,
         string loopMode = "forever", int loopCount = 0, int loopSeconds = 0, bool keyboardOnArm = false,
-        string? runStopHotkey = "Shift+F1", string? pauseResumeHotkey = "Shift+F3")
+        string? runStopHotkey = "Shift+F1", string? pauseResumeHotkey = "Shift+F3", string buzzerGpio = "GP6")
         => CodeTemplate
             .Replace("__MACHINE__", machine)
             .Replace("__GENERATED__", DateTime.Now.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture))
@@ -152,7 +152,8 @@ public static class PicoFirmwareExporter
             .Replace("__STATE_COUNT__", states.Count.ToString(CultureInfo.InvariantCulture))
             .Replace("__LOOP_MODE__", loopMode)
             .Replace("__LOOP_COUNT__", loopCount.ToString(CultureInfo.InvariantCulture))
-            .Replace("__LOOP_SECONDS__", loopSeconds.ToString(CultureInfo.InvariantCulture));
+            .Replace("__LOOP_SECONDS__", loopSeconds.ToString(CultureInfo.InvariantCulture))
+            .Replace("__BUZZER_GPIO__", buzzerGpio);
         // v0.9.60 — final hardware contract: the keyboard always runs on the Pico and the
         // keypad is fixed (GP4 = Num Lock start/stop, GP3 = Scroll Lock pause/resume), so
         // keyboardOnArm and the Options gestures no longer reach the firmware. The
@@ -933,7 +934,7 @@ public static class PicoFirmwareExporter
                     a = ints(line.split("|", 1)[1].split(","), 2)
                     if not 30 <= a[0] <= 20000 or a[1] <= 0:
                         return "ERR|RANGE|BEEP"
-                    tone = pwmio.PWMOut(board.GP6, duty_cycle=0, frequency=a[0], variable_frequency=True)
+                    tone = pwmio.PWMOut(board.__BUZZER_GPIO__, duty_cycle=0, frequency=a[0], variable_frequency=True)
                     try:
                         tone.duty_cycle = 32768
                         time.sleep(a[1] / 1000)
@@ -1127,7 +1128,7 @@ public static class PicoFirmwareExporter
                 import pwmio
                 tone = None
                 try:
-                    tone = pwmio.PWMOut(board.GP6, duty_cycle=0,
+                    tone = pwmio.PWMOut(board.__BUZZER_GPIO__, duty_cycle=0,
                                         frequency=int(freq), variable_frequency=True)
                     tone.duty_cycle = 32768
                     if not _plan_sleep_ms(int(ms)):
@@ -1268,7 +1269,7 @@ public static class PicoFirmwareExporter
 
     /// <summary>Per-system flashing + calibration instructions (Persian, like the other docs).</summary>
     public static string BuildReadme(IReadOnlyList<LightState> states, string machine,
-        string loopMode = "forever", int loopCount = 0, int loopSeconds = 0, bool keyboardOnArm = false)   // v0.9.44
+        string loopMode = "forever", int loopCount = 0, int loopSeconds = 0, bool keyboardOnArm = false, string buzzerGpio = "GP6")   // v0.9.44
     {
         var sb = new StringBuilder();
         sb.AppendLine("# Pico light sensor - " + machine);
@@ -1326,7 +1327,7 @@ public static class PicoFirmwareExporter
 
     /// <summary>Writes the whole bundle next to <paramref name="codePyPath"/> and returns the written paths.</summary>
     public static IReadOnlyList<string> Export(string codePyPath, IEnumerable<StepNode> steps, string machine,
-        string loopMode = "forever", int loopCount = 0, int loopSeconds = 0, bool keyboardOnArm = false)   // v0.9.44 — Play Options + keyboard board
+        string loopMode = "forever", int loopCount = 0, int loopSeconds = 0, bool keyboardOnArm = false, string buzzerGpio = "GP6")   // v0.9.44 — Play Options + keyboard board
     {
         var dir = Path.GetDirectoryName(codePyPath);
         if (string.IsNullOrEmpty(dir)) throw new IOException("no target folder for the Pico bundle");
@@ -1339,12 +1340,13 @@ public static class PicoFirmwareExporter
             written.Add(p);
         }
         var settings = AppSettings.Load();
+        var selectedBuzzerGpio = BuzzerGpioPolicy.Require(settings.BuzzerGpio);
         Put(string.IsNullOrWhiteSpace(Path.GetFileName(codePyPath)) ? "code.py" : Path.GetFileName(codePyPath),
             BuildCodePy(states, machine, loopMode, loopCount, loopSeconds, keyboardOnArm,
-                        settings.RunStopHotkey, settings.PauseResumeHotkey));
+                        settings.RunStopHotkey, settings.PauseResumeHotkey, selectedBuzzerGpio));
         Put("boot.py", BuildBootPy());
         Put("pico-calibration.json", BuildCalibrationJson(states, machine));
-        Put("README-FLASH.md", BuildReadme(states, machine, loopMode, loopCount, loopSeconds, keyboardOnArm));   // v0.9.44
+        Put("README-FLASH.md", BuildReadme(states, machine, loopMode, loopCount, loopSeconds, keyboardOnArm, selectedBuzzerGpio));   // v0.9.44
         return written;
     }
 }

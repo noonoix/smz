@@ -14,6 +14,7 @@ public partial class App : System.Windows.Application
             return;
         }
         Services.ErrorPolicyBootstrap.Initialize();
+        Services.HumanMouseDefaultsPolicy.ApplyOnce();
         base.OnStartup(e);
     }
 }

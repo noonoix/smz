@@ -1,0 +1,2 @@
+planGp6 matches=0
+ERROR RuntimeError('planGp6 anchor mismatch')

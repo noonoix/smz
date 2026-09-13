@@ -1,0 +1,120 @@
+name: keyboard-held-key-test-build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [phase1/configurable-buzzer-gpio]
+    paths:
+      - '.github/workflows/keyboard-fix-test.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair-and-build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore RunEngine and apply keyboard guard
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          $p = 'ams-shell/src/Ams.UI/Services/RunEngine.cs'
+          git show a6b709d0b86ad666753732f31bdbcca441ed9820:$p | Set-Content $p -Encoding UTF8
+          $s = Get-Content $p -Raw
+          $s = $s.Replace('private readonly HashSet<string> _scriptStack = new(StringComparer.OrdinalIgnoreCase);', 'private readonly HashSet<string> _scriptStack = new(StringComparer.OrdinalIgnoreCase);' + "`r`n" + '    // v0.9.64-keyboard-test — suppress duplicate KDOWN for a key already held in this run.' + "`r`n" + '    private readonly HashSet<int> _heldKeyboardKeys = new();')
+          $s = $s.Replace('_parallelKeySeq = 0; _lastParallelKeyTick = 0; _mouseRestAtSeq = -1;   // v0.9.23 — reset typing signal', '_parallelKeySeq = 0; _lastParallelKeyTick = 0; _mouseRestAtSeq = -1;   // v0.9.23 — reset typing signal' + "`r`n" + '        _heldKeyboardKeys.Clear();')
+          $old = 'await Send(wireCmd, ct,' + "`r`n" + '                                logAs: secret && cmd.StartsWith("KTEXT|") ? MaskKtext(cmd) : null);'
+          $new = 'if (TryHandleKeyboardStateGuard(wireCmd, out var guardedCmd, out var guardLog))' + "`r`n" + '                            {' + "`r`n" + '                                if (guardLog is not null) _log(guardLog);' + "`r`n" + '                                if (guardedCmd is not null)' + "`r`n" + '                                    await Send(guardedCmd, ct, logAs: secret && cmd.StartsWith("KTEXT|") ? MaskKtext(cmd) : null);' + "`r`n" + '                            }' + "`r`n" + '                            else' + "`r`n" + '                            {' + "`r`n" + '                                await Send(wireCmd, ct,' + "`r`n" + '                                    logAs: secret && cmd.StartsWith("KTEXT|") ? MaskKtext(cmd) : null);' + "`r`n" + '                            }'
+          $s = $s.Replace($old, $new)
+          $helper = @'
+
+    private bool TryHandleKeyboardStateGuard(string cmd, out string? guardedCmd, out string? guardLog)
+    {
+        guardedCmd = cmd;
+        guardLog = null;
+        string body = cmd;
+        string prefix = "";
+        if (body.StartsWith("KBDARM|", StringComparison.Ordinal)) { prefix = "KBDARM|"; body = body[7..]; }
+        else if (body.StartsWith("KBDPICO|", StringComparison.Ordinal)) { prefix = "KBDPICO|"; body = body[8..]; }
+        if (body.StartsWith("KDOWN|", StringComparison.Ordinal) && int.TryParse(body[6..], out var downVk))
+        {
+            if (_heldKeyboardKeys.Contains(downVk))
+            {
+                guardedCmd = null;
+                guardLog = $"keyboard guard: duplicate KDOWN|{downVk} suppressed";
+                return true;
+            }
+            _heldKeyboardKeys.Add(downVk);
+            guardedCmd = prefix + body;
+            return true;
+        }
+        if (body.StartsWith("KUP|", StringComparison.Ordinal) && int.TryParse(body[4..], out var upVk))
+        {
+            _heldKeyboardKeys.Remove(upVk);
+            guardedCmd = prefix + body;
+            return true;
+        }
+        return false;
+    }
+'@
+          $s = $s.Replace("`r`n    private async Task<string> Send(string cmd", $helper + "`r`n    private async Task<string> Send(string cmd")
+          Set-Content $p $s -Encoding UTF8
+          git add $p
+          git commit -m "Fix duplicate held keyboard key downs" || echo "No RunEngine changes to commit"
+          git push origin HEAD:phase1/configurable-buzzer-gpio
+
+      - name: Compile-check bridge stack
+        run: python -m py_compile ams-shell/bridge/bridge.py ams-shell/bridge/ams_serial.py ams-shell/bridge/ams_crypto.py
+
+      - name: Restore
+        run: dotnet restore ams-shell/AMS.sln
+
+      - name: Build Release
+        run: dotnet build ams-shell/AMS.sln -c Release --no-restore
+
+      - name: Build TestRunner
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force tests/bin, tests/obj -ErrorAction SilentlyContinue
+          dotnet build tests/TestRunner.csproj -c Release
+
+      - name: Run TestRunner
+        shell: pwsh
+        run: |
+          dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object ci-test-output.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (Select-String -Path ci-test-output.txt -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
+
+      - name: Package test release zip
+        if: success()
+        shell: pwsh
+        run: |
+          $out = "ams-shell/src/Ams.UI/bin/Release/net8.0-windows"
+          Remove-Item -Recurse -Force "$out/bridge/__pycache__" -ErrorAction SilentlyContinue
+          Compress-Archive -Path "$out/*" -DestinationPath "Classroom-Studio-keyboard-held-key-test.zip" -Force
+          (Get-FileHash Classroom-Studio-keyboard-held-key-test.zip -Algorithm SHA256).Hash | Out-File sha256.txt -Encoding ascii
+          $results = (Select-String -Path ci-test-output.txt -Pattern '=== Results' | Select-Object -Last 1).Line
+          @("**Purpose:** keyboard duplicate KeyDown test build", "", "**Tests:** $results", "", "**SHA256:** $(Get-Content sha256.txt -Raw)") | Out-File release_body.md -Encoding utf8
+
+      - name: Publish keyboard test release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: keyboard-held-key-test-${{ github.run_number }}
+          name: "Keyboard held-key test — run #${{ github.run_number }}"
+          body_path: release_body.md
+          prerelease: true
+          files: |
+            Classroom-Studio-keyboard-held-key-test.zip
+            sha256.txt
+            ci-test-output.txt

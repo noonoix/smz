@@ -1,0 +1,90 @@
+name: Phase 1 GP7 hardware artifact
+
+on:
+  pull_request:
+    paths:
+      - 'ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs'
+      - 'firmware/code64f/plan_engine.py'
+      - 'ams-shell/src/Ams.UI/Services/AutoCycleFirmwareBundle.cs'
+      - 'portable/plan3/sim/test_typing_space_contract.py'
+      - '.github/workflows/phase1-hardware-artifact.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-gp7-bundle:
+    name: phase1 / GP7 hardware artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate GP7 firmware bundle from the exporter template
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from datetime import datetime, timezone
+          from pathlib import Path
+          import hashlib
+          import json
+          import shutil
+
+          source = Path('ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs').read_text(encoding='utf-8')
+          marker = 'private const string CodeTemplate = """"'
+          start = source.index(marker)
+          body_start = source.index('\n', start) + 1
+          end = source.index('\n        """";', body_start)
+          body = source[body_start:end]
+          lines = body.splitlines()
+          body = '\n'.join(line[8:] if line.startswith('        ') else line for line in lines) + '\n'
+          values = {
+              '__MACHINE__': 'phase1-gp7-hardware-gate',
+              '__GENERATED__': datetime.now().strftime('%Y-%m-%d %H:%M'),
+              '__VERSION__': '0.9.64f',
+              '__STATE_COUNT__': '0',
+              '__LOOP_MODE__': 'once',
+              '__LOOP_COUNT__': '0',
+              '__LOOP_SECONDS__': '0',
+              '__BUZZER_GPIO__': 'GP7',
+          }
+          for key, value in values.items():
+              body = body.replace(key, value)
+          body = body.replace(
+              'line = raw.decode("utf-8", "replace").strip()',
+              'line = raw.decode("utf-8", "replace").rstrip("\\r")')
+          if 'PWMOut(board.GP7' not in body:
+              raise SystemExit('generated code has no GP7 PWM output')
+          if 'PWMOut(board.GP6' in body:
+              raise SystemExit('generated GP7 code still contains GP6 PWM output')
+          if 'raw.decode("utf-8", "replace").strip()' in body:
+              raise SystemExit('generated code still strips KTEXT trailing spaces')
+
+          out = Path('hardware-gate-gp7')
+          out.mkdir()
+          (out / 'code.py').write_text(body, encoding='utf-8')
+          (out / 'boot.py').write_text('''# Classroom Studio - Pico USB serial configuration\nimport usb_cdc\nusb_cdc.enable(console=True, data=True)\n''', encoding='utf-8')
+          (out / 'pico-calibration.json').write_text(json.dumps({
+              'generator': 'Classroom Studio v0.9.64f',
+              'system': 'phase1-gp7-hardware-gate',
+              'generatedUtc': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
+              'sensor': {'chip': 'BH1750', 'board': 'GY-302/GY-30', 'i2c': 'I2C0 SDA=GP20 SCL=GP21', 'addr': 35},
+              'states': [],
+          }, indent=2) + '\n', encoding='utf-8')
+          (out / 'README-FLASH.md').write_text('''# Phase 1 GP7 hardware gate\n\nThis bundle was generated from the configurable-buzzer-gpio exporter.\n\n- Buzzer control: Pico GP7, physical pin 10\n- Keep the existing transistor/resistor driver and common ground. Do not connect a passive buzzer directly to the GPIO.\n- Keep UART on GP16/GP17, I2C on GP20/GP21, and keypad wiring unchanged.\n- Copy `code.py`, `boot.py`, and `pico-calibration.json` to the root of `CIRCUITPY`.\n- Keep automatic restart/resume disabled; this is a manual hardware gate.\n- Test `BEEP|880,180`, then run a minimal HID/UART smoke test.\n''', encoding='utf-8')
+          shutil.copy('firmware/code64f/plan_engine.py', out / 'plan_engine.py')
+          (out / 'SOURCE-COMMIT.txt').write_text('${{ github.sha }}\n', encoding='utf-8')
+          for path in sorted(out.iterdir()):
+              digest = hashlib.sha256(path.read_bytes()).hexdigest()
+              with (out / 'sha256.txt').open('a', encoding='utf-8') as fh:
+                  fh.write(f'{digest}  {path.name}\n')
+          PY
+
+      - name: Upload GP7 hardware gate artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-gp7-hardware-gate-${{ github.sha }}
+          path: hardware-gate-gp7
+          if-no-files-found: error
+          retention-days: 14

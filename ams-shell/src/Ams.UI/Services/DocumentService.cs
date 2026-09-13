@@ -84,6 +84,8 @@ public static class DocumentService
 /// </summary>
 public sealed class AppSettings
 {
+    public string BuzzerGpio { get; set; } = "GP6";
+
     /// <summary>Default AUTO: BoardLink scans KNOWN_VIDS and finds the board on any COM (§14.3 / §15.5).</summary>
     public string Port { get; set; } = "AUTO";
     public string PythonDir { get; set; } = "";
@@ -98,8 +100,8 @@ public sealed class AppSettings
     public bool NoActivateWhenStopped { get; set; }
 
     // v0.9.67 — portable automatic-cycle settings. These belong to app settings and are
-    // intentionally not written into .amsj documents. The buzzer pin is hardware policy,
-    // not a user option: every portable export uses GP6.
+    // intentionally not written into .amsj documents. The selected buzzer pin is a hardware
+    // option and is resolved through BuzzerGpioPolicy at export time.
     public int RestartMinMinutes { get; set; } = 110;
     public int RestartMaxMinutes { get; set; } = 130;
     public bool AutoResumeEnabled { get; set; } = true;
@@ -111,7 +113,7 @@ public sealed class AppSettings
     public int PostRestartLaunchBeforeMaxSeconds { get; set; } = 3;
     public int PostRestartLaunchAfterMinSeconds { get; set; } = 20;
     public int PostRestartLaunchAfterMaxSeconds { get; set; } = 40;
-    public const string PortableBuzzerPin = "GP6";
+    public static string PortableBuzzerPin => BuzzerGpioPolicy.NormalizeOrDefault(Load().BuzzerGpio);
 
     public int WordDelayMin { get; set; }
     public int WordDelayMax { get; set; }

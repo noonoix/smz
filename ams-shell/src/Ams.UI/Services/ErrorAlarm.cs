@@ -1,9 +1,6 @@
-using System.Media;
-
 namespace Ams.UI.Services;
 
-/// <summary>Cancellable PC-side fallback alarm. Pico-side alarms remain local to the portable
-/// runtime; this class is used when the host still has a usable audio device.</summary>
+/// <summary>Cancellable PC-side fallback alarm. The portable runtime owns Pico-side alarms; this host fallback uses a framework console signal so it does not require an extra audio assembly reference during the Windows build.</summary>
 public sealed class ErrorAlarm : IDisposable
 {
     private readonly CancellationTokenSource _cts = new();
@@ -13,12 +10,10 @@ public sealed class ErrorAlarm : IDisposable
     {
         _loop = Task.Run(async () =>
         {
-            var until = policy.AlarmDurationSeconds > 0
-                ? DateTimeOffset.UtcNow.AddSeconds(policy.AlarmDurationSeconds)
-                : DateTimeOffset.MaxValue;
+            var until = policy.AlarmDurationSeconds > 0 ? DateTimeOffset.UtcNow.AddSeconds(policy.AlarmDurationSeconds) : DateTimeOffset.MaxValue;
             do
             {
-                try { SystemSounds.Exclamation.Play(); } catch { }
+                try { Console.Beep(880, 180); } catch { }
                 if (!policy.RepeatAlarm) break;
                 await Task.Delay(850, _cts.Token);
             } while (DateTimeOffset.UtcNow < until && !_cts.IsCancellationRequested);

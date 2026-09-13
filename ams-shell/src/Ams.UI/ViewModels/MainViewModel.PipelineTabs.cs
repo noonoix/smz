@@ -113,7 +113,12 @@ public partial class MainViewModel
     private void NewPipelineWorkspace()
     {
         if (!ConfirmDiscard()) return;
-        _pipelineWorkspace = new PipelineWorkspace();
+        InitializePipelineTabs();
+        foreach (var tab in _pipelineWorkspace.Tabs)
+        {
+            tab.Steps.Clear();
+            tab.IsDirty = false;
+        }
         _activePipelineTab = _pipelineWorkspace[PipelineKind.Main];
         _currentFile = null;
         _dirty = false;
@@ -130,14 +135,19 @@ public partial class MainViewModel
     private void OpenPipelineWorkspace()
     {
         if (!ConfirmDiscard()) return;
+        InitializePipelineTabs();
+        var targetKind = _activePipelineTab?.Kind ?? PipelineKind.Main;
         var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "AMS pipeline (*.amsj)|*.amsj" };
         if (dialog.ShowDialog() != true) return;
         try
         {
             var json = File.ReadAllText(dialog.FileName);
             try { _pipelineWorkspace = PipelineWorkspaceSerializer.Deserialize(json); }
-            catch (InvalidDataException) { _pipelineWorkspace = PipelineWorkspace.FromLegacy(DocumentService.Load(dialog.FileName)); }
-            _activePipelineTab = _pipelineWorkspace[PipelineKind.Main];
+            catch (InvalidDataException)
+            {
+                _pipelineWorkspace = PipelineWorkspace.FromLegacy(DocumentService.Load(dialog.FileName), targetKind);
+            }
+            _activePipelineTab = _pipelineWorkspace[targetKind];
             _currentFile = dialog.FileName;
             _dirty = false;
             LoadActivePipeline();
@@ -147,7 +157,7 @@ public partial class MainViewModel
             OnPropertyChanged(nameof(ActivePipelineTitle));
             OnPropertyChanged(nameof(IsLaunchPipeline));
             UpdateFileText();
-            Log("pipeline workspace opened: " + dialog.FileName + " — " + PipelineCounts());
+            Log("pipeline workspace opened in " + targetKind + ": " + dialog.FileName + " — " + PipelineCounts());
         }
         catch (Exception ex)
         {

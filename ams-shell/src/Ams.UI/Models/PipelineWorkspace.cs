@@ -41,14 +41,14 @@ public sealed class PipelineWorkspace
 
     public PipelineTabDocument this[PipelineKind kind] => Tabs.Single(x => x.Kind == kind);
 
-    /// <summary>Legacy .amsj files migrate losslessly: their original tree becomes Main.</summary>
-    public static PipelineWorkspace FromLegacy(IEnumerable<StepNode> roots)
+    /// <summary>Legacy .amsj files migrate losslessly into the requested active tab.</summary>
+    public static PipelineWorkspace FromLegacy(IEnumerable<StepNode> roots, PipelineKind target = PipelineKind.Main)
     {
         var workspace = new PipelineWorkspace();
         foreach (var root in roots)
         {
             DocumentService.FixParents(root, null);
-            workspace[PipelineKind.Main].Steps.Add(root);
+            workspace[target].Steps.Add(root);
         }
         return workspace;
     }

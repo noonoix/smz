@@ -10,12 +10,17 @@ namespace Ams.UI;
 /// keeping tooltips elsewhere in the application unchanged.</summary>
 public partial class MainWindow
 {
-    static MainWindow()
+    // Register through a field initializer so the existing instance constructor in
+    // MainWindow.xaml.cs remains the only MainWindow() constructor.
+    private static readonly bool RailTooltipsClassHandlerRegistered = RegisterRailTooltipsClassHandler();
+
+    private static bool RegisterRailTooltipsClassHandler()
     {
         EventManager.RegisterClassHandler(
             typeof(MainWindow),
             FrameworkElement.LoadedEvent,
             new RoutedEventHandler(MainWindowLoadedForRailTooltips));
+        return true;
     }
 
     private static void MainWindowLoadedForRailTooltips(object sender, RoutedEventArgs e)

@@ -7,6 +7,8 @@ on:
     paths:
       - .github/workflows/apply-error-step-timeout-ui.yml
       - tools/apply-error-step-timeout-ui.py
+  pull_request:
+    types: [opened, synchronize]
 
 permissions:
   contents: write
@@ -19,6 +21,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref_name }}
       - name: Apply patch
         run: python3 tools/apply-error-step-timeout-ui.py
       - name: Commit feature and remove patch helper
@@ -28,4 +31,4 @@ jobs:
           git rm .github/workflows/apply-error-step-timeout-ui.yml tools/apply-error-step-timeout-ui.py
           git add ams-shell/src/Ams.UI tests/TestRunner.cs
           git commit -m "Implement per-step timeout and mandatory error step"
-          git push
+          git push origin HEAD:${{ github.head_ref || github.ref_name }}

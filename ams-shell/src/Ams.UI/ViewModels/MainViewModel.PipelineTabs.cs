@@ -11,6 +11,8 @@ public partial class MainViewModel
     private PipelineWorkspace _pipelineWorkspace = new();
     private PipelineTabDocument? _activePipelineTab;
     private bool _pipelineInitialized;
+    private bool _pipelineLoadInProgress;
+    private bool _pipelineSyncAttached;
 
     public ObservableCollection<PipelineTabDocument> PipelineTabs => _pipelineWorkspace.Tabs;
     public PipelineTabDocument? ActivePipelineTab => _activePipelineTab;
@@ -24,6 +26,7 @@ public partial class MainViewModel
         var main = _pipelineWorkspace[PipelineKind.Main];
         CopyTree(Steps, main.Steps);
         _activePipelineTab = main;
+        AttachPipelineStepSync();
         OnPropertyChanged(nameof(PipelineTabs));
         OnPropertyChanged(nameof(ActivePipelineTab));
         OnPropertyChanged(nameof(ActivePipelineTitle));
@@ -58,16 +61,40 @@ public partial class MainViewModel
         _activePipelineTab.IsDirty |= _dirty;
     }
 
+    private void AttachPipelineStepSync()
+    {
+        if (_pipelineSyncAttached) return;
+        _pipelineSyncAttached = true;
+        Steps.CollectionChanged += PipelineSteps_CollectionChanged;
+    }
+
+    private void PipelineSteps_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        if (!_pipelineInitialized || _pipelineLoadInProgress || _activePipelineTab is null) return;
+        // Keep the tab document current as soon as a root-level edit happens. Save still
+        // performs a full capture so nested edits and property changes are included too.
+        CopyTree(Steps, _activePipelineTab.Steps);
+        _activePipelineTab.IsDirty = true;
+    }
+
     private void LoadActivePipeline()
     {
-        Steps.Clear();
-        if (_activePipelineTab is not null) CopyTree(_activePipelineTab.Steps, Steps);
-        SelectedNodes = new();
-        SelectedNode = null;
-        _collapsed.Clear();
-        _undo.Clear();
-        _redo.Clear();
-        Renumber();
+        _pipelineLoadInProgress = true;
+        try
+        {
+            Steps.Clear();
+            if (_activePipelineTab is not null) CopyTree(_activePipelineTab.Steps, Steps);
+            SelectedNodes = new();
+            SelectedNode = null;
+            _collapsed.Clear();
+            _undo.Clear();
+            _redo.Clear();
+            Renumber();
+        }
+        finally
+        {
+            _pipelineLoadInProgress = false;
+        }
     }
 
     private static void CopyTree(IEnumerable<StepNode> source, ICollection<StepNode> destination)
@@ -113,7 +140,7 @@ public partial class MainViewModel
             OnPropertyChanged(nameof(PipelineTabs));
             OnPropertyChanged(nameof(ActivePipelineTab));
             OnPropertyChanged(nameof(ActivePipelineTitle));
-        OnPropertyChanged(nameof(IsLaunchPipeline));
+            OnPropertyChanged(nameof(IsLaunchPipeline));
             UpdateFileText();
             Log("pipeline workspace opened: " + dialog.FileName);
         }

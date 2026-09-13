@@ -13,6 +13,7 @@ public partial class App : System.Windows.Application
             Shutdown(Services.BoardCleanupService.RunElevatedFromRequest(e.Args.Length > 1 ? e.Args[1] : null));
             return;
         }
+        Services.ErrorPolicyBootstrap.Initialize();
         base.OnStartup(e);
     }
 }

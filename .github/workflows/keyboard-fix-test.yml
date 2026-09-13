@@ -111,7 +111,7 @@ jobs:
           Compress-Archive -Path "$out/*" -DestinationPath "Classroom-Studio-keyboard-held-key-test.zip" -Force
           (Get-FileHash Classroom-Studio-keyboard-held-key-test.zip -Algorithm SHA256).Hash | Out-File sha256.txt -Encoding ascii
           $results = (Select-String -Path ci-test-output.txt -Pattern '=== Results' | Select-Object -Last 1).Line
-          @("**Purpose:** keyboard duplicate KeyDown test build", "", "**Trigger:** release build retry", "", "**Tests:** $results", "", "**SHA256:** $(Get-Content sha256.txt -Raw)") | Out-File release_body.md -Encoding utf8
+          @("**Purpose:** keyboard duplicate KeyDown test build", "", "**Trigger:** release build retry 2", "", "**Tests:** $results", "", "**SHA256:** $(Get-Content sha256.txt -Raw)") | Out-File release_body.md -Encoding utf8
 
       - name: Publish keyboard test release
         if: success()

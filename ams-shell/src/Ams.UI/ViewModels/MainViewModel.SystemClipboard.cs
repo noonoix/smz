@@ -1,8 +1,8 @@
 using System.Text.Json;
-using System.Windows;
 using Ams.UI.Models;
 using Ams.UI.Services;
 using CommunityToolkit.Mvvm.Input;
+using WpfClipboard = System.Windows.Clipboard;
 
 namespace Ams.UI.ViewModels;
 
@@ -29,7 +29,7 @@ public partial class MainViewModel
 
         try
         {
-            Clipboard.SetText(SystemStepClipboardPrefix + JsonSerializer.Serialize(copyable));
+            WpfClipboard.SetText(SystemStepClipboardPrefix + JsonSerializer.Serialize(copyable));
             Log($"copied {copyable.Count} step(s) to the Windows clipboard");
         }
         catch (Exception ex)
@@ -46,8 +46,8 @@ public partial class MainViewModel
         string text;
         try
         {
-            if (!Clipboard.ContainsText()) return;
-            text = Clipboard.GetText();
+            if (!WpfClipboard.ContainsText()) return;
+            text = WpfClipboard.GetText();
         }
         catch (Exception ex)
         {

@@ -1,5 +1,6 @@
 name: phase1-test-contract-fix
 
+# one-shot trigger after workflow installation
 on:
   push:
     branches:

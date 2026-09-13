@@ -20,12 +20,12 @@ public static class AutoCycleFirmwareBundle
     public static string PatchCode(string code,string manifestPath)
     {
         code=code.Replace("\r\n","\n").Replace('\r','\n');
-        code=PreserveKtextWhitespace(code);
         code=NormalizeBuzzerForManifest(code);
         var manifest=JsonSerializer.Deserialize<PatchDocument>(File.ReadAllText(manifestPath),new JsonSerializerOptions { PropertyNameCaseInsensitive = true })??throw new InvalidDataException("manifest چرخه قابل خواندن نیست.");
         if(manifest.Version!=1||manifest.Edits.Count==0)throw new InvalidDataException("نسخه یا محتوای manifest چرخه معتبر نیست.");
         if(!code.Contains(manifest.Baseline,StringComparison.Ordinal))throw new InvalidDataException("Firmware پایه h6 مورد انتظار پیدا نشد: "+manifest.Baseline);
         foreach(var edit in manifest.Edits)code=ReplaceOnce(code,edit.Old,edit.New);
+        code=PreserveKtextWhitespace(code);
         foreach(var marker in RequiredMarkers)if(!code.Contains(marker,StringComparison.Ordinal))throw new InvalidDataException("پست‌کاندیشن Firmware چرخه پیدا نشد: "+marker);
         code=code.Replace("tone = pwmio.PWMOut(board.GP6,","tone = pwmio.PWMOut(board."+BuzzerGpioPolicy.Require(AppSettings.Load().BuzzerGpio)+",",StringComparison.Ordinal);
         return code;

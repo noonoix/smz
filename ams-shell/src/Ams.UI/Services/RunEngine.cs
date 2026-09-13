@@ -24,6 +24,14 @@ public sealed class RunEngine
     /// <summary>findImage with onTimeout=stopSilent ends the run through this (§3.3.1 group E).</summary>
     public sealed class SilentStop : Exception { }
 
+    /// <summary>Stops the current run after the configured timeout policy has been applied.
+    /// This control-flow exception is never alarmed twice by the outer run handler.</summary>
+    public sealed class PolicyStop : Exception
+    {
+        public PolicyStop(bool alarmed) => Alarmed = alarmed;
+        public bool Alarmed { get; }
+    }
+
     private readonly IBoardBridge _bridge;
     private readonly Action<string> _log;
     private readonly int _screenW, _screenH;
@@ -1076,8 +1084,21 @@ public sealed class RunEngine
             // a sound window expiring is a normal outcome, not a fatal error (§3.3.1 group E)
             if (allowTimeout && reply.StartsWith("ERR|TIMEOUT", StringComparison.Ordinal))
             {
-                _log("sound window expired (timeout) — continuing");
-                return reply;
+                var policy = ErrorPolicyBootstrap.Settings.TimeoutPolicy;
+                if (policy == "continue")
+                {
+                    _log("wait window expired (timeout) — continuing by policy");
+                    return reply;
+                }
+                if (policy == "stopQuiet")
+                {
+                    _log("wait window expired (timeout) — stopping quietly by policy");
+                    throw new PolicyStop(alarmed: false);
+                }
+                var timeout = new TimeoutException($"Board wait timed out: {cmd}");
+                ErrorPolicyBootstrap.Handle(timeout, "timeout");
+                _log("wait window expired (timeout) — stopping with alarm by policy");
+                throw new PolicyStop(alarmed: true);
             }
             throw new InvalidOperationException($"Board replied {reply} to {cmd}");
         }

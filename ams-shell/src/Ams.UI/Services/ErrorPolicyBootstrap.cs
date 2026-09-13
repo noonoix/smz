@@ -35,7 +35,7 @@ public static class ErrorPolicyBootstrap
 
     public static bool Handle(Exception error, string source, string? tab = null)
     {
-        if (error is OperationCanceledException || error is RunEngine.SilentStop) return false;
+        if (error is OperationCanceledException || error is RunEngine.SilentStop || error is RunEngine.PolicyStop) return false;
         lock (Gate)
         {
             Settings.Record(source, error, tab);

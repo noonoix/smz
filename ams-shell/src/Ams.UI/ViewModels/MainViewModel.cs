@@ -2066,7 +2066,7 @@ public partial class MainViewModel : ObservableObject
 
         catch (OperationCanceledException) { Log("run aborted by user"); }
 
-        catch (Exception ex) { Log("run error: " + ex.Message); }
+        catch (Exception ex) { ErrorPolicyBootstrap.Handle(ex, "run"); Log("run error: " + ex.Message); }
 
         finally
 
@@ -2101,6 +2101,8 @@ public partial class MainViewModel : ObservableObject
     private void Stop()
 
     {
+        // Manual Stop is not fatal, but it must acknowledge a repeating alarm.
+        ErrorPolicyBootstrap.Acknowledge();
 
         if (IsRunning)
 

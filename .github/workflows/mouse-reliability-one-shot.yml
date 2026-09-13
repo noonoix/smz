@@ -5,6 +5,7 @@ on:
     branches: [phase1/configurable-buzzer-gpio]
     paths:
       - tools/apply_mouse_reliability.py
+      - tools/repair_mouse_patch_script.py
       - .github/workflows/mouse-reliability-one-shot.yml
 
 permissions:
@@ -28,8 +29,12 @@ jobs:
           $log = 'mouse-patch-result.txt'
           "mouse reliability run $(Get-Date -Format o)" | Set-Content $log
 
-          python tools/apply_mouse_reliability.py 2>&1 | Tee-Object -FilePath $log -Append
+          python tools/repair_mouse_patch_script.py 2>&1 | Tee-Object -FilePath $log -Append
           $code = $LASTEXITCODE
+          if ($code -eq 0) {
+            python tools/apply_mouse_reliability.py 2>&1 | Tee-Object -FilePath $log -Append
+            $code = $LASTEXITCODE
+          }
           if ($code -eq 0) {
             python -m py_compile ams-shell/bridge/bridge.py 2>&1 | Tee-Object -FilePath $log -Append
             $code = $LASTEXITCODE
@@ -47,6 +52,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if ($code -eq 0) {
             Remove-Item tools/apply_mouse_reliability.py
+            Remove-Item tools/repair_mouse_patch_script.py
             Remove-Item .github/workflows/mouse-reliability-one-shot.yml
             Remove-Item $log
             git add -A

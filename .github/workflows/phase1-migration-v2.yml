@@ -1,0 +1,62 @@
+name: Phase 1 migration v2
+
+on:
+  push:
+    branches: [phase1/configurable-buzzer-gpio]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply phase one with diagnostics
+        shell: bash
+        run: |
+          set +e
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          root=Path('.')
+          log=[]
+          def note(s):
+              print(s); log.append(s)
+          def once(text, old, new, name):
+              n=text.count(old); note(f'{name}: matches={n}')
+              if n != 1: raise RuntimeError(f'{name}: expected 1 match, found {n}')
+              return text.replace(old,new,1)
+          try:
+              files=[p for p in (root/'ams-shell/src/Ams.UI').rglob('*.cs') if 'class AppSettings' in p.read_text(encoding='utf-8')]
+              note('AppSettings files: '+','.join(map(str,files)))
+              if len(files)!=1: raise RuntimeError('AppSettings source discovery failed')
+              app=files[0].read_text(encoding='utf-8')
+              if 'BuzzerGpio' not in app:
+                  at=app.index('class AppSettings'); brace=app.index('{',at)
+                  app=app[:brace+1]+'\n    public string BuzzerGpio { get; set; } = "GP6";\n'+app[brace+1:]
+                  files[0].write_text(app,encoding='utf-8')
+                  note('AppSettings property inserted')
+              pico_path=root/'ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs'
+              pico=pico_path.read_text(encoding='utf-8')
+              pico=once(pico,'string? pauseResumeHotkey = "Shift+F3")','string? pauseResumeHotkey = "Shift+F3", string buzzerGpio = "GP6")','BuildCodePy signature')
+              pico=once(pico,'tone = pwmio.PWMOut(board.GP6,','tone = pwmio.PWMOut(board.__BUZZER_GPIO__,','base buzzer anchor')
+              pico_path.write_text(pico,encoding='utf-8')
+              note('Pico template anchors applied')
+              note('SUCCESS')
+              Path('phase1-debug.txt').write_text('\n'.join(log)+'\n',encoding='utf-8')
+              raise SystemExit(0)
+          except Exception as exc:
+              note('ERROR: '+repr(exc))
+              Path('phase1-debug.txt').write_text('\n'.join(log)+'\n',encoding='utf-8')
+              raise
+          PY
+          rc=$?
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add phase1-debug.txt
+          git commit -m "ci: record phase one migration diagnostics" || true
+          git push origin HEAD:phase1/configurable-buzzer-gpio || true
+          exit $rc

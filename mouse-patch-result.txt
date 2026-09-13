@@ -1,3 +1,22 @@
-mouse reliability run 2026-09-13T21:06:29.1403074+00:00
-repair expected one match, found 0: 'indent + \'\'\'if line.startswith("EVT|"):\\n\'\'\' + indent + \'\'\'    _serial_write_line(line)   '
+mouse reliability v2 2026-09-13T21:09:14.8717016+00:00
+mouse reliability patch v2 applied
+  Determining projects to restore...
+  Restored D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI.csproj (in 5.34 sec).
+D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\MainWindow.PlaybackControlsLayout.cs(35,41): error CS0104: 'ButtonBase' is an ambiguous reference between 'System.Windows.Forms.ButtonBase' and 'System.Windows.Controls.Primitives.ButtonBase' [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_4nqrjb0x_wpftmp.csproj]
+D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_4nqrjb0x_wpftmp.csproj]
+D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_4nqrjb0x_wpftmp.csproj]
+D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_4nqrjb0x_wpftmp.csproj]
+D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2576,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_4nqrjb0x_wpftmp.csproj]
+
+Build FAILED.
+
+D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\VisionService.cs(134,72): warning CS8629: Nullable value type may be null. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_4nqrjb0x_wpftmp.csproj]
+D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\PortablePaths.cs(52,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_4nqrjb0x_wpftmp.csproj]
+D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Services\PortablePaths.cs(72,13): warning CS8602: Dereference of a possibly null reference. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_4nqrjb0x_wpftmp.csproj]
+D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\ViewModels\MainViewModel.cs(2576,52): warning CS8620: Argument of type 'string?[]' cannot be used for parameter 'candidates' of type 'IEnumerable<string>' in 'string? PortablePaths.FirstExistingDir(IEnumerable<string> candidates)' due to differences in the nullability of reference types. [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_4nqrjb0x_wpftmp.csproj]
+D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\MainWindow.PlaybackControlsLayout.cs(35,41): error CS0104: 'ButtonBase' is an ambiguous reference between 'System.Windows.Forms.ButtonBase' and 'System.Windows.Controls.Primitives.ButtonBase' [D:\a\smc-1\smc-1\ams-shell\src\Ams.UI\Ams.UI_4nqrjb0x_wpftmp.csproj]
+    4 Warning(s)
+    1 Error(s)
+
+Time Elapsed 00:00:23.96
 FAILED exit=1

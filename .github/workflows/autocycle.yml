@@ -63,7 +63,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - name: Emergency restore RunEngine placeholder
+      - name: Apply RunEngine keyboard guard
         if: github.event_name == 'pull_request'
         shell: pwsh
         run: |
@@ -73,8 +73,49 @@ jobs:
           $current = Get-Content $p -Raw
           if ($current.Trim() -eq 'PLACEHOLDER') {
             git show a6b709d0b86ad666753732f31bdbcca441ed9820:$p | Set-Content $p -Encoding UTF8
+          }
+          $s = Get-Content $p -Raw
+          if ($s -notmatch '_heldKeyboardKeys') {
+            $s = $s.Replace('private readonly HashSet<string> _scriptStack = new(StringComparer.OrdinalIgnoreCase);', 'private readonly HashSet<string> _scriptStack = new(StringComparer.OrdinalIgnoreCase);' + "`r`n" + '    // v0.9.64-keyboard-test — suppress duplicate explicit KDOWN for a key already held in this run.' + "`r`n" + '    private readonly HashSet<string> _heldKeyboardKeys = new(StringComparer.Ordinal);')
+            $s = $s.Replace('_parallelKeySeq = 0; _lastParallelKeyTick = 0; _mouseRestAtSeq = -1;   // v0.9.23 — reset typing signal', '_parallelKeySeq = 0; _lastParallelKeyTick = 0; _mouseRestAtSeq = -1;   // v0.9.23 — reset typing signal' + "`r`n" + '        _heldKeyboardKeys.Clear();')
+            $old = 'await Send(wireCmd, ct,' + "`r`n" + '                                logAs: secret && cmd.StartsWith("KTEXT|") ? MaskKtext(cmd) : null);'
+            $new = 'if (TryHandleKeyboardStateGuard(wireCmd, out var guardedCmd, out var guardLog))' + "`r`n" + '                            {' + "`r`n" + '                                if (guardLog is not null) _log(guardLog);' + "`r`n" + '                                if (guardedCmd is not null)' + "`r`n" + '                                    await Send(guardedCmd, ct, logAs: secret && cmd.StartsWith("KTEXT|") ? MaskKtext(cmd) : null);' + "`r`n" + '                            }' + "`r`n" + '                            else' + "`r`n" + '                            {' + "`r`n" + '                                await Send(wireCmd, ct,' + "`r`n" + '                                    logAs: secret && cmd.StartsWith("KTEXT|") ? MaskKtext(cmd) : null);' + "`r`n" + '                            }'
+            $s = $s.Replace($old, $new)
+            $helper = @'
+
+    private bool TryHandleKeyboardStateGuard(string cmd, out string? guardedCmd, out string? guardLog)
+    {
+        guardedCmd = cmd;
+        guardLog = null;
+        string body = cmd;
+        string route = "direct";
+        if (body.StartsWith("KBDARM|", StringComparison.Ordinal)) { route = "arm"; body = body[7..]; }
+        else if (body.StartsWith("KBDPICO|", StringComparison.Ordinal)) { route = "pico"; body = body[8..]; }
+        if (body.StartsWith("KDOWN|", StringComparison.Ordinal) && int.TryParse(body[6..], out var downVk))
+        {
+            string key = route + ":" + downVk;
+            if (!_heldKeyboardKeys.Add(key))
+            {
+                guardedCmd = null;
+                guardLog = $"keyboard guard: duplicate {body} suppressed ({route})";
+                return true;
+            }
+            return true;
+        }
+        if (body.StartsWith("KUP|", StringComparison.Ordinal) && int.TryParse(body[4..], out var upVk))
+        {
+            _heldKeyboardKeys.Remove(route + ":" + upVk);
+            return true;
+        }
+        return false;
+    }
+'@
+            $s = $s.Replace("`r`n    private async Task<string> Send(string cmd", $helper + "`r`n    private async Task<string> Send(string cmd")
+            Set-Content $p $s -Encoding UTF8
+          }
+          if ((git status --porcelain $p)) {
             git add $p
-            git commit -m "Restore RunEngine after placeholder regression"
+            git commit -m "Fix duplicate held keyboard key downs"
             git push origin HEAD:phase1/configurable-buzzer-gpio
           }
       - name: Restore

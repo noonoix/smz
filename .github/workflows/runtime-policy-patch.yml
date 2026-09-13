@@ -1,0 +1,66 @@
+name: runtime-policy-patch
+
+on:
+  push:
+    branches:
+      - fix/remove-vertical-rail-tooltips
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message != 'Apply runtime policy patch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/remove-vertical-rail-tooltips
+          fetch-depth: 0
+      - name: Patch runtime
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def must_once(path, old, new):
+              p = Path(path)
+              s = p.read_text()
+              n = s.count(old)
+              if n != 1:
+                  raise RuntimeError(f'{path}: exact match count={n}')
+              p.write_text(s.replace(old, new, 1))
+
+          must_once(
+              'ams-shell/src/Ams.UI/Services/RunEngine.cs',
+              '    public sealed class SilentStop : Exception { }',
+              '''    public sealed class SilentStop : Exception { }\n\n    /// <summary>Stops the current run after the configured timeout policy has been applied.\n    /// This control-flow exception is never alarmed twice by the outer run handler.</summary>\n    public sealed class PolicyStop : Exception\n    {\n        public PolicyStop(bool alarmed) => Alarmed = alarmed;\n        public bool Alarmed { get; }\n    }''')
+
+          must_once(
+              'ams-shell/src/Ams.UI/Services/RunEngine.cs',
+              '''            if (allowTimeout && reply.StartsWith("ERR|TIMEOUT", StringComparison.Ordinal))\n            {\n                _log("sound window expired (timeout) — continuing");\n                return reply;\n            }''',
+              '''            if (allowTimeout && reply.StartsWith("ERR|TIMEOUT", StringComparison.Ordinal))\n            {\n                var policy = ErrorPolicyBootstrap.Settings.TimeoutPolicy;\n                if (policy == "continue")\n                {\n                    _log("wait window expired (timeout) — continuing by policy");\n                    return reply;\n                }\n                if (policy == "stopQuiet")\n                {\n                    _log("wait window expired (timeout) — stopping quietly by policy");\n                    throw new PolicyStop(alarmed: false);\n                }\n                var timeout = new TimeoutException($"Board wait timed out: {cmd}");\n                ErrorPolicyBootstrap.Handle(timeout, "timeout");\n                _log("wait window expired (timeout) — stopping with alarm by policy");\n                throw new PolicyStop(alarmed: true);\n            }''')
+
+          must_once(
+              'ams-shell/src/Ams.UI/Services/ErrorPolicyBootstrap.cs',
+              '        if (error is OperationCanceledException || error is RunEngine.SilentStop) return false;',
+              '        if (error is OperationCanceledException || error is RunEngine.SilentStop || error is RunEngine.PolicyStop) return false;')
+
+          must_once(
+              'ams-shell/src/Ams.UI/ViewModels/MainViewModel.cs',
+              '        catch (Exception ex) { Log("run error: " + ex.Message); }',
+              '        catch (Exception ex) { ErrorPolicyBootstrap.Handle(ex, "run"); Log("run error: " + ex.Message); }')
+
+          must_once(
+              'ams-shell/src/Ams.UI/ViewModels/MainViewModel.cs',
+              '    private void Stop()\n\n    {\n\n        if (IsRunning)',
+              '''    private void Stop()\n\n    {\n        // Manual Stop is not fatal, but it must acknowledge a repeating alarm.\n        ErrorPolicyBootstrap.Acknowledge();\n\n        if (IsRunning)''')
+          PY
+      - name: Commit runtime patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/runtime-policy-patch.yml
+          git add -A
+          git commit -m "Apply runtime policy patch"
+          git push origin HEAD:fix/remove-vertical-rail-tooltips

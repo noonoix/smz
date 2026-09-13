@@ -64,7 +64,11 @@
                     <TextBlock Text="پوشه‌ی Toolkit" Foreground="{StaticResource TextSecondaryBrush}" Width="120" VerticalAlignment="Center" />
                     <ui:TextBox x:Name="ToolkitBox" FontFamily="Cascadia Code" Width="200" />
                 </StackPanel>
-
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,4">
+                    <TextBlock Text="پین بازر Pico" Foreground="{StaticResource TextSecondaryBrush}" Width="120" VerticalAlignment="Center" />
+                    <ComboBox x:Name="BuzzerGpioBox" Width="200" HorizontalContentAlignment="Right" />
+                </StackPanel>
+                <TextBlock Text="GP6 پیش‌فرض است؛ پین‌های GP3/GP4، GP16/GP17 و GP20/GP21 رزرو هستند." TextWrapping="Wrap" TextAlignment="Right" FontSize="11" Margin="0,2,0,0" Foreground="{StaticResource TextTertiaryBrush}" />
             </StackPanel>
 
             <!-- Playback -->

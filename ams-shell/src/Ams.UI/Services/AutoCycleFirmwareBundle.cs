@@ -20,6 +20,7 @@ public static class AutoCycleFirmwareBundle
     public static string PatchCode(string code,string manifestPath)
     {
         code=code.Replace("\r\n","\n").Replace('\r','\n');
+        code=PreserveKtextWhitespace(code);
         code=NormalizeBuzzerForManifest(code);
         var manifest=JsonSerializer.Deserialize<PatchDocument>(File.ReadAllText(manifestPath),new JsonSerializerOptions { PropertyNameCaseInsensitive = true })??throw new InvalidDataException("manifest چرخه قابل خواندن نیست.");
         if(manifest.Version!=1||manifest.Edits.Count==0)throw new InvalidDataException("نسخه یا محتوای manifest چرخه معتبر نیست.");
@@ -28,6 +29,15 @@ public static class AutoCycleFirmwareBundle
         foreach(var marker in RequiredMarkers)if(!code.Contains(marker,StringComparison.Ordinal))throw new InvalidDataException("پست‌کاندیشن Firmware چرخه پیدا نشد: "+marker);
         code=code.Replace("tone = pwmio.PWMOut(board.GP6,","tone = pwmio.PWMOut(board."+BuzzerGpioPolicy.Require(AppSettings.Load().BuzzerGpio)+",",StringComparison.Ordinal);
         return code;
+    }
+    // A KTEXT payload may intentionally end with a literal space: in typo-correction
+    // mode the planner flushes the text before the slip and then retypes the remainder.
+    // The old line parser used strip(), deleting that trailing separator before HID saw it.
+    private static string PreserveKtextWhitespace(string code)
+    {
+        const string oldLine="line = raw.decode(\"utf-8\", \"replace\").strip()";
+        const string newLine="line = raw.decode(\"utf-8\", \"replace\").rstrip(\"\\r\")";
+        return code.Replace(oldLine,newLine,StringComparison.Ordinal);
     }
     private static string NormalizeBuzzerForManifest(string code)
     {
@@ -56,11 +66,6 @@ public static class AutoCycleFirmwareBundle
         var first=text.IndexOf(oldText,StringComparison.Ordinal);
         var duplicate=first>=0&&text.IndexOf(oldText,first+oldText.Length,StringComparison.Ordinal)>=0;
         if(!duplicate&&first>=0)return text[..first]+newText+text[(first+oldText.Length)..];
-
-        // The buzzer patch deliberately normalizes the generated firmware before applying
-        // the legacy manifest. If an older template changes only the indentation or the
-        // preceding TRGSND return block, keep the replacement anchored to the unique beep
-        // method instead of silently accepting an arbitrary match.
         const string beepMarker="    def beep(self, freq, ms):";
         const string beepEnd="            if not _plan_sleep_ms(int(ms)):\n";
         var oldBeep=text.IndexOf(beepMarker,StringComparison.Ordinal);

@@ -31,6 +31,7 @@ public partial class MainViewModel
         OnPropertyChanged(nameof(ActivePipelineTab));
         OnPropertyChanged(nameof(ActivePipelineTitle));
         OnPropertyChanged(nameof(IsLaunchPipeline));
+        Log("pipeline tabs initialized: " + PipelineCounts());
     }
 
     [RelayCommand]
@@ -44,7 +45,7 @@ public partial class MainViewModel
         OnPropertyChanged(nameof(ActivePipelineTab));
         OnPropertyChanged(nameof(ActivePipelineTitle));
         OnPropertyChanged(nameof(IsLaunchPipeline));
-        Log("pipeline tab: " + tab.Title);
+        Log("pipeline tab: " + tab.Title + " — visible roots=" + Steps.Count + ", total=" + CountAll(Steps));
     }
 
     internal PipelineWorkspace CapturePipelineWorkspaceForExport()
@@ -104,6 +105,10 @@ public partial class MainViewModel
             destination.Add(node);
     }
 
+    private string PipelineCounts()
+        => string.Join(", ", _pipelineWorkspace.Tabs.Select(tab =>
+            $"{tab.Kind}={{roots:{tab.Steps.Count},total:{CountAll(tab.Steps)}}}"));
+
     [RelayCommand]
     private void NewPipelineWorkspace()
     {
@@ -118,7 +123,7 @@ public partial class MainViewModel
         OnPropertyChanged(nameof(ActivePipelineTitle));
         OnPropertyChanged(nameof(IsLaunchPipeline));
         UpdateFileText();
-        Log("new pipeline workspace");
+        Log("new pipeline workspace: " + PipelineCounts());
     }
 
     [RelayCommand]
@@ -142,7 +147,7 @@ public partial class MainViewModel
             OnPropertyChanged(nameof(ActivePipelineTitle));
             OnPropertyChanged(nameof(IsLaunchPipeline));
             UpdateFileText();
-            Log("pipeline workspace opened: " + dialog.FileName);
+            Log("pipeline workspace opened: " + dialog.FileName + " — " + PipelineCounts());
         }
         catch (Exception ex)
         {
@@ -161,6 +166,7 @@ public partial class MainViewModel
     {
         InitializePipelineTabs();
         CaptureActivePipeline();
+        Log("pipeline save snapshot: " + PipelineCounts());
         var path = _currentFile;
         if (saveAs || string.IsNullOrWhiteSpace(path))
         {
@@ -179,7 +185,7 @@ public partial class MainViewModel
             _dirty = false;
             foreach (var tab in _pipelineWorkspace.Tabs) tab.IsDirty = false;
             UpdateFileText();
-            Log("pipeline workspace saved: " + path);
+            Log("pipeline workspace saved: " + path + " — " + PipelineCounts());
         }
         catch (Exception ex)
         {

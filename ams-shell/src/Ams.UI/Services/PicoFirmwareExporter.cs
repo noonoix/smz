@@ -1340,13 +1340,13 @@ public static class PicoFirmwareExporter
             written.Add(p);
         }
         var settings = AppSettings.Load();
-        var buzzerGpio = BuzzerGpioPolicy.Require(settings.BuzzerGpio);
+        var selectedBuzzerGpio = BuzzerGpioPolicy.Require(settings.BuzzerGpio);
         Put(string.IsNullOrWhiteSpace(Path.GetFileName(codePyPath)) ? "code.py" : Path.GetFileName(codePyPath),
             BuildCodePy(states, machine, loopMode, loopCount, loopSeconds, keyboardOnArm,
-                        settings.RunStopHotkey, settings.PauseResumeHotkey, buzzerGpio));
+                        settings.RunStopHotkey, settings.PauseResumeHotkey, selectedBuzzerGpio));
         Put("boot.py", BuildBootPy());
         Put("pico-calibration.json", BuildCalibrationJson(states, machine));
-        Put("README-FLASH.md", BuildReadme(states, machine, loopMode, loopCount, loopSeconds, keyboardOnArm, buzzerGpio));   // v0.9.44
+        Put("README-FLASH.md", BuildReadme(states, machine, loopMode, loopCount, loopSeconds, keyboardOnArm, selectedBuzzerGpio));   // v0.9.44
         return written;
     }
 }

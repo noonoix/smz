@@ -19,7 +19,7 @@ public static class ErrorPolicyBootstrap
             if (_installed) return;
             _installed = true;
             Settings = ErrorPolicySettings.Load();
-            Application.Current.DispatcherUnhandledException += (_, e) =>
+            System.Windows.Application.Current.DispatcherUnhandledException += (_, e) =>
             {
                 if (Handle(e.Exception, "ui")) e.Handled = true;
             };

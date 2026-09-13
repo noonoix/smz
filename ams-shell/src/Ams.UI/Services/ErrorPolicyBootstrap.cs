@@ -33,15 +33,15 @@ public static class ErrorPolicyBootstrap
         }
     }
 
-    public static bool Handle(Exception error, string source, string? tab = null)
+    public static bool Handle(Exception error, string source, string? tab = null, Func<Task>? picoBeep = null, bool forceAlarm = false)
     {
         if (error is OperationCanceledException || error is RunEngine.SilentStop || error is RunEngine.PolicyStop) return false;
         lock (Gate)
         {
             Settings.Record(source, error, tab);
-            if (!Settings.FatalAlarmEnabled) return false;
+            if (!Settings.FatalAlarmEnabled && !forceAlarm) return false;
             _alarm?.Dispose();
-            _alarm = ErrorAlarm.Start(Settings);
+            _alarm = ErrorAlarm.Start(Settings, picoBeep, forceAlarm);
             return true;
         }
     }

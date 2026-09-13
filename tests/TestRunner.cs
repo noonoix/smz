@@ -26,6 +26,14 @@ class TestRunner
     static void Main()
     {
         // ── Step 1: StepDefinitions exist ────────────────────────────
+        var errorDef = StepDefinitions.Get("raiseError");
+        Assert(errorDef.Label == "Raise Error / Stop Macro" && errorDef.Fields.Any(f => f.Key == "message"),
+            "raiseError definition exists with a message field");
+        Assert(StepDefinitions.Get("waitForSound").Fields.Any(f => f.Key == "onTimeout" && f.Options!.Contains("global")),
+            "waitForSound exposes a per-step timeout policy");
+        Assert(StepDefinitions.Get("waitForLight").Fields.Any(f => f.Key == "onTimeout" && f.Options!.Contains("stopWithAlarm")),
+            "waitForLight exposes a per-step timeout policy");
+
         var def = StepDefinitions.Get("openFile");
         Assert(def.Label == "Open File / Program", "openFile definition exists");
 

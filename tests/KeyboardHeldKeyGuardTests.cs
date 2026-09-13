@@ -1,4 +1,3 @@
-// Source-fix release trigger: tests the committed RunEngine guard, not a CI-only patch.
 using System;
 using System.Collections.Generic;
 using System.Linq;

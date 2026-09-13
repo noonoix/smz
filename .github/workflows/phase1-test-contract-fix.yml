@@ -1,6 +1,6 @@
 name: phase1-test-contract-fix
 
-# retry corrected API fixer installed on main
+# trigger pull_request_target patch installed on main
 on: [push]
 
 permissions:

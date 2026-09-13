@@ -1,6 +1,6 @@
 name: phase1-test-contract-fix
 
-# trigger corrected PR fixer installed on main
+# retry corrected API fixer installed on main
 on: [push]
 
 permissions:

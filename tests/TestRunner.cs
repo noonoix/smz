@@ -3497,8 +3497,15 @@ class TestRunner
         Assert(p58xaml.Contains("CommandParameter=\"buzzer\"") && !p58xaml.Contains("CommandParameter=\"playAudio\""),
             "custom buzzer: all insertion surfaces use buzzer instead of Play Audio");
         var buzFw = V27ReadSrc(Path.Combine("Services", "PicoFirmwareExporter.cs"));
-        Assert(buzFw.Contains("PWMOut(board.GP6") && !buzFw.Contains("PWMOut(board.GP5") && !buzFw.Contains("board.D9"),
-            "custom buzzer: passive PWM is Pico GP6 only");
+        var buzGp6 = PicoFirmwareExporter.BuildCodePy(Array.Empty<PicoFirmwareExporter.LightState>(), "TEST", buzzerGpio: "GP6");
+        var buzGp7 = PicoFirmwareExporter.BuildCodePy(Array.Empty<PicoFirmwareExporter.LightState>(), "TEST", buzzerGpio: "GP7");
+        Assert(buzFw.Contains("PWMOut(board.__BUZZER_GPIO__")
+               && buzGp6.Contains("PWMOut(board.GP6")
+               && buzGp7.Contains("PWMOut(board.GP7")
+               && !buzGp7.Contains("PWMOut(board.GP6")
+               && !buzFw.Contains("PWMOut(board.GP5")
+               && !buzFw.Contains("board.D9"),
+            "custom buzzer: passive PWM uses the selected Pico GPIO (GP6 default, GP7 supported)");
 
         // (c) meta guard: every version PIN in this file matches the current release.
         // Pin lines are the assertions that check the csproj Version tag, the app banner or

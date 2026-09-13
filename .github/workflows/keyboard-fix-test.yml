@@ -6,12 +6,14 @@ on:
     branches: [phase1/configurable-buzzer-gpio]
     paths:
       - '.github/workflows/keyboard-fix-test.yml'
+      - 'ams-shell/src/Ams.UI/Services/RunEngine.cs'
+      - 'tests/TestRunner.cs'
 
 permissions:
   contents: write
 
 jobs:
-  repair-patch-build:
+  commit-guard-build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,7 +25,7 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
-      - name: Restore source and apply keyboard guard
+      - name: Commit robust RunEngine keyboard guard if missing
         shell: pwsh
         run: |
           git config user.name "github-actions[bot]"
@@ -34,11 +36,12 @@ jobs:
             git show a6b709d0b86ad666753732f31bdbcca441ed9820:$p | Set-Content $p -Encoding UTF8
           }
           $s = Get-Content $p -Raw
-          if ($s -notmatch '_heldKeyboardKeys') {
-            $s = $s.Replace('private readonly HashSet<string> _scriptStack = new(StringComparer.OrdinalIgnoreCase);', 'private readonly HashSet<string> _scriptStack = new(StringComparer.OrdinalIgnoreCase);' + "`r`n" + '    // v0.9.64-keyboard-test — suppress duplicate KDOWN for a key already held in this run.' + "`r`n" + '    private readonly HashSet<int> _heldKeyboardKeys = new();')
+          if ($s -notmatch 'TryHandleKeyboardStateGuard') {
+            $s = $s.Replace('private readonly HashSet<string> _scriptStack = new(StringComparer.OrdinalIgnoreCase);', 'private readonly HashSet<string> _scriptStack = new(StringComparer.OrdinalIgnoreCase);' + "`r`n" + '    // v0.9.68-keyboard-test — suppress duplicate explicit KDOWN per route while a key is already held.' + "`r`n" + '    private readonly HashSet<string> _heldKeyboardKeys = new(StringComparer.Ordinal);')
             $s = $s.Replace('_parallelKeySeq = 0; _lastParallelKeyTick = 0; _mouseRestAtSeq = -1;   // v0.9.23 — reset typing signal', '_parallelKeySeq = 0; _lastParallelKeyTick = 0; _mouseRestAtSeq = -1;   // v0.9.23 — reset typing signal' + "`r`n" + '        _heldKeyboardKeys.Clear();')
             $old = 'await Send(wireCmd, ct,' + "`r`n" + '                                logAs: secret && cmd.StartsWith("KTEXT|") ? MaskKtext(cmd) : null);'
             $new = 'if (TryHandleKeyboardStateGuard(wireCmd, out var guardedCmd, out var guardLog))' + "`r`n" + '                            {' + "`r`n" + '                                if (guardLog is not null) _log(guardLog);' + "`r`n" + '                                if (guardedCmd is not null)' + "`r`n" + '                                    await Send(guardedCmd, ct, logAs: secret && cmd.StartsWith("KTEXT|") ? MaskKtext(cmd) : null);' + "`r`n" + '                            }' + "`r`n" + '                            else' + "`r`n" + '                            {' + "`r`n" + '                                await Send(wireCmd, ct,' + "`r`n" + '                                    logAs: secret && cmd.StartsWith("KTEXT|") ? MaskKtext(cmd) : null);' + "`r`n" + '                            }'
+            if (-not $s.Contains($old)) { throw 'RunEngine Send(wireCmd) anchor not found' }
             $s = $s.Replace($old, $new)
             $helper = @'
 
@@ -48,34 +51,78 @@ jobs:
         guardLog = null;
         string body = cmd;
         string prefix = "";
-        if (body.StartsWith("KBDARM|", StringComparison.Ordinal)) { prefix = "KBDARM|"; body = body[7..]; }
-        else if (body.StartsWith("KBDPICO|", StringComparison.Ordinal)) { prefix = "KBDPICO|"; body = body[8..]; }
+        string route = "direct";
+        if (body.StartsWith("KBDARM|", StringComparison.Ordinal)) { prefix = "KBDARM|"; route = "arm"; body = body[7..]; }
+        else if (body.StartsWith("KBDPICO|", StringComparison.Ordinal)) { prefix = "KBDPICO|"; route = "pico"; body = body[8..]; }
+
         if (body.StartsWith("KDOWN|", StringComparison.Ordinal) && int.TryParse(body[6..], out var downVk))
         {
-            if (_heldKeyboardKeys.Contains(downVk))
+            string key = route + ":" + downVk;
+            if (!_heldKeyboardKeys.Add(key))
             {
                 guardedCmd = null;
-                guardLog = $"keyboard guard: duplicate KDOWN|{downVk} suppressed";
+                guardLog = $"keyboard guard: duplicate {body} suppressed ({route})";
                 return true;
             }
-            _heldKeyboardKeys.Add(downVk);
             guardedCmd = prefix + body;
             return true;
         }
+
         if (body.StartsWith("KUP|", StringComparison.Ordinal) && int.TryParse(body[4..], out var upVk))
         {
-            _heldKeyboardKeys.Remove(upVk);
+            _heldKeyboardKeys.Remove(route + ":" + upVk);
             guardedCmd = prefix + body;
             return true;
         }
+
         return false;
     }
 '@
             $s = $s.Replace("`r`n    private async Task<string> Send(string cmd", $helper + "`r`n    private async Task<string> Send(string cmd")
             Set-Content $p $s -Encoding UTF8
           }
-          if ((git status --porcelain $p)) {
-            git add $p
+
+          $t = 'tests/TestRunner.cs'
+          $ts = Get-Content $t -Raw
+          if ($ts -notmatch 'keyboard guard suppresses duplicate explicit keyDown') {
+            $anchor = '        // defaults stay legacy-identical: no extra pauses, no typos'
+            $test = @'
+        // v0.9.68 — explicit keyDown is stateful: a second KDOWN for the same key/route
+        // before KUP is suppressed so Windows cannot auto-repeat a held key cluster.
+        var heldKeyBridge = new FakeBridge();
+        new RunEngine(heldKeyBridge, _ => { }, 1920, 1080).RunAsync(new[]
+        {
+            new StepNode { Type = "keyDown", Props = new Dictionary<string, object?> { { "key", "A" } } },
+            new StepNode { Type = "keyDown", Props = new Dictionary<string, object?> { { "key", "A" } } },
+            new StepNode { Type = "keyUp", Props = new Dictionary<string, object?> { { "key", "A" } } },
+        }, CancellationToken.None).Wait();
+        Assert(heldKeyBridge.Sent.Count(c => c == "KDOWN|65") == 1 && heldKeyBridge.Sent.Count(c => c == "KUP|65") == 1,
+            $"keyboard guard suppresses duplicate explicit keyDown (sent: {string.Join(", ", heldKeyBridge.Sent)})");
+
+        var heldLoopBridge = new FakeBridge();
+        var heldLoop = new StepNode { Type = "forLoop", Props = new Dictionary<string, object?> { { "mode", "count" }, { "count", 20 } } };
+        heldLoop.Children.Add(new StepNode { Type = "keyDown", Props = new Dictionary<string, object?> { { "key", "A" } } });
+        heldLoop.Children.Add(new StepNode { Type = "keyUp", Props = new Dictionary<string, object?> { { "key", "A" } } });
+        heldLoop.Children.Add(new StepNode { Type = "keystroke", Props = new Dictionary<string, object?> { { "key", "B" } } });
+        new RunEngine(heldLoopBridge, _ => { }, 1920, 1080).RunAsync(new[] { heldLoop }, CancellationToken.None).Wait();
+        var held = new HashSet<string>();
+        int repeatDowns = 0;
+        foreach (var sent in heldLoopBridge.Sent)
+        {
+            if (sent == "KDOWN|65" && !held.Add("A")) repeatDowns++;
+            if (sent == "KUP|65") held.Remove("A");
+        }
+        Assert(repeatDowns == 0,
+            $"keyboard fixture pattern has no repeated A downs without A up (repeatDowns={repeatDowns})");
+
+'@
+            if (-not $ts.Contains($anchor)) { throw 'TestRunner anchor not found' }
+            $ts = $ts.Replace($anchor, $test + $anchor)
+            Set-Content $t $ts -Encoding UTF8
+          }
+
+          if ((git status --porcelain $p $t)) {
+            git add $p $t
             git commit -m "Fix duplicate held keyboard key downs"
             git push origin HEAD:phase1/configurable-buzzer-gpio
           }
@@ -111,7 +158,7 @@ jobs:
           Compress-Archive -Path "$out/*" -DestinationPath "Classroom-Studio-keyboard-held-key-test.zip" -Force
           (Get-FileHash Classroom-Studio-keyboard-held-key-test.zip -Algorithm SHA256).Hash | Out-File sha256.txt -Encoding ascii
           $results = (Select-String -Path ci-test-output.txt -Pattern '=== Results' | Select-Object -Last 1).Line
-          @("**Purpose:** keyboard duplicate KeyDown test build", "", "**Trigger:** release build retry 2", "", "**Tests:** $results", "", "**SHA256:** $(Get-Content sha256.txt -Raw)") | Out-File release_body.md -Encoding utf8
+          @("**Purpose:** keyboard duplicate KeyDown test build", "", "**Trigger:** committed RunEngine guard source fix", "", "**Tests:** $results", "", "**SHA256:** $(Get-Content sha256.txt -Raw)") | Out-File release_body.md -Encoding utf8
 
       - name: Publish keyboard test release
         if: success()

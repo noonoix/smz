@@ -5,6 +5,8 @@ on:
     paths:
       - 'ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs'
       - 'firmware/code64f/plan_engine.py'
+      - 'ams-shell/src/Ams.UI/Services/AutoCycleFirmwareBundle.cs'
+      - 'portable/plan3/sim/test_typing_space_contract.py'
       - '.github/workflows/phase1-hardware-artifact.yml'
   workflow_dispatch:
 
@@ -30,10 +32,10 @@ jobs:
           import shutil
 
           source = Path('ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs').read_text(encoding='utf-8')
-          marker = 'private const string CodeTemplate = """'
+          marker = 'private const string CodeTemplate = """"'
           start = source.index(marker)
           body_start = source.index('\n', start) + 1
-          end = source.index('\n        """;', body_start)
+          end = source.index('\n        """";', body_start)
           body = source[body_start:end]
           lines = body.splitlines()
           body = '\n'.join(line[8:] if line.startswith('        ') else line for line in lines) + '\n'
@@ -49,10 +51,15 @@ jobs:
           }
           for key, value in values.items():
               body = body.replace(key, value)
+          body = body.replace(
+              'line = raw.decode("utf-8", "replace").strip()',
+              'line = raw.decode("utf-8", "replace").rstrip("\\r")')
           if 'PWMOut(board.GP7' not in body:
               raise SystemExit('generated code has no GP7 PWM output')
           if 'PWMOut(board.GP6' in body:
               raise SystemExit('generated GP7 code still contains GP6 PWM output')
+          if 'raw.decode("utf-8", "replace").strip()' in body:
+              raise SystemExit('generated code still strips KTEXT trailing spaces')
 
           out = Path('hardware-gate-gp7')
           out.mkdir()

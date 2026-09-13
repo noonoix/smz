@@ -12,14 +12,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: feature/error-step-timeout-ui
+          fetch-depth: 0
       - name: Update stale assertion
+        shell: bash
         run: |
+          set -euo pipefail
+          grep -n 'Assert(v43insert.Count' tests/TestRunner.cs
           sed -i 's/Assert(v43insert.Count == 24,/Assert(v43insert.Count == 25,/' tests/TestRunner.cs
-          grep -n 'v43insert.Count' tests/TestRunner.cs
+          grep -n 'Assert(v43insert.Count' tests/TestRunner.cs
       - name: Commit and push
+        shell: bash
         run: |
+          set -euo pipefail
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add tests/TestRunner.cs
           git commit -m "Correct insertion-surface step-count assertion"
-          git push
+          git push origin HEAD:feature/error-step-timeout-ui

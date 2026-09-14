@@ -3237,8 +3237,7 @@ public partial class MainViewModel : ObservableObject
     private bool NormalizeKeyPairs()
     {
         bool changed = false;
-        foreach (var root in Steps.ToList())
-            changed |= NormalizeKeyList(root.Parent?.Children ?? Steps);
+        changed = NormalizeKeyList(Steps);
         return changed;
 
         bool NormalizeKeyList(IList<StepNode> list)
@@ -3358,13 +3357,15 @@ public partial class MainViewModel : ObservableObject
 
                 bool opensParallel = n.Type == "parallelGroup";   // v0.9.44 — a Parallel Group with children registers its scope too, so its red vein shows (user report)
 
+                bool opensKeyHold = n.Type == "keyHold";
+
 
 
                 bool isCollapsed = _collapsed.Contains(n);   // v0.8.0 — accordion
 
 
 
-                if (opensLoop || opensIf || opensPackage || opensParallel)   // v0.9.44 — parallelGroup added: its children must show the red vein
+                if (opensLoop || opensIf || opensPackage || opensParallel || opensKeyHold)   // atomic Key Hold groups use the same red scope rail
 
                 {
 

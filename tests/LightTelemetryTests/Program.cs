@@ -35,11 +35,11 @@ Rejects("OK|LUX|seq=1|lux=1.0|mode=hires|sensor=bad", "invalid sensor marker is 
 Rejects("ERR|NOSENSOR|LUX|extra", "typed errors must be exact");
 Check(LightWatchService.DefaultIntervalMs == 250,
     "Watch default interval is 250 ms");
-Check(new[] { 100, 250, 500, 1000 }.All(ms =>
+Check(new[] { 100, 250, 500 }.All(ms =>
         LightWatchService.GetStaleThreshold(TimeSpan.FromMilliseconds(ms)) == TimeSpan.FromSeconds(2)),
-    "stale threshold follows max 2000 ms or three intervals");
-Check(LightWatchService.GetStaleThreshold(TimeSpan.FromMilliseconds(1000)) == TimeSpan.FromSeconds(2),
-    "supported one-second interval keeps the two-second stale floor");
+    "stale threshold keeps the two-second floor for fast intervals");
+Check(LightWatchService.GetStaleThreshold(TimeSpan.FromMilliseconds(1000)) == TimeSpan.FromSeconds(3),
+    "stale threshold grows to three intervals when larger");
 
 var oneRead = new FakeBridge(new[] { "OK|LUX|seq=7|lux=12.5|mode=hires|sensor=ok" });
 IBoardBridge oneReadContract = oneRead;

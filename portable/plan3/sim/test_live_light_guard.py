@@ -24,7 +24,8 @@ class LiveLightGuardTests(unittest.TestCase):
 
     def test_switch_requires_new_state_stability(self):
         guard = LightStateGuard(self.states, stable_ms=300, hysteresis=10)
-        self.assertEqual("dark", guard.update(50, 500))
+        self.assertIsNone(guard.update(50, 0))
+        self.assertEqual("dark", guard.update(50, 300))
         self.assertEqual("dark", guard.update(220, 600))
         self.assertEqual("dark", guard.update(220, 899))
         self.assertEqual("bright", guard.update(220, 900))

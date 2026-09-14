@@ -405,10 +405,6 @@ def parse_plan(text):
             prm["line"] = "|".join(fields[1:]).strip()
             if not prm["line"]:
                 raise ValueError("line %d: RAW needs a board line" % line_no)
-        elif op == "STATELOOP":
-            # v4: the portable live light guard owns routing and returns only
-            # when the keypad stops the run or the sensor becomes unsafe.
-            _run_state_loop(prm, ctx, pos, pauses, inc)
         elif op == "WLIGHT":
             pos = fields[1].split(",") if len(fields) > 1 else []
             if len(pos) < 5:
@@ -1135,6 +1131,10 @@ def run_plan(ops, ctx, _pos=None, _pauses=None, _inc=()):
                         raise PlanAbort()
                 else:
                     ctx.kcombo(cmd[1])
+        elif op == "STATELOOP":
+            # v4: the portable live light guard owns routing and returns only
+            # when the keypad stops the run or the sensor becomes unsafe.
+            _run_state_loop(prm, ctx, pos, pauses, inc)
         elif op == "WLIGHT":
             ok = ctx.wait_light(prm["lo"], prm["hi"], prm["stable"], prm["to"], prm["mode"])
             if ok and "key" in prm:

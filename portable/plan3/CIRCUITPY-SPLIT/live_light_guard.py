@@ -1,16 +1,7 @@
 # live_light_guard.py - portable BH1750 state guard (runtime v1)
-# Pure state-selection logic. The plan engine supplies lux samples and owns
-# the safe handoff at a command boundary; this module never guesses a state.
-
 
 class LightStateGuard:
-    """Debounced, hysteretic light-state selector.
-
-    A state becomes active only after stable_ms of in-range samples. The active
-    range is widened by hysteresis so small sensor noise cannot make the
-    pipeline oscillate. Overlapping candidate ranges are deliberately treated
-    as unknown unless exactly one state is eligible.
-    """
+    """Debounced and hysteretic light-state selector for the Pico runtime."""
 
     def __init__(self, states, stable_ms=750, hysteresis=0, sensor_timeout_ms=1500):
         self.states = tuple(states or ())
@@ -23,67 +14,48 @@ class LightStateGuard:
         self.last_sample_ms = None
 
     def _inside(self, state, lux, widened=False):
-        low = int(state["lo"])
-        high = int(state["hi"])
+        low, high = int(state["lo"]), int(state["hi"])
         if widened:
             low -= self.hysteresis
             high += self.hysteresis
         return low <= lux <= high
 
     def _eligible(self, lux):
-        if lux is None:
-            return []
-        return [state for state in self.states if self._inside(state, lux, False)]
+        return [] if lux is None else [s for s in self.states if self._inside(s, lux)]
 
     def _active_still_valid(self, lux):
         if lux is None or self.active is None:
             return False
-        for state in self.states:
-            if state["id"] == self.active:
-                return self._inside(state, lux, True)
-        return False
+        return any(s["id"] == self.active and self._inside(s, lux, True) for s in self.states)
 
     def update(self, lux, now_ms):
-        """Feed one sample and return the active state id, or None if unsafe.
-
-        None is returned for an unknown/ambiguous state and for a timed-out
-        sensor. A caller must stop before starting a new pipeline in that case.
-        """
         now_ms = int(now_ms)
         self.last_sample_ms = now_ms if lux is not None else self.last_sample_ms
-
         if lux is None:
-            if self.last_sample_ms is None:
-                return None
-            if now_ms - self.last_sample_ms > self.sensor_timeout_ms:
+            if self.last_sample_ms is None or now_ms - self.last_sample_ms > self.sensor_timeout_ms:
                 return None
             return self.active
-
         if self.active is not None and self._active_still_valid(lux):
             eligible = self._eligible(lux)
             if len(eligible) == 1 and eligible[0]["id"] == self.active:
                 self.candidate = None
                 self.candidate_since = None
                 return self.active
-
         eligible = self._eligible(lux)
         if len(eligible) != 1:
             self.candidate = None
             self.candidate_since = None
             return self.active if self.active is not None and self._active_still_valid(lux) else None
-
         state_id = eligible[0]["id"]
         if state_id != self.candidate:
             self.candidate = state_id
             self.candidate_since = now_ms
-
         if self.candidate_since is not None and now_ms - self.candidate_since >= self.stable_ms:
             self.active = state_id
             self.candidate = None
             self.candidate_since = None
             return self.active
-
-        return self.active if self.active is not None and self._active_still_valid(lux) else None
+        return self.active if self.active is not None else None
 
     def reset(self):
         self.active = None

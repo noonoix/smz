@@ -15,6 +15,7 @@
         </Grid.RowDefinitions>
 
         <!-- v0.9.55 - the vertical scrollbar no longer touches the Persian text: the content keeps a 14px inset -->
+        <!-- v0.9.68 - final audited release candidate: preserve the tested scroll contract -->
         <ScrollViewer Grid.Row="0" MaxHeight="480" VerticalScrollBarVisibility="Auto" Padding="14,0,14,0">
             <StackPanel x:Name="FormPanel" />
         </ScrollViewer>

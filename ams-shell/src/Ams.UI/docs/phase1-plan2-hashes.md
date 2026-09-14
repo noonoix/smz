@@ -1,0 +1,8 @@
+# Current PLAN2 source hashes
+
+```text
+cd2ac8d509c0e46d3b6921fdea8002d05f5ea582592a0ab31d086d794f45a1fe  portable/plan3/CIRCUITPY/plan_engine.py
+5aaddc4125c3c42dcb521f057c632338a9c26baa38b4b73305e0979e207a6d52  portable/plan3/tools/winr.py
+481014a11f085820ad9a4bc259d4bd592f1e325f663d80b8585eb7a4dd891cc8  portable/plan3/sim/sim_plan2.py
+edbb1439d5eb1ae8df96921cccc6e580b924360e8fec4eb39e734335ee2ac76f  portable/plan3/sim/sim_plan3.py
+```

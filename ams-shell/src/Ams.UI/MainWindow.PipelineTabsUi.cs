@@ -9,8 +9,11 @@ using Ams.UI.Models;
 using Ams.UI.ViewModels;
 using WpfColor = System.Windows.Media.Color;
 using WpfColorConverter = System.Windows.Media.ColorConverter;
+using WpfComboBox = System.Windows.Controls.ComboBox;
 using WpfCursors = System.Windows.Input.Cursors;
 using WpfListBox = System.Windows.Controls.ListBox;
+using WpfPanel = System.Windows.Controls.Panel;
+using WpfPoint = System.Windows.Point;
 
 namespace Ams.UI;
 
@@ -53,12 +56,11 @@ internal static class PipelineTabsUiBootstrap
         var statusPanel = BuildStatusPanel(vm);
         statusPanel.Visibility = Visibility.Collapsed;
         Grid.SetRow(statusPanel, 1);
-        Panel.SetZIndex(statusPanel, 50);
+        WpfPanel.SetZIndex(statusPanel, 50);
         host.Children.Add(statusPanel);
 
         var tabs = new StackPanel { Orientation = Orientation.Horizontal, FlowDirection = FlowDirection.LeftToRight };
         var buttons = new List<Button>();
-        var statusActive = false;
         Button? statusButton = null;
         foreach (var tab in vm.PipelineTabs)
         {
@@ -74,7 +76,6 @@ internal static class PipelineTabsUiBootstrap
             };
             button.Click += (_, _) =>
             {
-                statusActive = false;
                 statusPanel.Visibility = Visibility.Collapsed;
                 if (button.Tag is PipelineKind kind)
                 {
@@ -99,7 +100,6 @@ internal static class PipelineTabsUiBootstrap
         };
         statusButton.Click += (_, _) =>
         {
-            statusActive = true;
             statusPanel.Visibility = Visibility.Visible;
             Paint(buttons, null);
             PaintStatus(statusButton, true);
@@ -111,7 +111,6 @@ internal static class PipelineTabsUiBootstrap
 
         void RefreshTabUi()
         {
-            statusActive = false;
             statusPanel.Visibility = Visibility.Collapsed;
             UpdateTabKeyBindings(window, vm);
             Paint(buttons, vm.ActivePipelineTab);
@@ -180,8 +179,8 @@ internal static class PipelineTabsUiBootstrap
         toggle.SetBinding(ContentControl.ContentProperty, new Binding(nameof(MainViewModel.LightWatchButtonText)));
         controlRow.Children.Add(toggle);
         controlRow.Children.Add(new TextBlock { Text = "فاصله نمونه‌برداری:", Foreground = Brush("#D9DEE7"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(18, 0, 8, 0) });
-        var interval = new ComboBox { ItemsSource = vm.LightWatchIntervalsMs, Width = 100, Padding = new Thickness(6), VerticalContentAlignment = VerticalAlignment.Center };
-        interval.SetBinding(ComboBox.SelectedItemProperty, new Binding(nameof(MainViewModel.SelectedLightWatchIntervalMs)) { Mode = BindingMode.TwoWay });
+        var interval = new WpfComboBox { ItemsSource = vm.LightWatchIntervalsMs, Width = 100, Padding = new Thickness(6), VerticalContentAlignment = VerticalAlignment.Center };
+        interval.SetBinding(WpfComboBox.SelectedItemProperty, new Binding(nameof(MainViewModel.SelectedLightWatchIntervalMs)) { Mode = BindingMode.TwoWay });
         controlRow.Children.Add(interval);
         controlRow.Children.Add(new TextBlock { Text = "میلی‌ثانیه", Foreground = Brush("#AAB3C2"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) });
         controls.Child = controlRow;
@@ -225,7 +224,7 @@ internal static class PipelineTabsUiBootstrap
             {
                 var x = values.Count == 1 ? chart.ActualWidth / 2 : i * chart.ActualWidth / (values.Count - 1);
                 var y = chart.ActualHeight - 10 - ((values[i] - lo) / range) * (chart.ActualHeight - 20);
-                line.Points.Add(new Point(x, y));
+                line.Points.Add(new WpfPoint(x, y));
             }
         }
         chart.SizeChanged += (_, _) => DrawChart();

@@ -89,7 +89,7 @@ internal static class FooterUiBootstrap
         panel.Children.Add(new TextBlock
         {
             Text = title,
-            Foreground = TryBrush("TextSecondaryBrush", Brushes.LightGray),
+            Foreground = System.Windows.Media.Brushes.LightGray,
             FontSize = 10,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(4, 0, 4, 2),
@@ -97,8 +97,8 @@ internal static class FooterUiBootstrap
         panel.Children.Add(content);
         return new Border
         {
-            Background = TryBrush("BgElevatedBrush", new SolidColorBrush(Color.FromRgb(45, 49, 58))),
-            BorderBrush = TryBrush("BorderSubtleBrush", new SolidColorBrush(Color.FromRgb(68, 74, 85))),
+            Background = TryBrush("BgElevatedBrush", new SolidColorBrush(System.Windows.Media.Color.FromRgb(45, 49, 58))),
+            BorderBrush = TryBrush("BorderSubtleBrush", new SolidColorBrush(System.Windows.Media.Color.FromRgb(68, 74, 85))),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(6),
             Padding = new Thickness(6, 4, 6, 4),
@@ -108,5 +108,5 @@ internal static class FooterUiBootstrap
     }
 
     private static WpfBrush TryBrush(string key, WpfBrush fallback)
-        => Application.Current?.TryFindResource(key) as WpfBrush ?? fallback;
+        => System.Windows.Application.Current?.TryFindResource(key) as WpfBrush ?? fallback;
 }

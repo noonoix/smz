@@ -6,6 +6,7 @@ using System.Windows.Media;
 using Ams.UI.ViewModels;
 using WpfBinding = System.Windows.Data.Binding;
 using WpfTextBox = System.Windows.Controls.TextBox;
+using WpfPanel = System.Windows.Controls.Panel;
 
 namespace Ams.UI;
 
@@ -154,7 +155,7 @@ public partial class MainWindow
         Border? owner = null;
         for (DependencyObject? p = body; p is not null; p = VisualTreeHelper.GetParent(p))
             if (p is Border border) { owner = border; break; }
-        if (owner is null || owner.Parent is not Panel oldParent || host.Children.Contains(owner)) return;
+        if (owner is null || owner.Parent is not WpfPanel oldParent || host.Children.Contains(owner)) return;
         oldParent.Children.Remove(owner);
         owner.Margin = new Thickness(0, 0, 0, 8);
         host.Children.Add(owner);

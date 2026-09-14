@@ -35,8 +35,8 @@ public partial class BoardPrepWindow : Window
         public string IdePath { get; set; } = "";
         public string FlashHex { get; set; } = "";
         public string FlashPort { get; set; } = "";
-        public bool CheckOnly { get; set; }
-        public bool Erase { get; set; } = true;
+        public bool CheckOnly { get; set; } = true;
+        public bool Erase { get; set; } = false;
         public bool FixFuses { get; set; }
     }
 
@@ -53,6 +53,7 @@ public partial class BoardPrepWindow : Window
     public BoardPrepWindow()
     {
         InitializeComponent();
+        InitializeUsbUpdatePanel();
 
         _settingsPath = Path.Combine(AppContext.BaseDirectory, "board-prep-settings.json");
         _s = LoadSettings();

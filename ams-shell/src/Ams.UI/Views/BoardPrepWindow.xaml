@@ -327,9 +327,9 @@
                             </Grid>
 
                             <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                                <CheckBox x:Name="ChkCheckOnly" Content="فقط چک (بدون نوشتن)"
+                                <CheckBox x:Name="ChkCheckOnly" Content="فقط چک (بدون نوشتن)" IsChecked="True"
                                           Checked="FlashField_Changed" Unchecked="FlashField_Changed" />
-                                <CheckBox x:Name="ChkErase" Content="پاک‌سازی اول (erase)" Margin="12,0,0,0" IsChecked="True"
+                                <CheckBox x:Name="ChkErase" Content="پاک‌سازی اول (erase — فقط Recovery)" Margin="12,0,0,0" IsChecked="False"
                                           Checked="FlashField_Changed" Unchecked="FlashField_Changed" />
                                 <CheckBox x:Name="ChkFixFuses" Content="ترمیم فیوزها" Margin="12,0,0,0"
                                           Checked="FlashField_Changed" Unchecked="FlashField_Changed" />

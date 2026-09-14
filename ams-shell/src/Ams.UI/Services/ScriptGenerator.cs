@@ -157,11 +157,7 @@ public static class ScriptGenerator
                 sb.AppendLine(pad + "# TODO: PC-side image search — run this script via the AMS app's Run for Find Image support");
                 break;
 
-            case "buzzer":
-      sb.AppendLine($"{pad}Send-Cmd \"{Protect(StepDefinitions.BuildBuzzerSequenceCommand(n.Props))}\"");
-      break;
-
-  case "randomMousePosition":
+            case "randomMousePosition":
             {
                 var (x, y, w, h) = (PropEx.GetInt(n.Props, "x"), PropEx.GetInt(n.Props, "y"),
                                     Math.Max(1, PropEx.GetInt(n.Props, "w", 100)), Math.Max(1, PropEx.GetInt(n.Props, "h", 100)));
@@ -173,13 +169,7 @@ public static class ScriptGenerator
                 sb.AppendLine($"{pad}$destX = {x} + $script:rng.Next(0, {w})");
                 sb.AppendLine($"{pad}$destY = {y} + $script:rng.Next(0, {h})");
                 sb.AppendLine($"{pad}Move-HumanMouse $destX $destY {screenW} {screenH} @{{ " + CfgHash(n.Props, mouseSpeedMin, mouseSpeedMax) + " }");
-      switch (PropEx.GetString(n.Props, "action", "moveOnly"))
-      {
-          case "leftClick": sb.AppendLine($"{pad}Send-Cmd 'MCLICK|left,1'"); break;
-          case "rightClick": sb.AppendLine($"{pad}Send-Cmd 'MCLICK|right,1'"); break;
-          case "scroll": sb.AppendLine($"{pad}Send-Cmd 'MWHEEL|{PropEx.GetInt(n.Props, "scrollDelta", -1)}'"); break;
-      }
-      break;
+                break;
             }
 
             case "mouseMove":

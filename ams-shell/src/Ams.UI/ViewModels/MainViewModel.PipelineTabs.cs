@@ -35,6 +35,7 @@ public partial class MainViewModel
         OnPropertyChanged(nameof(IsMainPipeline));
         OnPropertyChanged(nameof(IsMainPipeline));
         OnPropertyChanged(nameof(IsMainPipeline));
+        OnPropertyChanged(nameof(IsMainPipeline));
         Log("pipeline tabs initialized: " + PipelineCounts());
     }
 
@@ -49,6 +50,7 @@ public partial class MainViewModel
         OnPropertyChanged(nameof(ActivePipelineTab));
         OnPropertyChanged(nameof(ActivePipelineTitle));
         OnPropertyChanged(nameof(IsLaunchPipeline));
+        OnPropertyChanged(nameof(IsMainPipeline));
         OnPropertyChanged(nameof(IsMainPipeline));
         OnPropertyChanged(nameof(IsMainPipeline));
         OnPropertyChanged(nameof(IsMainPipeline));
@@ -137,6 +139,7 @@ public partial class MainViewModel
         OnPropertyChanged(nameof(IsMainPipeline));
         OnPropertyChanged(nameof(IsMainPipeline));
         OnPropertyChanged(nameof(IsMainPipeline));
+        OnPropertyChanged(nameof(IsMainPipeline));
         UpdateFileText();
         Log("new pipeline workspace: " + PipelineCounts());
     }
@@ -166,6 +169,7 @@ public partial class MainViewModel
             OnPropertyChanged(nameof(ActivePipelineTab));
             OnPropertyChanged(nameof(ActivePipelineTitle));
             OnPropertyChanged(nameof(IsLaunchPipeline));
+        OnPropertyChanged(nameof(IsMainPipeline));
         OnPropertyChanged(nameof(IsMainPipeline));
         OnPropertyChanged(nameof(IsMainPipeline));
         OnPropertyChanged(nameof(IsMainPipeline));

@@ -4,13 +4,7 @@
 
 
 class LightStateGuard:
-    """Debounced, hysteretic light-state selector.
-
-    A state becomes active only after stable_ms of in-range samples. The active
-    range is widened by hysteresis so small sensor noise cannot make the
-    pipeline oscillate. Overlapping candidate ranges are deliberately treated
-    as unknown unless exactly one state is eligible.
-    """
+    """Debounced, hysteretic light-state selector."""
 
     def __init__(self, states, stable_ms=750, hysteresis=0, sensor_timeout_ms=1500):
         self.states = tuple(states or ())
@@ -38,17 +32,11 @@ class LightStateGuard:
     def _active_still_valid(self, lux):
         if lux is None or self.active is None:
             return False
-        for state in self.states:
-            if state["id"] == self.active:
-                return self._inside(state, lux, True)
-        return False
+        return any(state["id"] == self.active and self._inside(state, lux, True)
+                   for state in self.states)
 
     def update(self, lux, now_ms):
-        """Feed one sample and return the active state id, or None if unsafe.
-
-        None is returned for an unknown/ambiguous state and for a timed-out
-        sensor. A caller must stop before starting a new pipeline in that case.
-        """
+        """Return active id, or None when the sensor/state is unsafe."""
         now_ms = int(now_ms)
         self.last_sample_ms = now_ms if lux is not None else self.last_sample_ms
 
@@ -59,8 +47,6 @@ class LightStateGuard:
                 return None
             return self.active
 
-        # Keep the current pipeline through small excursions inside the
-        # hysteresis band. A new route still needs a primary-range match.
         if self.active is not None and self._active_still_valid(lux):
             eligible = self._eligible(lux)
             if len(eligible) == 1 and eligible[0]["id"] == self.active:
@@ -85,7 +71,8 @@ class LightStateGuard:
             self.candidate_since = None
             return self.active
 
-        return self.active if self.active is not None and self._active_still_valid(lux) else None
+        # Keep the current route while a new candidate is being debounced.
+        return self.active if self.active is not None else None
 
     def reset(self):
         self.active = None
@@ -95,5 +82,4 @@ class LightStateGuard:
 
 
 def state_spec(state_id, low, high, route):
-    """Small helper used by generated plans and CPython simulations."""
     return {"id": str(state_id), "lo": int(low), "hi": int(high), "route": str(route)}

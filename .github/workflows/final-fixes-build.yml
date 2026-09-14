@@ -1,0 +1,167 @@
+name: Final fixes build
+
+on:
+  push:
+    branches: [fix/classroom-studio-final-20260914]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - name: Patch final behavior
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          root=Path('.')
+          def rw(p, f):
+              q=root/p; s=q.read_text(encoding='utf-8'); n=f(s); q.write_text(n,encoding='utf-8')
+          def add(s, old, new, label):
+              if new in s: return s
+              if s.count(old)!=1: raise SystemExit(f'{label}: anchor not found uniquely')
+              return s.replace(old,new,1)
+
+          p='ams-shell/src/Ams.UI/Models/StepDefinitions.cs'
+          def step(s):
+              s=add(s,'                new("h", "Region height", FieldKind.Int, "1049"),\n                new("pauseBeforeMin"', '                new("h", "Region height", FieldKind.Int, "1049"),\n                new("action", "Action after arrival", FieldKind.Combo, "moveOnly", new[] { "moveOnly", "leftClick", "rightClick", "scroll" }),\n                new("scrollDelta", "Scroll delta (negative = down)", FieldKind.Int, "-1", HideWhenKey: "action", HideUnlessValue: "scroll"),\n                new("pauseBeforeMin"', 'random mouse fields')
+              s=add(s,'                new("pattern", "Custom sequence — freq:duration,pause;... (example 900:150,80;1200:250)", FieldKind.Text,\n                    "900:150,80;1200:250", HideWhenKey: "preset", HideUnlessValue: "custom"),', '                new("pattern", "Custom sequence — freq:duration,pause;... (example 900:150,80;1200:250)", FieldKind.Text,\n                    "900:150,80;1200:250", HideWhenKey: "preset", HideUnlessValue: "custom"),\n                new("speedPct", "Playback speed % (100 = normal)", FieldKind.Int, "100"),', 'buzzer speed field')
+              marker='    public static StepDefinition Get'
+              method=r'''    public static string BuildBuzzerSequenceCommand(IReadOnlyDictionary<string, object?> p)
+    {
+        int speed = Math.Clamp(PropEx.GetInt(p, "speedPct", 100), 25, 400);
+        var notes = new List<string>();
+        foreach (var cmd in BuildBuzzerCommands(p))
+        {
+            var a = cmd.Split('|', 2);
+            if (a[0] == "BEEP")
+            {
+                var x = a[1].Split(',');
+                int ms = Math.Max(1, (int)Math.Round(int.Parse(x[1]) * 100.0 / speed, MidpointRounding.AwayFromZero));
+                notes.Add($"{x[0]},{ms},0");
+            }
+            else if (a[0] == "DLY" && notes.Count > 0)
+            {
+                var x = notes[^1].Split(',');
+                x[2] = Math.Max(0, (int)Math.Round(int.Parse(a[1]) * 100.0 / speed, MidpointRounding.AwayFromZero)).ToString();
+                notes[^1] = string.Join(',', x);
+            }
+        }
+        return "BEEPSEQ|" + string.Join(';', notes);
+    }
+
+'''
+              return add(s,marker,method+marker,'buzzer sequence method')
+          rw(p,step)
+
+          p='ams-shell/src/Ams.UI/Services/RunEngine.cs'
+          def run(s):
+              s=add(s,'                    await HumanMoveToAsync(destX, destY, cfg, ct);\n                    break;\n                }\n\n                case "mouseMove":','''                    await HumanMoveToAsync(destX, destY, cfg, ct);
+                    switch (PropEx.GetString(s.Props, "action", "moveOnly"))
+                    {
+                        case "leftClick": await Send("MCLICK|left,1", ct); break;
+                        case "rightClick": await Send("MCLICK|right,1", ct); break;
+                        case "scroll": await Send($"MWHEEL|{PropEx.GetInt(s.Props, "scrollDelta", -1)}", ct); break;
+                    }
+                    break;
+                }
+
+                case "buzzer":
+                    await Send(StepDefinitions.BuildBuzzerSequenceCommand(s.Props), ct);
+                    break;
+
+                case "mouseMove":''','RunEngine actions')
+              return s
+          rw(p,run)
+
+          p='ams-shell/src/Ams.UI/Services/ScriptGenerator.cs'
+          def script(s):
+              s=add(s,'            case "randomMousePosition":','''            case "buzzer":
+                sb.AppendLine($"{pad}Send-Cmd \\\"{Protect(StepDefinitions.BuildBuzzerSequenceCommand(n.Props))}\\\"");
+                break;
+
+            case "randomMousePosition":''','script buzzer')
+              old='                sb.AppendLine($"{pad}Move-HumanMouse $destX $destY {screenW} {screenH} @{{ " + CfgHash(n.Props, mouseSpeedMin, mouseSpeedMax) + " }");\n                break;'
+              new='''                sb.AppendLine($"{pad}Move-HumanMouse $destX $destY {screenW} {screenH} @{{ " + CfgHash(n.Props, mouseSpeedMin, mouseSpeedMax) + " }");
+                switch (PropEx.GetString(n.Props, "action", "moveOnly"))
+                {
+                    case "leftClick": sb.AppendLine($"{pad}Send-Cmd 'MCLICK|left,1'"); break;
+                    case "rightClick": sb.AppendLine($"{pad}Send-Cmd 'MCLICK|right,1'"); break;
+                    case "scroll": sb.AppendLine($"{pad}Send-Cmd 'MWHEEL|{PropEx.GetInt(n.Props, "scrollDelta", -1)}'"); break;
+                }
+                break;'''
+              return add(s,old,new,'script random action')
+          rw(p,script)
+
+          p='ams-shell/src/Ams.UI/Services/PlanExporter.cs'
+          def plan(s):
+              old='            Emit(n, new[] { "RMOUSE|region=" + x + "," + y + "," + w + "," + h + Tuning(n, idle) }, "RMOUSE");'
+              new='''            var ops = new List<string> { "RMOUSE|region=" + x + "," + y + "," + w + "," + h + Tuning(n, idle) };
+            switch (PropEx.GetString(p, "action", "moveOnly"))
+            {
+                case "leftClick": ops.Add("CLICK|btn=left|n=1"); break;
+                case "rightClick": ops.Add("CLICK|btn=right|n=1"); break;
+                case "scroll": ops.Add("WHEEL|" + PropEx.GetInt(p, "scrollDelta", -1)); break;
+            }
+            Emit(n, ops, "RMOUSE");'''
+              return add(s,old,new,'plan random action')
+          rw(p,plan)
+
+          p='ams-shell/src/Ams.UI/Models/StepTextsFa.cs'
+          def fa(s):
+              s=add(s,'        ["delta"] = "مقدار ویل (عدد منفی = پایین)",','        ["delta"] = "مقدار ویل (عدد منفی = پایین)",\n        ["scrollDelta"] = "مقدار اسکرول (منفی = پایین، مثبت = بالا)",\n        ["speedPct"] = "سرعت پخش نوت‌ها ٪ (۱۰۰ عادی، بیشتر = سریع‌تر)",','fa labels')
+              return s
+          rw(p,fa)
+
+          # Add the copy button and keep the existing status bindings intact.
+          p='ams-shell/src/Ams.UI/MainWindow.FooterUi.cs'
+          def footer(s):
+              needle='        MoveChildren(connection, connectionWrap);\n        Grid.SetRow(connectionWrap, 0);'
+              ins='''        MoveChildren(connection, connectionWrap);
+        var copy = new Button { Content = "📋 کپی مشخصات اتصال", Padding = new Thickness(10, 3, 10, 3), Margin = new Thickness(8, 3, 4, 3), ToolTip = "کپی متن کامل وضعیت اتصال" };
+        copy.Click += (_, _) =>
+        {
+            var text = string.Join(Environment.NewLine, connectionWrap.Children.OfType<TextBlock>().Select(x => x.Text).Where(x => !string.IsNullOrWhiteSpace(x)));
+            if (!string.IsNullOrWhiteSpace(text)) Clipboard.SetText(text);
+        };
+        connectionWrap.Children.Add(copy);
+        Grid.SetRow(connectionWrap, 0);'''
+              return add(s,needle,ins,'footer copy')
+          rw(p,footer)
+
+          # Firmware templates: accept one atomic BEEPSEQ command and keep PWM alive for the sequence.
+          for p in ['ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs','firmware/autocycle-hostusb-v5/code.py']:
+              q=root/p; s=q.read_text(encoding='utf-8')
+              if 'BEEPSEQ|' in s: continue
+              m=re.search(r'(?m)^(\s*)def handle\(line\):',s)
+              if not m: raise SystemExit(f'{p}: handle() not found')
+              ind=m.group(1)
+              fn=f'''{ind}def _beep_sequence(line):\n{ind}    import pwmio\n{ind}    tone = None\n{ind}    try:\n{ind}        notes = [tuple(int(x) for x in part.split(",")) for part in line.split("|", 1)[1].split(";")]\n{ind}        tone = pwmio.PWMOut(board.GP6, duty_cycle=0, frequency=notes[0][0], variable_frequency=True)\n{ind}        for freq, duration, pause in notes:\n{ind}            tone.frequency = freq; tone.duty_cycle = 32768\n{ind}            time.sleep(duration / 1000.0)\n{ind}            tone.duty_cycle = 0\n{ind}            if pause: time.sleep(pause / 1000.0)\n{ind}        return "OK|BEEPSEQ"\n{ind}    finally:\n{ind}        if tone is not None:\n{ind}            tone.duty_cycle = 0; tone.deinit()\n\n'''
+              s=s[:m.start()]+fn+s[m.start():]
+              s=s.replace(m.group(0),m.group(0)+'\n'+ind+'    if line.startswith("BEEPSEQ|"): return _beep_sequence(line)',1)
+              q.write_text(s,encoding='utf-8')
+          print('patched')
+          PY
+      - name: Commit patched sources
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ams-shell/src/Ams.UI firmware/autocycle-hostusb-v5/code.py
+          if ! git diff --cached --quiet; then git commit -m "Add atomic buzzer playback and human random-area actions"; git push; fi
+      - uses: actions/setup-dotnet@v4
+        with: {dotnet-version: 8.x}
+      - name: Build release
+        run: dotnet build ams-shell/AMS.sln --configuration Release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Classroom-Studio-final-fixes
+          path: ams-shell/src/Ams.UI/bin/Release/**
+          if-no-files-found: warn

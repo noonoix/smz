@@ -12,12 +12,14 @@ public partial class BoardPrepWindow
     private TextBlock? _usbValidation;
     private Button? _usbUpdate;
     private bool _usbUpdateRunning;
+    private bool _usbPanelInitialized;
 
     /// <summary>Adds the recurring, safe path to the existing recovery panel without making
     /// the old ISP recovery controls look like a normal application updater.</summary>
     private void InitializeUsbUpdatePanel()
     {
-        if (PanelFlash.Content is not StackPanel host) return;
+        if (_usbPanelInitialized || PanelFlash.Content is not StackPanel host) return;
+        _usbPanelInitialized = true;
 
         var card = new Border
         {

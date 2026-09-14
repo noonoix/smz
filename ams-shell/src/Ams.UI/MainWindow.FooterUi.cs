@@ -8,8 +8,7 @@ using WpfPanel = System.Windows.Controls.Panel;
 
 namespace Ams.UI;
 
-/// <summary>Turns the status footer into responsive, multi-row cards instead of one long line.</summary>
-// The footer layout is intentionally assembled after XAML load so existing bindings remain intact.
+/// <summary>Turns the status footer into responsive, single-row cards with a copyable connection panel.</summary>
 internal static class FooterUiBootstrap
 {
     private static readonly DependencyProperty InstalledProperty = DependencyProperty.RegisterAttached(
@@ -27,34 +26,43 @@ internal static class FooterUiBootstrap
         var footer = root.Children.OfType<Border>()
             .FirstOrDefault(x => Grid.GetRow(x) == 3 && x.Child is DockPanel);
         if (footer?.Child is not DockPanel dock) return;
-        window.SetValue(InstalledProperty, true);
 
         var connection = dock.Children.OfType<StackPanel>()
             .FirstOrDefault(x => DockPanel.GetDock(x) == Dock.Left);
         var actions = dock.Children.OfType<StackPanel>()
             .FirstOrDefault(x => DockPanel.GetDock(x) == Dock.Right);
         if (connection is null || actions is null) return;
+        window.SetValue(InstalledProperty, true);
 
         dock.Children.Clear();
-        var layout = new Grid { FlowDirection = FlowDirection.RightToLeft };
-        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var layout = new Grid { FlowDirection = FlowDirection.LeftToRight };
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
         var connectionWrap = new WrapPanel
         {
             Orientation = Orientation.Horizontal,
-            FlowDirection = FlowDirection.RightToLeft,
+            FlowDirection = FlowDirection.LeftToRight,
             VerticalAlignment = VerticalAlignment.Center,
         };
         MoveChildren(connection, connectionWrap);
-        var copy = new Button { Content = "📋 کپی مشخصات اتصال", Padding = new Thickness(10, 3, 10, 3), Margin = new Thickness(8, 3, 4, 3), ToolTip = "کپی متن کامل وضعیت اتصال" };
+        var copy = new Button
+        {
+            Content = "📋 کپی مشخصات اتصال",
+            Padding = new Thickness(10, 3, 10, 3),
+            Margin = new Thickness(8, 3, 4, 3),
+            ToolTip = "کپی متن کامل وضعیت اتصال",
+        };
         copy.Click += (_, _) =>
         {
-  var text = string.Join(Environment.NewLine, connectionWrap.Children.OfType<TextBlock>().Select(x => x.Text).Where(x => !string.IsNullOrWhiteSpace(x)));
-  if (!string.IsNullOrWhiteSpace(text)) Clipboard.SetText(text);
+            var text = string.Join(Environment.NewLine,
+                connectionWrap.Children.OfType<TextBlock>()
+                    .Select(x => x.Text)
+                    .Where(x => !string.IsNullOrWhiteSpace(x)));
+            if (!string.IsNullOrWhiteSpace(text)) Clipboard.SetText(text);
         };
         connectionWrap.Children.Add(copy);
-        Grid.SetRow(connectionWrap, 0);
+        Grid.SetColumn(connectionWrap, 0);
         layout.Children.Add(Card("بردها و اتصال", connectionWrap));
 
         var actionWrap = new WrapPanel
@@ -64,7 +72,7 @@ internal static class FooterUiBootstrap
             HorizontalAlignment = HorizontalAlignment.Right,
         };
         MoveChildren(actions, actionWrap);
-        Grid.SetRow(actionWrap, 1);
+        Grid.SetColumn(actionWrap, 1);
         layout.Children.Add(Card("کنترل اجرا", actionWrap));
 
         footer.Padding = new Thickness(8, 6, 8, 6);
@@ -84,7 +92,7 @@ internal static class FooterUiBootstrap
                 if (element is TextBlock text)
                 {
                     text.TextWrapping = TextWrapping.Wrap;
-                    text.MaxWidth = 260;
+                    text.MaxWidth = 360;
                 }
             }
             destination.Children.Add(child);

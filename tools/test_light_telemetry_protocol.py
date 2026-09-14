@@ -39,6 +39,7 @@ read = namespace["read_lux_telemetry"]
 
 namespace["sensor"] = None
 assert read() == "ERR|NOSENSOR|LUX"
+assert namespace["_lux_seq"] == 0
 
 class Sensor:
     mode = 0x10
@@ -48,7 +49,12 @@ class Sensor:
 namespace["sensor"] = Sensor()
 namespace["_arm_lag"] = 1
 assert read() == "ERR|BUSY|LUX"
+assert namespace["_lux_seq"] == 0
 namespace["_arm_lag"] = 0
+namespace["_pending_move"] = "MMOVE|10,20,abs,2"
+assert read() == "ERR|BUSY|LUX"
+assert namespace["_lux_seq"] == 0
+namespace["_pending_move"] = None
 assert read() == "OK|LUX|seq=1|lux=1284.7|mode=hires|sensor=ok"
 assert read().startswith("OK|LUX|seq=2|")
 
@@ -60,8 +66,10 @@ class BrokenSensor:
     def lux(self):
         raise OSError("i2c")
 
+seq_before_error = namespace["_lux_seq"]
 namespace["sensor"] = BrokenSensor()
 assert read() == "ERR|I2C|LUX"
+assert namespace["_lux_seq"] == seq_before_error
 
 class InvalidSensor:
     mode = 0x10
@@ -70,4 +78,5 @@ class InvalidSensor:
 
 namespace["sensor"] = InvalidSensor()
 assert read() == "ERR|I2C|LUX"
+assert namespace["_lux_seq"] == seq_before_error
 print("light telemetry protocol: all contract tests passed")

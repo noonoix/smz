@@ -548,22 +548,14 @@ public partial class MainViewModel : ObservableObject
 
     {
 
-        if (type == "keyDown") type = RecoveryCallStepDefinitions.KeyHold;
-        if (type == "keyUp")
-        {
-            Log("add blocked: Key Up is created automatically with Key Hold Group");
-            return;
-        }
-
         if (type == RecoveryCallStepDefinitions.CallLaunch && !IsLaunchPipeline)
+
         {
+
             Log("add blocked: Run/Call Launch DC Recovery is only valid in the Launch tab");
+
             return;
-        }
-        if (type == RecoveryCallStepDefinitions.CallMain && !IsMainPipeline)
-        {
-            Log("add blocked: Run/Call Main DC Recovery is only valid in the Main tab");
-            return;
+
         }
 
         var def = StepDefinitions.Get(type);
@@ -3234,81 +3226,9 @@ public partial class MainViewModel : ObservableObject
 
 
 
-    private bool NormalizeKeyPairs()
-    {
-        bool changed = false;
-        changed = NormalizeKeyList(Steps);
-        return changed;
-
-        bool NormalizeKeyList(IList<StepNode> list)
-        {
-            bool local = false;
-            for (int i = 0; i < list.Count; i++)
-            {
-                var current = list[i];
-                local |= NormalizeKeyList(current.Children);
-
-                if (current.Type == "keyUp")
-                {
-                    // A release without an owned press is unsafe and cannot be moved into
-                    // a valid group. Drop it during migration rather than leaving a stuck state.
-                    list.RemoveAt(i--);
-                    local = true;
-                    continue;
-                }
-                if (current.Type != "keyDown") continue;
-
-                string key = PropEx.GetString(current.Props, "key", "SHIFT");
-                var open = new List<string> { key };
-                int close = -1;
-                for (int j = i + 1; j < list.Count; j++)
-                {
-                    var candidate = list[j];
-                    if (candidate.Type == "keyDown")
-                    {
-                        open.Add(PropEx.GetString(candidate.Props, "key", "SHIFT"));
-                    }
-                    else if (candidate.Type == "keyUp" && open.Count > 0)
-                    {
-                        string released = PropEx.GetString(candidate.Props, "key", "SHIFT");
-                        int matching = open.LastIndexOf(released);
-                        if (matching >= 0) open.RemoveAt(matching);
-                        if (open.Count == 0) { close = j; break; }
-                    }
-                }
-                if (close < 0) continue;
-
-                var middle = new List<StepNode>();
-                for (int j = i + 1; j < close; j++) middle.Add(list[j]);
-                // Normalize nested holds before placing them inside the outer transaction.
-                local |= NormalizeKeyList(middle);
-
-                var group = new StepNode
-                {
-                    Type = RecoveryCallStepDefinitions.KeyHold,
-                    Name = current.Name,
-                    Delay = current.Delay,
-                    DelayMax = current.DelayMax,
-                    Parent = current.Parent,
-                    Props = new Dictionary<string, object?> { ["key"] = key },
-                };
-                foreach (var child in middle)
-                {
-                    DocumentService.FixParents(child, group);
-                    group.Children.Add(child);
-                }
-                for (int j = close; j >= i; j--) list.RemoveAt(j);
-                list.Insert(i, group);
-                local = true;
-            }
-            return local;
-        }
-    }
-
     private void Renumber()
 
     {
-        if (NormalizeKeyPairs()) _dirty = true;
 
         // rebuild the flat view projection; rows are reused by node reference so the
 
@@ -3357,15 +3277,13 @@ public partial class MainViewModel : ObservableObject
 
                 bool opensParallel = n.Type == "parallelGroup";   // v0.9.44 — a Parallel Group with children registers its scope too, so its red vein shows (user report)
 
-                bool opensKeyHold = n.Type == "keyHold";
-
 
 
                 bool isCollapsed = _collapsed.Contains(n);   // v0.8.0 — accordion
 
 
 
-                if (opensLoop || opensIf || opensPackage || opensParallel || opensKeyHold)   // atomic Key Hold groups use the same red scope rail
+                if (opensLoop || opensIf || opensPackage || opensParallel)   // v0.9.44 — parallelGroup added: its children must show the red vein
 
                 {
 

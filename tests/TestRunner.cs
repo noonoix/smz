@@ -2267,7 +2267,7 @@ class TestRunner
             "v0.9.41: no reboot scheduling is left in the run loop");
 
         // 11-14) the vertical rail mirrors the Insert tab, grouped into per-section submenus
-        string[] v41types = { "mouseClick", "mouseMove", "mouseScroll", "randomMousePosition", "keystroke", "typeText", "keyHold", "delay", "forLoop", "randomPackage", "parallelGroup", "findImage", "waitForSound", "waitForLight", "openFile", "playAudio", "runExe", "playScript", "label", "gotoLabel", "comment", "rawCommand" };
+        string[] v41types = { "mouseClick", "mouseMove", "mouseScroll", "randomMousePosition", "keystroke", "typeText", "keyDown", "keyUp", "delay", "forLoop", "randomPackage", "parallelGroup", "findImage", "waitForSound", "waitForLight", "openFile", "playAudio", "runExe", "playScript", "label", "gotoLabel", "comment", "rawCommand" };
         int v41rs = v41xaml.IndexOf("<!-- Icon rail", StringComparison.Ordinal);
         int v41rj = v41xaml.IndexOf("<!-- Steps column", StringComparison.Ordinal);
         Assert(v41rs > 0 && v41rj > v41rs,
@@ -2609,18 +2609,14 @@ class TestRunner
                && v46mwc.Contains("_railOutsideTicks >= 3"),
             "v0.9.46: disconnected popup visuals close safely through the single watcher");
 
-        // 4-10) keyboard executor is global Options state; the old per-step dropdown
-        // was intentionally removed so action rows cannot disagree with the active board.
+        // 4-10) every keyboard step has Default/Pico/Pro Micro override with safe transport behavior
         foreach (var type in new[] { "keystroke", "typeText", "keyDown", "keyUp" })
         {
             var field = StepDefinitions.Get(type).Fields.SingleOrDefault(f => f.Key == "keyboardBoard");
-            Assert(field is null,
-                $"v0.9.67: {type} no longer exposes a duplicate per-step keyboard executor");
+            Assert(field is not null && field.Options is not null
+                   && field.Options.SequenceEqual(new[] { "default", "pico", "promicro" }),
+                $"v0.9.46: {type} exposes default/pico/promicro keyboard executor");
         }
-        var keyHoldDef = StepDefinitions.Get("keyHold");
-        Assert(keyHoldDef.IsContainer && keyHoldDef.IsScopeContainer
-               && keyHoldDef.Fields.Any(f => f.Key == "key"),
-            "v0.9.67: Key Hold is one atomic scope action with a held-key field");
         var v46key = new StepNode { Type = "keyDown", Props = new() { ["key"] = "A", ["keyboardBoard"] = "pico" } };
         Assert(StepDefinitions.RouteKeyboardCommand(v46key, "KDOWN|65") == "KBDPICO|KDOWN|65",
             "v0.9.46: a Pico-targeted step gets the KBDPICO envelope");

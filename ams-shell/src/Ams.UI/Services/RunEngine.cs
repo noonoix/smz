@@ -172,10 +172,6 @@ public sealed class RunEngine
                     await DelayRandom(PropEx.GetInt(s.Props, "minMs"), PropEx.GetInt(s.Props, "maxMs", 333), ct);
                     break;
 
-                case "keyHold":
-                    await RunKeyHoldAsync(s, ct);
-                    break;
-
                 case "forLoop":
                     await RunLoopAsync(s, ct);
                     break;
@@ -471,20 +467,10 @@ public sealed class RunEngine
                     int destX, destY;
                     lock (_rngLock) { destX = x + Rng.Next(w); destY = y + Rng.Next(h); }   // v0.9.15 — parallel-safe
                     await HumanMoveToAsync(destX, destY, cfg, ct);
-          switch (PropEx.GetString(s.Props, "action", "moveOnly"))
-          {
-              case "leftClick": await Send("MCLICK|left,1", ct); break;
-              case "rightClick": await Send("MCLICK|right,1", ct); break;
-              case "scroll": await Send($"MWHEEL|{PropEx.GetInt(s.Props, "scrollDelta", -1)}", ct); break;
-          }
-          break;
-      }
+                    break;
+                }
 
-      case "buzzer":
-          await Send(StepDefinitions.BuildBuzzerSequenceCommand(s.Props), ct);
-          break;
-
-      case "mouseMove":
+                case "mouseMove":
                 {
                     // v0.9.0 — "human" checked → the same app-side humanized path with the Gentle
                     // preset (human trail + light pauses, NO long idle breaks). Unchecked → raw MMOVE.
@@ -758,23 +744,6 @@ public sealed class RunEngine
     }
 
     // ─────────────────────────── loops ───────────────────────────
-
-    private async Task RunKeyHoldAsync(StepNode s, CancellationToken ct)
-    {
-        string key = PropEx.GetString(s.Props, "key", "SHIFT");
-        int vk = KeyMap.VK.TryGetValue(key, out var mapped) ? mapped : 16;
-        await Send($"KDOWN|{vk}", ct);
-        try
-        {
-            await RunStepsAsync(s.Children, ct);
-        }
-        finally
-        {
-            // The release is unconditional: cancellation, a failed child, or a nested
-            // group must never leave the physical key held down.
-            try { await Send($"KUP|{vk}", CancellationToken.None); } catch { }
-        }
-    }
 
     private async Task RunLoopAsync(StepNode s, CancellationToken ct)
     {

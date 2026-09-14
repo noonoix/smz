@@ -117,8 +117,6 @@ public static class StepDefinitions
                 new("y", "Region Y", FieldKind.Int, "0"),
                 new("w", "Region width", FieldKind.Int, "378"),
                 new("h", "Region height", FieldKind.Int, "1049"),
-                new("action", "Action after arrival", FieldKind.Combo, "moveOnly", new[] { "moveOnly", "leftClick", "rightClick", "scroll" }),
-                new("scrollDelta", "Scroll delta (negative = down)", FieldKind.Int, "-1", HideWhenKey: "action", HideUnlessValue: "scroll"),
                 new("pauseBeforeMin", "Reaction pause BEFORE the move — min (ms)", FieldKind.Int, "120"),
                 new("pauseBeforeMax", "Reaction pause BEFORE the move — max (ms)", FieldKind.Int, "450"),
                 new("pauseAfterMin", "Settle pause AFTER arrival — min (ms)", FieldKind.Int, "150"),
@@ -154,6 +152,7 @@ public static class StepDefinitions
                 new("key", "Key", FieldKind.Combo, "F4", KeyMap.KeyNames.ToArray()),
                 new("holdMin", "Hold min (ms) — random press-hold range; 0 = firmware default (firmware 1.7+)", FieldKind.Int, "0"),
                 new("holdMax", "Hold max (ms) — 0 = firmware default (firmware 1.7+)", FieldKind.Int, "0"),
+                new("keyboardBoard", "Keyboard executor — default uses Options; Pico executes locally; Pro Micro uses the UART arm", FieldKind.Combo, "default", new[] { "default", "pico", "promicro" }),
             },
             Summarize = s => "Keystroke " + ComboText(s.Props) + HoldText(s.Props) + KeyboardBoardHint(s.Props),
             Commands = s => new[] { "KCOMBO|" + ComboVk(s.Props) + HoldSuffix(s.Props) },
@@ -165,6 +164,7 @@ public static class StepDefinitions
             {
                 new("text", "Text", FieldKind.Multiline, ""),
                 new("mode", "Mode", FieldKind.Combo, "keystrokes", new[] { "keystrokes", "clipboard" }),
+                new("keyboardBoard", "Keyboard executor — default uses Options; Pico executes locally; Pro Micro uses the UART arm", FieldKind.Combo, "default", new[] { "default", "pico", "promicro" }),
                 new("secret", "Sensitive (password) — masked in logs, pasted via clipboard (§17.6)", FieldKind.Check, "false"),
                 new("hmin", "Humanize min (ms between keys — human-calibrated default 80)", FieldKind.Int, "80", HideWhenKey: "mode", HideWhenValue: "clipboard"),
                 new("hmax", "Humanize max (ms between keys — human-calibrated default 220)", FieldKind.Int, "220", HideWhenKey: "mode", HideWhenValue: "clipboard"),
@@ -204,6 +204,7 @@ public static class StepDefinitions
             Fields = new FieldDef[]
             {
                 new("key", "Key", FieldKind.Combo, "SHIFT", KeyMap.KeyNames.ToArray()),
+                new("keyboardBoard", "Keyboard executor — default uses Options; Pico executes locally; Pro Micro uses the UART arm", FieldKind.Combo, "default", new[] { "default", "pico", "promicro" }),
             },
             Summarize = s => "Key Down " + PropEx.GetString(s.Props, "key", "SHIFT") + KeyboardBoardHint(s.Props),
             Commands = s => new[] { "KDOWN|" + KeyVk(s.Props) },
@@ -214,6 +215,7 @@ public static class StepDefinitions
             Fields = new FieldDef[]
             {
                 new("key", "Key", FieldKind.Combo, "SHIFT", KeyMap.KeyNames.ToArray()),
+                new("keyboardBoard", "Keyboard executor — default uses Options; Pico executes locally; Pro Micro uses the UART arm", FieldKind.Combo, "default", new[] { "default", "pico", "promicro" }),
             },
             Summarize = s => "Key Up " + PropEx.GetString(s.Props, "key", "SHIFT") + KeyboardBoardHint(s.Props),
             Commands = s => new[] { "KUP|" + KeyVk(s.Props) },
@@ -443,7 +445,6 @@ public static class StepDefinitions
                 new("preset", "Tone pattern", FieldKind.Combo, "short", new[] { "short", "double", "warning", "success", "custom" }),
                 new("pattern", "Custom sequence — freq:duration,pause;... (example 900:150,80;1200:250)", FieldKind.Text,
                     "900:150,80;1200:250", HideWhenKey: "preset", HideUnlessValue: "custom"),
-                new("speedPct", "Playback speed % (100 = normal)", FieldKind.Int, "100"),
             },
             Summarize = s => "Buzzer · " + (PropEx.GetString(s.Props, "preset", "short") == "custom"
                 ? PropEx.GetString(s.Props, "pattern", "900:150")
@@ -546,29 +547,6 @@ public static class StepDefinitions
         }
         if (commands.Count == 0) throw new FormatException("buzzer pattern is empty");
         return commands;
-    }
-
-    public static string BuildBuzzerSequenceCommand(IReadOnlyDictionary<string, object?> p)
-    {
-        int speed = Math.Clamp(PropEx.GetInt(p, "speedPct", 100), 25, 400);
-        var notes = new List<string>();
-        foreach (var cmd in BuildBuzzerCommands(p))
-        {
-  var a = cmd.Split('|', 2);
-  if (a[0] == "BEEP")
-  {
-      var x = a[1].Split(',');
-      int ms = Math.Max(1, (int)Math.Round(int.Parse(x[1]) * 100.0 / speed, MidpointRounding.AwayFromZero));
-      notes.Add($"{x[0]},{ms},0");
-  }
-  else if (a[0] == "DLY" && notes.Count > 0)
-  {
-      var x = notes[^1].Split(',');
-      x[2] = Math.Max(0, (int)Math.Round(int.Parse(a[1]) * 100.0 / speed, MidpointRounding.AwayFromZero)).ToString();
-      notes[^1] = string.Join(',', x);
-  }
-        }
-        return "BEEPSEQ|" + string.Join(';', notes);
     }
 
     public static StepDefinition Get(string type) => Defs[type];

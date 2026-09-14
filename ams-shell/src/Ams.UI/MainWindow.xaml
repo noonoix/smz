@@ -143,7 +143,8 @@
                 <Separator />
                 <MenuItem Header="_Keystroke" Command="{Binding AddStepCommand}" CommandParameter="keystroke" />
                 <MenuItem Header="_Type Text" Command="{Binding AddStepCommand}" CommandParameter="typeText" />
-                <MenuItem Header="Key _Hold Group" Command="{Binding AddStepCommand}" CommandParameter="keyHold" />
+                <MenuItem Header="Key _Down" Command="{Binding AddStepCommand}" CommandParameter="keyDown" />
+                <MenuItem Header="Key _Up" Command="{Binding AddStepCommand}" CommandParameter="keyUp" />
                 <Separator />
                 <MenuItem Header="_Delay" Command="{Binding AddStepCommand}" CommandParameter="delay" />
                 <MenuItem Header="_For Loop" Command="{Binding AddStepCommand}" CommandParameter="forLoop" />
@@ -164,9 +165,6 @@
                 <MenuItem Header="Run/Call _Launch DC Recovery" Command="{Binding AddStepCommand}"
                           CommandParameter="callLaunchDcRecovery" IsEnabled="{Binding IsLaunchPipeline}"
                           ToolTip="فقط در تب Launch: اجرای launch_recovery.txt و سپس ادامه‌ی مسیر لانچر" />
-                <MenuItem Header="Run/Call _Main DC Recovery" Command="{Binding AddStepCommand}"
-                          CommandParameter="callMainDcRecovery" IsEnabled="{Binding IsMainPipeline}"
-                          ToolTip="فقط در تب Launch: اجرای main_recovery.txt و سپس ادامه‌ی مسیر لانچر" />
                 <Separator />
                 <MenuItem Header="Co_mment" Command="{Binding AddStepCommand}" CommandParameter="comment" />
                 <MenuItem Header="_Raw Command" Command="{Binding AddStepCommand}" CommandParameter="rawCommand" />
@@ -224,7 +222,9 @@
                                               Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                     <MenuItem Header="Type Text" CommandParameter="typeText"
                                               Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                    <MenuItem Header="Key Hold Group" CommandParameter="keyHold"
+                                    <MenuItem Header="Key Down" CommandParameter="keyDown"
+                                              Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                    <MenuItem Header="Key Up" CommandParameter="keyUp"
                                               Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                 </ContextMenu>
                             </Button.ContextMenu>
@@ -350,10 +350,6 @@
                                               IsEnabled="{Binding PlacementTarget.DataContext.IsLaunchPipeline, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                               ToolTip="فقط در تب Launch: اجرای launch_recovery.txt"
                                               Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                    <MenuItem Header="Run/Call Main DC Recovery" CommandParameter="callMainDcRecovery"
-                                              IsEnabled="{Binding PlacementTarget.DataContext.IsMainPipeline, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                              ToolTip="فقط در تب Main: اجرای main_recovery.txt"
-                                              Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                 </ContextMenu>
                             </Button.ContextMenu>
                             <StackPanel>
@@ -413,7 +409,9 @@
                                       Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                             <MenuItem Header="Type Text" CommandParameter="typeText"
                                       Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                            <MenuItem Header="Key Hold Group" CommandParameter="keyHold"
+                            <MenuItem Header="Key Down" CommandParameter="keyDown"
+                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="Key Up" CommandParameter="keyUp"
                                       Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                             <Separator />
                             <MenuItem Header="Delay" CommandParameter="delay"
@@ -451,10 +449,6 @@
                             <MenuItem Header="Run/Call Launch DC Recovery" CommandParameter="callLaunchDcRecovery"
                                       IsEnabled="{Binding PlacementTarget.DataContext.IsLaunchPipeline, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                       ToolTip="فقط در تب Launch: اجرای launch_recovery.txt"
-                                      Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                            <MenuItem Header="Run/Call Main DC Recovery" CommandParameter="callMainDcRecovery"
-                                      IsEnabled="{Binding PlacementTarget.DataContext.IsMainPipeline, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                      ToolTip="فقط در تب Main: اجرای main_recovery.txt"
                                       Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                             <Separator />
                             <MenuItem Header="Comment" CommandParameter="comment"
@@ -669,7 +663,6 @@
                                 FontFamily="Cascadia Code" />
                     <ui:Button Content="بازکردن دیالوگ استپ…" Appearance="Secondary" Margin="0,16,0,0"
                                Command="{Binding EditSelectedCommand}" />
-                    <StackPanel x:Name="InspectorExtras" Margin="0,14,0,0" />
                 </StackPanel>
             </Border>
         </Grid>

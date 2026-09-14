@@ -13,16 +13,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Patch engine
+      - name: Run guard tests
+        run: python3 -m unittest discover -s portable/plan3/sim -p 'test_live_light_guard.py' -v
+      - name: Patch canonical runtime
         run: python3 tools/apply_live_light_guard.py
-      - name: Push engine fix
+      - name: Patch memory-fit split runtime
+        run: python3 tools/apply_live_light_guard_split.py
+      - name: Push engine fixes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add portable/plan3/CIRCUITPY/plan_engine.py
+          git add portable/plan3/CIRCUITPY/plan_engine.py portable/plan3/CIRCUITPY-SPLIT/plan_engine.py
           if git diff --cached --quiet; then
-            echo "No patch needed"
+            echo "No runtime changes needed"
           else
-            git commit -m "fix: apply live light guard executor correction"
+            git commit -m "fix: apply live light guard to both portable runtimes"
             git push
           fi

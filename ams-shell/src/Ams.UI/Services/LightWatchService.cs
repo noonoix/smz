@@ -10,6 +10,7 @@ namespace Ams.UI.Services;
 /// </summary>
 public sealed class LightWatchService : IAsyncDisposable
 {
+    public const int DefaultIntervalMs = 250;
     private static readonly HashSet<int> AllowedIntervalsMs = new() { 100, 250, 500, 1000 };
     private readonly IBoardBridge _bridge;
     private readonly object _gate = new();
@@ -24,6 +25,12 @@ public sealed class LightWatchService : IAsyncDisposable
     public bool IsRunning
     {
         get { lock (_gate) return _runner is { IsCompleted: false }; }
+    }
+
+    public static TimeSpan GetStaleThreshold(TimeSpan sampleInterval)
+    {
+        if (sampleInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(sampleInterval));
+        return TimeSpan.FromMilliseconds(Math.Max(2000, sampleInterval.TotalMilliseconds * 3));
     }
 
     public Task StartAsync(TimeSpan interval, CancellationToken ct = default)

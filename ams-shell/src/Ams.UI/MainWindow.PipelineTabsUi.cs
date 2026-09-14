@@ -1,8 +1,10 @@
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Shapes;
 using Ams.UI.Models;
 using Ams.UI.ViewModels;
 using WpfColor = System.Windows.Media.Color;
@@ -12,7 +14,7 @@ using WpfListBox = System.Windows.Controls.ListBox;
 
 namespace Ams.UI;
 
-/// <summary>Fixed, non-closable browser-style tabs above the existing step editor.</summary>
+/// <summary>Fixed, non-closable browser-style pipeline tabs plus the read-only Status surface.</summary>
 internal static class PipelineTabsUiBootstrap
 {
     private static readonly DependencyProperty InstalledProperty = DependencyProperty.RegisterAttached(
@@ -48,8 +50,16 @@ internal static class PipelineTabsUiBootstrap
         DockPanel.SetDock(tools, Dock.Right);
         strip.Children.Add(tools);
 
+        var statusPanel = BuildStatusPanel(vm);
+        statusPanel.Visibility = Visibility.Collapsed;
+        Grid.SetRow(statusPanel, 1);
+        Panel.SetZIndex(statusPanel, 50);
+        host.Children.Add(statusPanel);
+
         var tabs = new StackPanel { Orientation = Orientation.Horizontal, FlowDirection = FlowDirection.LeftToRight };
         var buttons = new List<Button>();
+        var statusActive = false;
+        Button? statusButton = null;
         foreach (var tab in vm.PipelineTabs)
         {
             var button = new Button
@@ -64,24 +74,48 @@ internal static class PipelineTabsUiBootstrap
             };
             button.Click += (_, _) =>
             {
+                statusActive = false;
+                statusPanel.Visibility = Visibility.Collapsed;
                 if (button.Tag is PipelineKind kind)
                 {
                     var current = vm.PipelineTabs.Single(x => x.Kind == kind);
                     if (vm.SwitchPipelineCommand.CanExecute(current)) vm.SwitchPipelineCommand.Execute(current);
                 }
                 Paint(buttons, vm.ActivePipelineTab);
+                PaintStatus(statusButton!, false);
             };
             buttons.Add(button);
             tabs.Children.Add(button);
         }
+
+        statusButton = new Button
+        {
+            Content = "وضعیت",
+            Padding = new Thickness(14, 7, 14, 7),
+            Margin = new Thickness(6, 2, 3, 0),
+            BorderThickness = new Thickness(1),
+            Cursor = WpfCursors.Hand,
+            ToolTip = "Live read-only BH1750 telemetry",
+        };
+        statusButton.Click += (_, _) =>
+        {
+            statusActive = true;
+            statusPanel.Visibility = Visibility.Visible;
+            Paint(buttons, null);
+            PaintStatus(statusButton, true);
+        };
+        tabs.Children.Add(statusButton);
         strip.Children.Add(tabs);
         Grid.SetRow(strip, 0);
         host.Children.Add(strip);
 
         void RefreshTabUi()
         {
+            statusActive = false;
+            statusPanel.Visibility = Visibility.Collapsed;
             UpdateTabKeyBindings(window, vm);
             Paint(buttons, vm.ActivePipelineTab);
+            PaintStatus(statusButton, false);
         }
 
         vm.PropertyChanged += (_, args) =>
@@ -90,9 +124,142 @@ internal static class PipelineTabsUiBootstrap
                 or nameof(MainViewModel.PipelineTabs)) RefreshTabUi();
         };
         RefreshTabUi();
-
-        UpdateTabKeyBindings(window, vm);
     }
+
+    private static FrameworkElement BuildStatusPanel(MainViewModel vm)
+    {
+        var root = new Grid
+        {
+            Background = Brush("#171A1F"),
+            FlowDirection = FlowDirection.RightToLeft,
+        };
+        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        var body = new StackPanel { Margin = new Thickness(20), MaxWidth = 1100, HorizontalAlignment = HorizontalAlignment.Stretch };
+        scroll.Content = body;
+        root.Children.Add(scroll);
+
+        body.Children.Add(new TextBlock
+        {
+            Text = "وضعیت زنده‌ی سنسور نور",
+            FontSize = 23,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = Brush("#F5F7FA"),
+            Margin = new Thickness(0, 0, 0, 4),
+        });
+        body.Children.Add(new TextBlock
+        {
+            Text = "پایش فقط خواندنی است؛ تغییر نور هیچ ماکرو یا واکنش Armed را اجرا نمی‌کند.",
+            FontSize = 13,
+            Foreground = Brush("#AAB3C2"),
+            Margin = new Thickness(0, 0, 0, 16),
+        });
+
+        var summary = new Grid { Margin = new Thickness(0, 0, 0, 12) };
+        summary.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        summary.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        summary.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.2, GridUnitType.Star) });
+        var connection = Card("اتصال", Bound(nameof(MainViewModel.StatusText), 14), Bound(nameof(MainViewModel.LightSensorStatus), 17, FontWeights.SemiBold));
+        var freshness = Card("آخرین نمونه", Bound(nameof(MainViewModel.LastLightSampleText), 17, FontWeights.SemiBold), Bound(nameof(MainViewModel.LightFreshnessText), 13));
+        var lux = Card("نور فعلی (Lux)", Bound(nameof(MainViewModel.CurrentLuxDisplay), 38, FontWeights.Bold), Bound(nameof(MainViewModel.LightSensorMode), 13));
+        Grid.SetColumn(connection, 0); Grid.SetColumn(freshness, 1); Grid.SetColumn(lux, 2);
+        summary.Children.Add(connection); summary.Children.Add(freshness); summary.Children.Add(lux);
+        body.Children.Add(summary);
+
+        var controls = new Border
+        {
+            Background = Brush("#22262D"), BorderBrush = Brush("#343B46"), BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8), Padding = new Thickness(14), Margin = new Thickness(0, 0, 0, 12),
+        };
+        var controlRow = new StackPanel { Orientation = Orientation.Horizontal };
+        var toggle = new Button
+        {
+            Command = vm.ToggleLightWatchCommand,
+            Padding = new Thickness(18, 8, 18, 8), MinWidth = 125,
+            Background = Brush("#5E9FE8"), Foreground = Brush("#10151C"), FontWeight = FontWeights.SemiBold,
+        };
+        toggle.SetBinding(ContentControl.ContentProperty, new Binding(nameof(MainViewModel.LightWatchButtonText)));
+        controlRow.Children.Add(toggle);
+        controlRow.Children.Add(new TextBlock { Text = "فاصله نمونه‌برداری:", Foreground = Brush("#D9DEE7"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(18, 0, 8, 0) });
+        var interval = new ComboBox { ItemsSource = vm.LightWatchIntervalsMs, Width = 100, Padding = new Thickness(6), VerticalContentAlignment = VerticalAlignment.Center };
+        interval.SetBinding(ComboBox.SelectedItemProperty, new Binding(nameof(MainViewModel.SelectedLightWatchIntervalMs)) { Mode = BindingMode.TwoWay });
+        controlRow.Children.Add(interval);
+        controlRow.Children.Add(new TextBlock { Text = "میلی‌ثانیه", Foreground = Brush("#AAB3C2"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) });
+        controls.Child = controlRow;
+        body.Children.Add(controls);
+
+        var stats = new Grid { Margin = new Thickness(0, 0, 0, 12) };
+        for (var i = 0; i < 4; i++) stats.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var statItems = new[]
+        {
+            Card("کمینه ۶۰ ثانیه", Bound(nameof(MainViewModel.LightMinimumDisplay), 22, FontWeights.SemiBold)),
+            Card("بیشینه ۶۰ ثانیه", Bound(nameof(MainViewModel.LightMaximumDisplay), 22, FontWeights.SemiBold)),
+            Card("میانگین ۶۰ ثانیه", Bound(nameof(MainViewModel.LightAverageDisplay), 22, FontWeights.SemiBold)),
+            Card("دامنه تغییر", Bound(nameof(MainViewModel.LightSpreadDisplay), 22, FontWeights.SemiBold)),
+        };
+        for (var i = 0; i < statItems.Length; i++) { Grid.SetColumn(statItems[i], i); stats.Children.Add(statItems[i]); }
+        body.Children.Add(stats);
+
+        var chartCard = new Border
+        {
+            Background = Brush("#22262D"), BorderBrush = Brush("#343B46"), BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8), Padding = new Thickness(14),
+        };
+        var chartBody = new StackPanel();
+        chartBody.Children.Add(new TextBlock { Text = "نمودار نور · پنجره ۶۰ ثانیه", Foreground = Brush("#AAB3C2"), FontSize = 13, Margin = new Thickness(0, 0, 0, 8) });
+        var chart = new Canvas { Height = 180, Background = Brush("#181B20"), ClipToBounds = true };
+        var line = new Polyline { Stroke = Brush("#66D9A6"), StrokeThickness = 2, StrokeLineJoin = PenLineJoin.Round };
+        chart.Children.Add(line);
+        chartBody.Children.Add(chart);
+        chartCard.Child = chartBody;
+        body.Children.Add(chartCard);
+
+        void DrawChart()
+        {
+            var values = vm.GetLightChartLuxSnapshot();
+            line.Points.Clear();
+            if (values.Count == 0 || chart.ActualWidth <= 2 || chart.ActualHeight <= 2) return;
+            var lo = values.Min();
+            var hi = values.Max();
+            var range = Math.Max(1, hi - lo);
+            for (var i = 0; i < values.Count; i++)
+            {
+                var x = values.Count == 1 ? chart.ActualWidth / 2 : i * chart.ActualWidth / (values.Count - 1);
+                var y = chart.ActualHeight - 10 - ((values[i] - lo) / range) * (chart.ActualHeight - 20);
+                line.Points.Add(new Point(x, y));
+            }
+        }
+        chart.SizeChanged += (_, _) => DrawChart();
+        vm.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(MainViewModel.LightChartVersion)) DrawChart();
+        };
+        return root;
+    }
+
+    private static Border Card(string title, params UIElement[] content)
+    {
+        var body = new StackPanel();
+        body.Children.Add(new TextBlock { Text = title, Foreground = Brush("#AAB3C2"), FontSize = 12, Margin = new Thickness(0, 0, 0, 6) });
+        foreach (var item in content) body.Children.Add(item);
+        return new Border
+        {
+            Child = body, Background = Brush("#22262D"), BorderBrush = Brush("#343B46"), BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8), Padding = new Thickness(14), Margin = new Thickness(4), MinHeight = 92,
+        };
+    }
+
+    private static TextBlock Bound(string path, double size, FontWeight? weight = null)
+    {
+        var text = new TextBlock
+        {
+            FontSize = size, FontWeight = weight ?? FontWeights.Normal, Foreground = Brush("#F5F7FA"),
+            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 1, 0, 1),
+        };
+        text.SetBinding(TextBlock.TextProperty, new Binding(path));
+        return text;
+    }
+
+    private static SolidColorBrush Brush(string color) => new((WpfColor)WpfColorConverter.ConvertFromString(color));
 
     private static void UpdateTabKeyBindings(MainWindow window, MainViewModel vm)
     {
@@ -123,10 +290,17 @@ internal static class PipelineTabsUiBootstrap
         foreach (var button in buttons)
         {
             var selected = button.Tag is PipelineKind kind && active?.Kind == kind;
-            button.Background = new SolidColorBrush((WpfColor)WpfColorConverter.ConvertFromString(selected ? "#5E9FE8" : "#333740"));
-            button.Foreground = new SolidColorBrush((WpfColor)WpfColorConverter.ConvertFromString(selected ? "#10151C" : "#F5F7FA"));
-            button.BorderBrush = new SolidColorBrush((WpfColor)WpfColorConverter.ConvertFromString(selected ? "#5E9FE8" : "#444A55"));
-            button.FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal;
+            PaintButton(button, selected);
         }
+    }
+
+    private static void PaintStatus(Button button, bool selected) => PaintButton(button, selected);
+
+    private static void PaintButton(Button button, bool selected)
+    {
+        button.Background = Brush(selected ? "#5E9FE8" : "#333740");
+        button.Foreground = Brush(selected ? "#10151C" : "#F5F7FA");
+        button.BorderBrush = Brush(selected ? "#5E9FE8" : "#444A55");
+        button.FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal;
     }
 }

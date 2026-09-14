@@ -16,7 +16,9 @@ jobs:
         with:
           fetch-depth: 0
       - name: Apply source patch
-        run: python3 tools/apply_classroom_studio_ui_fixes.py
+        run: |
+          python3 tools/apply_classroom_studio_ui_fixes.py
+          python3 tools/apply_classroom_studio_ui_followup.py
       - name: Commit patched source
         run: |
           if git diff --quiet; then

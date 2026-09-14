@@ -756,7 +756,56 @@ def handle_keyboard(line, head, plan_mode=False):
     return "ERR|UNKNOWN|" + head
 
 
+def _beep_sequence(line):
+
+
+    import pwmio
+
+
+    tone = None
+
+
+    try:
+
+
+        notes = [tuple(int(x) for x in part.split(",")) for part in line.split("|", 1)[1].split(";")]
+
+
+        tone = pwmio.PWMOut(board.GP6, duty_cycle=0, frequency=notes[0][0], variable_frequency=True)
+
+
+        for freq, duration, pause in notes:
+
+
+            tone.frequency = freq; tone.duty_cycle = 32768
+
+
+            time.sleep(duration / 1000.0)
+
+
+            tone.duty_cycle = 0
+
+
+            if pause: time.sleep(pause / 1000.0)
+
+
+        return "OK|BEEPSEQ"
+
+
+    finally:
+
+
+        if tone is not None:
+
+
+            tone.duty_cycle = 0; tone.deinit()
+
+
+
 def handle(line):
+
+
+    if line.startswith("BEEPSEQ|"): return _beep_sequence(line)
     if line == "PING":
         return "OK|PONG|pico-light 0.9.64f-plan2h6|role=brain+keyboard+light|arm=promicro|planapi=3|engine=split|framing=%d|baud=%d|lagmax=%d|dropped=%d|cksum=%d|noframe=%d|sentjumps=%d|partial=%d" % (1 if ARM_FRAMING else 0, ARM_BAUD, ARM_LAG_MAX, _moves_dropped, _cksum_errors, _noframe_errors, _sent_jumps, _partial_writes)
     if line.startswith("LCAL|"):

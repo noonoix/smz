@@ -314,7 +314,14 @@ public static class PlanExporter
             // BEFORE Pair swaps the bounds - otherwise (min=800, max=0) swaps to (0,800) and the
             // off-intent is lost.
             var idle = PropEx.GetInt(p, "idlePauseMax", 3000) > 0 ? (i0, i1, p0, p1) : (1, 1, 0, 0);
-            Emit(n, new[] { "RMOUSE|region=" + x + "," + y + "," + w + "," + h + Tuning(n, idle) }, "RMOUSE");
+            var ops = new List<string> { "RMOUSE|region=" + x + "," + y + "," + w + "," + h + Tuning(n, idle) };
+  switch (PropEx.GetString(p, "action", "moveOnly"))
+  {
+      case "leftClick": ops.Add("CLICK|btn=left|n=1"); break;
+      case "rightClick": ops.Add("CLICK|btn=right|n=1"); break;
+      case "scroll": ops.Add("WHEEL|" + PropEx.GetInt(p, "scrollDelta", -1)); break;
+  }
+  Emit(n, ops, "RMOUSE");
         }
 
         private void EmitMouseMove(StepNode n){int x=PropEx.GetInt(n.Props,"x",600),y=PropEx.GetInt(n.Props,"y",497);if(!PropEx.GetBool(n.Props,"human",true)){Emit(n,new[]{"MOVETO|x="+x+"|y="+y+"|human=0"},"MOVETO");return;}Emit(n,new[]{"MOVETO|x="+x+"|y="+y+Tuning(n,(1,1,0,0))},"MOVETO");}

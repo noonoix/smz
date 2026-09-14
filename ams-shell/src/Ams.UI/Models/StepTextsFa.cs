@@ -40,6 +40,8 @@ public static class StepTextsFa
         ["button"] = "دکمه‌ی موس",
         ["action"] = "نوع کلیک",
         ["delta"] = "مقدار ویل (عدد منفی = پایین)",
+        ["scrollDelta"] = "مقدار اسکرول (منفی = پایین، مثبت = بالا)",
+        ["speedPct"] = "سرعت پخش نوت‌ها ٪ (۱۰۰ عادی، بیشتر = سریع‌تر)",
 
         // ── keyboard ──
         ["modCtrl"] = "Ctrl",

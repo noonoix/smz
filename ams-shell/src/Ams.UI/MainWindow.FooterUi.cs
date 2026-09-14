@@ -47,6 +47,13 @@ internal static class FooterUiBootstrap
             VerticalAlignment = VerticalAlignment.Center,
         };
         MoveChildren(connection, connectionWrap);
+        var copy = new Button { Content = "📋 کپی مشخصات اتصال", Padding = new Thickness(10, 3, 10, 3), Margin = new Thickness(8, 3, 4, 3), ToolTip = "کپی متن کامل وضعیت اتصال" };
+        copy.Click += (_, _) =>
+        {
+  var text = string.Join(Environment.NewLine, connectionWrap.Children.OfType<TextBlock>().Select(x => x.Text).Where(x => !string.IsNullOrWhiteSpace(x)));
+  if (!string.IsNullOrWhiteSpace(text)) Clipboard.SetText(text);
+        };
+        connectionWrap.Children.Add(copy);
         Grid.SetRow(connectionWrap, 0);
         layout.Children.Add(Card("بردها و اتصال", connectionWrap));
 

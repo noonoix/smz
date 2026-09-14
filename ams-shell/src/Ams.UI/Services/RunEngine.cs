@@ -471,10 +471,20 @@ public sealed class RunEngine
                     int destX, destY;
                     lock (_rngLock) { destX = x + Rng.Next(w); destY = y + Rng.Next(h); }   // v0.9.15 — parallel-safe
                     await HumanMoveToAsync(destX, destY, cfg, ct);
-                    break;
-                }
+          switch (PropEx.GetString(s.Props, "action", "moveOnly"))
+          {
+              case "leftClick": await Send("MCLICK|left,1", ct); break;
+              case "rightClick": await Send("MCLICK|right,1", ct); break;
+              case "scroll": await Send($"MWHEEL|{PropEx.GetInt(s.Props, "scrollDelta", -1)}", ct); break;
+          }
+          break;
+      }
 
-                case "mouseMove":
+      case "buzzer":
+          await Send(StepDefinitions.BuildBuzzerSequenceCommand(s.Props), ct);
+          break;
+
+      case "mouseMove":
                 {
                     // v0.9.0 — "human" checked → the same app-side humanized path with the Gentle
                     // preset (human trail + light pauses, NO long idle breaks). Unchecked → raw MMOVE.

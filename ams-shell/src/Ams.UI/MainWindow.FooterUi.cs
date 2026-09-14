@@ -9,6 +9,7 @@ using WpfPanel = System.Windows.Controls.Panel;
 namespace Ams.UI;
 
 /// <summary>Turns the status footer into responsive, multi-row cards instead of one long line.</summary>
+// The footer layout is intentionally assembled after XAML load so existing bindings remain intact.
 internal static class FooterUiBootstrap
 {
     private static readonly DependencyProperty InstalledProperty = DependencyProperty.RegisterAttached(

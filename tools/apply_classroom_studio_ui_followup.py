@@ -52,5 +52,17 @@ def patch_vm(text):
     return text
 
 
+def patch_pipeline_tabs(text):
+    pattern = re.compile(
+        r'(?m)^(?P<indent>[ \t]*)OnPropertyChanged\(nameof\(IsMainPipeline\)\);\n'
+        r'(?:^(?P=indent)OnPropertyChanged\(nameof\(IsMainPipeline\)\);\n)+'
+    )
+    return pattern.sub(
+        lambda m: f"{m.group('indent')}OnPropertyChanged(nameof(IsMainPipeline));\n",
+        text,
+    )
+
+
 edit("ams-shell/src/Ams.UI/MainWindow.xaml", patch_xaml)
 edit("ams-shell/src/Ams.UI/ViewModels/MainViewModel.cs", patch_vm)
+edit("ams-shell/src/Ams.UI/ViewModels/MainViewModel.PipelineTabs.cs", patch_pipeline_tabs)

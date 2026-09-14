@@ -19,14 +19,18 @@ jobs:
         run: python3 tools/apply_live_light_guard.py
       - name: Patch memory-fit split runtime
         run: python3 tools/apply_live_light_guard_split.py
-      - name: Push engine fixes
+      - name: Patch live state exporter contract
+        run: python3 tools/apply_live_light_exporter.py
+      - name: Regenerate embedded exporter runtime
+        run: python3 tools/make_plan_exporter.py
+      - name: Push engine and exporter fixes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add portable/plan3/CIRCUITPY/plan_engine.py portable/plan3/CIRCUITPY-SPLIT/plan_engine.py
+          git add portable/plan3/CIRCUITPY/plan_engine.py portable/plan3/CIRCUITPY-SPLIT/plan_engine.py tools/PlanExporter.cs.tpl tools/split_plan_engine.py ams-shell/src/Ams.UI/Models/StepDefinitions.cs ams-shell/src/Ams.UI/Services/PlanExporter.cs
           if git diff --cached --quiet; then
-            echo "No runtime changes needed"
+            echo "No runtime or exporter changes needed"
           else
-            git commit -m "fix: apply live light guard to both portable runtimes"
+            git commit -m "feat: export live light state loop and guard module"
             git push
           fi

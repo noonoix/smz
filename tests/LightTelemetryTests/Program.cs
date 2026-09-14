@@ -60,8 +60,11 @@ Check(stoppedCalls >= 3 && watchBridge.MaxInFlight == 1,
     "Watch takes repeated samples with exactly one request in flight");
 Check(watchBridge.Commands.Count == stoppedCalls && !watch.IsRunning,
     "StopAsync cancels and fully joins the Watch loop");
-Check(samples.Count == stoppedCalls && samples.Select(s => s.Sequence).SequenceEqual(Enumerable.Range(1, samples.Count).Select(i => (uint?)i)),
-    "Watch publishes typed samples in sequence order");
+Check(samples.Count >= 3 && samples.Select(s => s.Sequence)
+        .SequenceEqual(Enumerable.Range(1, samples.Count).Select(i => (uint?)i)),
+    "Watch publishes completed typed samples in sequence order");
+Check(stoppedCalls - samples.Count is 0 or 1,
+    "cancellation drops at most the final in-flight sample");
 await watch.DisposeAsync();
 
 var disconnected = new FakeBridge(Array.Empty<string>()) { Connected = false };

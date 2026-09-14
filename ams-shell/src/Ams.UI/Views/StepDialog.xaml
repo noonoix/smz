@@ -14,6 +14,7 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
+        <!-- v0.9.55 - the vertical scrollbar no longer touches the Persian hints: the content keeps a 14px inset -->
         <ScrollViewer Grid.Row="0" MaxHeight="680" VerticalScrollBarVisibility="Auto" Padding="14,0,14,0">
             <StackPanel x:Name="FormPanel" />
         </ScrollViewer>

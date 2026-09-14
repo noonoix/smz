@@ -3,6 +3,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
+using WpfBrush = System.Windows.Media.Brush;
+using WpfPanel = System.Windows.Controls.Panel;
+
 namespace Ams.UI;
 
 /// <summary>Turns the status footer into responsive, multi-row cards instead of one long line.</summary>
@@ -60,7 +63,7 @@ internal static class FooterUiBootstrap
         footer.Child = layout;
     }
 
-    private static void MoveChildren(Panel source, Panel destination)
+    private static void MoveChildren(WpfPanel source, WpfPanel destination)
     {
         var children = source.Children.Cast<UIElement>().ToList();
         source.Children.Clear();
@@ -104,6 +107,6 @@ internal static class FooterUiBootstrap
         };
     }
 
-    private static Brush TryBrush(string key, Brush fallback)
-        => Application.Current?.TryFindResource(key) as Brush ?? fallback;
+    private static WpfBrush TryBrush(string key, WpfBrush fallback)
+        => Application.Current?.TryFindResource(key) as WpfBrush ?? fallback;
 }

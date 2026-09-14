@@ -35,7 +35,7 @@ public partial class BoardPrepWindow : Window
         public string IdePath { get; set; } = "";
         public string FlashHex { get; set; } = "";
         public string FlashPort { get; set; } = "";
-        public bool CheckOnly { get; set; } = true; = true; = true; = true;
+        public bool CheckOnly { get; set; } = true; = true; = true; = true; = true;
         public bool Erase { get; set; } = false;
         public bool FixFuses { get; set; }
     }

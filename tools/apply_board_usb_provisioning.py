@@ -11,13 +11,37 @@ new = "        InitializeComponent();\n        InitializeUsbUpdatePanel();\n\n  
 if old in text and "InitializeUsbUpdatePanel();" not in text:
     text = text.replace(old, new, 1)
 
-# ISP is recovery-only now: a fresh window must not silently request a destructive erase.
-text = text.replace("public bool CheckOnly { get; set; }", "public bool CheckOnly { get; set; } = true;", 1)
-text = text.replace("public bool Erase { get; set; } = true;", "public bool Erase { get; set; } = false;", 1)
+# ISP is recovery-only now. Normalize the entire declaration rather than doing a
+# substring replacement: repeated corrective workflow runs must never produce
+# `= true; = true;` or `= false; = false;` in C#.
+text = re.sub(
+    r'public bool CheckOnly \{ get; set; \}(?:\s*=\s*true;)+',
+    'public bool CheckOnly { get; set; } = true;',
+    text,
+    count=1,
+)
+text = re.sub(
+    r'public bool Erase \{ get; set; \}(?:\s*=\s*false;)+',
+    'public bool Erase { get; set; } = false;',
+    text,
+    count=1,
+)
+text = re.sub(
+    r'public bool CheckOnly \{ get; set; \}(?!\s*=)',
+    'public bool CheckOnly { get; set; } = true;',
+    text,
+    count=1,
+)
+text = re.sub(
+    r'public bool Erase \{ get; set; \}(?!\s*=)',
+    'public bool Erase { get; set; } = false;',
+    text,
+    count=1,
+)
 cs.write_text(text, encoding="utf-8", newline="\n")
 
 # Keep the corrective patch idempotent. Re-running the workflow must normalize
-# each attribute to exactly one value, never append a second IsChecked attribute.
+# each XAML attribute to exactly one value, never append a second IsChecked.
 x = xaml.read_text(encoding="utf-8")
 lines = x.splitlines(keepends=True)
 for i, line in enumerate(lines):

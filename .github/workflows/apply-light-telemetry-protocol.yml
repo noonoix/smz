@@ -25,10 +25,10 @@ jobs:
           python-version: '3.x'
       - name: Apply LUX telemetry contract
         run: python tools/apply_light_telemetry_protocol.py
-      - name: Test telemetry and legacy parity
+      - name: Test telemetry, legacy commands and AutoCycle parity
         run: python tools/test_light_telemetry_protocol.py
-      - name: Compile-check firmware sources
-        run: python -m py_compile firmware/pico-light-0.9.60-template.py firmware/code64f/code.py
+      - name: Compile-check maintained firmware sources
+        run: python -m py_compile firmware/pico-light-0.9.60-template.py firmware/code64f/code.py firmware/autocycle-hostusb-v5/code.pre-autocycle.py firmware/autocycle-hostusb-v5/code.py
       - name: Commit generated source updates
         shell: bash
         run: |
@@ -38,6 +38,6 @@ jobs:
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs firmware/pico-light-0.9.60-template.py firmware/code64f/code.py
-          git commit -m 'feat: add read-only Pico light telemetry command'
+          git add ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs firmware/pico-light-0.9.60-template.py firmware/code64f/code.py firmware/autocycle-hostusb-v5/code.pre-autocycle.py firmware/autocycle-hostusb-v5/code.py
+          git commit -m 'feat: synchronize light telemetry firmware outputs'
           git push origin HEAD:feature/light-telemetry-protocol

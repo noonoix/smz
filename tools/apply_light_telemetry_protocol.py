@@ -1,10 +1,15 @@
 from pathlib import Path
+import json
 
 ROOT = Path(__file__).resolve().parents[1]
+PRE_AUTO = ROOT / "firmware/autocycle-hostusb-v5/code.pre-autocycle.py"
+AUTO = ROOT / "firmware/autocycle-hostusb-v5/code.py"
+MANIFEST = ROOT / "portable/plan3/autocycle_h6_patch.json"
 TARGETS = (
     ROOT / "ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs",
     ROOT / "firmware/pico-light-0.9.60-template.py",
     ROOT / "firmware/code64f/code.py",
+    PRE_AUTO,
 )
 
 
@@ -61,7 +66,27 @@ def patch(path):
         print("already patched", path.relative_to(ROOT))
 
 
+def sync_auto_cycle():
+    document = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    actual = PRE_AUTO.read_text(encoding="utf-8")
+    if document.get("version") != 1 or not document.get("edits"):
+        raise RuntimeError("invalid AutoCycle manifest")
+    if document.get("baseline") not in actual:
+        raise RuntimeError("AutoCycle baseline marker missing")
+    for index, edit in enumerate(document["edits"], 1):
+        count = actual.count(edit["old"])
+        if count != 1:
+            raise RuntimeError(f"AutoCycle anchor {index}: expected one, found {count}")
+        actual = actual.replace(edit["old"], edit["new"], 1)
+    if AUTO.read_text(encoding="utf-8") != actual:
+        AUTO.write_text(actual, encoding="utf-8", newline="\n")
+        print("synchronized", AUTO.relative_to(ROOT))
+    else:
+        print("already synchronized", AUTO.relative_to(ROOT))
+
+
 for target in TARGETS:
     if not target.exists():
         raise RuntimeError(f"missing target: {target}")
     patch(target)
+sync_auto_cycle()

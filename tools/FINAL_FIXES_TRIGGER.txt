@@ -1,1 +1,1 @@
-This marker triggers the final-fixes build workflow.
+Final fixes applied; trigger release build for commit 6a2611c.

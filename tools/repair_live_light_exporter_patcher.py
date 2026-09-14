@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# The correction is deliberately idempotent so the CI repair remains safe on retries.
 p = Path(__file__).with_name('apply_live_light_exporter.py')
 text = p.read_text(encoding='utf-8')
 old = 'if "EmitLiveLightStateLoop" not in tpl:'

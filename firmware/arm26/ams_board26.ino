@@ -550,6 +550,32 @@ static void session_reset() {
   g_rxCtr = 0;
 }
 
+// Keep long physical clicks HALT-abortable instead of blocking in delay(hold).
+static bool wait_mouse_hold_or_abort(uint16_t holdMs) {
+  unsigned long started = millis();
+  while (millis() - started < holdMs) {
+    if (serial1_line_ready()) {
+      if (!strncmp(g_line1, "HALT", 4)) {
+        do_halt();
+        send_line("ERR|ABORTED|MCLICK");
+        return false;
+      }
+      reply_err("BUSY");
+    }
+    if (Serial.available() && read_line_blocking(4)) {
+      static char pending[MAX_PT];
+      if (decrypt_to(g_line, pending, MAX_PT) && !strncmp(pending, "HALT", 4)) {
+        do_halt();
+        send_line("ERR|ABORTED|MCLICK");
+        return false;
+      }
+      reply_err("BUSY");
+    }
+    delay(2);
+  }
+  return true;
+}
+
 // ================= command handler =================
 static void handle(char* cmd) {
   char* args = strchr(cmd, '|');
@@ -629,7 +655,7 @@ static void handle(char* cmd) {
     for (int i = 0; i < cnt; i++) {
       SingleAbsoluteMouse.press(b);
       int hold = (hmx > hmn && hmn > 0) ? (int)random(hmn, hmx + 1) : 45;
-      delay(hold);
+      if (!wait_mouse_hold_or_abort((uint16_t)hold)) return;
       SingleAbsoluteMouse.release(b);
       if (i + 1 < cnt) delay((uint16_t)random(60, 140));
     }

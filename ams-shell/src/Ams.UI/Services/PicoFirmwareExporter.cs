@@ -197,7 +197,7 @@ public static class PicoFirmwareExporter
         #
         # Copy code.py + boot.py + pico-calibration.json onto CIRCUITPY and put the
         # adafruit_hid package into /lib. Full instructions: README-FLASH.md
-
+        
         import time
         import random
         import json
@@ -207,29 +207,29 @@ public static class PicoFirmwareExporter
         import usb_hid
         from adafruit_hid.keyboard import Keyboard
         from adafruit_hid.keycode import Keycode
-
+        
         ADDR = 0x23
         POWER_ON = 0x01
         RESET = 0x07
         CONT_HIRES = 0x10   # 1 lux, ~120 ms per sample (max 180 ms)
         CONT_LORES = 0x13   # 4 lux, ~16 ms per sample
-
+        
         # Play Options baked at export time: how often the armed standalone states run.
         LOOP_MODE = "__LOOP_MODE__"      # once | times | timed | forever
         LOOP_COUNT = __LOOP_COUNT__      # passes for "times"
         LOOP_SECONDS = __LOOP_SECONDS__  # seconds for "timed"
-
+        
         # v0.9.60 - safe default: copying/booting code.py NEVER starts the macro by itself.
         # Set True only for a deliberate power-on-autorun scenario.
         AUTOSTART = False
-
+        
         # v0.9.61-plan1 - portable plan: when /plan.txt exists and no host is driving, the
         # standalone engine runs the plan (random mouse / click / type / delay / loop /
         # wait-for-light) with the SAME humanization as the PC app and fresh randomness
         # every pass. PLAN_DEBUG=True prints step lines on the USB console.
         PLAN_DEBUG = False
         PLAN_PATH = "/plan.txt"
-
+        
         # v0.9.62 - death-of-motion fixes (field evidence: 2026-09-09 record, 53.4 s run):
         #   * GP4 start RE-ARMS the engine (start_engine): passes reset + flow ledger wiped.
         #     The v0.9.61 LOOP_MODE="once" trap (passes never reset, so one early pass end -
@@ -268,7 +268,7 @@ public static class PicoFirmwareExporter
         #     plan resumes from its stored position and its first move re-homes the cursor
         #     into the plan region - HID has no position feedback channel. The complete fix
         #     for that case is app-side cursor sync on start (queued for the C# line).
-
+        
         SPECIAL_VK = {
             0x0D: Keycode.ENTER, 0x1B: Keycode.ESCAPE, 0x20: Keycode.SPACE, 0x09: Keycode.TAB,
             0x08: Keycode.BACKSPACE, 0x25: Keycode.LEFT_ARROW, 0x27: Keycode.RIGHT_ARROW,
@@ -282,8 +282,8 @@ public static class PicoFirmwareExporter
             0x5B: Keycode.LEFT_GUI, 0x5C: Keycode.RIGHT_GUI,
         }
         DIGITS = ("ZERO", "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE")
-
-
+        
+        
         def keycode_for_vk(vk):
             if 0x41 <= vk <= 0x5A:
                 return getattr(Keycode, chr(vk))
@@ -292,8 +292,8 @@ public static class PicoFirmwareExporter
             if 0x70 <= vk <= 0x7B:
                 return getattr(Keycode, "F" + str(vk - 0x6F))
             return SPECIAL_VK.get(vk, MOD_VK.get(vk, Keycode.E))   # modifiers included
-
-
+        
+        
         # v0.9.60d - ASCII -> Keycode name for the US layout. The adafruit_hid 6.1.10 bundle on
         # /lib has NO Keyboard.write method, so KTEXT types via press/release instead.
         _KTEXT_PLAIN = {
@@ -308,8 +308,8 @@ public static class PicoFirmwareExporter
             "{": "LEFT_BRACKET", "}": "RIGHT_BRACKET", "|": "BACKSLASH", "~": "GRAVE_ACCENT",
             "<": "COMMA", ">": "PERIOD",
         }
-
-
+        
+        
         def _ascii_key(ch):
             # returns (keycode, need_shift); (None, False) when the char is not US-printable
             o = ord(ch)
@@ -324,8 +324,8 @@ public static class PicoFirmwareExporter
             if ch in _KTEXT_SHIFTED:
                 return getattr(Keycode, _KTEXT_SHIFTED[ch], None), True
             return None, False
-
-
+        
+        
         class Bh1750:
             def __init__(self, i2c, mode=CONT_HIRES):
                 self._i2c = i2c
@@ -334,7 +334,7 @@ public static class PicoFirmwareExporter
                 self._cmd(POWER_ON)
                 self._cmd(RESET)
                 self.set_mode(mode)
-
+        
             def _cmd(self, value):
                 while not self._i2c.try_lock():
                     pass
@@ -342,14 +342,14 @@ public static class PicoFirmwareExporter
                     self._i2c.writeto(ADDR, bytes([value]))
                 finally:
                     self._i2c.unlock()
-
+        
             def set_mode(self, mode):
                 if mode == self.mode:
                     return
                 self.mode = mode
                 self._cmd(mode)          # sent once per mode change, never per sample
                 time.sleep(0.2 if mode == CONT_HIRES else 0.05)
-
+        
             def lux(self):
                 while not self._i2c.try_lock():
                     pass
@@ -359,26 +359,26 @@ public static class PicoFirmwareExporter
                     self._i2c.unlock()
                 raw = (self._buf[0] << 8) | self._buf[1]
                 return raw / 1.2         # datasheet conversion
-
-
+        
+        
         def median(values):
             ordered = sorted(values)
             return ordered[len(ordered) // 2]
-
-
+        
+        
         def load_states():
             try:
                 with open("/pico-calibration.json", "r") as fh:
                     return json.load(fh).get("states", [])
             except Exception:
                 return []
-
-
+        
+        
         kbd = Keyboard(usb_hid.devices)
         serial = usb_cdc.data if usb_cdc.data is not None else usb_cdc.console
         states = load_states()
         window = []
-
+        
         # PLAN2 hotfix h1 - optional engine, but import failures must never be silent.
         _pe_import_error = None
         try:
@@ -387,7 +387,7 @@ public static class PicoFirmwareExporter
             _pe = None
             _pe_import_error = exc
             print("plan: engine import failed:", exc)
-
+        
         # v0.9.60 - the light sensor is OPTIONAL. A loose SDA/SCL wire must never kill the brain
         # before its command loop (that was the silent boot death): without the sensor the light
         # commands answer ERR|NOSENSOR and everything else keeps working.
@@ -396,21 +396,22 @@ public static class PicoFirmwareExporter
             sensor = Bh1750(i2c)
         except Exception:
             sensor = None
-
+        
         # Commands that are not the brain's own job: forwarded to the Pro Micro arm.
         ARM_PREFIXES = ("MMOVE", "MCLICK", "MWHEEL", "MDOWN", "MUP", "SETRES", "WSND", "TRGSND", "SCAL")
         # v0.9.60 - mouse goes fire-and-ack (smooth dense paths); the rest waits for the arm reply.
-        MOUSE_PREFIXES = ("MMOVE", "MCLICK", "MWHEEL", "MDOWN", "MUP")
+        # MCLICK waits for physical completion so an in-flight hold can be aborted.
+        FAST_MOUSE_PREFIXES = ("MMOVE", "MWHEEL", "MDOWN", "MUP")
         # Keyboard commands: ALWAYS typed locally by this Pico (final contract).
         KBD_PREFIXES = ("KTEXT", "KCOMBO", "KDOWN", "KUP")
-
+        
         ARM_BAUD = 57600       # v0.9.64d - must match Serial1.begin() in the arm sketch (fw >= 2.4)
-
+        
         try:
             arm = busio.UART(board.GP16, board.GP17, baudrate=ARM_BAUD, timeout=0.2)
         except Exception:
             arm = None
-
+        
         # v0.9.60 - fixed keypad (contract): GP4->GND = Num Lock = Start/Stop,
         # GP3->GND = Scroll Lock = Pause/Resume. Active-low with pull-ups, edge-detected.
         try:
@@ -426,7 +427,7 @@ public static class PicoFirmwareExporter
         except Exception:
             btn1 = btn2 = None
             _last_btn1 = _last_btn2 = True
-
+        
         # v0.9.62 - onboard LED (GP25): headless state + fault signalling. Absent on Pico W
         # (its LED lives on the wifi chip) - then led stays None and every LED call no-ops.
         try:
@@ -435,20 +436,20 @@ public static class PicoFirmwareExporter
             led.value = False
         except Exception:
             led = None
-
+        
         engine_on = AUTOSTART        # GP4 toggles this (Num Lock = Start/Stop)
         engine_paused = False        # GP3 toggles this (Scroll Lock = Pause/Resume)
         _btn1_since = None           # v0.9.64b - GP4 press timestamp for the panic-hold gesture
         last_host_cmd = time.monotonic()
-
-
+        
+        
         def _serial_write_line(text):
             try:
                 serial.write((text + "\n").encode("utf-8"))
             except Exception:
                 pass
-
-
+        
+        
         _arm_buf = bytearray()
         _arm_lag = 0          # v0.9.60c - MMOVEs written to the arm minus the arm's OK|MMOVE acks
         _pending_move = None  # v0.9.60c - newest coalesced absolute MMOVE while the arm is behind
@@ -468,7 +469,7 @@ public static class PicoFirmwareExporter
         _diag_last_print = 0.0
         _arm_last_ack = time.monotonic()  # v0.9.62 - the last OK|MMOVE the arm actually sent
         ARM_ACK_TIMEOUT = 1.0  # v0.9.62 - lag this old with zero acks = the ledger drifted: self-heal
-
+        
         # v0.9.64c - arm-link integrity frames (needs arm fw >= 2.3). Every line written to the
         # Pro Micro is wrapped as '#' + 2 hex (sum of the payload bytes mod 256) + '|' + payload.
         # The unframed UART drops bytes in the field: 2026-09-10 hardware run, three ~1280 px
@@ -478,8 +479,8 @@ public static class PicoFirmwareExporter
         # point is invisible, because the next point of the humanized path is 2-3 px away.
         ARM_FRAMING = True     # set False only for an arm running fw <= 2.2
         _cksum_errors = 0      # v0.9.64c - corrupted lines the arm rejected since boot
-
-
+        
+        
         def pump_arm():
             """v0.9.60 - permanent arm pump. Called on EVERY loop iteration (and inside every
             blocking wait) so the Pro Micro's small TX buffer can never fill up and wedge it.
@@ -529,7 +530,7 @@ public static class PicoFirmwareExporter
                     print("arm: CKSUM drop #%d (line rejected, not executed)" % _cksum_errors)
                     continue
                 parts = line.split("|")
-                if len(parts) > 1 and parts[0] == "OK" and parts[1] in MOUSE_PREFIXES:
+                if len(parts) > 1 and parts[0] == "OK" and parts[1] in FAST_MOUSE_PREFIXES:
                     if parts[1] == "MMOVE":               # v0.9.60c - the arm caught up one move
                         _arm_last_ack = time.monotonic()  # v0.9.62 - feed the ack watchdog
                         if _arm_lag > 0:
@@ -557,16 +558,16 @@ public static class PicoFirmwareExporter
                     # from the cursor, so dropping it costs nothing.
                     _pending_move = None
             return ready
-
-
+        
+        
         def _frame(line):
             """v0.9.64c - arm fw>=2.3 integrity frame: '#' + 2 hex byte-sum + '|' + payload."""
             total = 0
             for b in line.encode("utf-8"):
                 total = (total + b) & 0xFF
             return "#%02X|%s" % (total, line)
-
-
+        
+        
         def _note_sent(line):
             """v0.9.64f - sent-stream watchdog on the ONE place every line is written.
             A gap right after a coalesce drop is expected (the dropped mid-points ARE the
@@ -595,8 +596,8 @@ public static class PicoFirmwareExporter
             print("plan: SENT JUMP #%d %s -> %d,%d (dx=%d dy=%d) %s" % (
                 _sent_jumps, prev, nx, ny, dx, dy,
                 "after-drop" if coalesced else "NO-DROP"))
-
-
+        
+        
         def _arm_write(line):
             global _partial_writes
             if arm is None:
@@ -615,8 +616,8 @@ public static class PicoFirmwareExporter
                 return True
             except Exception:
                 return False
-
-
+        
+        
         def forward_fast(line):
             """v0.9.60c - mouse fast path. Discrete clicks/wheel still fire-and-ack. Dense
             MMOVE (streamed by send_path, which never reads per-move acks) is fire-and-forget
@@ -646,16 +647,16 @@ public static class PicoFirmwareExporter
             if not _arm_write(line):
                 return "ERR|NOARM|" + head
             return "OK|" + head
-
-
+        
+        
         def _flow_reset():
             """v0.9.60e - wipe the 60c mouse flow ledger (HALT/BYE/SETRES): no stale coalesced
             move may flush into the next run, and leftover lag must not slow the next path."""
             global _arm_lag, _pending_move
             _arm_lag = 0
             _pending_move = None
-
-
+        
+        
         def release_all_buttons(force=False):
             """v0.9.63 - panic release: ghost MDOWN/MCLICK corruption on the unframed UART (or
             an arm reset mid-click) can leave a button logically held = Windows unclickable
@@ -671,8 +672,40 @@ public static class PicoFirmwareExporter
             for btn in targets:
                 _arm_write("MUP|" + btn)
             _held_buttons.clear()
-
-
+        
+        
+        _host_abort_buf = bytearray()
+        
+        
+        def _poll_host_halt():
+            """Forward host HALT to the arm while the Pico waits for MCLICK."""
+            global _host_abort_buf
+            if serial is None:
+                return False
+            try:
+                n = serial.in_waiting
+                if n:
+                    _host_abort_buf.extend(serial.read(n))
+            except Exception:
+                return False
+            saw_halt = False
+            while True:
+                nl = _host_abort_buf.find(b"\n")
+                if nl < 0:
+                    break
+                raw = bytes(_host_abort_buf[:nl])
+                _host_abort_buf = _host_abort_buf[nl + 1:]
+                line = raw.decode("utf-8", "replace").rstrip("\r")
+                if not line:
+                    continue
+                if line == "HALT":
+                    _arm_write("HALT")
+                    saw_halt = True
+                else:
+                    _serial_write_line("ERR|BUSY|" + line.split("|", 1)[0])
+            return saw_halt
+        
+        
         def _forward_once(line, timeout_s):
             """Blocking forward for commands whose reply the PC needs (sound, SETRES, HALT/BYE).
             Keeps pumping while waiting so arm EVT| lines still stream to the PC.
@@ -686,16 +719,17 @@ public static class PicoFirmwareExporter
             if not _arm_write(line):
                 return "ERR|NOARM|" + head
             end = time.monotonic() + timeout_s
+            abort_sent = False
             while time.monotonic() < end:
+                if not abort_sent and _poll_host_halt():
+                    abort_sent = True
                 for reply in pump_arm():
-                    # commands are strictly serialized and mouse OKs are already filtered:
-                    # the first non-mouse OK/ERR we see belongs to this command.
                     if reply.split("|")[0] in ("OK", "ERR"):
                         return reply
                 time.sleep(0.005)
-            return "ERR|TIMEOUT|" + head
-
-
+            return ("ERR|ABORTED|" + head) if abort_sent else ("ERR|TIMEOUT|" + head)
+        
+        
         def forward_to_arm(line, timeout_s, retries=0):
             """v0.9.61 - retry wrapper: the pico<->arm UART has no framing, so one lost byte
             (field-observed as a 5 s SETRES silence that killed a timed run) used to surface
@@ -708,22 +742,33 @@ public static class PicoFirmwareExporter
                 time.sleep(0.15)                  # let a busy arm finish what it was doing
                 reply = _forward_once(line, timeout_s)
             return reply
-
-
+        
+        
+        def _mclick_timeout(line):
+            """Physical-completion timeout for randomized MCLICK holds."""
+            try:
+                fields = line.split("|", 1)[1].split(",")
+                count = max(1, int(fields[1])) if len(fields) > 1 else 1
+                hmin = max(0, int(fields[2])) if len(fields) > 2 else 45
+                hmax = max(hmin, int(fields[3])) if len(fields) > 3 else hmin
+                return max(5.0, 2.0 + (count * hmax + max(0, count - 1) * 140) / 1000.0)
+            except Exception:
+                return 5.0
+        
         def sample():
             window.append(sensor.lux())
             if len(window) > 5:
                 window.pop(0)
             return median(window)
-
-
+        
+        
         def press(vk, hold_ms):
             code = keycode_for_vk(vk)
             kbd.press(code)
             time.sleep(max(10, hold_ms) / 1000)
             kbd.release(code)
-
-
+        
+        
         def tap_key(code):
             """v0.9.60 - one fixed keypad tap (Num Lock / Scroll Lock) towards the PC."""
             try:
@@ -732,8 +777,8 @@ public static class PicoFirmwareExporter
                 kbd.release(code)
             except Exception:
                 pass
-
-
+        
+        
         def start_engine():
             """v0.9.62 - every GP4 start RE-ARMS the engine: the passes counter resets (kills
             the v0.9.61 LOOP_MODE=once trap, where one early pass end silenced Num Lock until
@@ -745,8 +790,8 @@ public static class PicoFirmwareExporter
             # v0.9.64: deliberately keep _plan_mouse_pos across Stop/Start. Only the UART
             # flow ledger resets; the next portable path resumes from its last sent point.
             release_all_buttons()      # v0.9.64b - tracked-held only (a pointless MUP teleports the cursor)
-
-
+        
+        
         def led_fault(n):
             """v0.9.62 - n rapid onboard-LED flashes = a fault code readable with no PC."""
             if led is None:
@@ -756,8 +801,8 @@ public static class PicoFirmwareExporter
                 time.sleep(0.08)
                 led.value = False
                 time.sleep(0.08)
-
-
+        
+        
         def poll_keypad():
             """v0.9.60 - fixed mapping, independent of the app's Options: GP4 toggles the
             standalone engine (and sends Num Lock), GP3 toggles pause (and sends Scroll Lock).
@@ -791,8 +836,8 @@ public static class PicoFirmwareExporter
                     led.value = (time.monotonic() % 1.0) < 0.5
                 else:
                     led.value = engine_on
-
-
+        
+        
         def wait_range(lo, hi, stable_ms, timeout_ms, mode):
             sensor.set_mode(CONT_LORES if mode == 1 else CONT_HIRES)
             deadline = time.monotonic() + timeout_ms / 1000
@@ -809,8 +854,8 @@ public static class PicoFirmwareExporter
                     inside_since = None
                 time.sleep(0.02)
             return None
-
-
+        
+        
         def ints(fields, count, default=0):
             out = []
             for i in range(count):
@@ -819,8 +864,8 @@ public static class PicoFirmwareExporter
                 except Exception:
                     out.append(default)
             return out
-
-
+        
+        
         def handle_keyboard(line, head, plan_mode=False):
             # The Pico owns the keyboard (final contract) - always local execution.
             if head == "KDOWN":
@@ -887,8 +932,8 @@ public static class PicoFirmwareExporter
                             time.sleep(_type_delay / 1000)
                 return "OK|KTEXT"
             return "ERR|UNKNOWN|" + head
-
-
+        
+        
         def handle(line):
             if line == "PING":
                 return "OK|PONG|pico-light __VERSION__|role=brain+keyboard+light|arm=promicro|framing=%d|baud=%d|lagmax=%d|dropped=%d|cksum=%d|noframe=%d|sentjumps=%d|partial=%d" % (1 if ARM_FRAMING else 0, ARM_BAUD, ARM_LAG_MAX, _moves_dropped, _cksum_errors, _noframe_errors, _sent_jumps, _partial_writes)
@@ -959,7 +1004,9 @@ public static class PicoFirmwareExporter
             head = line.split("|")[0]
             if head in KBD_PREFIXES:
                 return handle_keyboard(line, head)
-            if head in MOUSE_PREFIXES:
+            if head == "MCLICK":
+                return forward_to_arm(line, _mclick_timeout(line))
+            if head in FAST_MOUSE_PREFIXES:
                 return forward_fast(line)
             if head in ARM_PREFIXES:
                 if head == "SETRES":
@@ -967,13 +1014,13 @@ public static class PicoFirmwareExporter
                 tmo = 30 if head in ("WSND", "TRGSND", "SCAL") else 5
                 return forward_to_arm(line, tmo, 1 if head == "SETRES" else 0)
             return "ERR|UNKNOWN|" + line
-
-
-
+        
+        
+        
         _plan_cache = None          # v0.9.61 - parsed plan ops, or False when unavailable
         _plan_mouse_pos = None      # v0.9.64 - last MMOVE actually sent by portable plan; survives Start/Stop
-
-
+        
+        
         def _plan_sleep_ms(ms):
             """v0.9.61 - pump-aware plan delay: keeps the arm drained and the keypad alive while
             a plan step waits. Returns False when the plan must abort (host traffic arrived or
@@ -991,62 +1038,64 @@ public static class PicoFirmwareExporter
                 if not engine_paused and time.monotonic() >= end:
                     return True
                 time.sleep(0.01)
-
-
+        
+        
         class _PlanCtx:
             """v0.9.61 - adapter from plan_engine ops to this firmware's drivers."""
             screen_w = 1920
             screen_h = 1080
             speed_min = 0
             speed_max = 2000
-
+        
             def get_mouse_pos(self):
                 # None only on a fresh Pico boot; plan_engine then uses screen centre once.
                 return _plan_mouse_pos
-
+        
             def set_mouse_pos(self, x, y):
                 global _plan_mouse_pos
                 _plan_mouse_pos = (int(x), int(y))
-
+        
             def now(self):
                 return time.monotonic()
-
+        
             def log(self, msg):
                 if PLAN_DEBUG:
                     print("plan:", msg)
-
+        
             def sleep_ms(self, ms):
                 return _plan_sleep_ms(ms)
-
+        
             def mmove(self, x, y):
                 forward_fast("MMOVE|%d,%d,abs,2" % (x, y))   # fw>=1.9 micro-steps; 1.8 = plain jump
-
+        
             def mclick(self, btn, count, hmin, hmax):
                 line = "MCLICK|%s,%d" % (btn, count)
                 if hmax > 0:
                     line += ",%d,%d" % (hmin, hmax)
-                forward_fast(line)
-
+                reply = forward_to_arm(line, _mclick_timeout(line))
+                if reply.startswith("ERR|"):
+                    raise _pe.PlanAbort()
+        
             def ktext(self, hmin, hmax, text):
                 _typed = handle_keyboard("KTEXT|%d,%d,%s" % (hmin, hmax, text), "KTEXT", True)
                 if _typed == "ABORT|KTEXT":
                     raise _pe.PlanAbort()
-
+        
             def kcombo(self, vk):
                 handle_keyboard("KCOMBO|%d" % vk, "KCOMBO")
-
+        
             def wait_light(self, lo, hi, stable_ms, timeout_ms, mode):
                 if sensor is None:
                     return False
                 return wait_range(lo, hi, stable_ms, timeout_ms, mode) is not None
-
+        
             def key(self, vk, hold_ms):
                 press(vk, hold_ms)
-
+        
             # PLAN|2 firmware contract. Keep transport behavior byte-for-byte on the
             # accepted 0.9.64f line; these methods only adapt new plan operations to it.
             plan_api = 3
-
+        
             def gate(self):
                 global last_host_cmd
                 while True:
@@ -1060,43 +1109,43 @@ public static class PicoFirmwareExporter
                     if not engine_paused:
                         return True
                     time.sleep(0.01)
-
+        
             def _ok(self, reply, what):
                 if reply is None or str(reply).startswith("ERR|"):
                     raise RuntimeError("%s failed: %s" % (what, reply))
                 return reply
-
+        
             def setres(self, w, h):
                 reply = forward_to_arm("SETRES|%d,%d" % (int(w), int(h)), 5, 1)
                 return self._ok(reply, "SETRES")
-
+        
             def key_combo(self, vks, hmin, hmax):
                 body = "+".join(str(int(v)) for v in vks)
                 reply = handle_keyboard("KCOMBO|%s,%d,%d" % (body, int(hmin), int(hmax)), "KCOMBO")
                 return self._ok(reply, "KCOMBO")
-
+        
             def kdown(self, vk):
                 return self._ok(handle_keyboard("KDOWN|%d" % int(vk), "KDOWN"), "KDOWN")
-
+        
             def kup(self, vk):
                 return self._ok(handle_keyboard("KUP|%d" % int(vk), "KUP"), "KUP")
-
+        
             def wheel(self, delta):
                 return self._ok(forward_fast("MWHEEL|%d" % int(delta)), "MWHEEL")
-
+        
             def raw(self, line):
                 reply = handle(str(line))
                 if reply is None:
                     return "OK|RAW"
                 return self._ok(reply, "RAW")
-
+        
             def read_plan_file(self, name):
                 # parse_plan already rejects traversal; repeat the guard at the filesystem boundary.
                 if not name or "/" in name or "\\" in name or ":" in name or not name.lower().endswith(".txt"):
                     raise ValueError("unsafe include file name")
                 with open("/" + name, "r") as fh:
                     return fh.read()
-
+        
             def wait_sound(self, threshold, min_ms, timeout_ms):
                 reply = forward_to_arm(
                     "WSND|%d,%d,%d" % (int(threshold), int(min_ms), int(timeout_ms)),
@@ -1108,7 +1157,7 @@ public static class PicoFirmwareExporter
                 if "ABORTED" in reply:
                     return None
                 raise RuntimeError("WSND failed: " + reply)
-
+        
             def trg_sound(self, threshold, min_ms, timeout_ms, action,
                           react_min, react_max, hold_min, hold_max):
                 reply = forward_to_arm(
@@ -1121,7 +1170,7 @@ public static class PicoFirmwareExporter
                 if reply.startswith("ERR|TIMEOUT|TRGSND"):
                     return False
                 raise RuntimeError("TRGSND failed: " + reply)
-
+        
             def beep(self, freq, ms):
                 # PLAN|2 v3 buzzer contract. Import pwmio lazily to keep boot RAM low.
                 import pwmio
@@ -1139,8 +1188,8 @@ public static class PicoFirmwareExporter
                             tone.deinit()
                         except Exception:
                             pass
-
-
+        
+        
         def plan_pass():
             """v0.9.61 - run one pass of /plan.txt. Returns True when a plan exists and ran
             (even if it aborted early), False when there is no plan to run."""
@@ -1175,8 +1224,8 @@ public static class PicoFirmwareExporter
                 led_fault(3)
                 release_all_buttons(force=True)   # v0.9.64b - full shield on the error path
                 return "error"
-
-
+        
+        
         def standalone_pass():
             # No host command pending: run the armed states of this system in order.
             if sensor is None:
@@ -1189,8 +1238,8 @@ public static class PicoFirmwareExporter
                                  st.get("mode", 0))
                 if got is not None:
                     press(st.get("keyVk", 69), 40)
-
-
+        
+        
         def loop_due():
             # Play Options baked at export: how often the armed states run standalone
             if LOOP_MODE == "once":
@@ -1200,8 +1249,8 @@ public static class PicoFirmwareExporter
             if LOOP_MODE == "timed":
                 return time.monotonic() - started < LOOP_SECONDS
             return True                      # forever
-
-
+        
+        
         buffer = bytearray()               # v0.9.60 - bounded byte buffer, not string concat
         passes = 0
         started = time.monotonic()

@@ -140,7 +140,8 @@ except Exception:
 # Commands that are not the brain's own job: forwarded to the Pro Micro arm.
 ARM_PREFIXES = ("MMOVE", "MCLICK", "MWHEEL", "MDOWN", "MUP", "SETRES", "WSND", "TRGSND", "SCAL")
 # v0.9.60 - mouse goes fire-and-ack (smooth dense paths); the rest waits for the arm reply.
-MOUSE_PREFIXES = ("MMOVE", "MCLICK", "MWHEEL", "MDOWN", "MUP")
+# MCLICK waits for physical completion so an in-flight hold can be aborted.
+FAST_MOUSE_PREFIXES = ("MMOVE", "MWHEEL", "MDOWN", "MUP")
 # Keyboard commands: ALWAYS typed locally by this Pico (final contract).
 KBD_PREFIXES = ("KTEXT", "KCOMBO", "KDOWN", "KUP")
 
@@ -209,7 +210,7 @@ def pump_arm():
             _serial_write_line(line)              # arm events reach the PC live
             continue
         parts = line.split("|")
-        if len(parts) > 1 and parts[0] == "OK" and parts[1] in MOUSE_PREFIXES:
+        if len(parts) > 1 and parts[0] == "OK" and parts[1] in FAST_MOUSE_PREFIXES:
             continue                              # the PC already got its fire-and-ack
         ready.append(line)
     return ready
@@ -234,6 +235,38 @@ def forward_fast(line):
     return "OK|" + head
 
 
+_host_abort_buf = bytearray()
+
+
+def _poll_host_halt():
+    """Forward host HALT to the arm while the Pico waits for MCLICK."""
+    global _host_abort_buf
+    if serial is None:
+        return False
+    try:
+        n = serial.in_waiting
+        if n:
+            _host_abort_buf.extend(serial.read(n))
+    except Exception:
+        return False
+    saw_halt = False
+    while True:
+        nl = _host_abort_buf.find(b"\n")
+        if nl < 0:
+            break
+        raw = bytes(_host_abort_buf[:nl])
+        _host_abort_buf = _host_abort_buf[nl + 1:]
+        line = raw.decode("utf-8", "replace").rstrip("\r")
+        if not line:
+            continue
+        if line == "HALT":
+            _arm_write("HALT")
+            saw_halt = True
+        else:
+            _serial_write_line("ERR|BUSY|" + line.split("|", 1)[0])
+    return saw_halt
+
+
 def forward_to_arm(line, timeout_s):
     """Blocking forward for commands whose reply the PC needs (sound, SETRES, HALT/BYE).
     Keeps pumping while waiting so arm EVT| lines still stream to the PC."""
@@ -241,15 +274,27 @@ def forward_to_arm(line, timeout_s):
     if not _arm_write(line):
         return "ERR|NOARM|" + head
     end = time.monotonic() + timeout_s
+    abort_sent = False
     while time.monotonic() < end:
+        if not abort_sent and _poll_host_halt():
+            abort_sent = True
         for reply in pump_arm():
-            # commands are strictly serialized and mouse OKs are already filtered:
-            # the first non-mouse OK/ERR we see belongs to this command.
             if reply.split("|")[0] in ("OK", "ERR"):
                 return reply
         time.sleep(0.005)
-    return "ERR|TIMEOUT|" + head
+    return ("ERR|ABORTED|" + head) if abort_sent else ("ERR|TIMEOUT|" + head)
 
+
+def _mclick_timeout(line):
+    """Physical-completion timeout for randomized MCLICK holds."""
+    try:
+        fields = line.split("|", 1)[1].split(",")
+        count = max(1, int(fields[1])) if len(fields) > 1 else 1
+        hmin = max(0, int(fields[2])) if len(fields) > 2 else 45
+        hmax = max(hmin, int(fields[3])) if len(fields) > 3 else hmin
+        return max(5.0, 2.0 + (count * hmax + max(0, count - 1) * 140) / 1000.0)
+    except Exception:
+        return 5.0
 
 def sample():
     window.append(sensor.lux())
@@ -422,7 +467,9 @@ def handle(line):
     head = line.split("|")[0]
     if head in KBD_PREFIXES:
         return handle_keyboard(line, head)
-    if head in MOUSE_PREFIXES:
+    if head == "MCLICK":
+        return forward_to_arm(line, _mclick_timeout(line))
+    if head in FAST_MOUSE_PREFIXES:
         return forward_fast(line)
     if head in ARM_PREFIXES:
         tmo = 30 if head in ("WSND", "TRGSND", "SCAL") else 5

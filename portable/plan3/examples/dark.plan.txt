@@ -1,0 +1,3 @@
+PLAN|2
+# Dark-screen pipeline placeholder
+DELAY|100,150

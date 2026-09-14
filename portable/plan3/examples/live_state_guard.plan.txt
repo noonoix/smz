@@ -1,0 +1,5 @@
+# Live Light State Guard example.
+# The route files are exported beside this plan on the Pico.
+PLAN|2
+SCREEN|1920,1080
+STATELOOP|poll=250|stable=750|hysteresis=20|timeout=1500|fallback=STOP|routes=dark:0:100:dark.plan.txt,bright:160:400:bright.plan.txt

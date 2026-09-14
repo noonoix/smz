@@ -38,6 +38,6 @@ jobs:
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs firmware/pico-light-0.9.60-template.py firmware/code64f/code.py firmware/autocycle-hostusb-v5/code.pre-autocycle.py firmware/autocycle-hostusb-v5/code.py
+          git add ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs firmware/pico-light-0.9.60-template.py firmware/code64f/code.py firmware/autocycle-hostusb-v5/code.pre-autocycle.py firmware/autocycle-hostusb-v5/code.py portable/plan3/autocycle_h6_patch.json
           git commit -m 'feat: synchronize light telemetry firmware outputs'
           git push origin HEAD:feature/light-telemetry-protocol

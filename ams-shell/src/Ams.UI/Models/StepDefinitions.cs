@@ -152,7 +152,6 @@ public static class StepDefinitions
                 new("key", "Key", FieldKind.Combo, "F4", KeyMap.KeyNames.ToArray()),
                 new("holdMin", "Hold min (ms) — random press-hold range; 0 = firmware default (firmware 1.7+)", FieldKind.Int, "0"),
                 new("holdMax", "Hold max (ms) — 0 = firmware default (firmware 1.7+)", FieldKind.Int, "0"),
-                new("keyboardBoard", "Keyboard executor — default uses Options; Pico executes locally; Pro Micro uses the UART arm", FieldKind.Combo, "default", new[] { "default", "pico", "promicro" }),
             },
             Summarize = s => "Keystroke " + ComboText(s.Props) + HoldText(s.Props) + KeyboardBoardHint(s.Props),
             Commands = s => new[] { "KCOMBO|" + ComboVk(s.Props) + HoldSuffix(s.Props) },
@@ -164,7 +163,6 @@ public static class StepDefinitions
             {
                 new("text", "Text", FieldKind.Multiline, ""),
                 new("mode", "Mode", FieldKind.Combo, "keystrokes", new[] { "keystrokes", "clipboard" }),
-                new("keyboardBoard", "Keyboard executor — default uses Options; Pico executes locally; Pro Micro uses the UART arm", FieldKind.Combo, "default", new[] { "default", "pico", "promicro" }),
                 new("secret", "Sensitive (password) — masked in logs, pasted via clipboard (§17.6)", FieldKind.Check, "false"),
                 new("hmin", "Humanize min (ms between keys — human-calibrated default 80)", FieldKind.Int, "80", HideWhenKey: "mode", HideWhenValue: "clipboard"),
                 new("hmax", "Humanize max (ms between keys — human-calibrated default 220)", FieldKind.Int, "220", HideWhenKey: "mode", HideWhenValue: "clipboard"),
@@ -204,7 +202,6 @@ public static class StepDefinitions
             Fields = new FieldDef[]
             {
                 new("key", "Key", FieldKind.Combo, "SHIFT", KeyMap.KeyNames.ToArray()),
-                new("keyboardBoard", "Keyboard executor — default uses Options; Pico executes locally; Pro Micro uses the UART arm", FieldKind.Combo, "default", new[] { "default", "pico", "promicro" }),
             },
             Summarize = s => "Key Down " + PropEx.GetString(s.Props, "key", "SHIFT") + KeyboardBoardHint(s.Props),
             Commands = s => new[] { "KDOWN|" + KeyVk(s.Props) },
@@ -215,7 +212,6 @@ public static class StepDefinitions
             Fields = new FieldDef[]
             {
                 new("key", "Key", FieldKind.Combo, "SHIFT", KeyMap.KeyNames.ToArray()),
-                new("keyboardBoard", "Keyboard executor — default uses Options; Pico executes locally; Pro Micro uses the UART arm", FieldKind.Combo, "default", new[] { "default", "pico", "promicro" }),
             },
             Summarize = s => "Key Up " + PropEx.GetString(s.Props, "key", "SHIFT") + KeyboardBoardHint(s.Props),
             Commands = s => new[] { "KUP|" + KeyVk(s.Props) },

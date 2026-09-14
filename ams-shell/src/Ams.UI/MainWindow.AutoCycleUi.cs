@@ -30,6 +30,7 @@ public partial class MainWindow
         window.SetValue(AutoCycleUiInstalledProperty, true);
 
         var advanced = AutoCycleUiKit.EnsureAdvancedPanel(body);
+        MovePlayOptionsToInspector(window, body);
         var section = new StackPanel
         {
             FlowDirection = FlowDirection.RightToLeft,
@@ -145,6 +146,18 @@ public partial class MainWindow
         advanced.Children.Add(AutoCycleUiKit.Card(AutoCycleUiKit.ScheduleTag, section));
         AutoCycleUiKit.ReorderAdvanced(advanced);
         AutoCycleUiKit.Reorder(body);
+    }
+
+    private static void MovePlayOptionsToInspector(MainWindow window, StackPanel body)
+    {
+        if (window.FindName("InspectorExtras") is not StackPanel host) return;
+        Border? owner = null;
+        for (DependencyObject? p = body; p is not null; p = VisualTreeHelper.GetParent(p))
+            if (p is Border border) { owner = border; break; }
+        if (owner is null || owner.Parent is not Panel oldParent || host.Children.Contains(owner)) return;
+        oldParent.Children.Remove(owner);
+        owner.Margin = new Thickness(0, 0, 0, 8);
+        host.Children.Add(owner);
     }
 
     private static FrameworkElement BuildRangeRow(

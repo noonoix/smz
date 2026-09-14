@@ -1,1 +1,1 @@
-Final fixes applied; trigger release build for commit 6a2611c.
+Trigger visual audit pass for the final delivery gate.

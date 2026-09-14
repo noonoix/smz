@@ -258,6 +258,39 @@ def parse_plan(text):
             if loop_stack[-1][1] in else_seen:
                 raise ValueError('line %d: duplicate ELSE in one IF block' % line_no)
             else_seen.add(loop_stack[-1][1])
+        elif op == 'STATELOOP':
+            vals = {}
+            for kv in fields[1:]:
+                if '=' not in kv:
+                    raise ValueError('line %d: STATELOOP wants key=value' % line_no)
+                k, v = kv.split('=', 1)
+                vals[k.strip().lower()] = v.strip()
+            try:
+                prm['poll'] = max(25, int(vals.get('poll', '250')))
+                prm['stable'] = max(0, int(vals.get('stable', '750')))
+                prm['hysteresis'] = max(0, int(vals.get('hysteresis', '0')))
+                prm['timeout'] = max(prm['poll'], int(vals.get('timeout', '1500')))
+            except Exception:
+                raise ValueError('line %d: bad STATELOOP timing' % line_no)
+            raw_routes = vals.get('routes', '')
+            routes = []
+            for raw_route in raw_routes.split(','):
+                bits = raw_route.split(':')
+                if len(bits) != 4 or not bits[0] or (not bits[3].endswith('.txt')):
+                    raise ValueError("line %d: bad STATELOOP route '%s'" % (line_no, raw_route))
+                try:
+                    lo, hi = (int(bits[1]), int(bits[2]))
+                except Exception:
+                    raise ValueError('line %d: bad STATELOOP lux range' % line_no)
+                if hi < lo:
+                    lo, hi = (hi, lo)
+                routes.append({'id': bits[0], 'lo': lo, 'hi': hi, 'file': bits[3]})
+            if not routes:
+                raise ValueError('line %d: STATELOOP needs routes=' % line_no)
+            prm['routes'] = routes
+            prm['fallback'] = vals.get('fallback', 'STOP').upper()
+            if prm['fallback'] not in ('STOP', 'FIRST'):
+                raise ValueError('line %d: STATELOOP fallback must be STOP or FIRST' % line_no)
         elif op in ('WSND', 'TRGSND', 'IFSND', 'IFLUX'):
             pa = fields[1].split(',') if len(fields) > 1 else []
             need = {'WSND': 3, 'IFSND': 3, 'IFLUX': 5, 'TRGSND': 8}[op]
@@ -285,38 +318,6 @@ def parse_plan(text):
             prm['line'] = '|'.join(fields[1:]).strip()
             if not prm['line']:
                 raise ValueError('line %d: RAW needs a board line' % line_no)
-        elif op == 'STATELOOP':
-            vals = {}
-            for kv in fields[1:]:
-                if '=' not in kv:
-                    raise ValueError('line %d: STATELOOP wants key=value' % line_no)
-                k, v = kv.split('=', 1)
-                vals[k.strip().lower()] = v.strip()
-            try:
-                prm['poll'] = max(25, int(vals.get('poll', '250')))
-                prm['stable'] = max(0, int(vals.get('stable', '750')))
-                prm['hysteresis'] = max(0, int(vals.get('hysteresis', '0')))
-                prm['timeout'] = max(prm['poll'], int(vals.get('timeout', '1500')))
-            except Exception:
-                raise ValueError('line %d: bad STATELOOP timing' % line_no)
-            routes = []
-            for raw_route in vals.get('routes', '').split(','):
-                bits = raw_route.split(':')
-                if len(bits) != 4 or not bits[0] or not bits[3].endswith('.txt'):
-                    raise ValueError("line %d: bad STATELOOP route '%s'" % (line_no, raw_route))
-                try:
-                    lo, hi = int(bits[1]), int(bits[2])
-                except Exception:
-                    raise ValueError('line %d: bad STATELOOP lux range' % line_no)
-                if hi < lo:
-                    lo, hi = hi, lo
-                routes.append({'id': bits[0], 'lo': lo, 'hi': hi, 'file': bits[3]})
-            if not routes:
-                raise ValueError('line %d: STATELOOP needs routes=' % line_no)
-            prm['routes'] = routes
-            prm['fallback'] = vals.get('fallback', 'STOP').upper()
-            if prm['fallback'] not in ('STOP', 'FIRST'):
-                raise ValueError('line %d: STATELOOP fallback must be STOP or FIRST' % line_no)
         elif op == 'WLIGHT':
             pos = fields[1].split(',') if len(fields) > 1 else []
             if len(pos) < 5:
@@ -442,14 +443,13 @@ class PausePlanner:
         self.next_idle_at = max(1, rand_range(c['idle_every_min'], c['idle_every_max']))
         return rand_range(c['idle_pause_min'], c['idle_pause_max'])
 
-
-
 class _LightStateChanged(Exception):
+
     def __init__(self, state_id):
         self.state_id = state_id
 
-
 class _LiveLightSession:
+
     def __init__(self, prm, ctx):
         try:
             from live_light_guard import LightStateGuard, state_spec
@@ -464,7 +464,9 @@ class _LiveLightSession:
         self.next_poll = -1
 
     def _lux(self):
-        reader = getattr(self.ctx, 'read_lux', None) or getattr(self.ctx, 'light_lux', None)
+        reader = getattr(self.ctx, 'read_lux', None)
+        if reader is None:
+            reader = getattr(self.ctx, 'light_lux', None)
         if reader is not None:
             try:
                 value = reader()
@@ -489,13 +491,17 @@ class _LiveLightSession:
         self.next_poll = now + self.prm['poll']
         state_id = self.guard.update(self._lux(), now)
         if state_id is None:
+            if self.current is not None:
+                self.ctx.log('light guard unsafe - stopping')
             raise PlanAbort()
         if self.current is None:
             self.current = state_id
+            self.ctx.log('light state -> ' + state_id)
         elif state_id != self.current:
+            old = self.current
             self.current = state_id
+            self.ctx.log('light state %s -> %s' % (old, state_id))
             raise _LightStateChanged(state_id)
-
 
 def _run_state_loop(prm, ctx, pos, pauses, inc):
     session = _LiveLightSession(prm, ctx)

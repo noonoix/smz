@@ -59,7 +59,7 @@ internal static class FooterUiBootstrap
                 connectionWrap.Children.OfType<TextBlock>()
                     .Select(x => x.Text)
                     .Where(x => !string.IsNullOrWhiteSpace(x)));
-            if (!string.IsNullOrWhiteSpace(text)) Clipboard.SetText(text);
+            if (!string.IsNullOrWhiteSpace(text)) System.Windows.Clipboard.SetText(text);
         };
         connectionWrap.Children.Add(copy);
         Grid.SetColumn(connectionWrap, 0);

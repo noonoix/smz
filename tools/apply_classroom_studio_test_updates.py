@@ -35,11 +35,13 @@ new = '''        // 4-10) keyboard executor is global Options state; the old per
                && keyHoldDef.Fields.Any(f => f.Key == "key"),
             "v0.9.67: Key Hold is one atomic scope action with a held-key field");
 '''
-if old not in text:
+if old in text:
+    text = text.replace(old, new, 1)
+elif 'v0.9.67: {type} no longer exposes a duplicate per-step keyboard executor' not in text:
     raise RuntimeError("keyboard executor assertion block not found")
-text = text.replace(old, new, 1)
 
-if text == original:
-    raise RuntimeError("no test updates were applied")
-path.write_text(text, encoding="utf-8")
-print("updated tests/TestRunner.cs")
+if text != original:
+    path.write_text(text, encoding="utf-8")
+    print("updated tests/TestRunner.cs")
+else:
+    print("tests/TestRunner.cs already matches the new action contracts")

@@ -29,6 +29,8 @@ jobs:
         run: python tools/test_light_telemetry_protocol.py
       - name: Compile-check maintained firmware sources
         run: python -m py_compile firmware/pico-light-0.9.60-template.py firmware/code64f/code.py firmware/autocycle-hostusb-v5/code.pre-autocycle.py firmware/autocycle-hostusb-v5/code.py
+      - name: Capture current PLAN2 source hashes
+        run: sha256sum portable/plan3/CIRCUITPY/plan_engine.py portable/plan3/tools/winr.py portable/plan3/sim/sim_plan2.py portable/plan3/sim/sim_plan3.py > tools/phase1-plan2-hashes.txt
       - name: Commit generated source updates
         shell: bash
         run: |
@@ -38,6 +40,6 @@ jobs:
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs firmware/pico-light-0.9.60-template.py firmware/code64f/code.py firmware/autocycle-hostusb-v5/code.pre-autocycle.py firmware/autocycle-hostusb-v5/code.py portable/plan3/autocycle_h6_patch.json
-          git commit -m 'feat: synchronize light telemetry firmware outputs'
+          git add ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs firmware/pico-light-0.9.60-template.py firmware/code64f/code.py firmware/autocycle-hostusb-v5/code.pre-autocycle.py firmware/autocycle-hostusb-v5/code.py portable/plan3/autocycle_h6_patch.json tools/phase1-plan2-hashes.txt
+          git commit -m 'ci: record current PLAN2 source hashes'
           git push origin HEAD:feature/light-telemetry-protocol

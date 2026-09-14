@@ -1,5 +1,8 @@
+import sys
 import unittest
+from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "CIRCUITPY"))
 from live_light_guard import LightStateGuard, state_spec
 
 

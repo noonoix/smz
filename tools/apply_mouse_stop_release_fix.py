@@ -1,5 +1,4 @@
 from pathlib import Path
-import re
 
 
 def once(text, old, new, label):
@@ -58,9 +57,7 @@ def _poll_host_halt():
         if not line:
             continue
         if line == "HALT":
-            _flow_reset()
-            if arm is not None:
-                _arm_write("HALT")
+            _arm_write("HALT")
             saw_halt = True
         else:
             _serial_write_line("ERR|BUSY|" + line.split("|", 1)[0])
@@ -69,7 +66,8 @@ def _poll_host_halt():
 
 '''
     if "def _poll_host_halt():" not in text:
-        text = once(text, "def _forward_once(line, timeout_s):", abort_helper + "def _forward_once(line, timeout_s):", "host HALT pump")
+        marker = "def _forward_once(line, timeout_s):" if "def _forward_once(line, timeout_s):" in text else "def forward_to_arm(line, timeout_s):"
+        text = once(text, marker, abort_helper + marker, "host HALT pump")
 
     old_wait = '''    end = time.monotonic() + timeout_s
     while time.monotonic() < end:
@@ -90,7 +88,10 @@ def _poll_host_halt():
                 return reply
         time.sleep(0.005)
     return ("ERR|ABORTED|" + head) if abort_sent else ("ERR|TIMEOUT|" + head)'''
-    text = once(text, old_wait, new_wait, "abort-aware forward wait")
+    if old_wait in text:
+        text = once(text, old_wait, new_wait, "abort-aware forward wait")
+    elif new_wait not in text:
+        raise RuntimeError("abort-aware forward wait: anchor not found")
 
     old_dispatch = '''    if head in MOUSE_PREFIXES:
         return forward_fast(line)
@@ -110,7 +111,8 @@ def _poll_host_halt():
             raise _pe.PlanAbort()
 
     def ktext(self, hmin, hmax, text):'''
-    text = once(text, old_plan, new_plan, "plan MCLICK dispatch")
+    if old_plan in text or new_plan in text:
+        text = once(text, old_plan, new_plan, "plan MCLICK dispatch")
     return text
 
 
@@ -125,8 +127,7 @@ def patch_exporter(path):
     if body_end < 0:
         raise RuntimeError(f"{path}: CodeTemplate end missing")
     raw = text[body_start:body_end]
-    lines = raw.splitlines()
-    body = "\n".join(line[8:] if line.startswith("        ") else line for line in lines) + "\n"
+    body = "\n".join(line[8:] if line.startswith("        ") else line for line in raw.splitlines()) + "\n"
     patched = patch_pico_body(body)
     indented = "\n".join("        " + line if line else "        " for line in patched.rstrip("\n").splitlines()) + "\n"
     path.write_text(text[:body_start] + indented + text[body_end:], encoding="utf-8")
@@ -168,8 +169,7 @@ static bool wait_mouse_hold_or_abort(uint16_t holdMs) {
 
 
 def patch_pico_file(path):
-    text = path.read_text(encoding="utf-8")
-    path.write_text(patch_pico_body(text), encoding="utf-8")
+    path.write_text(patch_pico_body(path.read_text(encoding="utf-8")), encoding="utf-8")
 
 
 def main():

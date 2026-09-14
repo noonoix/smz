@@ -8,6 +8,7 @@ on:
       - 'firmware/arm26/**'
       - 'firmware/autocycle-hostusb-v5/**'
       - 'portable/plan3/**'
+      - 'tests/LightTelemetryTests/**'
       - '.github/workflows/autocycle.yml'
 
 permissions:
@@ -77,13 +78,16 @@ jobs:
           dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object windows-tests.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (Select-String -Path windows-tests.log -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
+      - name: Run typed light telemetry tests
+        shell: pwsh
+        run: dotnet run --project tests/LightTelemetryTests/LightTelemetryTests.csproj -c Release 2>&1 | Tee-Object light-telemetry-tests.log
       - name: Report Windows failure tail
         if: failure() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const names=['windows-restore.log','windows-build.log','windows-testrunner-build.log','windows-tests.log'];
+            const names=['windows-restore.log','windows-build.log','windows-testrunner-build.log','windows-tests.log','light-telemetry-tests.log'];
             const text=names.map(n=>fs.existsSync(n)?('=== '+n+' ===\n'+fs.readFileSync(n,'utf8')):'').join('\n');
             const lines=text.split('\n');
             const failures=lines.filter(line=>line.includes('FAIL:')||line.includes('Unhandled exception')||line.includes('Results:')).join('\n');

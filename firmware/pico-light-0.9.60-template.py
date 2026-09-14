@@ -127,6 +127,7 @@ kbd = Keyboard(usb_hid.devices)
 serial = usb_cdc.data if usb_cdc.data is not None else usb_cdc.console
 states = load_states()
 window = []
+_lux_seq = 0       # read-only LUX? sequence; resets on every Pico boot
 
 # v0.9.60 - the light sensor is OPTIONAL. A loose SDA/SCL wire must never kill the brain
 # before its command loop (that was the silent boot death): without the sensor the light
@@ -296,6 +297,24 @@ def _mclick_timeout(line):
     except Exception:
         return 5.0
 
+def read_lux_telemetry():
+    # Read-only telemetry: no key, mouse, buzzer, calibration or plan side effect.
+    global _lux_seq
+    if sensor is None:
+        return "ERR|NOSENSOR|LUX"
+    if _arm_lag > 0 or _pending_move is not None:
+        return "ERR|BUSY|LUX"
+    try:
+        value = sensor.lux()
+    except Exception:
+        return "ERR|I2C|LUX"
+    if value is None or value != value or value < 0:
+        return "ERR|I2C|LUX"
+    _lux_seq = (_lux_seq + 1) & 0xFFFFFFFF
+    mode = "lowres" if sensor.mode == CONT_LORES else "hires"
+    return "OK|LUX|seq=%d|lux=%.1f|mode=%s|sensor=ok" % (_lux_seq, value, mode)
+
+
 def sample():
     window.append(sensor.lux())
     if len(window) > 5:
@@ -416,6 +435,8 @@ def handle_keyboard(line, head):
 
 
 def handle(line):
+    if line == "LUX?":
+        return read_lux_telemetry()
     if line == "PING":
         return "OK|PONG|pico-light __VERSION__|role=brain+keyboard+light|arm=promicro"
     if line.startswith("LCAL|"):

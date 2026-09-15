@@ -82,6 +82,9 @@ public partial class MainViewModel
         }
     }
 
+    public void ReportLightProfileEditorValidationError()
+        => LightProfileSaveStatus = "ذخیره نشد: یک یا چند فیلد خالی یا دارای قالب نامعتبر است.";
+
     public void ResetLightStateProfiles()
     {
         var preferredCalibrationProfileId = SelectedLightCalibrationProfile?.Id;

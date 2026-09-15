@@ -55,6 +55,7 @@ public partial class MainViewModel
         _lightStateClassifier?.Reset();
         LightStateDisplay = "نامشخص — داده قدیمی";
         LightStateConfidenceDisplay = "—";
+        MarkLightGateDiagnosticStale();
     }
 
     public bool SaveLightStateProfiles()
@@ -71,6 +72,7 @@ public partial class MainViewModel
             LightStateProfileStore.Save(normalized);
             _lightStateClassifier = new LightStateClassifier(LightStateProfiles);
             _lastClassifiedChartVersion = -1;
+            RefreshLightGateDiagnosticProfiles();
             LightStateWarning = DescribeProfileOverlaps(LightStateProfiles);
             LightProfileSaveStatus = "پروفایل‌ها ذخیره شدند؛ مقادیر تا کالیبراسیون سخت‌افزاری فرضی‌اند.";
             return true;
@@ -113,6 +115,7 @@ public partial class MainViewModel
         LightStateWarning = classification.Kind == LightStateClassificationKind.Ambiguous
             ? "هم‌پوشانی فعال: " + string.Join(" / ", classification.Matches?.Select(x => x.Name) ?? Array.Empty<string>())
             : DescribeProfileOverlaps(LightStateProfiles);
+        ObserveLightGateDiagnostic(classification);
     }
 
     public static string DescribeProfileOverlaps(IEnumerable<LightStateProfile> profiles)

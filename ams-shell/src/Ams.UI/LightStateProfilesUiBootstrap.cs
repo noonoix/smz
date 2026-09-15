@@ -105,13 +105,31 @@ internal static class LightStateProfilesUiBootstrap
         var insertAt = Math.Max(0, body.Children.Count - 1);
         body.Children.Insert(insertAt, section);
 
+        // Freshness text includes the changing age, so it raises PropertyChanged every timer tick.
+        // Stale state is an edge, not a repeated event: revoke once on the fresh→stale transition,
+        // then wait for a fresh chart sample before allowing another stale notification.
+        var staleReported = false;
         vm.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(MainViewModel.LightChartVersion))
+            {
+                staleReported = false;
                 window.Dispatcher.BeginInvoke(new Action(vm.ObserveCurrentLightState));
-            else if (args.PropertyName == nameof(MainViewModel.LightFreshnessText)
-                     && vm.LightFreshnessText.StartsWith("داده قدیمی", StringComparison.Ordinal))
-                vm.MarkCurrentLightStateStale();
+            }
+            else if (args.PropertyName == nameof(MainViewModel.LightFreshnessText))
+            {
+                var stale = vm.LightFreshnessText.StartsWith("داده قدیمی", StringComparison.Ordinal);
+                if (stale)
+                {
+                    if (staleReported) return;
+                    staleReported = true;
+                    vm.MarkCurrentLightStateStale();
+                }
+                else
+                {
+                    staleReported = false;
+                }
+            }
         };
     }
 

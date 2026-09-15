@@ -14,8 +14,11 @@ POWER_ON = 0x01
 RESET = 0x07
 CONT_HIRES = 0x10
 
-serial = usb_cdc.data
-_buffer = bytearray()
+_channels = []
+for _candidate in (usb_cdc.data, usb_cdc.console):
+    if _candidate is not None and all(_candidate is not _item for _item in _channels):
+        _channels.append(_candidate)
+_buffers = [bytearray() for _ in _channels]
 _sequence = 0
 
 
@@ -61,10 +64,10 @@ except Exception:
     sensor = None
 
 
-def send(line):
-    if serial is not None:
+def send(channel, line):
+    if channel is not None:
         try:
-            serial.write((line + "\n").encode("utf-8"))
+            channel.write((line + "\n").encode("utf-8"))
         except Exception:
             pass
 
@@ -97,27 +100,29 @@ def handle(line):
     return "ERR|READONLY|" + head
 
 
+def poll_channel(index, channel, buffer):
+    waiting = channel.in_waiting
+    if not waiting:
+        return
+    buffer.extend(channel.read(waiting))
+    if len(buffer) > 1024:
+        del buffer[:-512]
+    while True:
+        newline = buffer.find(b"\n")
+        if newline < 0:
+            return
+        raw = bytes(buffer[:newline])
+        del buffer[:newline + 1]
+        line = raw.decode("utf-8", "replace").strip()
+        if line:
+            send(channel, handle(line))
+
+
 while True:
     try:
-        if serial is None:
-            time.sleep(1.0)
-            continue
-        waiting = serial.in_waiting
-        if waiting:
-            _buffer.extend(serial.read(waiting))
-            if len(_buffer) > 1024:
-                del _buffer[:-512]
-            while True:
-                newline = _buffer.find(b"\n")
-                if newline < 0:
-                    break
-                raw = bytes(_buffer[:newline])
-                del _buffer[:newline + 1]
-                line = raw.decode("utf-8", "replace").strip()
-                if line:
-                    send(handle(line))
-        else:
-            time.sleep(0.01)
+        for _index, _channel in enumerate(_channels):
+            poll_channel(_index, _channel, _buffers[_index])
+        time.sleep(0.01)
     except Exception:
         # Keep the read-only endpoint alive after malformed input or USB noise.
         time.sleep(0.05)

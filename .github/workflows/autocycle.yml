@@ -91,10 +91,10 @@ jobs:
           $out = 'ams-shell/src/Ams.UI/bin/Release/net8.0-windows'
           Remove-Item -Recurse -Force "$out/bridge/__pycache__" -ErrorAction SilentlyContinue
           @(
-            'Classroom Studio — Light State Profiles test build',
+            'Classroom Studio — Phase 6 non-executing authorization diagnostics test build',
             'Source commit: ${{ github.event.pull_request.head.sha }}',
-            'Diagnostic build only; Launch/Auto Resume light gating remains disabled.',
-            'Login and DC share one light profile; DC recovery prepends exactly one ESC.'
+            'Diagnostic build only; actuator and all execution paths remain disabled.',
+            'Status Live Watch and manual Arm/Issue/Consume are diagnostic-only.'
           ) | Set-Content "$out/LIGHT-STATE-TEST.txt" -Encoding utf8
       - name: Upload gated Windows output
         if: success()
@@ -123,7 +123,7 @@ jobs:
 
   test-package:
     name: autocycle / downloadable test package
-    if: github.event_name == 'pull_request' && github.head_ref == 'feature/light-state-profiles'
+    if: github.event_name == 'pull_request' && (github.head_ref == 'feature/light-state-profiles' || github.head_ref == 'phase6/non-executing-authorization-diagnostics')
     needs: [portable-contracts, windows-app]
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -137,42 +137,45 @@ jobs:
         run: |
           set -euo pipefail
           cd staged/ams-shell/src/Ams.UI/bin/Release/net8.0-windows
-          zip -qr ../../../../../../../Classroom-Studio-light-state-test.zip .
+          zip -qr ../../../../../../../Classroom-Studio-phase6-diagnostics-test.zip .
           cd ../../../../../../../
-          sha256sum Classroom-Studio-light-state-test.zip | awk '{print toupper($1)}' > light-state-test-sha256.txt
+          sha256sum Classroom-Studio-phase6-diagnostics-test.zip | awk '{print toupper($1)}' > phase6-diagnostics-test-sha256.txt
           cat > TEST-GUIDE-FA.md <<'EOF'
-          # راهنمای تست مرحله اول
+          # راهنمای تست آزمایشی Phase 6
 
-          1. فایل ZIP را Extract کنید؛ برنامه را از داخل ZIP اجرا نکنید.
+          1. فایل ZIP را Extract کنید؛ برنامه را مستقیماً از داخل ZIP اجرا نکنید.
           2. `ClassroomStudio.exe` را اجرا کنید.
-          3. وارد تب «وضعیت» شوید.
-          4. فعلاً برد را وصل نکنید؛ ظاهر RTL و نمایش شش پروفایل را بررسی کنید.
-          5. نتیجه مرحله اول را گزارش کنید تا تست اتصال و Live Watch را ادامه دهیم.
+          3. وارد بخش «وضعیت» شوید.
+          4. ابتدا ظاهر کارت، هشدار «فقط تشخیصی — بدون اجرا» و وضعیت دکمه‌ها را بررسی کنید.
+          5. سپس فقط سنسور read-only مجاز را وصل کنید و Live Watch را بررسی کنید.
+          6. Arm، Issue و Consume را فقط دستی انجام دهید.
+          7. هرگونه Macro، کلیک، تایپ، HID، BEEP، Launch، Recovery یا actuator باید غیرفعال بماند.
 
-          این نسخه آزمایشی است و گیت اجرایی Launch/Auto Resume خاموش می‌ماند.
+          این نسخه آزمایشی است؛ Release نهایی نیست و actuator در این فاز مجاز نیست.
           EOF
           {
-            echo '# Light State Profiles — test build'
+            echo '# Phase 6 non-executing authorization diagnostics — test build'
             echo
-            echo 'Source PR: #158'
+            echo 'Source PR: #174'
             echo
             echo "Source commit: ${{ github.event.pull_request.head.sha }}"
             echo
-            echo "SHA-256: $(cat light-state-test-sha256.txt)"
+            echo "SHA-256: $(cat phase6-diagnostics-test-sha256.txt)"
             echo
-            echo 'All portable, Windows, TestRunner and typed light-profile gates passed before packaging.'
+            echo 'Portable, Windows, TestRunner and typed light-telemetry gates passed before packaging.'
+            echo 'This is a prerelease diagnostic package; no actuator or execution path is enabled.'
           } > release-body.md
       - name: Publish prerelease test build
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: light-state-test-${{ github.run_number }}
+          tag_name: phase6-diagnostics-test-${{ github.run_number }}
           target_commitish: ${{ github.event.pull_request.head.sha }}
-          name: "Light State Profiles test #${{ github.run_number }}"
+          name: "Phase 6 diagnostics test #${{ github.run_number }}"
           prerelease: true
           body_path: release-body.md
           files: |
-            Classroom-Studio-light-state-test.zip
-            light-state-test-sha256.txt
+            Classroom-Studio-phase6-diagnostics-test.zip
+            phase6-diagnostics-test-sha256.txt
             TEST-GUIDE-FA.md
             staged/windows-tests.log
             staged/light-telemetry-tests.log

@@ -1,20 +1,19 @@
 # Classroom Studio — isolated read-only Pico light telemetry
-# Firmware: pico-light-readonly 1.0.4
+# Firmware: pico-light-readonly 1.0.5
 # Sensor: BH1750 / GY-30, I2C0, SDA=GP20, SCL=GP21, ADDR=GND => 0x23
 # This file intentionally has no HID, keyboard, UART, macro, buzzer or actuator path.
 
+import sys
 import time
 import board
 import busio
-import usb_cdc
 
-VERSION = "1.0.4"
+VERSION = "1.0.5"
 ADDR = 0x23
 POWER_ON = 0x01
 RESET = 0x07
 CONT_HIRES = 0x10
 
-serial = usb_cdc.console
 _buffer = bytearray()
 _sequence = 0
 _i2c = None
@@ -78,14 +77,6 @@ def ensure_sensor():
     return _sensor
 
 
-def send(line):
-    if serial is not None:
-        try:
-            serial.write((line + "\n").encode("utf-8"))
-        except Exception:
-            pass
-
-
 def lux_reply():
     global _sequence
     sensor = ensure_sensor()
@@ -117,25 +108,13 @@ def handle(line):
 
 while True:
     try:
-        if serial is None:
-            time.sleep(1.0)
-            continue
-        available = serial.in_waiting
-        if available:
-            _buffer.extend(serial.read(available))
-            if len(_buffer) > 1024:
-                del _buffer[:-512]
-            while True:
-                newline = _buffer.find(b"\n")
-                if newline < 0:
-                    break
-                raw = bytes(_buffer[:newline])
-                del _buffer[:newline + 1]
-                line = raw.decode("utf-8", "replace").strip()
-                if line:
-                    send(handle(line))
-        else:
+        line = sys.stdin.readline()
+        if not line:
             time.sleep(0.01)
+            continue
+        reply = handle(line.strip())
+        sys.stdout.write(reply + "\n")
+        sys.stdout.flush()
     except Exception:
         # Keep the read-only endpoint alive after malformed input or USB noise.
         time.sleep(0.05)

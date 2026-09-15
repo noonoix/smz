@@ -208,6 +208,7 @@ kbd = Keyboard(usb_hid.devices)
 serial = usb_cdc.data if usb_cdc.data is not None else usb_cdc.console
 states = load_states()
 window = []
+_lux_seq = 0       # read-only LUX? sequence; resets on every Pico boot
 
 # PLAN2 hotfix h1 + AUTO_CYCLE_PATCH_0967_H6.
 _pe_import_error = None
@@ -571,6 +572,24 @@ def forward_to_arm(line, timeout_s, retries=0):
     return reply
 
 
+def read_lux_telemetry():
+    # Read-only telemetry: no key, mouse, buzzer, calibration or plan side effect.
+    global _lux_seq
+    if sensor is None:
+        return "ERR|NOSENSOR|LUX"
+    if _arm_lag > 0 or _pending_move is not None:
+        return "ERR|BUSY|LUX"
+    try:
+        value = sensor.lux()
+    except Exception:
+        return "ERR|I2C|LUX"
+    if value is None or value != value or value < 0:
+        return "ERR|I2C|LUX"
+    _lux_seq = (_lux_seq + 1) & 0xFFFFFFFF
+    mode = "lowres" if sensor.mode == CONT_LORES else "hires"
+    return "OK|LUX|seq=%d|lux=%.1f|mode=%s|sensor=ok" % (_lux_seq, value, mode)
+
+
 def sample():
     window.append(sensor.lux())
     if len(window) > 5:
@@ -756,56 +775,9 @@ def handle_keyboard(line, head, plan_mode=False):
     return "ERR|UNKNOWN|" + head
 
 
-def _beep_sequence(line):
-
-
-    import pwmio
-
-
-    tone = None
-
-
-    try:
-
-
-        notes = [tuple(int(x) for x in part.split(",")) for part in line.split("|", 1)[1].split(";")]
-
-
-        tone = pwmio.PWMOut(board.GP6, duty_cycle=0, frequency=notes[0][0], variable_frequency=True)
-
-
-        for freq, duration, pause in notes:
-
-
-            tone.frequency = freq; tone.duty_cycle = 32768
-
-
-            time.sleep(duration / 1000.0)
-
-
-            tone.duty_cycle = 0
-
-
-            if pause: time.sleep(pause / 1000.0)
-
-
-        return "OK|BEEPSEQ"
-
-
-    finally:
-
-
-        if tone is not None:
-
-
-            tone.duty_cycle = 0; tone.deinit()
-
-
-
 def handle(line):
-
-
-    if line.startswith("BEEPSEQ|"): return _beep_sequence(line)
+    if line == "LUX?":
+        return read_lux_telemetry()
     if line == "PING":
         return "OK|PONG|pico-light 0.9.64f-plan2h6|role=brain+keyboard+light|arm=promicro|planapi=3|engine=split|framing=%d|baud=%d|lagmax=%d|dropped=%d|cksum=%d|noframe=%d|sentjumps=%d|partial=%d" % (1 if ARM_FRAMING else 0, ARM_BAUD, ARM_LAG_MAX, _moves_dropped, _cksum_errors, _noframe_errors, _sent_jumps, _partial_writes)
     if line.startswith("LCAL|"):

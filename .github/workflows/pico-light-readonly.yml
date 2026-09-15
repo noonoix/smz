@@ -1,0 +1,56 @@
+name: Pico read-only light firmware
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'firmware/pico-light-readonly-1.0.0/**'
+      - '.github/workflows/pico-light-readonly.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-package:
+    name: pico-light / validate and package
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile firmware sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile firmware/pico-light-readonly-1.0.0/boot.py firmware/pico-light-readonly-1.0.0/code.py
+
+      - name: Enforce read-only source boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          code=firmware/pico-light-readonly-1.0.0/code.py
+          boot=firmware/pico-light-readonly-1.0.0/boot.py
+          grep -q 'usb_hid.disable' "$boot"
+          grep -q 'role=light-readonly' "$code"
+          grep -q 'ERR|READONLY' "$code"
+          ! grep -Eq 'adafruit_hid|usb_hid|busio\.UART|MMOVE|MCLICK|KBD|TRGSND|WSND|PWMOut|digitalio' "$code"
+          test "$(grep -c 'if line == \"LUX?\"' "$code")" -eq 1
+          test "$(grep -c 'if line == \"PING\"' "$code")" -eq 1
+
+      - name: Package firmware sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          zip -qr pico-light-readonly-1.0.0.zip firmware/pico-light-readonly-1.0.0
+          sha256sum pico-light-readonly-1.0.0.zip | awk '{print toupper($1)}' > pico-light-readonly-1.0.0-sha256.txt
+          cat pico-light-readonly-1.0.0-sha256.txt
+
+      - name: Upload read-only firmware package
+        uses: actions/upload-artifact@v4
+        with:
+          name: pico-light-readonly-1.0.0
+          path: |
+            pico-light-readonly-1.0.0.zip
+            pico-light-readonly-1.0.0-sha256.txt
+          retention-days: 14
+          if-no-files-found: error

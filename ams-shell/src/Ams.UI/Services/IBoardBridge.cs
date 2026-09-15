@@ -1,3 +1,5 @@
+using Ams.UI.Models;
+
 namespace Ams.UI.Services;
 
 /// <summary>Sidecar/board connection lifecycle.</summary>
@@ -35,6 +37,16 @@ public interface IBoardBridge : IAsyncDisposable
     /// for long-window commands (WSND/TRGSND/SCAL — §15.4 rule 4); null = bridge default (5s).
     /// </summary>
     Task<string> SendAsync(string command, double? timeoutSeconds = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reads one typed, read-only BH1750 sample through the existing serialized command path.
+    /// The two-second board timeout is intentionally short; SendAsync still owns the one-command lock.
+    /// </summary>
+    async Task<LightTelemetrySample> ReadLightAsync(CancellationToken ct = default)
+    {
+        var reply = await SendAsync("LUX?", timeoutSeconds: 2, ct).ConfigureAwait(false);
+        return LightTelemetryParser.Parse(reply);
+    }
 
     /// <summary>
     /// Instant abort (v0.6.2): out-of-band HALT write that does NOT wait for the

@@ -9,6 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../ams-shell/src/Ams.UI/Ams.UI.csproj" />
+    <Compile Remove="LightTelemetryTests\**\*.cs" />
   </ItemGroup>
   <!-- v0.9.67: keep the long-lived runner source compatible with the current Insert contract.
        playAudio remains registered for old .amsj files; buzzer and Launch recovery are visible actions. -->

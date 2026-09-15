@@ -25,6 +25,7 @@ public partial class MainViewModel
 
     public void StartLightGateDiagnosticSession()
     {
+        RevokeLightAuthorizationDiagnostic(LightAuthorizationReasonCode.WatchSessionChanged);
         var now = MonotonicNow();
         _lightGateCoordinator.StartSession(LightStateProfiles, now);
         _lightGateObservationRevision = _lightGateCoordinator.ProfileRevision;
@@ -33,6 +34,7 @@ public partial class MainViewModel
 
     public void StopLightGateDiagnosticSession()
     {
+        RevokeLightAuthorizationDiagnostic(LightAuthorizationReasonCode.Disconnected);
         if (_lightGateCoordinator.IsSessionActive)
             PublishLightGateResult(_lightGateCoordinator.Stop(MonotonicNow()), null);
         else
@@ -44,6 +46,7 @@ public partial class MainViewModel
 
     private void RefreshLightGateDiagnosticProfiles()
     {
+        RevokeLightAuthorizationDiagnostic(LightAuthorizationReasonCode.ProfileChanged);
         if (!_lightGateCoordinator.IsSessionActive) return;
         _lightGateObservationRevision = _lightGateCoordinator.RefreshProfiles(
             LightStateProfiles, MonotonicNow());
@@ -69,6 +72,7 @@ public partial class MainViewModel
 
     private void MarkLightGateDiagnosticStale()
     {
+        RevokeLightAuthorizationDiagnostic(LightAuthorizationReasonCode.StaleGateResult);
         if (!_lightGateCoordinator.IsSessionActive) return;
         var now = MonotonicNow();
         var staleAt = now - TimeSpan.FromMilliseconds(2001);

@@ -1,5 +1,5 @@
 # Classroom Studio — isolated read-only Pico light telemetry
-# Firmware: pico-light-readonly 1.0.2
+# Firmware: pico-light-readonly 1.0.3
 # Sensor: BH1750 / GY-30, I2C0, SDA=GP20, SCL=GP21, ADDR=GND => 0x23
 # This file intentionally has no HID, keyboard, UART, macro, buzzer or actuator path.
 
@@ -8,22 +8,14 @@ import board
 import busio
 import usb_cdc
 
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 ADDR = 0x23
 POWER_ON = 0x01
 RESET = 0x07
 CONT_HIRES = 0x10
 
-_channels = []
-for _candidate in (usb_cdc.data, usb_cdc.console):
-    if _candidate is not None and all(_candidate is not _item for _item in _channels):
-        _channels.append(_candidate)
-_buffers = [bytearray() for _ in _channels]
-for _channel in _channels:
-    try:
-        _channel.timeout = 0.0
-    except Exception:
-        pass
+serial = usb_cdc.console
+_buffer = bytearray()
 _sequence = 0
 _i2c = None
 _sensor = None
@@ -79,10 +71,10 @@ def ensure_sensor():
     return _sensor
 
 
-def send(channel, line):
-    if channel is not None:
+def send(line):
+    if serial is not None:
         try:
-            channel.write((line + "\n").encode("utf-8"))
+            serial.write((line + "\n").encode("utf-8"))
         except Exception:
             pass
 
@@ -116,32 +108,27 @@ def handle(line):
     return "ERR|READONLY|" + head
 
 
-def poll_channel(channel, buffer):
-    try:
-        chunk = channel.read(64)
-    except Exception:
-        return
-    if not chunk:
-        return
-    buffer.extend(chunk)
-    if len(buffer) > 1024:
-        del buffer[:-512]
-    while True:
-        newline = buffer.find(b"\n")
-        if newline < 0:
-            return
-        raw = bytes(buffer[:newline])
-        del buffer[:newline + 1]
-        line = raw.decode("utf-8", "replace").strip()
-        if line:
-            send(channel, handle(line))
-
-
 while True:
     try:
-        for _index, _channel in enumerate(_channels):
-            poll_channel(_channel, _buffers[_index])
-        time.sleep(0.01)
+        if serial is None:
+            time.sleep(1.0)
+            continue
+        available = serial.in_waiting
+        if available:
+            _buffer.extend(serial.read(available))
+            if len(_buffer) > 1024:
+                del _buffer[:-512]
+            while True:
+                newline = _buffer.find(b"\n")
+                if newline < 0:
+                    break
+                raw = bytes(_buffer[:newline])
+                del _buffer[:newline + 1]
+                line = raw.decode("utf-8", "replace").strip()
+                if line:
+                    send(handle(line))
+        else:
+            time.sleep(0.01)
     except Exception:
         # Keep the read-only endpoint alive after malformed input or USB noise.
         time.sleep(0.05)

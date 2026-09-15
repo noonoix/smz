@@ -57,8 +57,8 @@ public sealed record LightGateInput(
     TimeSpan RequiredStableDuration);
 
 /// <summary>
-/// Diagnostic data only. This result intentionally contains no callback, command, transport,
-/// runtime reference or execution token.
+/// Diagnostic data only. Intent is evidence of what the pure evaluator checked; it is not a
+/// command or authorization. This result intentionally contains no callback, transport or runtime.
 /// </summary>
 public sealed record LightGateResult(
     LightGateDecisionKind Decision,
@@ -67,7 +67,8 @@ public sealed record LightGateResult(
     string WatchSessionId,
     string ProfileRevision,
     TimeSpan? SampleAge = null,
-    TimeSpan? StableDuration = null)
+    TimeSpan? StableDuration = null,
+    LightExecutionIntent? Intent = null)
 {
     public bool IsEligible => Decision == LightGateDecisionKind.Eligible;
 }
@@ -85,7 +86,8 @@ public static class LightExecutionGate
 
         LightGateResult Deny(LightGateReasonCode reason, TimeSpan? age = null, TimeSpan? stable = null)
             => new(LightGateDecisionKind.Denied, reason, input.Now,
-                input.WatchSessionId ?? string.Empty, input.ProfileRevision ?? string.Empty, age, stable);
+                input.WatchSessionId ?? string.Empty, input.ProfileRevision ?? string.Empty,
+                age, stable, input.Intent);
 
         if (input.CancellationRequested)
             return Deny(LightGateReasonCode.Cancelled);
@@ -145,7 +147,8 @@ public static class LightExecutionGate
             input.WatchSessionId,
             input.ProfileRevision,
             sampleAge,
-            stableDuration);
+            stableDuration,
+            input.Intent);
     }
 
     private static bool MatchesIntent(LightExecutionIntent intent, string? profileId)

@@ -84,8 +84,10 @@ public partial class MainViewModel
 
     public void ResetLightStateProfiles()
     {
+        var preferredCalibrationProfileId = SelectedLightCalibrationProfile?.Id;
         LightStateProfiles.Clear();
         foreach (var profile in LightStateDefaults.CreateInitialProfiles()) LightStateProfiles.Add(profile);
+        ResetLightCalibrationProfileSelection(preferredCalibrationProfileId);
         SaveLightStateProfiles();
     }
 

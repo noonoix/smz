@@ -104,4 +104,16 @@ public partial class MainViewModel
         LightCalibrationStatus = "پیشنهاد روی فرم اعمال شد؛ برای ماندگارشدن، «ذخیره پروفایل‌ها» را بزنید.";
         return true;
     }
+
+    public void ResetLightCalibrationProfileSelection(string? preferredProfileId)
+    {
+        IsLightCalibrationRunning = false;
+        _lightCalibrationStartedAt = null;
+        _lightCalibrationSamples.Clear();
+        _pendingLightCalibrationSuggestion = null;
+        SelectedLightCalibrationProfile = LightStateProfiles.FirstOrDefault(x => x.Id == preferredProfileId)
+                                          ?? LightStateProfiles.FirstOrDefault();
+        OnPropertyChanged(nameof(LightCalibrationSuggestionDisplay));
+        LightCalibrationStatus = "پروفایل‌ها بازنشانی شدند؛ پروفایل کالیبراسیون دوباره انتخاب شد.";
+    }
 }

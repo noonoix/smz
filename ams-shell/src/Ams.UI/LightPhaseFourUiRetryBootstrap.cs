@@ -10,8 +10,8 @@ namespace Ams.UI;
 
 /// <summary>
 /// Orders the phase-four dynamic sections after the phase-three Status surface.
-/// Module/class-handler order is not guaranteed; hardware QA showed the original
-/// one-shot installers could run before the Status body existed and then never retry.
+/// The Status panel starts collapsed, so its descendant visual tree may not exist
+/// during MainWindow.Loaded. Keep a lightweight layout hook until Status is shown.
 /// </summary>
 internal static class LightPhaseFourUiRetryBootstrap
 {
@@ -24,21 +24,28 @@ internal static class LightPhaseFourUiRetryBootstrap
     {
         if (sender is not MainWindow window || window.DataContext is not MainViewModel vm) return;
 
-        window.Dispatcher.BeginInvoke(new Action(async () =>
+        EventHandler? layoutHandler = null;
+        layoutHandler = (_, _) =>
         {
-            for (var attempt = 0; attempt < 12; attempt++)
-            {
-                if (ContainsText(window, "وضعیت زنده‌ی سنسور نور"))
-                {
-                    if (!ContainsText(window, "تشخیص وضعیت نور"))
-                        InvokeInstaller(typeof(LightStateProfilesUiBootstrap), window, vm);
-                    if (!ContainsText(window, "کالیبراسیون پیشنهادی"))
-                        InvokeInstaller(typeof(LightCalibrationUiBootstrap), window, vm);
-                    return;
-                }
-                await Task.Delay(100);
-            }
-        }), DispatcherPriority.ApplicationIdle);
+            if (!ContainsText(window, "وضعیت زنده‌ی سنسور نور")) return;
+            EnsureInstalled(window, vm);
+            if (ContainsText(window, "تشخیص وضعیت نور")
+                && ContainsText(window, "کالیبراسیون پیشنهادی"))
+                window.LayoutUpdated -= layoutHandler;
+        };
+        window.LayoutUpdated += layoutHandler;
+
+        window.Dispatcher.BeginInvoke(new Action(() => EnsureInstalled(window, vm)),
+            DispatcherPriority.ContextIdle);
+    }
+
+    private static void EnsureInstalled(MainWindow window, MainViewModel vm)
+    {
+        if (!ContainsText(window, "وضعیت زنده‌ی سنسور نور")) return;
+        if (!ContainsText(window, "تشخیص وضعیت نور"))
+            InvokeInstaller(typeof(LightStateProfilesUiBootstrap), window, vm);
+        if (!ContainsText(window, "کالیبراسیون پیشنهادی"))
+            InvokeInstaller(typeof(LightCalibrationUiBootstrap), window, vm);
     }
 
     private static void InvokeInstaller(Type type, MainWindow window, MainViewModel vm)
@@ -50,8 +57,8 @@ internal static class LightPhaseFourUiRetryBootstrap
         }
         catch
         {
-            // Existing sections remain usable; the next test build exposes any
-            // installer regression without taking down the application.
+            // Preserve the existing Status surface if an optional phase-four
+            // installer fails; CI and hardware QA cover the added sections.
         }
     }
 

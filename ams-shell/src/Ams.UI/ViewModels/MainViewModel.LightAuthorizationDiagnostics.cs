@@ -57,6 +57,7 @@ public partial class MainViewModel
         private set => SetProperty(ref _lightAuthorizationDiagnosticIsActive, value);
     }
 
+    public bool LightAuthorizationDiagnosticCanArm => !_lightAuthorizationDiagnosticIsActive;
     public bool LightAuthorizationDiagnosticCanIssue => _lightAuthorizationDiagnostics.CanIssue;
     public bool LightAuthorizationDiagnosticCanConsume => _lightAuthorizationDiagnostics.CanConsume;
     public bool LightAuthorizationDiagnosticCanRevoke => _lightAuthorizationDiagnosticIsActive;
@@ -120,6 +121,7 @@ public partial class MainViewModel
             _ => "غیرفعال · فقط تشخیصی — بدون اجرا",
         };
         LightAuthorizationDiagnosticIsActive = snapshot.IsArmed;
+        OnPropertyChanged(nameof(LightAuthorizationDiagnosticCanArm));
         OnPropertyChanged(nameof(LightAuthorizationDiagnosticCanIssue));
         OnPropertyChanged(nameof(LightAuthorizationDiagnosticCanConsume));
         OnPropertyChanged(nameof(LightAuthorizationDiagnosticCanRevoke));

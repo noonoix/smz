@@ -120,6 +120,10 @@ internal static class LightAuthorizationDiagnosticsUiBootstrap
             Margin = new Thickness(4, 0, 4, 8),
         };
         var arm = ActionButton("Arm تشخیصی", "#5E9FE8", "#10151C");
+        arm.SetBinding(UIElement.IsEnabledProperty, new Binding(nameof(MainViewModel.LightAuthorizationDiagnosticCanArm))
+        {
+            Source = vm,
+        });
         arm.Click += (_, _) => vm.ArmLightAuthorizationDiagnostic();
         actions.Children.Add(arm);
 

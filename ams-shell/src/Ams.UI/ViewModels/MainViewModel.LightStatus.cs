@@ -160,6 +160,7 @@ public partial class MainViewModel
 
     private void OnLightWatchFaulted(Exception ex) => RunOnUi(() =>
     {
+        RevokeLightAuthorizationDiagnostic(LightAuthorizationReasonCode.StaleGateResult);
         LightSensorStatus = "خطای دریافت داده";
         Log("light watch: " + ex.Message);
     });

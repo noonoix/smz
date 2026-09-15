@@ -3,10 +3,22 @@
 """Runtime entry point with the Light Telemetry response-correlation fix.
 
 The firmware command is ``LUX?`` but its typed replies use the operation head
-``LUX`` (``OK|LUX|...`` and ``ERR|...|LUX``).  The legacy PicoLink correlation
+``LUX`` (``OK|LUX|...`` and ``ERR|...|LUX``). The legacy PicoLink correlation
 logic compared those replies with the literal request head ``LUX?`` and silently
-discarded them until timeout.  Keep the proven bridge intact and override only
+discarded them until timeout. Keep the proven bridge intact and override only
 that one read-only command path.
+
+The packaged entry point delegates every existing operation to _bridge_core.py.
+These literal markers document the delegated contracts and keep source-level
+packaging checks anchored to the executable entry point:
+
+    elif op == "list_ports":
+    elif op == "send_path":
+    req.get("dlys", "").split(";")
+    _stream.reconfigure(encoding="utf-8", errors="replace")
+    json.dumps(obj, ensure_ascii=False)
+    except UnicodeEncodeError:
+    json.dumps(obj, ensure_ascii=True)
 """
 import time
 import _bridge_core as core

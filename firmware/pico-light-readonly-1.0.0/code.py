@@ -1,5 +1,5 @@
 # Classroom Studio — isolated read-only Pico light telemetry
-# Firmware: pico-light-readonly 1.0.0
+# Firmware: pico-light-readonly 1.0.1
 # Sensor: BH1750 / GY-30, I2C0, SDA=GP20, SCL=GP21, ADDR=GND => 0x23
 # This file intentionally has no HID, keyboard, UART, macro, buzzer or actuator path.
 
@@ -8,7 +8,7 @@ import board
 import busio
 import usb_cdc
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 ADDR = 0x23
 POWER_ON = 0x01
 RESET = 0x07
@@ -19,6 +19,11 @@ for _candidate in (usb_cdc.data, usb_cdc.console):
     if _candidate is not None and all(_candidate is not _item for _item in _channels):
         _channels.append(_candidate)
 _buffers = [bytearray() for _ in _channels]
+for _channel in _channels:
+    try:
+        _channel.timeout = 0.0
+    except Exception:
+        pass
 _sequence = 0
 
 
@@ -100,11 +105,14 @@ def handle(line):
     return "ERR|READONLY|" + head
 
 
-def poll_channel(index, channel, buffer):
-    waiting = channel.in_waiting
-    if not waiting:
+def poll_channel(channel, buffer):
+    try:
+        chunk = channel.read(64)
+    except Exception:
         return
-    buffer.extend(channel.read(waiting))
+    if not chunk:
+        return
+    buffer.extend(chunk)
     if len(buffer) > 1024:
         del buffer[:-512]
     while True:
@@ -121,7 +129,7 @@ def poll_channel(index, channel, buffer):
 while True:
     try:
         for _index, _channel in enumerate(_channels):
-            poll_channel(_index, _channel, _buffers[_index])
+            poll_channel(_channel, _buffers[_index])
         time.sleep(0.01)
     except Exception:
         # Keep the read-only endpoint alive after malformed input or USB noise.

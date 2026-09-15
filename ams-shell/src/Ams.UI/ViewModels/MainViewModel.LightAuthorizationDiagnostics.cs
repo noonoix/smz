@@ -57,10 +57,13 @@ public partial class MainViewModel
         private set => SetProperty(ref _lightAuthorizationDiagnosticIsActive, value);
     }
 
+    public bool LightAuthorizationDiagnosticCanIssue => _lightAuthorizationDiagnostics.CanIssue;
+    public bool LightAuthorizationDiagnosticCanConsume => _lightAuthorizationDiagnostics.CanConsume;
+    public bool LightAuthorizationDiagnosticCanRevoke => _lightAuthorizationDiagnosticIsActive;
+
     public void ArmLightAuthorizationDiagnostic()
     {
         var snapshot = _lightAuthorizationDiagnostics.Arm(CurrentLightAuthorizationContext());
-        LightAuthorizationDiagnosticIsActive = snapshot.State == LightAuthorizationDiagnosticState.Armed;
         PublishLightAuthorizationSnapshot(snapshot);
         Log($"light auth diagnostic: arm intent={snapshot.SelectedIntent} reason={snapshot.ReasonCode}");
     }
@@ -86,7 +89,6 @@ public partial class MainViewModel
         LightAuthorizationReasonCode reason = LightAuthorizationReasonCode.PermitRevoked)
     {
         var snapshot = _lightAuthorizationDiagnostics.Revoke(reason);
-        LightAuthorizationDiagnosticIsActive = false;
         PublishLightAuthorizationSnapshot(snapshot);
         Log($"light auth diagnostic: revoke reason={snapshot.ReasonCode}");
     }
@@ -117,6 +119,10 @@ public partial class MainViewModel
             LightAuthorizationDiagnosticState.Denied => "رد مجوز تشخیصی · " + DescribeAuthorizationReason(snapshot.ReasonCode),
             _ => "غیرفعال · فقط تشخیصی — بدون اجرا",
         };
+        LightAuthorizationDiagnosticIsActive = snapshot.IsArmed;
+        OnPropertyChanged(nameof(LightAuthorizationDiagnosticCanIssue));
+        OnPropertyChanged(nameof(LightAuthorizationDiagnosticCanConsume));
+        OnPropertyChanged(nameof(LightAuthorizationDiagnosticCanRevoke));
     }
 
     private static string IntentLabel(LightExecutionIntent intent)

@@ -124,7 +124,7 @@ internal static class LightAuthorizationDiagnosticsUiBootstrap
         actions.Children.Add(arm);
 
         var issue = ActionButton("Issue Permit تشخیصی", "#3D6B55", "#F5F7FA");
-        issue.SetBinding(UIElement.IsEnabledProperty, new Binding(nameof(MainViewModel.LightAuthorizationDiagnosticIsActive))
+        issue.SetBinding(UIElement.IsEnabledProperty, new Binding(nameof(MainViewModel.LightAuthorizationDiagnosticCanIssue))
         {
             Source = vm,
         });
@@ -132,7 +132,7 @@ internal static class LightAuthorizationDiagnosticsUiBootstrap
         actions.Children.Add(issue);
 
         var consume = ActionButton("Consume بدون اجرا", "#3D6B55", "#F5F7FA");
-        consume.SetBinding(UIElement.IsEnabledProperty, new Binding(nameof(MainViewModel.LightAuthorizationDiagnosticIsActive))
+        consume.SetBinding(UIElement.IsEnabledProperty, new Binding(nameof(MainViewModel.LightAuthorizationDiagnosticCanConsume))
         {
             Source = vm,
         });
@@ -140,6 +140,10 @@ internal static class LightAuthorizationDiagnosticsUiBootstrap
         actions.Children.Add(consume);
 
         var revoke = ActionButton("Revoke", "#333740", "#F5F7FA");
+        revoke.SetBinding(UIElement.IsEnabledProperty, new Binding(nameof(MainViewModel.LightAuthorizationDiagnosticCanRevoke))
+        {
+            Source = vm,
+        });
         revoke.Click += (_, _) => vm.RevokeLightAuthorizationDiagnostic();
         actions.Children.Add(revoke);
         section.Children.Add(actions);

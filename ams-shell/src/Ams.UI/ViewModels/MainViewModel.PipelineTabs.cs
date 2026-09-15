@@ -41,6 +41,7 @@ public partial class MainViewModel
     {
         if (tab is null || ReferenceEquals(tab, _activePipelineTab) || IsRunning) return;
         InitializePipelineTabs();
+        RevokeLightAuthorizationDiagnostic(LightAuthorizationReasonCode.PipelineChanged);
         CaptureActivePipeline();
         _activePipelineTab = tab;
         LoadActivePipeline();
@@ -75,6 +76,7 @@ public partial class MainViewModel
     private void PipelineSteps_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
     {
         if (!_pipelineInitialized || _pipelineLoadInProgress || _activePipelineTab is null) return;
+        RevokeLightAuthorizationDiagnostic(LightAuthorizationReasonCode.PipelineChanged);
         // Keep the tab document current as soon as a root-level edit happens. Save still
         // performs a full capture so nested edits and property changes are included too.
         CopyTree(Steps, _activePipelineTab.Steps);
@@ -117,6 +119,7 @@ public partial class MainViewModel
     {
         if (!ConfirmDiscard()) return;
         InitializePipelineTabs();
+        RevokeLightAuthorizationDiagnostic(LightAuthorizationReasonCode.PipelineChanged);
         foreach (var tab in _pipelineWorkspace.Tabs)
         {
             tab.Steps.Clear();
@@ -151,6 +154,7 @@ public partial class MainViewModel
             {
                 _pipelineWorkspace = PipelineWorkspace.FromLegacy(DocumentService.Load(dialog.FileName), targetKind);
             }
+            RevokeLightAuthorizationDiagnostic(LightAuthorizationReasonCode.PipelineChanged);
             _activePipelineTab = _pipelineWorkspace[targetKind];
             _currentFile = dialog.FileName;
             _dirty = false;
@@ -160,7 +164,7 @@ public partial class MainViewModel
             OnPropertyChanged(nameof(ActivePipelineTab));
             OnPropertyChanged(nameof(ActivePipelineTitle));
             OnPropertyChanged(nameof(IsLaunchPipeline));
-        OnPropertyChanged(nameof(IsMainPipeline));
+            OnPropertyChanged(nameof(IsMainPipeline));
             UpdateFileText();
             Log("pipeline workspace opened in " + targetKind + ": " + dialog.FileName + " — " + PipelineCounts());
         }

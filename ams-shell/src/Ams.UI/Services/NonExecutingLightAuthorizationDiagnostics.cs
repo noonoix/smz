@@ -77,6 +77,8 @@ public sealed class NonExecutingLightAuthorizationDiagnostics
     public LightExecutionIntent SelectedIntent => _selectedIntent;
     public LightAuthorizationDiagnosticSnapshot Snapshot { get; private set; }
     public LightExecutionPermit? CurrentPermit => _permit;
+    public bool CanIssue => Snapshot.State == LightAuthorizationDiagnosticState.Armed;
+    public bool CanConsume => Snapshot.State == LightAuthorizationDiagnosticState.PermitIssued;
 
     public LightAuthorizationDiagnosticSnapshot SelectIntent(LightExecutionIntent intent)
     {
@@ -139,8 +141,11 @@ public sealed class NonExecutingLightAuthorizationDiagnostics
             IndependentEntryReasonKnown: false));
         if (!result.Succeeded || result.Permit is null)
         {
+            var armExpiresAt = _arm?.ExpiresAt;
+            if (InvalidatesArm(result.ReasonCode))
+                RevokeInternal(result.ReasonCode);
             Snapshot = NewSnapshot(LightAuthorizationDiagnosticState.Denied,
-                result.ReasonCode, _arm.ExpiresAt);
+                result.ReasonCode, armExpiresAt);
             return Snapshot;
         }
 
@@ -164,11 +169,15 @@ public sealed class NonExecutingLightAuthorizationDiagnostics
             context.WatchSessionId, context.ProfileRevision, context.PipelineRevision,
             context.Now, context.WatchRunning && context.ConnectionHealthy,
             context.CancellationRequested));
+        var permit = _permit;
+        var armExpiresAt = _arm?.ExpiresAt;
+        if (!result.Succeeded && InvalidatesArm(result.ReasonCode))
+            RevokeInternal(result.ReasonCode);
         Snapshot = result.Succeeded
             ? NewSnapshot(LightAuthorizationDiagnosticState.PermitConsumed,
-                result.ReasonCode, _arm?.ExpiresAt, result.Permit)
+                result.ReasonCode, armExpiresAt, result.Permit)
             : NewSnapshot(LightAuthorizationDiagnosticState.Denied,
-                result.ReasonCode, _arm?.ExpiresAt, _permit);
+                result.ReasonCode, armExpiresAt, permit);
         return Snapshot;
     }
 
@@ -193,6 +202,17 @@ public sealed class NonExecutingLightAuthorizationDiagnostics
         _arm = null;
         _permit = null;
     }
+
+    private static bool InvalidatesArm(LightAuthorizationReasonCode reason)
+        => reason is LightAuthorizationReasonCode.ArmExpired
+            or LightAuthorizationReasonCode.Cancelled
+            or LightAuthorizationReasonCode.Disconnected
+            or LightAuthorizationReasonCode.ProcessGenerationChanged
+            or LightAuthorizationReasonCode.WatchSessionChanged
+            or LightAuthorizationReasonCode.ProfileChanged
+            or LightAuthorizationReasonCode.PipelineChanged
+            or LightAuthorizationReasonCode.ArmRevoked
+            or LightAuthorizationReasonCode.PermitIntentMismatch;
 
     private LightAuthorizationDiagnosticSnapshot NewSnapshot(
         LightAuthorizationDiagnosticState state,

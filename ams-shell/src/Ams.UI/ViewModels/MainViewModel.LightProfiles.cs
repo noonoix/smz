@@ -69,6 +69,7 @@ public partial class MainViewModel
 
         try
         {
+            RevokeLightAuthorizationDiagnostic(LightAuthorizationReasonCode.ProfileChanged);
             LightStateProfileStore.Save(normalized);
             _lightStateClassifier = new LightStateClassifier(LightStateProfiles);
             _lastClassifiedChartVersion = -1;
@@ -90,6 +91,7 @@ public partial class MainViewModel
     public void ResetLightStateProfiles()
     {
         var preferredCalibrationProfileId = SelectedLightCalibrationProfile?.Id;
+        RevokeLightAuthorizationDiagnostic(LightAuthorizationReasonCode.ProfileChanged);
         LightStateProfiles.Clear();
         foreach (var profile in LightStateDefaults.CreateInitialProfiles()) LightStateProfiles.Add(profile);
         ResetLightCalibrationProfileSelection(preferredCalibrationProfileId);

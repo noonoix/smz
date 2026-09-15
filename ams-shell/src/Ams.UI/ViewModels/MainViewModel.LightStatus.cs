@@ -131,6 +131,8 @@ public partial class MainViewModel
     {
         var service = _lightWatch;
         var bridge = _lightWatchBridge;
+        if (service is not null || IsLightWatchRunning)
+            RevokeLightAuthorizationDiagnostic(LightAuthorizationReasonCode.Disconnected);
         _lightWatch = null;
         _lightWatchBridge = null;
         if (bridge is not null) bridge.StateChanged -= OnLightBridgeStateChanged;
@@ -149,6 +151,7 @@ public partial class MainViewModel
         if (state == BridgeState.Connected) return;
         RunOnUi(async () =>
         {
+            RevokeLightAuthorizationDiagnostic(LightAuthorizationReasonCode.Disconnected);
             await StopLightWatchAsync();
             LightSensorStatus = "اتصال Pico قطع شد";
             Log("light watch stopped — board disconnected");
@@ -209,6 +212,7 @@ public partial class MainViewModel
     {
         if (_lightWatch is { IsRunning: false } && IsLightWatchRunning)
         {
+            RevokeLightAuthorizationDiagnostic(LightAuthorizationReasonCode.Disconnected);
             IsLightWatchRunning = false;
             LightSensorStatus = Connection == ConnectionState.Connected ? "پایش متوقف شد" : "اتصال Pico قطع شد";
         }

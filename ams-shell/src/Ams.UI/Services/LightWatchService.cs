@@ -16,6 +16,7 @@ public sealed class LightWatchService : IAsyncDisposable
     private readonly object _gate = new();
     private CancellationTokenSource? _runCts;
     private Task? _runner;
+    private Task? _stopTask;
 
     public LightWatchService(IBoardBridge bridge) => _bridge = bridge ?? throw new ArgumentNullException(nameof(bridge));
 
@@ -43,6 +44,8 @@ public sealed class LightWatchService : IAsyncDisposable
 
         lock (_gate)
         {
+            if (_stopTask is not null)
+                throw new InvalidOperationException("Light Watch is still stopping.");
             if (_runner is { IsCompleted: false })
                 throw new InvalidOperationException("Light Watch is already running.");
             _runCts?.Dispose();
@@ -52,19 +55,42 @@ public sealed class LightWatchService : IAsyncDisposable
         return Task.CompletedTask;
     }
 
-    public async Task StopAsync()
+    public Task StopAsync()
     {
-        Task? runner;
-        CancellationTokenSource? cts;
         lock (_gate)
         {
-            runner = _runner;
-            cts = _runCts;
+            if (_stopTask is not null) return _stopTask;
+
+            var runner = _runner;
+            var cts = _runCts;
             cts?.Cancel();
+
+            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _stopTask = completion.Task;
+            _ = StopCoreAsync(runner, cts, completion);
+            return completion.Task;
         }
-        if (runner is null) return;
-        try { await runner.ConfigureAwait(false); }
-        catch (OperationCanceledException) { }
+    }
+
+    private async Task StopCoreAsync(
+        Task? runner,
+        CancellationTokenSource? cts,
+        TaskCompletionSource completion)
+    {
+        try
+        {
+            if (runner is not null)
+            {
+                // Break an in-flight LUX? command immediately. Cancellation stops the local
+                // wait; the out-of-band abort also stops the sidecar/board command so Stop
+                // cannot leave a polling request alive after the UI reports stopped.
+                try { await _bridge.SendAbortAsync().ConfigureAwait(false); }
+                catch { /* best effort: cancellation still unwinds the local runner */ }
+
+                try { await runner.ConfigureAwait(false); }
+                catch (OperationCanceledException) { }
+            }
+        }
         finally
         {
             lock (_gate)
@@ -75,7 +101,9 @@ public sealed class LightWatchService : IAsyncDisposable
                     _runCts = null;
                     cts?.Dispose();
                 }
+                _stopTask = null;
             }
+            completion.TrySetResult();
         }
     }
 

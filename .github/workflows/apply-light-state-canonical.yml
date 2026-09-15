@@ -1,0 +1,130 @@
+name: Apply canonical LUX correlation fix
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/light-state-profiles]
+    paths: [.github/workflows/apply-light-state-canonical.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/light-state-profiles
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Patch canonical bridge and direct regression tests
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          bridge = Path('ams-shell/bridge/bridge.py')
+          text = bridge.read_text(encoding='utf-8')
+          old = '''        want = "PONG" if expect == "PING" else expect
+          retried = False                  # v0.9.60g - one retry on ERR|UNKNOWN (UART glitch)'''
+          new = '''        # LUX? is the only request whose protocol response/error subject drops
+        # the question mark: OK|LUX|... / ERR|...|LUX. Keep that mapping in
+        # the canonical bridge so packaged and source builds share one contract.
+        want = "PONG" if expect == "PING" else ("LUX" if expect == "LUX?" else expect)
+        error_subject = "LUX" if expect == "LUX?" else expect
+        retried = False                  # v0.9.60g - one retry on ERR|UNKNOWN (UART glitch)'''
+          if old not in text:
+              raise SystemExit('canonical success-correlation anchor not found')
+          text = text.replace(old, new, 1)
+          old = '''            if len(parts) >= 3 and parts[0] == "ERR" and parts[2] and parts[2] != expect:
+                continue                 # v0.9.60e - stale ERR of an older command'''
+          new = '''            if len(parts) >= 3 and parts[0] == "ERR" and parts[2] and parts[2] != error_subject:
+                continue                 # v0.9.60e - stale ERR of an older command'''
+          if old not in text:
+              raise SystemExit('canonical error-correlation anchor not found')
+          bridge.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          tests = Path('tools/test_bridge_pico.py')
+          text = tests.read_text(encoding='utf-8')
+          old = ''' 8. HALT goes out as a bare write (abort path), close() sends HALT+BYE
+"""'''
+          new = ''' 8. HALT goes out as a bare write (abort path), close() sends HALT+BYE
+ 9. LUX? correlates both OK|LUX and ERR|...|LUX without swallowing EVT lines
+"""'''
+          if old not in text:
+              raise SystemExit('test doc anchor not found')
+          text = text.replace(old, new, 1)
+          anchor = '''print("=== bridge pico transport: %d checks passed, 0 failed ===" % PASSED)
+'''
+          addition = '''# ── scenario 9: canonical LUX? response/error correlation ─────────────
+pico5 = FakePort([
+    ("PING", [BRAIN_PONG]),
+    ("LUX?", ["EVT|HOSTUSB|UP", "OK|LUX|seq=42|lux=1284.7|mode=hires|sensor=ok"]),
+])
+br5 = fresh_bridge(pico5)
+link5, _ = br5.open_link("COM5")
+reply = link5.command("LUX?", timeout=1.0)
+check("9a: LUX? accepts the canonical OK|LUX response",
+      reply == "OK|LUX|seq=42|lux=1284.7|mode=hires|sensor=ok")
+check("9b: EVT before OK|LUX is queued rather than mispaired",
+      link5.events == ["EVT|HOSTUSB|UP"])
+
+pico6 = FakePort([
+    ("PING", [BRAIN_PONG]),
+    ("LUX?", ["ERR|NOSENSOR|LUX"]),
+])
+br6 = fresh_bridge(pico6)
+link6, _ = br6.open_link("COM5")
+reply = link6.command("LUX?", timeout=1.0)
+check("9c: LUX? accepts the canonical typed Lux error",
+      reply == "ERR|NOSENSOR|LUX")
+
+print("=== bridge pico transport: %d checks passed, 0 failed ===" % PASSED)
+'''
+          if anchor not in text:
+              raise SystemExit('test insertion anchor not found')
+          tests.write_text(text.replace(anchor, addition, 1), encoding='utf-8')
+
+          state = Path('project-state/PROJECT-STATE.md')
+          text = state.read_text(encoding='utf-8')
+          old = '''## پروفایل‌های اولیه فاز ۴
+
+اعداد زیر فرضی و قابل‌ویرایش‌اند؛ تلورانس پیش‌فرض همه `±2 Lux` است:
+
+- Desktop: مرکز `0`، بازه‌ی clamp‌شده‌ی `0..2`.
+- Login یا DC: مرکز `25`، بازه‌ی `23..27`.
+- Character dashboard: مرکز `31`، بازه‌ی `29..33`.
+- Entering-game loading: مرکز `5`، بازه‌ی `3..7`.
+- Game: مرکز `26`، بازه‌ی `24..28`.
+- Targeted: مرکز `20`، بازه‌ی `18..22`.
+
+Login/DC و Game بین `24..27 Lux` overlap دارند. classifier باید `Ambiguous` برگرداند و هرگز براساس ترتیب پروفایل برنده انتخاب نکند.'''
+          new = '''## پروفایل‌های کالیبره‌شده فاز ۴
+
+کالیبراسیون نهایی در ۲۰۲۶-۰۹-۱۵ روی سخت‌افزار واقعی تأیید شد. هر شش پروفایل فعال‌اند، `StableDuration = 1250 ms` و `Hysteresis = 1 Lux` است:
+
+- Desktop: مرکز `35.8`، تلورانس `±1`، بازه‌ی `34.8..36.8`.
+- Login یا DC: مرکز `5.8`، تلورانس `±2.6`، بازه‌ی `3.2..8.4`.
+- Character dashboard: مرکز `15.8`، تلورانس `±1`، بازه‌ی `14.8..16.8`.
+- Entering-game loading: مرکز `38.3`، تلورانس `±0.5`، بازه‌ی `37.8..38.8`.
+- Game: مرکز `26.7`، تلورانس `±1`، بازه‌ی `25.7..27.7`.
+- Targeted: مرکز `30`، تلورانس `±1`، بازه‌ی `29..31`.
+
+بازه‌های مؤثر overlap ندارند و گذارهای واقعی بدون Ambiguous پایدار تأیید شده‌اند.'''
+          if old not in text:
+              raise SystemExit('project-state calibration anchor not found')
+          state.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+          python -m py_compile ams-shell/bridge/bridge.py tools/test_bridge_pico.py
+          python tools/test_bridge_pico.py
+      - name: Commit canonical fix
+        shell: bash
+        run: |
+          rm .github/workflows/apply-light-state-canonical.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add ams-shell/bridge/bridge.py tools/test_bridge_pico.py project-state/PROJECT-STATE.md .github/workflows/apply-light-state-canonical.yml
+          git commit -m "Fix canonical LUX response correlation"
+          git push origin HEAD:feature/light-state-profiles

@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
+using Ams.UI.Models;
 using Ams.UI.ViewModels;
 using WpfColor = System.Windows.Media.Color;
 using WpfColorConverter = System.Windows.Media.ColorConverter;
@@ -63,7 +64,11 @@ internal static class LightCalibrationUiBootstrap
         cancel.Click += (_, _) => vm.CancelLightProfileCalibration();
         controls.Children.Add(cancel);
         var apply = Button("اعمال پیشنهاد روی فرم", "#3D6B55", "#F5F7FA");
-        apply.Click += (_, _) => vm.ApplyPendingLightCalibrationSuggestion();
+        apply.Click += (_, _) =>
+        {
+            if (!vm.ApplyPendingLightCalibrationSuggestion()) return;
+            RefreshProfileEditor(window);
+        };
         controls.Children.Add(apply);
         content.Children.Add(controls);
 
@@ -81,6 +86,27 @@ internal static class LightCalibrationUiBootstrap
             if (args.PropertyName == nameof(MainViewModel.LightChartVersion))
                 window.Dispatcher.BeginInvoke(new Action(vm.CaptureLightCalibrationSample));
         };
+    }
+
+    private static void RefreshProfileEditor(DependencyObject root)
+    {
+        if (root is TextBox box
+            && box.GetBindingExpression(TextBox.TextProperty) is BindingExpression expression
+            && expression.ResolvedSource is LightStateProfile)
+            expression.UpdateTarget();
+
+        if (root is Grid grid)
+        {
+            var center = grid.Children.OfType<TextBox>()
+                .FirstOrDefault(x => Grid.GetColumn(x) == 2)?
+                .GetBindingExpression(TextBox.TextProperty)?.ResolvedSource as LightStateProfile;
+            var range = grid.Children.OfType<TextBlock>().FirstOrDefault(x => Grid.GetColumn(x) == 4);
+            if (center is not null && range is not null)
+                range.Text = $"{center.LuxMin:0.#} تا {center.LuxMax:0.#}";
+        }
+
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+            RefreshProfileEditor(VisualTreeHelper.GetChild(root, i));
     }
 
     private static Button Button(string label, string background, string foreground) => new()

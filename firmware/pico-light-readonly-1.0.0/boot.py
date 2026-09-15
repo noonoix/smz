@@ -1,5 +1,5 @@
 # Classroom Studio — read-only Pico light telemetry USB policy
-# No HID device is exposed. CDC is used only for the read-only endpoint.
+# No HID device is exposed. One CDC console is used for the read-only endpoint.
 import usb_cdc
 import usb_hid
 
@@ -9,9 +9,7 @@ except Exception:
     pass
 
 try:
-    # Keep both CDC channels available so the endpoint can be diagnosed even
-    # when CircuitPython enumerates data and console as separate COM ports.
-    usb_cdc.enable(console=True, data=True)
+    usb_cdc.enable(console=True, data=False)
 except Exception:
-    # Keep the file safe on CircuitPython variants that already expose CDC.
+    # Keep the file safe on CircuitPython variants that already expose console.
     pass

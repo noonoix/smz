@@ -33,6 +33,13 @@ Rejects("OK|LUX|seq=1|lux=-1|mode=hires|sensor=ok", "negative lux is rejected");
 Rejects("OK|LUX|seq=1|lux=1.0|mode=turbo|sensor=ok", "unknown mode is rejected");
 Rejects("OK|LUX|seq=1|lux=1.0|mode=hires|sensor=bad", "invalid sensor marker is rejected");
 Rejects("ERR|NOSENSOR|LUX|extra", "typed errors must be exact");
+Check(LightWatchService.DefaultIntervalMs == 250,
+    "Watch default interval is 250 ms");
+Check(new[] { 100, 250, 500 }.All(ms =>
+        LightWatchService.GetStaleThreshold(TimeSpan.FromMilliseconds(ms)) == TimeSpan.FromSeconds(2)),
+    "stale threshold keeps the two-second floor for fast intervals");
+Check(LightWatchService.GetStaleThreshold(TimeSpan.FromMilliseconds(1000)) == TimeSpan.FromSeconds(3),
+    "stale threshold grows to three intervals when larger");
 
 var oneRead = new FakeBridge(new[] { "OK|LUX|seq=7|lux=12.5|mode=hires|sensor=ok" });
 IBoardBridge oneReadContract = oneRead;
@@ -97,7 +104,7 @@ sealed class FakeBridge : IBoardBridge
     public event EventHandler<string>? LineReceived { add { } remove { } }
     public event EventHandler<BridgeState>? StateChanged { add { } remove { } }
     public BridgeState State => Connected ? BridgeState.Connected : BridgeState.Disconnected;
-    public string? FirmwareVersion => "phase-two-test";
+    public string? FirmwareVersion => "phase-three-test";
     public string? Port => "FAKE";
     public Task ConnectAsync(string portName, CancellationToken ct = default) => Task.CompletedTask;
     public async Task<string> SendAsync(string command, double? timeoutSeconds = null, CancellationToken ct = default)

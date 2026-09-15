@@ -41,6 +41,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          find firmware/pico-light-readonly-1.0.0 -type d -name '__pycache__' -prune -exec rm -rf {} +
           zip -qr pico-light-readonly-1.0.0.zip firmware/pico-light-readonly-1.0.0
           sha256sum pico-light-readonly-1.0.0.zip | awk '{print toupper($1)}' > pico-light-readonly-1.0.0-sha256.txt
           cat pico-light-readonly-1.0.0-sha256.txt

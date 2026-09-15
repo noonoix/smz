@@ -12,10 +12,12 @@ The existing Status page already shows the pure diagnostic gate. The next sectio
 2. press **Arm diagnostics**;
 3. wait for the existing gate to become `EligibleStableMatch` for that exact intent;
 4. press **Issue diagnostic permit**;
-5. optionally press **Consume without execution**;
+5. press **Consume without execution** when the permit is to be ledger-consumed;
 6. observe expiry or revoke.
 
 Every label must include `فقط تشخیصی — بدون اجرا` so a permit cannot be mistaken for an active automation setting.
+
+One explicit Arm → Issue → Consume cycle is the UI contract. After Issue, only Consume/Revoke remain enabled; after Consume, a new explicit Arm is required before another Issue.
 
 ## Initial intent allowlist
 
@@ -46,7 +48,7 @@ A constant or placeholder pipeline revision is forbidden. At arm, issue and cons
 
 The revision includes all five tabs and all step fields. Any New/Open/import/edit/undo/redo/tab mutation therefore fails closed at the next authorization operation even if an explicit notification was missed.
 
-Mutating operations should additionally call revoke immediately where practical; identity comparison remains the backstop.
+Root-level collection mutations, tab switching, New and Open additionally revoke immediately. Nested property/tree mutations retain the revision comparison as the fail-closed backstop.
 
 ## Observation identity
 
@@ -69,6 +71,8 @@ A new non-UI controller owns:
 
 Every method receives caller-owned monotonic time and current session/profile/pipeline identities. The controller has no WPF, `IBoardBridge`, `RunEngine`, delegate, event or command payload dependency.
 
+A successful Consume closes the UI cycle. The controller retains the terminal ledger entry only so a repeated direct Consume remains auditable as `AlreadyConsumed`; it cannot Issue again until Arm is called explicitly.
+
 ## View-model responsibilities
 
 The MainViewModel adapter:
@@ -77,7 +81,7 @@ The MainViewModel adapter:
 - supplies current `LightGateResult` from the read-only coordinator;
 - computes pipeline revision on every Arm/Issue/Consume operation;
 - supplies observation identity from session/revision/chart version;
-- publishes display strings and button availability;
+- publishes display strings and state-aware button availability;
 - revokes on Watch Stop, reconnect, profile Save/Reset/import and connection loss.
 
 The adapter must not call `TryConsume` from a property-change handler. Consume is manual only.
@@ -96,14 +100,14 @@ Insert one card below the existing gate decision cards:
 - raw reason code in ToolTip
 - short permit ID prefix and remaining lifetime for diagnosis only
 
-Buttons use distinct neutral styling. No button uses the app's Run, Launch or danger styles.
+Buttons use distinct neutral styling. Issue is enabled only in the Armed state; Consume is enabled only after PermitIssued; Revoke is enabled only while an arm or permit is active. No button uses the app's Run, Launch or danger styles.
 
 ## Lifecycle rules
 
 | Event | Required result |
 |---|---|
 | Watch off | revoke; `Disconnected` |
-| board disconnect | revoke; `Disconnected` |
+| board disconnect | revoke before asynchronous Watch disposal; `Disconnected` |
 | Watch reconnect | new session; old arm and permit revoked |
 | profile Save/Reset/import | revoke before accepting new revision |
 | pipeline edit | revision mismatch at next operation; immediate revoke where notified |
@@ -137,7 +141,9 @@ The controller and adapter tests must cover:
 - observation identity advances with chart version;
 - pipeline revision is deterministic and changes on any tab/tree mutation;
 - issue is manual and never happens from observation alone;
-- consume is manual and returns display state only;
+- Consume is manual and returns display state only;
+- one-cycle button state: Armed → Issue, PermitIssued → Consume, terminal → new Arm;
+- pipeline mismatch revokes the local diagnostic lease;
 - Stop/disconnect/reconnect/profile change/intent change revoke;
 - expiry and replay reason codes are visible;
 - no `IBoardBridge`, `RunEngine`, delegate or execution event exists;

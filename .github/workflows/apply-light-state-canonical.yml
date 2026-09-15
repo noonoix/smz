@@ -1,3 +1,4 @@
+# One-shot workflow; it removes itself after applying the canonical patch.
 name: Apply canonical LUX correlation fix
 
 on:

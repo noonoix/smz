@@ -6,6 +6,7 @@ using System.Windows.Media;
 using Ams.UI.ViewModels;
 using WpfColor = System.Windows.Media.Color;
 using WpfColorConverter = System.Windows.Media.ColorConverter;
+using WpfComboBox = System.Windows.Controls.ComboBox;
 
 namespace Ams.UI;
 
@@ -46,12 +47,12 @@ internal static class LightCalibrationUiBootstrap
 
         var controls = new WrapPanel { Margin = new Thickness(0, 10, 0, 8) };
         controls.Children.Add(Text("پروفایل:", 12, "#D9DEE7"));
-        var profile = new ComboBox { ItemsSource = vm.LightStateProfiles, DisplayMemberPath = "Name", Width = 210, MinHeight = 36, Margin = new Thickness(6, 0, 12, 6) };
-        profile.SetBinding(ComboBox.SelectedItemProperty, new Binding(nameof(MainViewModel.SelectedLightCalibrationProfile)) { Mode = BindingMode.TwoWay });
+        var profile = new WpfComboBox { ItemsSource = vm.LightStateProfiles, DisplayMemberPath = "Name", Width = 210, MinHeight = 36, Margin = new Thickness(6, 0, 12, 6) };
+        profile.SetBinding(WpfComboBox.SelectedItemProperty, new Binding(nameof(MainViewModel.SelectedLightCalibrationProfile)) { Mode = BindingMode.TwoWay });
         controls.Children.Add(profile);
         controls.Children.Add(Text("مدت:", 12, "#D9DEE7"));
-        var duration = new ComboBox { ItemsSource = vm.LightCalibrationDurationsSeconds, Width = 80, MinHeight = 36, Margin = new Thickness(6, 0, 4, 6) };
-        duration.SetBinding(ComboBox.SelectedItemProperty, new Binding(nameof(MainViewModel.SelectedLightCalibrationDurationSeconds)) { Mode = BindingMode.TwoWay });
+        var duration = new WpfComboBox { ItemsSource = vm.LightCalibrationDurationsSeconds, Width = 80, MinHeight = 36, Margin = new Thickness(6, 0, 4, 6) };
+        duration.SetBinding(WpfComboBox.SelectedItemProperty, new Binding(nameof(MainViewModel.SelectedLightCalibrationDurationSeconds)) { Mode = BindingMode.TwoWay });
         controls.Children.Add(duration);
         controls.Children.Add(Text("ثانیه", 12, "#AAB3C2"));
 

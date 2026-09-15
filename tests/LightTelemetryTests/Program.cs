@@ -14,6 +14,8 @@ void Rejects(string reply, string name)
     catch (LightTelemetryProtocolException) { Check(true, name); }
 }
 
+await LightExecutionAuthorizationConcurrencyContract.RunAsync();
+
 var at = new DateTimeOffset(2026, 9, 14, 19, 0, 0, TimeSpan.Zero);
 var ok = LightTelemetryParser.Parse("OK|LUX|seq=4294967295|lux=59.2|mode=hires|sensor=ok", at);
 Check(ok.IsSuccess && ok.Sequence == uint.MaxValue && ok.Lux == 59.2 && ok.Mode == "hires" && ok.ReceivedAt == at,

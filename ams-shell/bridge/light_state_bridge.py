@@ -19,11 +19,16 @@ packaging checks anchored to the executable entry point:
     json.dumps(obj, ensure_ascii=False)
     except UnicodeEncodeError:
     json.dumps(obj, ensure_ascii=True)
+
+Offline startup must not fall through to the encrypted direct-board path. That
+path requires the private/shared ``ams_key.json`` and is only relevant when an
+actual direct board port was selected.
 """
 import time
 import _bridge_core as core
 
 _original_command = core.PicoLink.command
+_original_open_link = core.open_link
 
 
 def _command_with_light_alias(self, cmd, timeout=5.0):
@@ -52,7 +57,21 @@ def _command_with_light_alias(self, cmd, timeout=5.0):
         # bridge's one-command correlation guarantee.
 
 
+def _open_link_without_implicit_key_load(port):
+    """Fail closed when AUTO found no board, before BoardLink loads its PSK.
+
+    The packaged diagnostic app is allowed to start with no hardware. A missing
+    key is not a valid reason to make offline Status diagnostics look broken,
+    and fabricating or bundling a key would be unsafe. Explicit real-port
+    connections retain the existing encrypted BoardLink behavior.
+    """
+    if not port or str(port).strip().upper() == "AUTO":
+        raise RuntimeError("هیچ پورت سریالی پیدا نشد — برد وصل است؟")
+    return _original_open_link(port)
+
+
 core.PicoLink.command = _command_with_light_alias
+core.open_link = _open_link_without_implicit_key_load
 
 if __name__ == "__main__":
     core.main()

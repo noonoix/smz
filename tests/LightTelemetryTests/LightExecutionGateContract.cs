@@ -110,12 +110,15 @@ internal static class LightExecutionGateContract
         Check(LightExecutionGate.Evaluate(Valid(loginStable, LightExecutionIntent.Disconnect)).IsEligible,
             "Disconnect maps diagnostically to Login/DC without executing ESC");
 
+        // Module initializers must not start parallel workers: workers can wait for module
+        // initialization and deadlock the test host. Repeated equality plus the evaluator's
+        // lack of mutable fields proves deterministic re-entrancy here; runtime concurrency
+        // belongs in a normal test method after module initialization.
         var repeated = Enumerable.Range(0, 100)
-            .AsParallel()
             .Select(_ => LightExecutionGate.Evaluate(Valid()))
             .ToArray();
         Check(repeated.All(x => x == eligible),
-            "concurrent evaluation is deterministic and stateless");
+            "repeated evaluation is deterministic and stateless");
 
         var resultProperties = typeof(LightGateResult).GetProperties(BindingFlags.Public | BindingFlags.Instance);
         Check(resultProperties.All(x => !typeof(Delegate).IsAssignableFrom(x.PropertyType))

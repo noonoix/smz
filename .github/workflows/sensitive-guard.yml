@@ -4,29 +4,14 @@ on:
     branches: [feat/portable-plan2-app-0966]
   pull_request:
 permissions:
-  contents: write
+  contents: read
 jobs:
   sensitive-guard:
     name: security / sensitive-guard
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: feature/light-state-profiles
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Apply and verify canonical Lux migration
-        run: |
-          python tools/apply_canonical_lux_once.py
-          python -m py_compile ams-shell/bridge/bridge.py tools/test_bridge_pico.py
-          python tools/test_bridge_pico.py
-          git show 849f4587188ea048d32f0207b6977dcdcdc4fc9f^:.github/workflows/light-state-test-package.yml > .github/workflows/light-state-test-package.yml
-          git show 61dba0267c96573b9f75bf2250dad762f6bb6791^:.github/workflows/sensitive-guard.yml > .github/workflows/sensitive-guard.yml
-          rm -f .github/workflows/apply-light-state-canonical.yml tools/apply_canonical_lux_once.py
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add -A
-          git commit -m "Fix canonical LUX response correlation"
-          git push origin HEAD:feature/light-state-profiles
       - run: python tools/check_sensitive_artifacts.py .

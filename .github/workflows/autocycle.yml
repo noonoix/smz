@@ -12,7 +12,7 @@ on:
       - '.github/workflows/autocycle.yml'
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
 
 jobs:
@@ -80,7 +80,33 @@ jobs:
           if (Select-String -Path windows-tests.log -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
       - name: Run typed light telemetry tests
         shell: pwsh
-        run: dotnet run --project tests/LightTelemetryTests/LightTelemetryTests.csproj -c Release 2>&1 | Tee-Object light-telemetry-tests.log
+        run: |
+          dotnet run --project tests/LightTelemetryTests/LightTelemetryTests.csproj -c Release 2>&1 | Tee-Object light-telemetry-tests.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (Select-String -Path light-telemetry-tests.log -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
+      - name: Stage Windows test output
+        if: success()
+        shell: pwsh
+        run: |
+          $out = 'ams-shell/src/Ams.UI/bin/Release/net8.0-windows'
+          Remove-Item -Recurse -Force "$out/bridge/__pycache__" -ErrorAction SilentlyContinue
+          @(
+            'Classroom Studio — Light State Profiles test build',
+            'Source commit: ${{ github.event.pull_request.head.sha }}',
+            'Diagnostic build only; Launch/Auto Resume light gating remains disabled.',
+            'Login and DC share one light profile; DC recovery prepends exactly one ESC.'
+          ) | Set-Content "$out/LIGHT-STATE-TEST.txt" -Encoding utf8
+      - name: Upload gated Windows output
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: light-state-windows-output
+          path: |
+            ams-shell/src/Ams.UI/bin/Release/net8.0-windows/**
+            windows-tests.log
+            light-telemetry-tests.log
+          retention-days: 14
+          if-no-files-found: error
       - name: Report Windows failure tail
         if: failure() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
@@ -94,3 +120,59 @@ jobs:
             const tail=lines.slice(-100).join('\n');
             const report=(failures?'=== failure markers ===\n'+failures+'\n':'')+'=== tail ===\n'+tail;
             await github.rest.issues.createComment({owner:context.repo.owner,repo:context.repo.repo,issue_number:context.issue.number,body:'<!-- autocycle-windows-failure -->\n**AutoCycle Windows failure diagnostics**\n```\n'+report+'\n```'});
+
+  test-package:
+    name: autocycle / downloadable test package
+    if: github.event_name == 'pull_request' && github.head_ref == 'feature/light-state-profiles'
+    needs: [portable-contracts, windows-app]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: light-state-windows-output
+          path: staged
+      - name: Package and hash
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd staged/ams-shell/src/Ams.UI/bin/Release/net8.0-windows
+          zip -qr ../../../../../../../Classroom-Studio-light-state-test.zip .
+          cd ../../../../../../../
+          sha256sum Classroom-Studio-light-state-test.zip | awk '{print toupper($1)}' > light-state-test-sha256.txt
+          cat > TEST-GUIDE-FA.md <<'EOF'
+          # راهنمای تست مرحله اول
+
+          1. فایل ZIP را Extract کنید؛ برنامه را از داخل ZIP اجرا نکنید.
+          2. `ClassroomStudio.exe` را اجرا کنید.
+          3. وارد تب «وضعیت» شوید.
+          4. فعلاً برد را وصل نکنید؛ ظاهر RTL و نمایش شش پروفایل را بررسی کنید.
+          5. نتیجه مرحله اول را گزارش کنید تا تست اتصال و Live Watch را ادامه دهیم.
+
+          این نسخه آزمایشی است و گیت اجرایی Launch/Auto Resume خاموش می‌ماند.
+          EOF
+          {
+            echo '# Light State Profiles — test build'
+            echo
+            echo 'Source PR: #158'
+            echo
+            echo "Source commit: ${{ github.event.pull_request.head.sha }}"
+            echo
+            echo "SHA-256: $(cat light-state-test-sha256.txt)"
+            echo
+            echo 'All portable, Windows, TestRunner and typed light-profile gates passed before packaging.'
+          } > release-body.md
+      - name: Publish prerelease test build
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: light-state-test-${{ github.run_number }}
+          target_commitish: ${{ github.event.pull_request.head.sha }}
+          name: "Light State Profiles test #${{ github.run_number }}"
+          prerelease: true
+          body_path: release-body.md
+          files: |
+            Classroom-Studio-light-state-test.zip
+            light-state-test-sha256.txt
+            TEST-GUIDE-FA.md
+            staged/windows-tests.log
+            staged/light-telemetry-tests.log

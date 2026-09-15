@@ -1,9 +1,21 @@
+using System.Runtime.CompilerServices;
 using Ams.UI.Models;
 using Ams.UI.Services;
 
 internal static class LightStateClassifierContract
 {
-    public static IReadOnlyList<(bool Passed, string Name)> Run()
+    [ModuleInitializer]
+    internal static void Execute()
+    {
+        var checks = Run();
+        foreach (var check in checks)
+            Console.WriteLine((check.Passed ? "PASS: " : "FAIL: ") + check.Name);
+        var failed = checks.Count(x => !x.Passed);
+        Console.WriteLine($"=== Light state profile results: {checks.Count - failed} passed, {failed} failed ===");
+        if (failed > 0) throw new InvalidOperationException($"Light state profile contract failed: {failed}");
+    }
+
+    private static IReadOnlyList<(bool Passed, string Name)> Run()
     {
         var checks = new List<(bool, string)>();
         void Check(bool condition, string name) => checks.Add((condition, name));

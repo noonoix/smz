@@ -1,0 +1,11 @@
+Classroom Studio Phase 6
+Firmware: pico-light-readonly 1.0.0
+Target: Raspberry Pi Pico (non-W)
+Allowed commands: PING, LUX?, HALT, BYE
+HID: disabled
+UART: absent
+Keyboard: absent
+Macro: absent
+Buzzer: absent
+Actuator: absent
+Sensor: BH1750 at I2C0 GP20/GP21 address 0x23

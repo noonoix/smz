@@ -124,10 +124,10 @@ public sealed class NonExecutingLightAuthorizationDiagnostics
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(gateResult);
-        if (_arm is null)
+        if (_arm is null || Snapshot.State != LightAuthorizationDiagnosticState.Armed)
         {
             Snapshot = NewSnapshot(LightAuthorizationDiagnosticState.Denied,
-                LightAuthorizationReasonCode.NotArmed);
+                LightAuthorizationReasonCode.NotArmed, _arm?.ExpiresAt);
             return Snapshot;
         }
 

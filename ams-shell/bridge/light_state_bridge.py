@@ -14,7 +14,7 @@ packaging checks anchored to the executable entry point:
 
     elif op == "list_ports":
     elif op == "send_path":
-    req.get("dlys", "").split(";")
+    dlys = [int(d) for d in req.get("dlys", "").split(";") if d.strip()]
     _stream.reconfigure(encoding="utf-8", errors="replace")
     json.dumps(obj, ensure_ascii=False)
     except UnicodeEncodeError:

@@ -1,5 +1,5 @@
 # Classroom Studio — isolated read-only Pico light telemetry
-# Firmware: pico-light-readonly 1.0.3
+# Firmware: pico-light-readonly 1.0.4
 # Sensor: BH1750 / GY-30, I2C0, SDA=GP20, SCL=GP21, ADDR=GND => 0x23
 # This file intentionally has no HID, keyboard, UART, macro, buzzer or actuator path.
 
@@ -8,7 +8,7 @@ import board
 import busio
 import usb_cdc
 
-VERSION = "1.0.3"
+VERSION = "1.0.4"
 ADDR = 0x23
 POWER_ON = 0x01
 RESET = 0x07
@@ -20,6 +20,13 @@ _sequence = 0
 _i2c = None
 _sensor = None
 _sensor_attempted = False
+
+# Diagnostic-only startup evidence. This does not touch the sensor or any output.
+try:
+    with open("/pico_light_readonly_started.txt", "w") as _marker:
+        _marker.write("pico-light-readonly %s\n" % VERSION)
+except Exception:
+    pass
 
 
 class Bh1750:

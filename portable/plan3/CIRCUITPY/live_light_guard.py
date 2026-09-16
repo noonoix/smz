@@ -76,8 +76,11 @@ def load_guard_bundle(root="/"):
         raise GuardBundleError("Guard calibration revision mismatch")
 
     raw_profiles = manifest.get("profiles")
-    if not isinstance(raw_profiles, list) or {p.get("id") for p in raw_profiles} != set(PROFILE_IDS):
-        raise GuardBundleError("Guard manifest needs exactly six optical profiles")
+    if (not isinstance(raw_profiles, list)
+            or len(raw_profiles) != len(PROFILE_IDS)
+            or any(not isinstance(item, dict) for item in raw_profiles)
+            or {item.get("id") for item in raw_profiles} != set(PROFILE_IDS)):
+        raise GuardBundleError("Guard manifest needs exactly six unique optical profiles")
     calibration_profiles = calibration.get("profiles")
     if not isinstance(calibration_profiles, dict) or set(calibration_profiles) != set(PROFILE_IDS):
         raise GuardBundleError("Guard calibration needs exactly six optical profiles")

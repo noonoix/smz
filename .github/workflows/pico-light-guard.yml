@@ -1,10 +1,11 @@
-name: Pico light Guard firmware
+name: Pico combined light Guard firmware
 
 on:
   workflow_dispatch:
   pull_request:
     paths:
       - 'firmware/pico-light-guard-1.0.0/**'
+      - 'portable/plan3/CIRCUITPY/**'
       - '.github/workflows/pico-light-guard.yml'
 
 permissions:
@@ -18,36 +19,45 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compile Guard firmware sources
+      - name: Compile combined firmware sources
         shell: bash
         run: |
           set -euo pipefail
           python3 -m py_compile \
             firmware/pico-light-guard-1.0.0/boot.py \
-            firmware/pico-light-guard-1.0.0/code.py
+            firmware/pico-light-guard-1.0.0/code.py \
+            firmware/pico-light-guard-1.0.0/combined_guard_runtime.py
 
-      - name: Enforce isolated Guard boundary
+      - name: Enforce combined Guard boundary
         shell: bash
         run: |
           set -euo pipefail
           root=firmware/pico-light-guard-1.0.0
-          grep -q 'usb_hid.disable' "$root/boot.py"
-          grep -q 'role=light-guard' "$root/code.py"
-          grep -q 'board.GP20' "$root/code.py"
-          grep -q 'board.GP21' "$root/code.py"
-          grep -q 'board.GP4' "$root/code.py"
-          grep -q 'board.GP3' "$root/code.py"
-          grep -q 'board.GP6' "$root/code.py"
-          grep -q 'CAL_SECONDS = 5.0' "$root/code.py"
-          grep -q '"desktop"' "$root/code.py"
-          grep -q '"login-or-dc"' "$root/code.py"
-          grep -q '"character-dashboard"' "$root/code.py"
-          grep -q '"entering-game-loading"' "$root/code.py"
-          grep -q '"game"' "$root/code.py"
-          grep -q '"targeted"' "$root/code.py"
-          ! grep -Eq 'adafruit_hid|usb_hid|busio\.UART|KBDPICO|KBDARM|RunEngine|TRGSND|WSND' "$root/code.py"
+          runtime="$root/combined_guard_runtime.py"
+          grep -q 'usb_cdc.enable(console=True, data=True)' "$root/boot.py"
+          grep -q 'usb_hid' "$root/boot.py"
+          grep -q 'from combined_guard_runtime import main' "$root/code.py"
+          grep -q 'board.GP20' "$runtime"
+          grep -q 'board.GP21' "$runtime"
+          grep -q 'board.GP4' "$runtime"
+          grep -q 'board.GP3' "$runtime"
+          grep -q 'board.GP6' "$runtime"
+          grep -q 'board.GP16' "$runtime"
+          grep -q 'board.GP17' "$runtime"
+          grep -q 'baudrate=57600' "$runtime"
+          grep -q 'load_guard_bundle' "$runtime"
+          grep -q 'GuardBundleError' "$runtime"
+          grep -q 'plan_engine.run_plan' "$runtime"
+          grep -q 'short UART write' "$runtime"
+          grep -q 'self.pending >= 2' "$runtime"
+          grep -q 'self.arm.abort' "$runtime"
+          grep -q 'self.controls.paused' "$runtime"
+          grep -q 'self.stage = 0' "$runtime"
+          grep -q 'seconds=5' "$runtime"
+          grep -q 'PROFILEs' "$runtime" || grep -q 'PROFILES' "$runtime"
+          ! grep -Eq 'usb_hid\.disable|role=light-guard.*hid=off|RunEngine' "$runtime"
 
-      - name: Package Guard firmware
+      - name: Package combined Guard firmware
         shell: bash
         run: |
           set -euo pipefail
@@ -57,7 +67,7 @@ jobs:
           sha256sum pico-light-guard-1.0.0.zip | awk '{print toupper($1)}' > pico-light-guard-1.0.0-sha256.txt
           cat pico-light-guard-1.0.0-sha256.txt
 
-      - name: Upload Guard firmware package
+      - name: Upload combined Guard package
         uses: actions/upload-artifact@v4
         with:
           name: pico-light-guard-1.0.0

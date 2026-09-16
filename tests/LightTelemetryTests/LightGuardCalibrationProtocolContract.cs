@@ -19,7 +19,7 @@ internal static class LightGuardCalibrationProtocolContract
             "desktop", new[] { 10.0, 10.5, 9.8, 10.2, 10.1 }, 750, 5.0);
         Check(stable is not null
               && stable.Center == 10.1
-              && stable.Spread == 0.7
+              && Math.Abs(stable.Spread - 0.7) < 0.000001
               && stable.Tolerance == 2.0,
             "five-second estimator produces median, spread and minimum tolerance");
 

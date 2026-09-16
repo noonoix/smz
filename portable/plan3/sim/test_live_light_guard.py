@@ -13,6 +13,16 @@ class LiveLightGuardTests(unittest.TestCase):
             state_spec("bright", 160, 400, "bright.plan.txt"),
         ]
 
+    def setUpCanonical(self):
+        self.canonical = [
+            state_spec("desktop", 0, 10, "desktop_steps.txt"),
+            state_spec("login-or-dc", 20, 30, "login_or_dc_steps.txt"),
+            state_spec("character-dashboard", 40, 50, "character_dashboard_steps.txt"),
+            state_spec("entering-game-loading", 60, 70, "entering_game_loading_steps.txt"),
+            state_spec("game", 80, 90, "game_steps.txt"),
+            state_spec("targeted", 100, 110, "targeted_steps.txt"),
+        ]
+
     def test_requires_stability_before_activation(self):
         guard = LightStateGuard(self.states, stable_ms=500, hysteresis=10)
         self.assertIsNone(guard.update(50, 0))
@@ -43,6 +53,32 @@ class LiveLightGuardTests(unittest.TestCase):
         self.assertEqual("dark", guard.update(50, 0))
         self.assertEqual("dark", guard.update(None, 200))
         self.assertIsNone(guard.update(None, 251))
+
+    def test_canonical_guard_enforces_ordered_stages(self):
+        self.setUpCanonical()
+        guard = LightStateGuard(self.canonical, stable_ms=0)
+        for lux, profile in zip((5, 25, 45, 65, 85), (
+            "desktop", "login-or-dc", "character-dashboard",
+            "entering-game-loading", "game")):
+            self.assertEqual(profile, guard.update(lux, lux))
+            self.assertTrue(guard.last_decision["execute"])
+
+    def test_canonical_guard_rejects_out_of_order_route(self):
+        self.setUpCanonical()
+        guard = LightStateGuard(self.canonical, stable_ms=0)
+        self.assertEqual("desktop", guard.update(5, 0))
+        self.assertIsNone(guard.update(85, 100))
+        self.assertFalse(guard.last_decision["execute"])
+
+    def test_canonical_guard_dc_fallback_and_targeted_return(self):
+        self.setUpCanonical()
+        guard = LightStateGuard(self.canonical, stable_ms=0)
+        for lux in (5, 25, 45, 65, 85):
+            self.assertIsNotNone(guard.update(lux, lux))
+        self.assertEqual("targeted", guard.update(105, 105))
+        self.assertEqual("dc", guard.last_decision["context"])
+        self.assertEqual("login-or-dc", guard.update(25, 125))
+        self.assertEqual(2, guard.last_decision["stage"])
 
 
 if __name__ == "__main__":

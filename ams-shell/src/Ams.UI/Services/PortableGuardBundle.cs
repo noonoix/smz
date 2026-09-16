@@ -44,30 +44,55 @@ public static class PortableGuardBundle
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(profiles);
         ValidateProfiles(profiles);
+        ValidateWorkspace(workspace);
 
         var fullPlanPath = Path.GetFullPath(planPath);
         var directory = Path.GetDirectoryName(fullPlanPath)
             ?? throw new IOException("مسیر bundle Portable نامعتبر است.");
         Directory.CreateDirectory(directory);
 
+        // Preflight all external runtime inputs before the exporter writes anything. This keeps
+        // a missing application-bundled runtime from producing a misleading half-bundle.
+        var runtimeDirectory = Path.Combine(AppContext.BaseDirectory, "portable-runtime");
+        var runtimeSources = RuntimeFiles
+            .Select(runtime => (Name: runtime, Path: Path.Combine(runtimeDirectory, runtime)))
+            .ToArray();
+        var missingRuntime = runtimeSources
+            .Where(item => !File.Exists(item.Path))
+            .Select(item => item.Name)
+            .ToArray();
+        if (missingRuntime.Length > 0)
+            throw new IOException("فایل runtime Guard پیدا نشد: " + string.Join(", ", missingRuntime));
+
+        // Compile every route before the first write. Unsupported Steps therefore block the
+        // combined publication instead of leaving a partially compiled route set behind.
+        var routeTexts = workspace.Tabs.ToDictionary(
+            tab => tab.Kind,
+            tab => tab.Steps.Count == 0
+                ? "PLAN|2\n"
+                : PlanExporter.CompileOnce(tab.Steps.ToList(), settings, screenW, screenH,
+                    sourceName + "#" + tab.Kind, machine).Text);
+
         var allSteps = workspace.Tabs.SelectMany(tab => tab.Steps).ToList();
         var written = new List<string>();
 
-        // The existing exporter supplies the combined Pico code.py/boot.py baseline. The
-        // transition manifest and portable route files below are the authoritative additions.
+        // PicoFirmwareExporter accepts a code.py path. Passing plan.txt here used to overwrite
+        // the entry plan with Python source; the combined bundle now keeps the firmware and the
+        // STATELOOP entry plan as separate files.
+        var codePath = Path.Combine(directory, "code.py");
         written.AddRange(PicoFirmwareExporter.Export(
-            fullPlanPath, allSteps, machine, "once", 1, 0, keyboardOnArm: false));
+            codePath, allSteps, machine, "once", 1, 0, keyboardOnArm: false));
 
         foreach (var tab in workspace.Tabs)
         {
             var routePath = Path.Combine(directory, RouteFiles[tab.Kind]);
-            var text = tab.Steps.Count == 0
-                ? "PLAN|2\n"
-                : PlanExporter.CompileOnce(tab.Steps.ToList(), settings, screenW, screenH,
-                    sourceName + "#" + tab.Kind, machine).Text;
-            AtomicWrite(routePath, Encoding.UTF8.GetBytes(text));
+            AtomicWrite(routePath, Encoding.UTF8.GetBytes(routeTexts[tab.Kind]));
             written.Add(routePath);
         }
+
+        var entryPlanPath = Path.Combine(directory, "plan.txt");
+        AtomicWrite(entryPlanPath, Encoding.UTF8.GetBytes(BuildEntryPlan(profiles)));
+        written.Add(entryPlanPath);
 
         var manifest = BuildManifest(workspace, profiles);
         var manifestPath = Path.Combine(directory, "guard-transition.json");
@@ -78,14 +103,10 @@ public static class PortableGuardBundle
         AtomicWrite(calibrationPath, Encoding.UTF8.GetBytes(BuildCalibration(profiles)));
         written.Add(calibrationPath);
 
-        var runtimeDirectory = Path.Combine(AppContext.BaseDirectory, "portable-runtime");
-        foreach (var runtime in RuntimeFiles)
+        foreach (var runtime in runtimeSources)
         {
-            var source = Path.Combine(runtimeDirectory, runtime);
-            if (!File.Exists(source))
-                throw new IOException("فایل runtime Guard پیدا نشد: " + runtime);
-            var destination = Path.Combine(directory, runtime);
-            AtomicWrite(destination, File.ReadAllBytes(source));
+            var destination = Path.Combine(directory, runtime.Name);
+            AtomicWrite(destination, File.ReadAllBytes(runtime.Path));
             written.Add(destination);
         }
 
@@ -165,6 +186,14 @@ public static class PortableGuardBundle
             || LightGuardCalibrationProtocol.ProfileIds.Any(id => profiles.Count(profile => profile.Id == id) != 1)
             || profiles.Any(profile => !profile.IsValid))
             throw new InvalidDataException("Combined Portable bundle requires exactly six valid Guard profiles.");
+    }
+
+    private static void ValidateWorkspace(PipelineWorkspace workspace)
+    {
+        if (workspace.Tabs.Count != RouteFiles.Count
+            || workspace.Tabs.Select(tab => tab.Kind).Distinct().Count() != RouteFiles.Count
+            || RouteFiles.Keys.Any(kind => !workspace.Tabs.Any(tab => tab.Kind == kind)))
+            throw new InvalidDataException("Combined Portable bundle requires the seven canonical route tabs.");
     }
 
     private static PipelineKind KindFor(string profileId) => profileId switch

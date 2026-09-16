@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Text.Json;
 using Ams.UI.Models;
 using Ams.UI.Services;
 
@@ -15,6 +14,7 @@ public partial class MainViewModel
     private string _lightGuardObservationStatus = "پایش Guard خاموش است.";
     private string _lightGuardStateDisplay = "نامشخص";
     private bool _lightGuardIdentityValid;
+    private bool _lightGuardCalibrationSynchronized;
     private bool _lightGuardObservationEnabled;
 
     public ObservableCollection<string> LightGuardProfileDisplays { get; } = new();
@@ -26,6 +26,7 @@ public partial class MainViewModel
     public string LightGuardObservationStatus { get => _lightGuardObservationStatus; private set => SetProperty(ref _lightGuardObservationStatus, value); }
     public string LightGuardStateDisplay { get => _lightGuardStateDisplay; private set => SetProperty(ref _lightGuardStateDisplay, value); }
     public bool LightGuardIdentityValid { get => _lightGuardIdentityValid; private set => SetProperty(ref _lightGuardIdentityValid, value); }
+    public bool LightGuardCalibrationSynchronized { get => _lightGuardCalibrationSynchronized; private set => SetProperty(ref _lightGuardCalibrationSynchronized, value); }
     public bool LightGuardObservationEnabled { get => _lightGuardObservationEnabled; private set => SetProperty(ref _lightGuardObservationEnabled, value); }
 
     public void InitializeLightGuardAdapter()
@@ -37,11 +38,13 @@ public partial class MainViewModel
         }
         RefreshLightGuardProfileDisplays();
         OnPropertyChanged(nameof(LightGuardIdentityValid));
+        OnPropertyChanged(nameof(LightGuardCalibrationSynchronized));
     }
 
     public async Task RefreshLightGuardIdentityAsync()
     {
         InitializeLightGuardAdapter();
+        LightGuardCalibrationSynchronized = false;
         if (_bridge is null || Connection != ConnectionState.Connected)
         {
             LightGuardIdentityValid = false;
@@ -74,12 +77,13 @@ public partial class MainViewModel
                 return;
             }
             var appRevision = LightGuardAppAdapter.ComputeRevision(LightStateProfiles);
+            var revisionMatches = device.Count == 6 && device.Revision == appRevision;
             LightGuardRevisionDisplay = $"نسخهٔ Pico: {device.Revision:-} · رکوردها: {device.Count}/6 · نسخهٔ برنامه: {appRevision}";
-            LightGuardRevisionComparison = device.Count == 6 && device.Revision == appRevision
-                ? "همگام است؛ مقادیر شش‌گانه با Classroom Studio یکی هستند."
+            LightGuardRevisionComparison = revisionMatches
+                ? "revision یکسان است؛ برای اعتماد این جلسه باید هر شش CALSET دوباره تأیید شوند."
                 : "عدم تطابق یا کالیبراسیون ناقص؛ قبل از استفاده Sync را اجرا کنید.";
-            LightGuardCalibrationStatus = device.Count == 6 && device.Revision == appRevision
-                ? "کالیبراسیون کامل و همگام است."
+            LightGuardCalibrationStatus = revisionMatches
+                ? "هویت معتبر است، اما Guard تا تأیید شش CALSET در این جلسه روشن نمی‌شود."
                 : "کالیبراسیون Pico با منبع حقیقت برنامه همگام نیست.";
             Log($"phase7 Guard: {LightGuardIdentityDisplay}; CALGET revision={device.Revision}, count={device.Count}");
         }
@@ -95,6 +99,7 @@ public partial class MainViewModel
     public async Task SyncLightGuardCalibrationAsync()
     {
         InitializeLightGuardAdapter();
+        LightGuardCalibrationSynchronized = false;
         if (_bridge is null || Connection != ConnectionState.Connected)
         {
             LightGuardCalibrationStatus = "همگام‌سازی مسدود شد: برد متصل نیست.";
@@ -118,13 +123,15 @@ public partial class MainViewModel
             if (!LightGuardAppAdapter.TryParseCalGet(check, out var device) || device is null
                 || device.Count != 6 || device.Revision != revision)
                 throw new InvalidOperationException("تأیید نهایی CALGET با revision برنامه یکسان نیست.");
+            LightGuardCalibrationSynchronized = true;
             LightGuardRevisionDisplay = $"نسخهٔ Pico: {device.Revision} · رکوردها: {device.Count}/6 · نسخهٔ برنامه: {revision}";
-            LightGuardRevisionComparison = "همگام‌سازی موفق؛ شش رکورد با یک revision ذخیره شد.";
+            LightGuardRevisionComparison = "همگام‌سازی موفق؛ شش رکورد با یک revision ذخیره و تأیید شد.";
             LightGuardCalibrationStatus = "شش پروفایل با موفقیت به Pico Guard ارسال و تأیید شدند.";
             Log("phase7 Guard: six CALSET records synchronized and verified");
         }
         catch (Exception ex)
         {
+            LightGuardCalibrationSynchronized = false;
             LightGuardCalibrationStatus = "همگام‌سازی ناقص/ناموفق — fail closed: " + ex.Message;
             LightGuardRevisionComparison = "revision نامطمئن است؛ دوباره CALGET و Sync را بررسی کنید.";
             Log("phase7 Guard CALSET failed: " + ex.Message);
@@ -152,6 +159,11 @@ public partial class MainViewModel
         if (!LightGuardIdentityValid)
         {
             LightGuardObservationStatus = "فرمان Guard مسدود شد: ابتدا هویت Guard را Refresh کنید.";
+            return;
+        }
+        if (command == "GUARD|ON" && !LightGuardCalibrationSynchronized)
+        {
+            LightGuardObservationStatus = "Guard ON مسدود شد: ابتدا هر شش CALSET را Sync و تأیید کنید.";
             return;
         }
         try
@@ -195,12 +207,14 @@ public partial class MainViewModel
         if (LightGuardAppAdapter.TryParseCalibrationEvent(line, out var calibration) && calibration is not null)
         {
             var stage = calibration.Stage is int s ? $"مرحله {s}/6" : "کالیبراسیون";
+            if (calibration.Mode is "complete" or "cancelled")
+                LightGuardCalibrationSynchronized = false;
             LightGuardCalibrationStatus = calibration.Mode switch
             {
                 "ready" => $"{stage}: جایگاه «{calibration.ProfileId}» آماده؛ GP3 را فشار دهید.",
                 "started" => $"{stage}: نمونه‌برداری پنج‌ثانیه‌ای برای «{calibration.ProfileId}» در حال انجام است.",
                 "complete-stage" => $"{stage}: ذخیره شد · مرکز {calibration.Center:0.0} · spread {calibration.Spread:0.0} · تلورانس ±{calibration.Tolerance:0.0}",
-                "complete" => $"کالیبراسیون شش‌مرحله‌ای کامل شد · revision {calibration.Revision}",
+                "complete" => $"کالیبراسیون شش‌مرحله‌ای کامل شد · revision {calibration.Revision}; اکنون Sync برنامه را اجرا کنید.",
                 "cancelled" => "کالیبراسیون فیزیکی لغو شد؛ آخرین مجموعهٔ کامل حفظ می‌شود.",
                 _ => "رویداد کالیبراسیون دریافت شد: " + calibration.Mode,
             };

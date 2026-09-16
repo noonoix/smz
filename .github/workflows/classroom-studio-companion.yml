@@ -5,7 +5,7 @@ on:
   pull_request:
     paths:
       - 'tools/ClassroomStudio.Companion/**'
-      - 'tests/ClassroomStudioCompanionContractTests/**'
+      - 'tools/ClassroomStudio.Companion.ContractTests/**'
       - '.github/workflows/classroom-studio-companion.yml'
 
 permissions:
@@ -26,7 +26,7 @@ jobs:
         run: dotnet build tools/ClassroomStudio.Companion/ClassroomStudio.Companion.csproj -c Release
       - name: Run companion contract tests
         shell: pwsh
-        run: dotnet run --project tests/ClassroomStudioCompanionContractTests/ClassroomStudioCompanionContractTests.csproj -c Release
+        run: dotnet run --project tools/ClassroomStudio.Companion.ContractTests/ClassroomStudio.Companion.ContractTests.csproj -c Release
       - name: Publish local companion artifact
         shell: pwsh
         run: dotnet publish tools/ClassroomStudio.Companion/ClassroomStudio.Companion.csproj -c Release -r win-x64 --self-contained false -o companion-output

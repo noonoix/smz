@@ -1,0 +1,47 @@
+name: Classroom Studio companion validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'tools/ClassroomStudio.Companion/**'
+      - 'tests/ClassroomStudioCompanionContractTests/**'
+      - '.github/workflows/classroom-studio-companion.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  companion:
+    name: companion / Windows build and contracts
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build companion
+        shell: pwsh
+        run: dotnet build tools/ClassroomStudio.Companion/ClassroomStudio.Companion.csproj -c Release
+      - name: Run companion contract tests
+        shell: pwsh
+        run: dotnet run --project tests/ClassroomStudioCompanionContractTests/ClassroomStudioCompanionContractTests.csproj -c Release
+      - name: Publish local companion artifact
+        shell: pwsh
+        run: dotnet publish tools/ClassroomStudio.Companion/ClassroomStudio.Companion.csproj -c Release -r win-x64 --self-contained false -o companion-output
+      - name: Add software-only scope notice
+        shell: pwsh
+        run: |
+          @(
+            'Classroom Studio companion MCP v0.1',
+            'Software-only UI Automation, screenshots, logs, export staging, and hash validation.',
+            'No serial, USB, HID, firmware flashing, reset, actuator, Guard, Run/Stop, or release operations.'
+          ) | Set-Content companion-output/SCOPE.txt -Encoding utf8
+      - name: Upload companion artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: classroom-studio-companion-windows
+          path: companion-output/**
+          retention-days: 14
+          if-no-files-found: error

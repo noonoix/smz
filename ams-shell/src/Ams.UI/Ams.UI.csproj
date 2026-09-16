@@ -32,6 +32,7 @@
     <None Include="..\..\caterina\Caterina.hex"><Link>caterina\Caterina.hex</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\tools\isp_flash.py"><Link>tools\isp_flash.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY\plan_cycle.py"><Link>portable-runtime\plan_cycle.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="..\..\..\portable\plan3\CIRCUITPY\plan_engine.py"><Link>portable-runtime\plan_engine.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY\cycle_runtime.py"><Link>portable-runtime\cycle_runtime.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY\restart_windows.py"><Link>portable-runtime\restart_windows.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY\auto_resume_boot.py"><Link>portable-runtime\auto_resume_boot.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
@@ -43,6 +44,7 @@
     <None Include="..\..\..\portable\plan3\CIRCUITPY\guard_calibration_protocol.py"><Link>portable-runtime\guard_calibration_protocol.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\firmware\pico-light-guard-1.0.0\code.py"><Link>combined-runtime\code.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\firmware\pico-light-guard-1.0.0\boot.py"><Link>combined-runtime\boot.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="..\..\..\firmware\pico-light-guard-1.0.0\combined_guard_runtime.py"><Link>portable-runtime\combined_guard_runtime.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\firmware\pico-light-guard-1.0.0\combined_guard_runtime.py"><Link>combined-runtime\combined_guard_runtime.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\firmware\pico-light-guard-1.0.0\guard_calibration_protocol.py"><Link>combined-runtime\guard_calibration_protocol.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
   </ItemGroup>

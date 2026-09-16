@@ -7,6 +7,7 @@ on:
       - 'ams-shell/**'
       - 'firmware/arm26/**'
       - 'firmware/autocycle-hostusb-v5/**'
+      - 'firmware/pico-light-guard-1.0.0/**'
       - 'portable/plan3/**'
       - 'tests/LightTelemetryTests/**'
       - 'tools/ClassroomStudio.Companion/**'
@@ -69,6 +70,27 @@ jobs:
       - name: Build Classroom Studio
         shell: pwsh
         run: dotnet build ams-shell/AMS.sln -c Release --no-restore 2>&1 | Tee-Object windows-build.log
+      - name: Verify Combined Guard runtime files in Windows output
+        shell: pwsh
+        run: |
+          $out = 'ams-shell/src/Ams.UI/bin/Release/net8.0-windows'
+          $required = @(
+            'portable-runtime/plan_engine.py',
+            'portable-runtime/live_light_guard.py',
+            'portable-runtime/guard_transition.py',
+            'portable-runtime/guard_calibration_protocol.py',
+            'portable-runtime/error_policy.py',
+            'portable-runtime/combined_guard_runtime.py',
+            'combined-runtime/code.py',
+            'combined-runtime/boot.py'
+          )
+          $missing = @($required | Where-Object { -not (Test-Path (Join-Path $out $_)) })
+          if ($missing.Count -gt 0) {
+            Write-Error ('Missing Combined Guard runtime files: ' + ($missing -join ', '))
+            exit 1
+          }
+          Write-Host 'All required Combined Guard runtime files are present:'
+          $required | ForEach-Object { Write-Host (' - ' + (Join-Path $out $_)) }
       - name: Build TestRunner from a clean tree
         shell: pwsh
         run: |

@@ -44,7 +44,7 @@ for phrase in (
     "elif line == \"CALGET\"",
     "elif line.startswith(\"CALSET|\")",
     "ERR|CALSET|BUSY",
-    "ERR|CALSET|REVISION",
+    "return \"ERR|CALSET|\" + error",
 ):
     assert phrase in runtime, phrase
 

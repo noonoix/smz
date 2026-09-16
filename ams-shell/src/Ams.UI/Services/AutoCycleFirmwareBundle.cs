@@ -5,7 +5,7 @@ namespace Ams.UI.Services;
 public static class AutoCycleFirmwareBundle
 {
     private const string PatchManifest = "autocycle_h6_patch.json";
-    private static readonly string[] RuntimeFiles={"plan_cycle.py","cycle_runtime.py","restart_windows.py","auto_resume_boot.py","resume_essentials_runtime.py"};
+    private static readonly string[] RuntimeFiles={"plan_cycle.py","cycle_runtime.py","restart_windows.py","auto_resume_boot.py","resume_essentials_runtime.py","live_light_guard.py","guard_transition.py"};
     public static IReadOnlyList<string> Export(string codePyPath,IEnumerable<StepNode> steps,string machine,string loopMode,int loopCount,int loopSeconds,bool keyboardOnArm)
     {
         var runtimeDir=Path.Combine(AppContext.BaseDirectory,"portable-runtime");
@@ -55,11 +55,6 @@ public static class AutoCycleFirmwareBundle
         var first=text.IndexOf(oldText,StringComparison.Ordinal);
         var duplicate=first>=0&&text.IndexOf(oldText,first+oldText.Length,StringComparison.Ordinal)>=0;
         if(!duplicate&&first>=0)return text[..first]+newText+text[(first+oldText.Length)..];
-
-        // The buzzer patch deliberately normalizes the generated firmware before applying
-        // the legacy manifest. If an older template changes only the indentation or the
-        // preceding TRGSND return block, keep the replacement anchored to the unique beep
-        // method instead of silently accepting an arbitrary match.
         const string beepMarker="    def beep(self, freq, ms):";
         const string beepEnd="            if not _plan_sleep_ms(int(ms)):\n";
         var oldBeep=text.IndexOf(beepMarker,StringComparison.Ordinal);

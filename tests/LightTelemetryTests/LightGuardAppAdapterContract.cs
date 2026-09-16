@@ -37,6 +37,16 @@ internal static class LightGuardAppAdapterContract
               && calibration.Stage == 1 && calibration.ProfileId == "desktop",
             "physical calibration stage events parse safely");
 
+        Check(LightGuardAppAdapter.TryParseCalibrationEvent(
+            "EVT|CAL|mode=saved-stage|stage=3|id=character-dashboard|saved=1", out var saved)
+              && saved is not null && saved.Mode == "saved-stage"
+              && saved.Stage == 3 && saved.ProfileId == "character-dashboard",
+            "yellow save event identifies the targeted dashboard position");
+        Check(LightGuardAppAdapter.TryParseCalibrationEvent(
+            "EVT|CAL|mode=exited|saved=1", out var exited)
+              && exited is not null && exited.Mode == "exited",
+            "blue long-hold exit event parses partial calibration completion");
+
         var changed = LightStateDefaults.CreateInitialProfiles();
         changed[0].LuxCenter = 1;
         Check(revision != LightGuardAppAdapter.ComputeRevision(changed),

@@ -12,9 +12,11 @@ import usb_hid
 from adafruit_hid.keyboard import Keyboard
 from adafruit_hid.keycode import Keycode
 import plan_engine
+from guard_calibration_protocol import build_calibration_get, parse_calibration_set
 from live_light_guard import GuardBundleError, LightStateGuard, load_guard_bundle
 
 PROFILES = ("desktop", "login-or-dc", "character-dashboard", "entering-game-loading", "game", "targeted")
+PENDING_REVISION = "pending"
 
 class BH1750:
     def __init__(self):
@@ -172,22 +174,64 @@ class Combined:
     def emit(self, line):
         try: self.usb.write((line + "\n").encode())
         except Exception: pass
+    def _replace_json(self, path, text):
+        temp = path + ".tmp"
+        with open(temp, "w") as fh: fh.write(text)
+        try: os.remove(path)
+        except Exception: pass
+        os.rename(temp, path)
+    def _publish_calibration(self, revision, profile_id, profile):
+        manifest = json.loads(json.dumps(self.bundle["manifest"]))
+        calibration = json.loads(json.dumps(self.bundle["calibration"]))
+        manifest["calibrationRevision"] = revision
+        found = False
+        for item in manifest.get("profiles", []):
+            if item.get("id") == profile_id:
+                item["center"] = profile["center"]; item["tolerance"] = profile["tolerance"]; item["stableMs"] = profile["stable_ms"]; found = True
+        if not found: raise GuardBundleError("profile missing from Guard manifest")
+        calibration["revision"] = revision
+        calibration.setdefault("profiles", {})[profile_id] = {
+            "center": profile["center"], "tolerance": profile["tolerance"], "stable_ms": profile["stable_ms"]}
+        old_manifest = json.dumps(self.bundle["manifest"])
+        old_calibration = json.dumps(self.bundle["calibration"])
+        try:
+            self._replace_json("/guard-transition.json", json.dumps(manifest))
+            self._replace_json("/guard-calibration.json", json.dumps(calibration))
+            new_bundle = load_guard_bundle("/")
+            new_guard = LightStateGuard.from_bundle("/")
+        except Exception:
+            try: self._replace_json("/guard-transition.json", old_manifest)
+            except Exception: pass
+            try: self._replace_json("/guard-calibration.json", old_calibration)
+            except Exception: pass
+            raise
+        self.bundle = new_bundle; self.guard = new_guard
+    def calibration_count(self):
+        return len(self.bundle.get("calibration", {}).get("profiles", {}))
+    def calget(self):
+        return build_calibration_get(self.bundle["revision"], self.calibration_count())
+    def calset(self, line):
+        if self.controls.running or self.calibrating: return "ERR|CALSET|BUSY"
+        payload, error = parse_calibration_set(line)
+        if error is not None: return "ERR|CALSET|" + error
+        try:
+            self._publish_calibration(payload["revision"], payload["id"], payload)
+        except Exception:
+            return "ERR|CALSET|SAVE"
+        return "OK|CALSET|%s|revision=%s|count=%d" % (payload["id"], payload["revision"], self.calibration_count())
     def start_cal(self):
         self.controls.stop(); self.calibrating = True; self.stage = 0; self.samples = []; self.result = None; self.saved = False; self.saved_ids = set(); self.emit("EVT|CAL|mode=ready|stage=1|id=" + PROFILES[0] + "|seconds=5|saved=0")
     def end_cal(self):
-        if self.result is not None and not self.saved: self.emit("ERR|CAL|UNSAVED|stage=%d" % (self.stage + 1)); return
+        if self.result is not None and self.result != "sampling" and not self.saved: self.emit("ERR|CAL|UNSAVED|stage=%d" % (self.stage + 1)); return
         self.calibrating = False; self.result = None; self.emit("EVT|CAL|mode=exited|saved=%d" % len(self.saved_ids))
     def save_cal(self):
-        try:
-            with open("/guard-calibration.json", "r") as fh: payload = json.load(fh)
-        except Exception: payload = {"format":1,"revision":"","profiles":{}}
-        payload.setdefault("profiles", {})[PROFILES[self.stage]] = self.result; payload["revision"] = ""; temp = "/guard-calibration.json.tmp"
-        with open(temp, "w") as fh: json.dump(payload, fh)
-        try: os.remove("/guard-calibration.json")
-        except Exception: pass
-        os.rename(temp, "/guard-calibration.json"); self.saved = True; self.saved_ids.add(PROFILES[self.stage]); self.emit("EVT|CAL|mode=saved-stage|stage=%d|id=%s|saved=%d" % (self.stage+1, PROFILES[self.stage], len(self.saved_ids)))
+        if not isinstance(self.result, dict): self.emit("ERR|CAL|BUSY|stage=%d" % (self.stage + 1)); return
+        try: self._publish_calibration(PENDING_REVISION, PROFILES[self.stage], self.result)
+        except Exception: self.emit("ERR|CAL|SAVE|stage=%d" % (self.stage + 1)); return
+        self.saved = True; self.saved_ids.add(PROFILES[self.stage]); self.emit("EVT|CAL|mode=saved-stage|stage=%d|id=%s|saved=%d" % (self.stage+1, PROFILES[self.stage], len(self.saved_ids)))
     def yellow_action(self):
         if not self.calibrating: self.controls.paused = not self.controls.paused; return
+        if self.result == "sampling": self.emit("ERR|CAL|BUSY|stage=%d" % (self.stage + 1)); return
         if self.result is not None: self.save_cal(); return
         self.samples = []; self.sample_started = time.monotonic(); self.result = "sampling"; self.emit("EVT|CAL|mode=started|stage=%d|id=%s|seconds=5|saved=%d" % (self.stage+1, PROFILES[self.stage], len(self.saved_ids)))
     def cal_tick(self):
@@ -199,7 +243,7 @@ class Combined:
         self.result = {"center":center,"tolerance":max(2.0,spread*1.5),"stable_ms":750}; self.saved = False; self.emit("EVT|CAL|mode=complete-stage|stage=%d|id=%s|center=%.1f|spread=%.1f|tolerance=%.1f|saved=0" % (self.stage+1, PROFILES[self.stage], center, spread, self.result["tolerance"]))
     def next_cal(self):
         if not self.calibrating: return
-        if self.result is not None and not self.saved: self.emit("ERR|CAL|UNSAVED|stage=%d" % (self.stage+1)); return
+        if self.result is not None and self.result != "sampling" and not self.saved: self.emit("ERR|CAL|UNSAVED|stage=%d" % (self.stage+1)); return
         if self.stage >= 5: self.emit("EVT|CAL|mode=last|stage=6|saved=%d" % len(self.saved_ids)); return
         self.stage += 1; self.result = None; self.saved = False; self.emit("EVT|CAL|mode=ready|stage=%d|id=%s|seconds=5|saved=%d" % (self.stage+1, PROFILES[self.stage], len(self.saved_ids)))
     def buttons(self):
@@ -222,6 +266,8 @@ class Combined:
             if not line: continue
             try:
                 if line == "PING": reply = "OK|PONG|combined-pico-guard-executor|hid=on|uart=on|profiles=6"
+                elif line == "CALGET": reply = self.calget()
+                elif line.startswith("CALSET|"): reply = self.calset(line)
                 elif line == "GUARD|ON": self.controls.start(); reply = "OK|GUARD|ON"
                 elif line in ("GUARD|OFF", "HALT"): self.controls.stop(); reply = "OK|GUARD|OFF"
                 elif line == "LUX?": reply = "OK|LUX|lux=%.1f|sensor=ok" % self.sensor.lux()

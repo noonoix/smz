@@ -89,6 +89,16 @@ public partial class MainViewModel
     public void RevokeLightAuthorizationDiagnostic(
         LightAuthorizationReasonCode reason = LightAuthorizationReasonCode.PermitRevoked)
     {
+        // Lifecycle callbacks can arrive twice (for example bridge disconnect followed by
+        // Watch disposal). A repeated identical revoke is already represented in the ledger;
+        // suppress only that no-op so distinct later reasons remain visible.
+        if (reason == LightAuthorizationReasonCode.StaleGateResult && !IsLightWatchRunning)
+            return;
+        if (!_lightAuthorizationDiagnosticIsActive
+            && _lightAuthorizationDiagnostics.Snapshot.State == LightAuthorizationDiagnosticState.Revoked
+            && _lightAuthorizationDiagnostics.Snapshot.ReasonCode == reason)
+            return;
+
         var snapshot = _lightAuthorizationDiagnostics.Revoke(reason);
         PublishLightAuthorizationSnapshot(snapshot);
         Log($"light auth diagnostic: revoke reason={snapshot.ReasonCode}");

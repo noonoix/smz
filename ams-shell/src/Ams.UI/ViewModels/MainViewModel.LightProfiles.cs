@@ -74,6 +74,8 @@ public partial class MainViewModel
             _lightStateClassifier = new LightStateClassifier(LightStateProfiles);
             _lastClassifiedChartVersion = -1;
             RefreshLightGateDiagnosticProfiles();
+            RefreshLightGuardProfileDisplays();
+            LightGuardCalibrationSynchronized = false;
             LightStateWarning = DescribeProfileOverlaps(LightStateProfiles);
             LightProfileSaveStatus = "پروفایل‌ها ذخیره شدند؛ مقادیر تا کالیبراسیون سخت‌افزاری فرضی‌اند.";
             return true;

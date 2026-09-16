@@ -6,7 +6,6 @@ model = (root / "ams-shell/src/Ams.UI/Models/PipelineWorkspace.cs").read_text(en
 viewmodel = (root / "ams-shell/src/Ams.UI/ViewModels/MainViewModel.PipelineTabs.cs").read_text(encoding="utf-8")
 serializer = (root / "ams-shell/src/Ams.UI/Services/PipelineWorkspaceSerializer.cs").read_text(encoding="utf-8")
 controller = (root / "ams-shell/src/Ams.UI/Services/LightGuardTransitionController.cs").read_text(encoding="utf-8")
-execution = (root / "ams-shell/src/Ams.UI/ViewModels/MainViewModel.LightGuardExecution.cs").read_text(encoding="utf-8")
 ui = (root / "ams-shell/src/Ams.UI/LightGuardUiBootstrap.cs").read_text(encoding="utf-8")
 spec = (root / "docs/light-guard-phase7-tab-migration.md").read_text(encoding="utf-8")
 matrix = (root / "docs/light-guard-phase7-transition-matrix.md").read_text(encoding="utf-8")
@@ -81,8 +80,7 @@ for stage in (
 ):
     assert stage in matrix
 
-# The execution-layer implementation validates revisions/session prerequisites, enforces
-# 1->2->3->4->5, gives DC priority over Targeted, and rechecks the workspace before Run.
+# The transition policy is portable-output policy, not a desktop RunEngine trigger.
 for phrase in (
     "LightGuardTransitionController",
     "duplicate stable state",
@@ -94,14 +92,7 @@ for phrase in (
     assert phrase in controller
 assert "LightGuardEntryContext.Disconnect" in controller
 assert "LightGuardEntryContext.Targeted" in controller
-for phrase in (
-    "CurrentLightGuardPipelineRevision",
-    "RunCommand.CanExecute(null)",
-    "RunCommand.Execute(null)",
-    "pipeline changed after authorization",
-    "_lightGuardTransitionController.ObserveStable",
-):
-    assert phrase in execution
-assert "LightGuardExecutionStatus" in ui
+assert "All actions are observation/calibration protocol only" in ui
+assert "RunEngine" not in ui
 
-print("pipeline tabs migration contract: seven tabs, ordered stages, DC fallback, Targeted side-state, and guarded RunEngine boundary verified")
+print("pipeline tabs migration contract: seven tabs, ordered stages, DC fallback, Targeted side-state, and portable execution boundary verified")

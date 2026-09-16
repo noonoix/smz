@@ -6,6 +6,7 @@ root = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(root / "portable/plan3/CIRCUITPY"))
 from guard_calibration_protocol import build_calibration_get, parse_calibration_set
 
+# Revision tokens reject both field delimiters and line breaks without imposing a hash format.
 revision = "guard-0123456789abcdef"
 payload, error = parse_calibration_set("CALSET|%s|desktop|10.1|2|750" % revision)
 assert error is None

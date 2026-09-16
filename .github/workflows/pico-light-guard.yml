@@ -65,6 +65,7 @@ jobs:
           grep -q 'self._replace_text("/SHA256SUMS.txt", self._hash_manifest())' "$runtime"
           grep -q 'old_hashes = self._read_text("/SHA256SUMS.txt")' "$runtime"
           grep -q '("/SHA256SUMS.txt", old_hashes)' "$runtime"
+          grep -q 'NOT a complete CIRCUITPY runtime bundle' "$root/SAFE-MANIFEST.txt"
           ! grep -Eq 'usb_hid\.disable|role=light-guard.*hid=off|RunEngine' "$runtime"
 
       - name: Test combined Guard calibration protocol
@@ -73,22 +74,31 @@ jobs:
           set -euo pipefail
           python3 portable/plan3/sim/test_combined_guard_calibration_protocol.py
 
-      - name: Package combined Guard firmware
+      - name: Package combined Guard core source artifact
         shell: bash
         run: |
           set -euo pipefail
           root=firmware/pico-light-guard-1.0.0
+          package=pico-light-guard-1.0.0-core
           find "$root" -type d -name '__pycache__' -prune -exec rm -rf {} +
-          zip -qr pico-light-guard-1.0.0.zip "$root"
-          sha256sum pico-light-guard-1.0.0.zip | awk '{print toupper($1)}' > pico-light-guard-1.0.0-sha256.txt
-          cat pico-light-guard-1.0.0-sha256.txt
+          printf '%s\n' \
+            'This is a core-source validation artifact, not a complete CIRCUITPY runtime bundle.' \
+            'Do not copy it directly to CIRCUITPY.' \
+            'Generate the complete seven-route bundle with Classroom Studio PortableGuardBundle.Export.' \
+            'The complete bundle must include plan.txt, plan_engine.py, live_light_guard.py,' \
+            'guard_transition.py, error_policy.py, seven route files, both JSON manifests and SHA256SUMS.txt.' \
+            > "$package-SCOPE.txt"
+          zip -qr "$package.zip" "$root" "$package-SCOPE.txt"
+          sha256sum "$package.zip" | awk '{print toupper($1)}' > "$package-sha256.txt"
+          cat "$package-sha256.txt"
 
-      - name: Upload combined Guard package
+      - name: Upload combined Guard core artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pico-light-guard-1.0.0
+          name: pico-light-guard-1.0.0-core
           path: |
-            pico-light-guard-1.0.0.zip
-            pico-light-guard-1.0.0-sha256.txt
+            pico-light-guard-1.0.0-core.zip
+            pico-light-guard-1.0.0-core-sha256.txt
+            pico-light-guard-1.0.0-core-SCOPE.txt
           retention-days: 14
           if-no-files-found: error

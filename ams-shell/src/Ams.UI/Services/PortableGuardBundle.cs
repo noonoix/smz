@@ -21,7 +21,7 @@ public static class PortableGuardBundle
 
     private static readonly string[] RuntimeFiles =
     {
-        "plan_engine.py", "live_light_guard.py", "guard_transition.py", "error_policy.py", "combined_guard_runtime.py",
+        "plan_engine.py", "live_light_guard.py", "guard_transition.py", "guard_calibration_protocol.py", "error_policy.py", "combined_guard_runtime.py",
     };
 
     private static readonly string[] CombinedFirmwareFiles = { "code.py", "boot.py" };

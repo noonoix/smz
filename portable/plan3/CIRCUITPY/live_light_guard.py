@@ -30,6 +30,18 @@ ROUTE_FILES = {
     "Targeted": "targeted_steps.txt",
     "Resumable": "resumable_steps.txt",
 }
+REQUIRED_BUNDLE_FILES = (
+    "code.py",
+    "boot.py",
+    "plan.txt",
+    "plan_engine.py",
+    "live_light_guard.py",
+    "guard_transition.py",
+    "guard_calibration_protocol.py",
+    "error_policy.py",
+    "combined_guard_runtime.py",
+    "SHA256SUMS.txt",
+)
 
 
 class GuardBundleError(ValueError):
@@ -53,10 +65,10 @@ def _finite_nonnegative(value, label):
 def load_guard_bundle(root="/"):
     """Load and fail closed on the exported transition/calibration contract.
 
-    The manifest and calibration revision must agree, all seven route files must be
-    present, and the six optical profiles must be unique and numerically valid. This
-    is intentionally a pure filesystem check so the Pico can reject a stale or partial
-    CIRCUITPY copy before STATELOOP executes a route.
+    The manifest and calibration revision must agree, all seven route files and all
+    combined runtime files must be present, and the six optical profiles must be
+    unique and numerically valid. This is intentionally a pure filesystem check so
+    the Pico can reject a stale or partial CIRCUITPY copy before STATELOOP executes.
     """
     manifest = _read_json(root, "guard-transition.json")
     calibration = _read_json(root, "guard-calibration.json")
@@ -64,6 +76,10 @@ def load_guard_bundle(root="/"):
         raise GuardBundleError("unsupported Guard manifest")
     if calibration.get("format") != 1:
         raise GuardBundleError("unsupported Guard calibration")
+
+    for filename in REQUIRED_BUNDLE_FILES:
+        if not os.path.isfile(os.path.join(root, filename)):
+            raise GuardBundleError("missing Guard runtime file: " + filename)
 
     routes = manifest.get("routes")
     if routes != ROUTE_FILES:

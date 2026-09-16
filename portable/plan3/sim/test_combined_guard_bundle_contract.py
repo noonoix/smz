@@ -7,7 +7,13 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(root / "portable/plan3/CIRCUITPY"))
-from live_light_guard import GuardBundleError, LightStateGuard, ROUTE_FILES, load_guard_bundle
+from live_light_guard import (
+    GuardBundleError,
+    LightStateGuard,
+    REQUIRED_BUNDLE_FILES,
+    ROUTE_FILES,
+    load_guard_bundle,
+)
 
 PROFILE_IDS = (
     "desktop",
@@ -40,6 +46,8 @@ def write_bundle(path):
     (path / "guard-calibration.json").write_text(json.dumps(calibration), encoding="utf-8")
     for filename in ROUTE_FILES.values():
         (path / filename).write_text("PLAN|2\n", encoding="utf-8")
+    for filename in REQUIRED_BUNDLE_FILES:
+        (path / filename).write_text("# offline preflight placeholder\n", encoding="utf-8")
 
 
 def expect_rejected(path, label):
@@ -83,4 +91,8 @@ with tempfile.TemporaryDirectory() as temporary:
     (bundle / ROUTE_FILES["Resumable"]).unlink()
     expect_rejected(bundle, "missing Resumable route")
 
-print("combined Guard bundle preflight: exact six profiles, seven routes, revision parity and fail-closed rejection verified")
+    write_bundle(bundle)
+    (bundle / "plan_engine.py").unlink()
+    expect_rejected(bundle, "missing plan engine")
+
+print("combined Guard bundle preflight: exact six profiles, seven routes, runtime completeness, revision parity and fail-closed rejection verified")

@@ -166,6 +166,7 @@ class LiveLightGuardTests(unittest.TestCase):
         try:
             calibration["revision"] = "other-revision"
             Path(root.name, "guard-calibration.json").write_text(json.dumps(calibration), encoding="utf-8")
+            self._refresh_hashes(root.name)
             with self.assertRaisesRegex(GuardBundleError, "revision mismatch"):
                 load_guard_bundle(root.name)
         finally:
@@ -176,6 +177,7 @@ class LiveLightGuardTests(unittest.TestCase):
         try:
             calibration["profiles"]["game"]["tolerance"] = 6.0
             Path(root.name, "guard-calibration.json").write_text(json.dumps(calibration), encoding="utf-8")
+            self._refresh_hashes(root.name)
             with self.assertRaisesRegex(GuardBundleError, "profile mismatch"):
                 load_guard_bundle(root.name)
         finally:
@@ -186,6 +188,7 @@ class LiveLightGuardTests(unittest.TestCase):
         try:
             manifest["routes"].pop("Resumable")
             Path(root.name, "guard-transition.json").write_text(json.dumps(manifest), encoding="utf-8")
+            self._refresh_hashes(root.name)
             with self.assertRaisesRegex(GuardBundleError, "route map"):
                 load_guard_bundle(root.name)
         finally:

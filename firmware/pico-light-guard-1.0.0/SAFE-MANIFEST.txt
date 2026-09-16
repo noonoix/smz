@@ -1,0 +1,14 @@
+Classroom Studio Phase 7 Light Guard
+Firmware: pico-light-guard 1.0.0
+Target: Raspberry Pi Pico (non-W)
+Sensor: BH1750/GY-30, SDA=GP20/pin26, SCL=GP21/pin27, ADDR=GND/0x23
+Button: GP4 Start/Stop, 3-second hold enters calibration
+Button: GP3 Pass/Next calibration stage
+Passive piezo: GP6 PWM
+Calibration: six profiles, 5-second median/spread gate
+HID: disabled
+UART: absent
+Keyboard: absent
+Mouse: absent
+Macro: absent
+Actuator: absent

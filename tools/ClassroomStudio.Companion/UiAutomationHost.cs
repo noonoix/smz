@@ -84,7 +84,17 @@ public sealed class UiAutomationHost
     public void InvokeCombinedGuardExport(Process process)
     {
         var root = WaitForWindow(process, TimeSpan.FromSeconds(5)); AutomationElement? button = null;
-        foreach (var query in new[] { "Combined Guard", "ساخت Combined Guard Bundle", "Combined Guard Bundle" }) { button = Find(root, query); if (button is not null) break; }
+        foreach (var query in new[]
+        {
+            "۰  ·  ساخت Combined Guard Bundle",
+            "۰ · ساخت Combined Guard Bundle",
+            "Combined Guard",
+            "ساخت Combined Guard Bundle",
+            "Combined Guard Bundle",
+        })
+        {
+            button = Find(root, query); if (button is not null) break;
+        }
         if (button is null) throw new InvalidOperationException("Combined Guard export control is not visible.");
         var name = button.Current.Name;
         if (!name.Contains("combined", StringComparison.OrdinalIgnoreCase) || !name.Contains("guard", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Refused to invoke a control that is not the Combined Guard export.");

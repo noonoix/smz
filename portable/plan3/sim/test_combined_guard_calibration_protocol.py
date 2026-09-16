@@ -19,7 +19,8 @@ assert payload == {
 assert build_calibration_get(revision, 6) == "OK|CALGET|revision=%s|count=6" % revision
 
 for line, expected in (
-    ("CALSET|bad|desktop|10|2|750", "REVISION"),
+    ("CALSET|bad|revision|desktop|10|2|750", "ARG"),
+    ("CALSET|bad\nrevision|desktop|10|2|750", "REVISION"),
     ("CALSET|%s|not-a-profile|10|2|750" % revision, "PROFILE"),
     ("CALSET|%s|desktop|nan|2|750" % revision, "VALUE"),
     ("CALSET|%s|desktop|-1|2|750" % revision, "VALUE"),

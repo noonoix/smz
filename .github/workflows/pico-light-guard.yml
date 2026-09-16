@@ -1,0 +1,63 @@
+name: Pico light Guard firmware
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'firmware/pico-light-guard-1.0.0/**'
+      - '.github/workflows/pico-light-guard.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-guard:
+    name: pico-light-guard / validate and package
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile Guard firmware sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            firmware/pico-light-guard-1.0.0/boot.py \
+            firmware/pico-light-guard-1.0.0/code.py
+
+      - name: Enforce isolated Guard boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=firmware/pico-light-guard-1.0.0
+          grep -q 'usb_hid.disable' "$root/boot.py"
+          grep -q 'role=light-guard' "$root/code.py"
+          grep -q 'board.GP20' "$root/code.py"
+          grep -q 'board.GP21' "$root/code.py"
+          grep -q 'board.GP4' "$root/code.py"
+          grep -q 'board.GP3' "$root/code.py"
+          grep -q 'board.GP6' "$root/code.py"
+          grep -q 'CAL_SECONDS = 5.0' "$root/code.py"
+          test "$(grep -o '"'"'desktop'"'"'\|"'"'login-or-dc'"'"'\|"'"'character-dashboard'"'"'\|"'"'entering-game-loading'"'"'\|"'"'game'"'"'\|"'"'targeted'"'"'' "$root/code.py" | wc -l)" -eq 6
+          ! grep -Eq 'adafruit_hid|usb_hid|busio\.UART|KBDPICO|KBDARM|RunEngine|TRGSND|WSND' "$root/code.py"
+
+      - name: Package Guard firmware
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=firmware/pico-light-guard-1.0.0
+          find "$root" -type d -name '__pycache__' -prune -exec rm -rf {} +
+          zip -qr pico-light-guard-1.0.0.zip "$root"
+          sha256sum pico-light-guard-1.0.0.zip | awk '{print toupper($1)}' > pico-light-guard-1.0.0-sha256.txt
+          cat pico-light-guard-1.0.0-sha256.txt
+
+      - name: Upload Guard firmware package
+        uses: actions/upload-artifact@v4
+        with:
+          name: pico-light-guard-1.0.0
+          path: |
+            pico-light-guard-1.0.0.zip
+            pico-light-guard-1.0.0-sha256.txt
+          retention-days: 14
+          if-no-files-found: error

@@ -8,7 +8,7 @@ namespace Ams.UI.Services;
 public static class PortablePaths
 {
     /// <summary>First existing directory from an ordered list of candidates.</summary>
-    public static string? FirstExistingDir(IEnumerable<string> candidates)
+    public static string? FirstExistingDir(IEnumerable<string?> candidates)
     {
         foreach (var c in candidates)
         {

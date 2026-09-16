@@ -40,6 +40,9 @@
     <None Include="..\..\..\portable\plan3\CIRCUITPY\error_policy.py"><Link>portable-runtime\error_policy.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY\live_light_guard.py"><Link>portable-runtime\live_light_guard.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY\guard_transition.py"><Link>portable-runtime\guard_transition.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="..\..\..\firmware\pico-light-guard-1.0.0\code.py"><Link>combined-runtime\code.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="..\..\..\firmware\pico-light-guard-1.0.0\boot.py"><Link>combined-runtime\boot.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="..\..\..\firmware\pico-light-guard-1.0.0\combined_guard_runtime.py"><Link>combined-runtime\combined_guard_runtime.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
   </ItemGroup>
 
 </Project>

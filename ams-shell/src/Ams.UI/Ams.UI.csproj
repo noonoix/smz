@@ -39,7 +39,7 @@
     <None Include="..\..\..\portable\plan3\autocycle_h6_patch.json"><Link>portable-runtime\autocycle_h6_patch.json</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY\error_policy.py"><Link>portable-runtime\error_policy.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY\live_light_guard.py"><Link>portable-runtime\live_light_guard.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
-    <None Include="..\..\..\portable\plan3\CIRCUITPY\guard_transition.py"><Link>portable-runtime\guard_transition.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></none>
+    <None Include="..\..\..\portable\plan3\CIRCUITPY\guard_transition.py"><Link>portable-runtime\guard_transition.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
   </ItemGroup>
 
 </Project>

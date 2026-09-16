@@ -13,7 +13,13 @@ from adafruit_hid.keyboard import Keyboard
 from adafruit_hid.keycode import Keycode
 import plan_engine
 from guard_calibration_protocol import build_calibration_get, parse_calibration_set
-from live_light_guard import GuardBundleError, LightStateGuard, load_guard_bundle
+from live_light_guard import (
+    HASHED_BUNDLE_FILES,
+    GuardBundleError,
+    LightStateGuard,
+    _file_sha256,
+    load_guard_bundle,
+)
 
 PROFILES = ("desktop", "login-or-dc", "character-dashboard", "entering-game-loading", "game", "targeted")
 PENDING_REVISION = "pending"
@@ -174,12 +180,19 @@ class Combined:
     def emit(self, line):
         try: self.usb.write((line + "\n").encode())
         except Exception: pass
-    def _replace_json(self, path, text):
+    def _replace_text(self, path, text):
         temp = path + ".tmp"
         with open(temp, "w") as fh: fh.write(text)
         try: os.remove(path)
         except Exception: pass
         os.rename(temp, path)
+    def _read_text(self, path):
+        with open(path, "r") as fh: return fh.read()
+    def _replace_json(self, path, text):
+        self._replace_text(path, text)
+    def _hash_manifest(self):
+        lines = ["%s  %s" % (_file_sha256("/", name), name) for name in sorted(HASHED_BUNDLE_FILES)]
+        return "\n".join(lines) + "\n"
     def _publish_calibration(self, revision, profile_id, profile):
         manifest = json.loads(json.dumps(self.bundle["manifest"]))
         calibration = json.loads(json.dumps(self.bundle["calibration"]))
@@ -192,18 +205,27 @@ class Combined:
         calibration["revision"] = revision
         calibration.setdefault("profiles", {})[profile_id] = {
             "center": profile["center"], "tolerance": profile["tolerance"], "stable_ms": profile["stable_ms"]}
-        old_manifest = json.dumps(self.bundle["manifest"])
-        old_calibration = json.dumps(self.bundle["calibration"])
+        old_manifest = self._read_text("/guard-transition.json")
+        old_calibration = self._read_text("/guard-calibration.json")
+        old_hashes = self._read_text("/SHA256SUMS.txt")
         try:
             self._replace_json("/guard-transition.json", json.dumps(manifest))
             self._replace_json("/guard-calibration.json", json.dumps(calibration))
+            self._replace_text("/SHA256SUMS.txt", self._hash_manifest())
             new_bundle = load_guard_bundle("/")
             new_guard = LightStateGuard.from_bundle("/")
         except Exception:
-            try: self._replace_json("/guard-transition.json", old_manifest)
-            except Exception: pass
-            try: self._replace_json("/guard-calibration.json", old_calibration)
-            except Exception: pass
+            rollback_error = None
+            for path, text in (
+                ("/guard-transition.json", old_manifest),
+                ("/guard-calibration.json", old_calibration),
+                ("/SHA256SUMS.txt", old_hashes),
+            ):
+                try:
+                    self._replace_text(path, text)
+                except Exception as exc:
+                    if rollback_error is None: rollback_error = exc
+            if rollback_error is not None: raise RuntimeError("calibration rollback failed") from rollback_error
             raise
         self.bundle = new_bundle; self.guard = new_guard
     def calibration_count(self):

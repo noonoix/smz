@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   companion:
@@ -23,14 +24,21 @@ jobs:
           dotnet-version: '8.0.x'
       - name: Build companion
         shell: pwsh
-        run: dotnet build tools/ClassroomStudio.Companion/ClassroomStudio.Companion.csproj -c Release
+        run: |
+          dotnet build tools/ClassroomStudio.Companion/ClassroomStudio.Companion.csproj -c Release 2>&1 | Tee-Object companion-build.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Run companion contract tests
         shell: pwsh
-        run: dotnet run --project tools/ClassroomStudio.Companion.ContractTests/ClassroomStudio.Companion.ContractTests.csproj -c Release
+        run: |
+          dotnet run --project tools/ClassroomStudio.Companion.ContractTests/ClassroomStudio.Companion.ContractTests.csproj -c Release 2>&1 | Tee-Object companion-contract.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Publish local companion artifact
         shell: pwsh
-        run: dotnet publish tools/ClassroomStudio.Companion/ClassroomStudio.Companion.csproj -c Release -r win-x64 --self-contained false -o companion-output
+        run: |
+          dotnet publish tools/ClassroomStudio.Companion/ClassroomStudio.Companion.csproj -c Release -r win-x64 --self-contained false -o companion-output 2>&1 | Tee-Object companion-publish.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Add software-only scope notice
+        if: success()
         shell: pwsh
         run: |
           @(
@@ -39,9 +47,25 @@ jobs:
             'No serial, USB, HID, firmware flashing, reset, actuator, Guard, Run/Stop, or release operations.'
           ) | Set-Content companion-output/SCOPE.txt -Encoding utf8
       - name: Upload companion artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: classroom-studio-companion-windows
           path: companion-output/**
           retention-days: 14
           if-no-files-found: error
+      - name: Report companion failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const names = ['companion-build.log', 'companion-contract.log', 'companion-publish.log'];
+            const text = names.map(name => fs.existsSync(name) ? `=== ${name} ===\n${fs.readFileSync(name, 'utf8')}` : '').filter(Boolean).join('\n');
+            const tail = text.split('\n').slice(-160).join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '<!-- companion-failure -->\n**Classroom Studio companion failure diagnostics**\n```\n' + tail + '\n```'
+            });

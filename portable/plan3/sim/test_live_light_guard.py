@@ -83,7 +83,13 @@ class LiveLightGuardTests(unittest.TestCase):
         self.assertEqual("login-or-dc", guard.update(25, 125))
         self.assertEqual("dc", guard.last_decision["context"])
         self.assertEqual(2, guard.last_decision["stage"])
-        self.assertEqual("game", guard.update(85, 185))
+        # DC falls back to stage 2; the next fresh stable profiles must progress
+        # through stages 2, 3, and 4 before Game can be accepted again.
+        for lux, profile in ((25, "login-or-dc"), (45, "character-dashboard"),
+                             (65, "entering-game-loading")):
+            self.assertEqual(profile, guard.update(lux, 125 + lux))
+            self.assertTrue(guard.last_decision["execute"])
+        self.assertEqual("game", guard.update(85, 210))
         self.assertEqual("return-from-targeted", guard.last_decision["context"])
 
     def _bundle(self, include_resumable=True):

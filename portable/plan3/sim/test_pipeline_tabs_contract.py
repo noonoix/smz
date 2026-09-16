@@ -5,8 +5,11 @@ root = Path(__file__).resolve().parents[3]
 model = (root / "ams-shell/src/Ams.UI/Models/PipelineWorkspace.cs").read_text(encoding="utf-8")
 viewmodel = (root / "ams-shell/src/Ams.UI/ViewModels/MainViewModel.PipelineTabs.cs").read_text(encoding="utf-8")
 serializer = (root / "ams-shell/src/Ams.UI/Services/PipelineWorkspaceSerializer.cs").read_text(encoding="utf-8")
-controller = (root / "ams-shell/src/Ams.UI/Services/LightGuardTransitionController.cs").read_text(encoding="utf-8")
+exporter = (root / "ams-shell/src/Ams.UI/Services/PortableGuardBundle.cs").read_text(encoding="utf-8")
+export_command = (root / "ams-shell/src/Ams.UI/ViewModels/MainViewModel.AutoCycleExport.cs").read_text(encoding="utf-8")
+export_ui = (root / "ams-shell/src/Ams.UI/MainWindow.CombinedGuardExportUi.cs").read_text(encoding="utf-8")
 ui = (root / "ams-shell/src/Ams.UI/LightGuardUiBootstrap.cs").read_text(encoding="utf-8")
+portable_guard = (root / "portable/plan3/CIRCUITPY/guard_transition.py").read_text(encoding="utf-8")
 spec = (root / "docs/light-guard-phase7-tab-migration.md").read_text(encoding="utf-8")
 matrix = (root / "docs/light-guard-phase7-transition-matrix.md").read_text(encoding="utf-8")
 portable = (root / "docs/portable-output-architecture.md").read_text(encoding="utf-8")
@@ -83,18 +86,20 @@ for stage in (
 
 # The transition policy is portable-output policy, not a desktop RunEngine trigger.
 for phrase in (
-    "LightGuardTransitionController",
-    "duplicate stable state",
-    "pipeline revision mismatch",
-    "DC fallback to stage 2",
-    "Targeted side-state returned to Game",
-    "does not invoke RunEngine",
+    "GuardTransition",
+    "duplicate-stable-state",
+    "dc-fallback-to-stage-2",
+    "targeted-returned-to-game",
 ):
-    assert phrase in controller
-assert "LightGuardEntryContext.Disconnect" in controller
-assert "LightGuardEntryContext.Targeted" in controller
-assert "All actions are observation/calibration protocol only" in ui
-assert "RunEngine" not in ui
+    assert phrase in portable_guard
+assert "RunEngine" not in portable_guard
+assert "ExportCombinedPortableGuard" in export_command
+assert "PortableGuardBundle.Export" in export_command
+assert "BuildEntryPlan" in exporter
+assert "Path.Combine(directory, \"plan.txt\")" in exporter
+assert "codePath" in exporter and "code.py" in exporter
+assert "ExportCombinedPortableGuardCommand" in export_ui
+assert "RunCommand" not in ui
 for phrase in (
     "Classroom Studio is the authoring kitchen",
     "runtime source of truth",
@@ -104,4 +109,4 @@ for phrase in (
 ):
     assert phrase in portable
 
-print("pipeline tabs migration contract: seven tabs, ordered stages, DC fallback, Targeted side-state, and portable output boundary verified")
+print("pipeline tabs migration contract: seven tabs, combined export, ordered stages, DC fallback, Targeted side-state, and portable output boundary verified")

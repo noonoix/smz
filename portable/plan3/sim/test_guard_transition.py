@@ -53,7 +53,7 @@ class GuardTransitionTests(unittest.TestCase):
         self.assertTrue(decision["execute"])
         self.assertEqual("dc", decision["context"])
         self.assertEqual(2, decision["stage"])
-        self.assertEqual("login-or-dc_steps.txt", decision["route"])
+        self.assertEqual("login_or_dc_steps.txt", decision["route"])
 
     def test_targeted_is_side_state_and_returns_to_game(self):
         self.advance_to_game()

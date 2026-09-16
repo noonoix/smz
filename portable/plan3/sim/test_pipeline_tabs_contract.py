@@ -5,6 +5,7 @@ root = Path(__file__).resolve().parents[3]
 model = (root / "ams-shell/src/Ams.UI/Models/PipelineWorkspace.cs").read_text(encoding="utf-8")
 viewmodel = (root / "ams-shell/src/Ams.UI/ViewModels/MainViewModel.PipelineTabs.cs").read_text(encoding="utf-8")
 serializer = (root / "ams-shell/src/Ams.UI/Services/PipelineWorkspaceSerializer.cs").read_text(encoding="utf-8")
+controller = (root / "ams-shell/src/Ams.UI/Services/LightGuardTransitionController.cs").read_text(encoding="utf-8")
 spec = (root / "docs/light-guard-phase7-tab-migration.md").read_text(encoding="utf-8")
 matrix = (root / "docs/light-guard-phase7-transition-matrix.md").read_text(encoding="utf-8")
 
@@ -78,4 +79,18 @@ for stage in (
 ):
     assert stage in matrix
 
-print("pipeline tabs migration contract: seven tabs, ordered stages, DC fallback, and Targeted side-state verified")
+# The first execution-layer implementation is a pure, fail-closed planner. It validates
+# revisions/session prerequisites, enforces 1->2->3->4->5, and gives DC priority over Targeted.
+for phrase in (
+    "LightGuardTransitionController",
+    "duplicate stable state",
+    "pipeline revision mismatch",
+    "DC fallback to stage 2",
+    "Targeted side-state returned to Game",
+    "does not invoke RunEngine",
+):
+    assert phrase in controller
+assert "LightGuardEntryContext.Disconnect" in controller
+assert "LightGuardEntryContext.Targeted" in controller
+
+print("pipeline tabs migration contract: seven tabs, ordered stages, DC fallback, Targeted side-state, and guarded planner verified")

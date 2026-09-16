@@ -1,6 +1,12 @@
 # Firmware ترکیبی Pico Guard + Portable Executor — Phase 7
 
-این firmware برای یک Raspberry Pi Pico معمولی طراحی شده است. Pico پس از کپی دستی bundle به `CIRCUITPY`، هم Guard نوری و هم اجرای Portable Steps را بر عهده دارد. Classroom Studio فقط محل authoring، تست دستی با RunEngine، export و همگام‌سازی revision است؛ پس از قطع کامپیوتر runtime به Windows وابسته نیست.
+این firmware برای یک Raspberry Pi Pico معمولی طراحی شده است. Pico پس از کپی دستی bundle کامل به `CIRCUITPY`، هم Guard نوری و هم اجرای Portable Steps را بر عهده دارد. Classroom Studio فقط محل authoring، تست دستی با RunEngine، export و همگام‌سازی revision است؛ پس از قطع کامپیوتر runtime به Windows وابسته نیست.
+
+## هشدار مهم دربارهٔ این پوشه
+
+پوشهٔ `firmware/pico-light-guard-1.0.0` فقط **core firmware source** را نگه می‌دارد؛ شامل `code.py`، `boot.py`، `combined_guard_runtime.py` و helper کالیبراسیون است. این پوشه یا artifact با نام `pico-light-guard-1.0.0-core` به‌تنهایی bundle قابل اجرای `CIRCUITPY` نیست و نباید مستقیماً روی Pico کپی شود.
+
+Bundle کامل باید با `PortableGuardBundle.Export` از Classroom Studio ساخته شود و علاوه بر core firmware شامل `plan.txt`، `plan_engine.py`، `live_light_guard.py`، `guard_transition.py`، `error_policy.py`، هفت route file، دو manifest JSON و `SHA256SUMS.txt` باشد. فایل ناقص یا placeholder قابل قبول نیست.
 
 ## سخت‌افزار مجاز
 
@@ -49,16 +55,16 @@ Login و DC یک calibration record مشترک دارند؛ تفاوت آن‌ه
 
 ## Bundle و runtime
 
-فایل‌های روی `CIRCUITPY` منبع حقیقت runtime هستند. Bundle معتبر شامل این موارد است:
+فایل‌های روی `CIRCUITPY` منبع حقیقت runtime هستند. Bundle کامل معتبر شامل این موارد است:
 
 - `code.py`, `boot.py`
 - `plan.txt`
 - `desktop_steps.txt`, `login_or_dc_steps.txt`, `character_dashboard_steps.txt`, `entering_game_loading_steps.txt`, `game_steps.txt`, `targeted_steps.txt`, `resumable_steps.txt`
-- `plan_engine.py` و runtime moduleهای لازم
+- `plan_engine.py`, `live_light_guard.py`, `guard_transition.py`, `guard_calibration_protocol.py`, `error_policy.py`, `combined_guard_runtime.py`
 - `guard-transition.json`, `guard-calibration.json`
 - `SHA256SUMS.txt`
 
-Loader پیش از استفاده، manifest، هفت route، شش profile، revision و runtime files را بررسی می‌کند و bundle ناقص یا stale را رد می‌کند.
+این bundle باید از Classroom Studio export شود. core source directory یا core CI artifact جایگزین export کامل نیست. Loader پیش از استفاده، manifest، هفت route، شش profile، revision و runtime files را بررسی می‌کند و bundle ناقص یا stale را رد می‌کند.
 
 ## Transition policy
 
@@ -97,4 +103,4 @@ OK|PONG|combined-pico-guard-executor|hid=on|uart=on|profiles=6
 
 ## وضعیت پذیرش
 
-CI و Windows build جایگزین Hardware Acceptance نیستند. این package هنوز نباید روی setup قبلی نصب یا flash شود. پذیرش فیزیکی جداگانه باید با SHA دقیق package، wiring مصوب، evidence کالیبراسیون، CALSET/CALGET، transitionهای ordered، Targeted/DC، keyboard HID، Arduino mouse/sound و مسیر HALT انجام شود. تا آن زمان PR Draft می‌ماند و هیچ Hardware Acceptance یا production-readiness ادعایی مجاز نیست.
+CI و Windows build جایگزین Hardware Acceptance نیستند. این core source یا core artifact نباید به‌جای export کامل روی setup قبلی نصب یا flash شود. پذیرش فیزیکی جداگانه باید با SHA دقیق bundle کامل، wiring مصوب، evidence کالیبراسیون، CALSET/CALGET، transitionهای ordered، Targeted/DC، keyboard HID، Arduino mouse/sound و مسیر HALT انجام شود. تا آن زمان PR Draft می‌ماند و هیچ Hardware Acceptance یا production-readiness ادعایی مجاز نیست.

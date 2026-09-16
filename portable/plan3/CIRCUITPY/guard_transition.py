@@ -65,7 +65,9 @@ class GuardTransition:
 
     def _login_or_dc(self):
         if self.targeted_active or self.stage in (3, 4, 5):
-            self.targeted_active = False
+            # DC has priority over the Targeted route and resets ordered progress
+            # to stage 2. Keep the side-state marker so the eventual fresh Game
+            # observation returns from Targeted without executing Game a second time.
             self.stage = 2
             return self._execute("login-or-dc", "dc", 2, 2,
                                  "dc-fallback-to-stage-2")

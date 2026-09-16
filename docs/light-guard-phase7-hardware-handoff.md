@@ -6,7 +6,7 @@
 
 **Firmware line:** `pico-light-guard-1.0.0`
 
-**Current software evidence:** CI passed on the PR head. Record the exact CI artifact SHA-256 immediately before any future physical pass; do not infer or substitute a source-commit hash.
+**Current software evidence:** The preceding implementation commit `8e2b74eab7ba9aa7b6a8a6908307beae99113cf1` passed the required CI gates. This documentation-only handoff commit does not authorize physical validation. Record the exact CI artifact SHA-256 immediately before any future physical pass; do not infer or substitute a source-commit hash.
 
 ## 1. Entry conditions
 

@@ -10,8 +10,7 @@ using WpfColorConverter = System.Windows.Media.ColorConverter;
 
 namespace Ams.UI;
 
-/// <summary>Visible Phase 7 Guard panel. Calibration and execution remain independently
-/// fail-closed and revisioned.</summary>
+/// <summary>Visible Phase 7 Guard panel. All actions are observation/calibration protocol only.</summary>
 internal static class LightGuardUiBootstrap
 {
     private static readonly DependencyProperty InstalledProperty = DependencyProperty.RegisterAttached(
@@ -40,7 +39,7 @@ internal static class LightGuardUiBootstrap
         var content = new StackPanel();
         content.Children.Add(Text("Light Guard — Phase 7", 16, "#F5F7FA", FontWeights.SemiBold));
         content.Children.Add(Text(
-            "Guard جدا از Phase 6 است: BH1750 روی GP20/GP21، GP4 شروع/توقف و hold سه‌ثانیه‌ای کالیبراسیون، GP3 Pass/Next، و GP6 passive piezo. هویت، کالیبراسیون، pipeline revision و Stop قبل از هر اجرای Steps بررسی می‌شوند.",
+            "Guard جدا از Phase 6 است: BH1750 روی GP20/GP21، GP4 شروع/توقف و hold سه‌ثانیه‌ای کالیبراسیون، GP3 Pass/Next، و GP6 passive piezo. هیچ RunEngine، HID، UART یا actuator در این مسیر نیست.",
             12, "#AAB3C2"));
         content.Children.Add(Text("کالیبراسیون فیزیکی: GP4 را ۳ ثانیه نگه دارید؛ برای هر جایگاه GP3 را بزنید. بعد از هر مرحلهٔ موفق، GP3 مرحلهٔ بعد را آماده می‌کند.", 12, "#DE9255"));
 
@@ -56,7 +55,6 @@ internal static class LightGuardUiBootstrap
         content.Children.Add(Bound(nameof(MainViewModel.LightGuardRevisionComparison), 12, "#DE9255"));
         content.Children.Add(Bound(nameof(MainViewModel.LightGuardCalibrationStatus), 12, "#72BC8F"));
         content.Children.Add(Bound(nameof(MainViewModel.LightGuardObservationStatus), 12, "#D9DEE7"));
-        content.Children.Add(Bound(nameof(MainViewModel.LightGuardExecutionStatus), 12, "#DE9255", FontWeights.SemiBold));
         content.Children.Add(Bound(nameof(MainViewModel.LightGuardStateDisplay), 12, "#72BC8F", FontWeights.SemiBold));
 
         var profiles = new ItemsControl();

@@ -6,6 +6,18 @@ Classroom Studio is the authoring kitchen. It edits the seven pipeline tabs, val
 
 The Windows application must not be required for normal portable execution and must not be treated as a second competing RunEngine for the same Guard transition.
 
+## Desktop Step test boundary
+
+`RunEngine` remains available in Classroom Studio as a manual authoring test tool. It is used to run the Steps currently written in a selected tab so the author can verify the sequence before export. The existing in-app Run/Stop controls belong to this test boundary only.
+
+Guard events must never consume, hijack or indirectly trigger the Classroom Studio Run/Stop buttons. Guard observation, portable export and desktop Step testing are separate paths:
+
+```text
+write/edit Steps → manual RunEngine test → approve/export bundle → copy to CIRCUITPY
+```
+
+A successful desktop test does not replace portable-runtime validation and does not make the Windows application a runtime dependency.
+
 ## Output boundary
 
 A portable pipeline export must be an atomic bundle containing:

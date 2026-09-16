@@ -1,14 +1,20 @@
-Classroom Studio Phase 7 Light Guard
+Classroom Studio Phase 7 Combined Guard
+Scope: core firmware source only — NOT a complete CIRCUITPY runtime bundle
 Firmware: pico-light-guard 1.0.0
 Target: Raspberry Pi Pico (non-W)
+
+This directory must not be copied directly to CIRCUITPY. A runnable bundle must be produced by Classroom Studio PortableGuardBundle.Export and must additionally contain plan.txt, plan_engine.py, live_light_guard.py, guard_transition.py, error_policy.py, seven route files, guard-transition.json, guard-calibration.json and SHA256SUMS.txt.
+
+Hardware contract for the combined runtime:
 Sensor: BH1750/GY-30, SDA=GP20/pin26, SCL=GP21/pin27, ADDR=GND/0x23
 Button: GP4 Start/Stop, 3-second hold enters calibration
-Button: GP3 Pass/Next calibration stage
+Button: GP3 Pause/Resume or calibration sample/save
 Passive piezo: GP6 PWM
 Calibration: six profiles, 5-second median/spread gate
-HID: disabled
-UART: absent
-Keyboard: absent
-Mouse: absent
-Macro: absent
-Actuator: absent
+HID: enabled; Pico USB HID is the Portable Steps keyboard path
+UART: enabled to Arduino arm, GP16 TX/GP17 RX, 57600 8N1
+Mouse/sound: Arduino arm remains responsible
+Windows/RunEngine: not a runtime dependency
+Actuator boundary: no unrelated actuator, relay, Pro Micro or BSS138 wiring
+
+The CI artifact for this directory is a core-source validation artifact. It is not Hardware Acceptance and is not a complete install bundle until Classroom Studio exports the full route/runtime/manifest bundle.

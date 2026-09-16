@@ -3,7 +3,7 @@ using Ams.UI.Models;
 
 namespace Ams.UI.Services;
 
-/// <summary>Versioned persistence envelope for browser-style pipeline tabs.</summary>
+/// <summary>Versioned persistence envelope for six optical-position tabs plus Resumable.</summary>
 public static class PipelineWorkspaceSerializer
 {
     private sealed class Envelope
@@ -11,6 +11,7 @@ public static class PipelineWorkspaceSerializer
         public string app { get; set; } = "AMS";
         public int pipelineVersion { get; set; } = PipelineWorkspace.FormatVersion;
         public Dictionary<string, List<StepNode>> pipelines { get; set; } = new();
+        public Dictionary<string, List<StepNode>> legacyPipelines { get; set; } = new();
     }
 
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
@@ -20,6 +21,8 @@ public static class PipelineWorkspaceSerializer
         var envelope = new Envelope();
         foreach (var tab in workspace.Tabs)
             envelope.pipelines[tab.Kind.ToString()] = tab.Steps.ToList();
+        foreach (var pair in workspace.LegacyPipelines)
+            envelope.legacyPipelines[pair.Key] = pair.Value;
         return JsonSerializer.Serialize(envelope, Options);
     }
 
@@ -27,10 +30,29 @@ public static class PipelineWorkspaceSerializer
     {
         var envelope = JsonSerializer.Deserialize<Envelope>(json, Options)
             ?? throw new InvalidDataException("Not an AMS pipeline document.");
-        if (envelope.app != "AMS" || envelope.pipelineVersion != PipelineWorkspace.FormatVersion)
+        if (envelope.app != "AMS")
             throw new InvalidDataException("Unsupported AMS pipeline document.");
 
         var workspace = new PipelineWorkspace();
+        if (envelope.pipelineVersion == PipelineWorkspace.FormatVersion)
+        {
+            foreach (var pair in envelope.legacyPipelines)
+                workspace.LegacyPipelines[pair.Key] = pair.Value;
+        }
+        else if (envelope.pipelineVersion != 1)
+        {
+            throw new InvalidDataException("Unsupported AMS pipeline document.");
+        }
+
+        var currentNames = workspace.Tabs.Select(tab => tab.Kind.ToString()).ToHashSet(StringComparer.Ordinal);
+        foreach (var pair in envelope.pipelines)
+        {
+            // Version-1 Launch/Main/Recovery/Resume Essentials trees are retained as
+            // migration data instead of being guessed into a new optical position.
+            if (!currentNames.Contains(pair.Key))
+                workspace.LegacyPipelines[pair.Key] = pair.Value;
+        }
+
         foreach (var tab in workspace.Tabs)
         {
             tab.Steps.Clear();

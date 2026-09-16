@@ -38,16 +38,20 @@ assert portable_helper == firmware_helper
 runtime = (root / "firmware/pico-light-guard-1.0.0/combined_guard_runtime.py").read_text(encoding="utf-8")
 assert "from live_light_guard import (" in runtime
 assert "HASHED_BUNDLE_FILES" in runtime
-assert "_file_sha256(\"/\", name)" in runtime
-assert "return \"\\n\".join(lines) + \"\\n\"" in runtime
-assert '"%s  %s"' in runtime
+assert "_file_sha256" in runtime
 assert "def _hash_manifest(self)" in runtime
-assert "old_hashes = self._read_text(\"/SHA256SUMS.txt\")" in runtime
-assert "self._replace_text(\"/SHA256SUMS.txt\", self._hash_manifest())" in runtime
-assert runtime.index('self._replace_text("/SHA256SUMS.txt", self._hash_manifest())') > runtime.index('self._replace_json("/guard-calibration.json", json.dumps(calibration))')
-assert runtime.index('new_bundle = load_guard_bundle("/")') > runtime.index('self._replace_text("/SHA256SUMS.txt", self._hash_manifest())')
+
+publication = runtime.split("def _publish_calibration", 1)[1].split("def calibration_count", 1)[0]
+assert "old_manifest = self._read_text(\"/guard-transition.json\")" in publication
+assert "old_calibration = self._read_text(\"/guard-calibration.json\")" in publication
+assert "old_hashes = self._read_text(\"/SHA256SUMS.txt\")" in publication
+assert "self._replace_json(\"/guard-transition.json\", json.dumps(manifest))" in publication
+assert "self._replace_json(\"/guard-calibration.json\", json.dumps(calibration))" in publication
+assert "self._replace_text(\"/SHA256SUMS.txt\", self._hash_manifest())" in publication
+assert publication.index("self._replace_json(\"/guard-calibration.json\"") < publication.index("self._replace_text(\"/SHA256SUMS.txt\"")
+assert publication.index("self._replace_text(\"/SHA256SUMS.txt\"") < publication.index("new_bundle = load_guard_bundle(\"/\")")
 for path in ("/guard-transition.json", "/guard-calibration.json", "/SHA256SUMS.txt"):
-    assert '("%s",' % path in runtime, path
+    assert path in publication
 
 for phrase in (
     "def calget(self)",

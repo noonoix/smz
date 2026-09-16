@@ -1,62 +1,103 @@
 # Phase 7 Combined Guard — Hardware Handoff Packet
 
-**Status:** Prepared, not run. This document is a handoff plan only; it does not authorize installation, flashing, physical testing or Hardware Acceptance.
+**Status:** Prepared, not run. This document is a human handoff plan only; it does not authorize installation, flashing, physical testing or Hardware Acceptance.
 
 **PR:** #175 — keep Open and Draft.
 
-**Firmware line:** `pico-light-guard-1.0.0`
+## Critical package distinction
 
-**Current software evidence:** The preceding implementation commit `8e2b74eab7ba9aa7b6a8a6908307beae99113cf1` passed the required CI gates. This documentation-only handoff commit does not authorize physical validation. Record the exact CI artifact SHA-256 immediately before any future physical pass; do not infer or substitute a source-commit hash.
+`firmware/pico-light-guard-1.0.0/` contains **core firmware source only**:
+
+- `code.py`
+- `boot.py`
+- `combined_guard_runtime.py`
+- `guard_calibration_protocol.py`
+- documentation and scope metadata
+
+The `pico-light-guard-1.0.0-core` CI artifact is a validation artifact for those sources. **Do not copy it directly to `CIRCUITPY`.** It does not contain the runnable plan, loader, transition module, routes or calibration manifests.
+
+A runnable hardware bundle must be produced by Classroom Studio `PortableGuardBundle.Export`. It must contain, at the bundle root:
+
+```text
+code.py
+boot.py
+plan.txt
+plan_engine.py
+live_light_guard.py
+guard_transition.py
+guard_calibration_protocol.py
+error_policy.py
+combined_guard_runtime.py
+desktop_steps.txt
+login_or_dc_steps.txt
+character_dashboard_steps.txt
+entering_game_loading_steps.txt
+game_steps.txt
+targeted_steps.txt
+resumable_steps.txt
+guard-transition.json
+guard-calibration.json
+SHA256SUMS.txt
+```
+
+Do not invent missing files or use placeholders. The exact route content and manifests must come from the approved Classroom Studio export.
 
 ## 1. Entry conditions
 
-A separate reviewer must confirm all of the following before any power is applied:
-
-- [ ] The physical pass is explicitly approved as a separate activity.
-- [ ] The exact CI-produced combined package and SHA-256 are recorded.
+- [ ] A separate physical pass is explicitly approved.
+- [ ] The complete Classroom Studio export, not the core artifact, is identified.
+- [ ] The complete export hash is recorded; do not use the source commit hash as the bundle hash.
 - [ ] A regular Raspberry Pi Pico is available; Pico W is not allowed.
-- [ ] The existing Phase 6 read-only setup is isolated and will not be modified.
-- [ ] The rollback plan is written: disconnect power, remove the combined bundle, restore the prior read-only setup only through its own approved procedure.
+- [ ] The old Phase 6 read-only setup is isolated.
+- [ ] A rollback plan and a separate reviewer are assigned.
 - [ ] No production release, merge or production-readiness claim is part of the pass.
-- [ ] A reviewer is assigned to observe and record evidence.
 
-Until every entry condition is checked, stop at software/CI evidence. Do not connect hardware.
+Until all entry conditions are satisfied, do not connect hardware or copy files to `CIRCUITPY`.
 
-## 2. Approved wiring record
+## 2. Approved wiring
 
-Record the actual wiring and photographs in the acceptance evidence log. Only this boundary is in scope:
+| Component | Connection |
+|---|---|
+| BH1750/GY-30 SDA | Pico GP20, physical pin 26 |
+| BH1750/GY-30 SCL | Pico GP21, physical pin 27 |
+| BH1750/GY-30 VCC | Pico 3V3 |
+| BH1750/GY-30 GND | Pico GND |
+| BH1750/GY-30 ADDR | GND, address 0x23 |
+| Blue button | GP4 to GND |
+| Yellow button | GP3 to GND |
+| Passive piezo | GP6 |
+| Pico UART0 TX | GP16 -> Arduino RX |
+| Pico UART0 RX | GP17 <- Arduino TX |
+| Common arm ground | Pico GND <-> Arduino GND |
 
-| Component | Connection | Record before power-on |
-|---|---|---|
-| BH1750/GY-30 SDA | Pico GP20, physical pin 26 | continuity and photo |
-| BH1750/GY-30 SCL | Pico GP21, physical pin 27 | continuity and photo |
-| BH1750/GY-30 VCC | Pico 3V3 | 3.3 V confirmation |
-| BH1750/GY-30 GND | Pico GND | common-ground confirmation |
-| BH1750/GY-30 ADDR | GND, address 0x23 | address confirmation |
-| Blue button | GP4 to GND | pull-up and debounce |
-| Yellow button | GP3 to GND | pull-up and debounce |
-| Passive piezo | GP6 | passive piezo confirmation |
-| Pico UART0 TX | GP16 -> Arduino RX | 57600 8N1 |
-| Pico UART0 RX | GP17 <- Arduino TX | 57600 8N1 |
-| Arduino arm ground | Pico GND <-> Arduino GND | common-ground confirmation |
+Arduino remains responsible for mouse/sound. Pico USB HID remains the keyboard path. Do not add Pro Micro, BSS138, relay, old integrated buzzer or unrelated actuator wiring.
 
-The Arduino arm remains the mouse/sound component. Pico USB HID remains the keyboard path. Do not add Pro Micro, BSS138, relay, old integrated buzzer or unrelated actuator wiring.
+## 3. Software-only bundle preparation
 
-## 3. Staged validation order
+1. In Classroom Studio, validate exactly six profiles and seven visible route tabs.
+2. Keep the canonical order: `desktop`, `login-or-dc`, `character-dashboard`, `entering-game-loading`, `game`, `targeted`; `Resumable` remains a separate route.
+3. Run manual Step tests in Classroom Studio only.
+4. Use `PortableGuardBundle.Export` to generate a clean output directory.
+5. Verify all files in the complete list above are present at the output root.
+6. Verify `SHA256SUMS.txt` contains lowercase SHA-256 digests, two spaces, basenames, every hashed bundle file except itself.
+7. Verify manifest/calibration revision parity and the exact seven route map.
+8. Record the complete export file list and SHA-256.
 
-Do not skip a stage or combine evidence from different packages.
+The core CI artifact may be used as source evidence, but it must not replace this export.
 
-### Stage A — Power-off inspection
+## 4. Human-operated validation order
 
-- [ ] Inspect for shorts between 3V3 and GND.
-- [ ] Verify sensor orientation and fixed mounting.
-- [ ] Verify button colors and pin mapping.
-- [ ] Verify UART polarity, baud and common ground.
+Only after the complete export has passed the software checks above:
+
+### A — Power-off inspection
+
+- [ ] Check for shorts between 3V3 and GND.
+- [ ] Verify sensor orientation, button colors, UART polarity and common ground.
 - [ ] Photograph the complete wiring.
 
-### Stage B — Identity only
+### B — Identity only
 
-- [ ] Install/use only the recorded CI package during the approved pass.
+- [ ] Use the recorded complete export.
 - [ ] Capture `PING` and verify:
 
 ```text
@@ -64,51 +105,44 @@ OK|PONG|combined-pico-guard-executor|hid=on|uart=on|profiles=6
 ```
 
 - [ ] Capture `CALGET` and record revision/count.
-- [ ] Stop immediately if the identity is read-only, isolated, stale or inconsistent with the package record.
+- [ ] Stop if the identity is stale, read-only, isolated or inconsistent.
 
-### Stage C — Calibration protocol
+### C — Calibration
 
-For each canonical profile, record the raw event log:
+For each profile, in canonical order:
 
-1. Hold GP4 for three seconds while stopped to enter calibration.
-2. Use GP4 to select, in order: `desktop`, `login-or-dc`, `character-dashboard`, `entering-game-loading`, `game`, `targeted`.
-3. Press GP3 once to start the five-second sample.
-4. Keep the sensor fixed; record median, spread and tolerance.
-5. Press GP3 again to save.
-6. Confirm unsaved navigation/exit is rejected.
-7. Confirm an unstable or sensor-failure sample preserves the previous saved value.
-8. Exit with a three-second GP4 hold and record the saved profile set.
+1. Hold GP4 for three seconds while stopped.
+2. Press GP3 once to start the five-second sample.
+3. Keep the sensor fixed and record median, spread and tolerance.
+4. Press GP3 again to save.
+5. Confirm unsaved navigation/exit is rejected.
+6. Confirm unstable or sensor-failure samples preserve the prior value.
 
-Login and DC must remain one optical calibration record: `login-or-dc`.
+Login and DC remain one optical record: `login-or-dc`.
 
-### Stage D — Classroom Studio synchronization
+### D — Classroom Studio synchronization
 
-- [ ] Confirm exactly six profiles in the app.
-- [ ] Record the app-computed revision.
-- [ ] Send one `CALSET` per canonical profile with that revision.
-- [ ] Record six `OK|CALSET|...` replies.
+- [ ] Confirm six app profiles and one shared Login/DC record.
+- [ ] Record the app revision.
+- [ ] Send six `CALSET` commands with that revision.
+- [ ] Record six `OK|CALSET|...` responses.
 - [ ] Confirm final `CALGET` reports count 6 and the same revision.
-- [ ] Verify stale, incomplete or mismatched revisions fail closed.
-- [ ] Verify calibration events never become runtime Start/Stop or Pause/Resume events.
 
-### Stage E — Export and portable execution
+### E — Portable behavior
 
-- [ ] Export after manual Step testing and record the exact bundle file list.
-- [ ] Verify the seven route files, `plan.txt`, runtime modules, both JSON files and `SHA256SUMS.txt`.
-- [ ] Verify the manifest hash set covers every hashed bundle file and excludes `SHA256SUMS.txt` itself.
-- [ ] Manually copy the approved bundle to `CIRCUITPY`; do not depend on Windows after disconnect.
-- [ ] Verify ordered progression: Desktop -> Login/DC -> Character Dashboard -> Entering Game/Loading -> Game.
-- [ ] Verify DC fallback, Targeted one-shot behavior and fresh Game return without replaying Game Steps.
+- [ ] Copy only the complete approved export to `CIRCUITPY`.
+- [ ] Verify ordered progression Desktop -> Login/DC -> Character Dashboard -> Entering Game/Loading -> Game.
+- [ ] Verify DC fallback, Targeted one-shot return and no repeated route execution.
 - [ ] Verify Stop/HALT releases all held arm buttons.
-- [ ] Verify missing files, tampering, stale revision and ambiguous light fail closed.
+- [ ] Verify missing files, tampering, stale revisions and ambiguous light fail closed.
 
-## 4. Evidence packet template
+## 5. Evidence and stop conditions
 
-Create one evidence folder outside the firmware bundle containing:
+Record:
 
 ```text
-package-name.txt
-package-sha256.txt
+complete-export-file-list.txt
+complete-export-sha256.txt
 pico-board-identity.txt
 wiring-photo-before-power.jpg
 wiring-pin-check.txt
@@ -117,36 +151,12 @@ calget-before.log
 calibration-events.log
 calset-sync.log
 calget-after.log
-bundle-file-list.txt
 SHA256SUMS.txt
 portable-transition.log
 halt-release.log
 reviewer-signoff.txt
 ```
 
-`reviewer-signoff.txt` must state the package SHA, board type, wiring scope, observed negative tests and whether every applicable checklist item has evidence. It must not say Hardware Acceptance passed unless the separate acceptance gate is actually completed.
+Stop and remove power for wrong board/package, wiring uncertainty, unexpected HID/RunEngine/actuator behavior, stale/tampered bundle acceptance, calibration corruption, HALT failure or any need to bypass a fail-closed error.
 
-## 5. Stop and rollback triggers
-
-Stop the pass and remove power if any of the following occurs:
-
-- wrong Pico type, unexpected board identity or wrong package SHA;
-- 3V3/GND short, wrong voltage or uncertain UART polarity;
-- unexpected HID, desktop RunEngine, Windows-runtime or actuator behavior;
-- stale/tampered bundle accepted by the loader;
-- calibration save changes an unrelated profile or cannot reload;
-- Stop/HALT fails to release the arm;
-- any test requires bypassing a fail-closed error.
-
-After a stop, preserve logs and photographs. Do not retry by changing firmware files manually.
-
-## 6. Exit gate
-
-This handoff is complete only when a separate reviewer has the evidence packet and has explicitly recorded one of:
-
-- **Not started:** software/CI evidence only; no hardware was connected.
-- **Blocked:** a listed entry or negative test failed; no acceptance claim.
-- **Accepted for the separate pass:** all applicable evidence is present and the reviewer authorizes the next controlled step.
-- **Hardware Acceptance:** only if every applicable item in `docs/light-guard-phase7-hardware-acceptance-checklist.md` has been physically evidenced and reviewed.
-
-The current state remains **Prepared, not run**. CI success, a Windows build, a Classroom Studio test or this handoff document are not Hardware Acceptance and do not authorize release or production use.
+Hardware Acceptance is **not** passed by CI, the core artifact, a Windows build, a Classroom Studio test or this handoff. It requires the complete export, physical evidence and separate review. Current status remains **Prepared, not run**.

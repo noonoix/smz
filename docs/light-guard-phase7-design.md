@@ -52,6 +52,17 @@ CALSET|<revision>|<profile-id>|<center>|<tolerance>|<stable-ms>
 
 The Pico stores a local copy in `guard-calibration.json`. A revision mismatch is visible and fails closed; the Pico must not silently merge two calibration sets.
 
+The Classroom Studio Phase 7 adapter now provides a visible Guard panel with:
+
+- Guard identity and six-profile validation from `PING`;
+- `CALGET` revision/count display;
+- app-side deterministic revision derived from the six canonical profiles;
+- sequential upload and final verification of all six `CALSET` records;
+- physical `EVT|CAL` stage/retry/cancel/complete display;
+- Guard state and enabled/disabled observation display.
+
+`Guard ON` is fail-closed until the current session has uploaded and verified all six records with one revision. Saving the app-side light profiles invalidates that trust and requires a fresh sync.
+
 ## Guard observation
 
 `GUARD|ON` enables observation only. The Pico emits a state event after the matching profile remains stable for its configured duration:
@@ -65,6 +76,10 @@ No event causes a Pico-side key, mouse, HID, macro or actuator operation. The Cl
 ## Legacy step policy
 
 `Wait For Light` and `Find Image` remain available for existing Classroom Studio scripts and plans. The new Guard flow does not use them. A later removal would require a separate migration, backup and compatibility review.
+
+## Hardware acceptance
+
+Physical testing is not yet accepted. Use [`light-guard-phase7-hardware-acceptance-checklist.md`](./light-guard-phase7-hardware-acceptance-checklist.md) for the isolated wiring, firmware identity, six-stage calibration, synchronization, negative tests and required evidence. The checklist explicitly prohibits the Phase 6 wiring, Pro Micro, BSS138, UART, HID and actuator paths.
 
 ## Failure conditions
 

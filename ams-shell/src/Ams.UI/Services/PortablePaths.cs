@@ -48,7 +48,8 @@ public static class PortablePaths
                 UseShellExecute = false,
                 CreateNoWindow = true,
             };
-            using var proc = System.Diagnostics.Process.Start(psi);
+            using var proc = System.Diagnostics.Process.Start(psi)
+                ?? throw new InvalidOperationException("The Python launcher could not be started.");
             proc.WaitForExit(3000);
             if (proc.ExitCode == 0)
             {
@@ -68,7 +69,8 @@ public static class PortablePaths
                 UseShellExecute = false,
                 CreateNoWindow = true,
             };
-            using var proc2 = System.Diagnostics.Process.Start(psi2);
+            using var proc2 = System.Diagnostics.Process.Start(psi2)
+                ?? throw new InvalidOperationException("The Python executable could not be started.");
             proc2.WaitForExit(3000);
             if (proc2.ExitCode == 0) return "python";
         }

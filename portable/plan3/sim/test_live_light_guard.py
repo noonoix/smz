@@ -76,9 +76,12 @@ class LiveLightGuardTests(unittest.TestCase):
         for lux in (5, 25, 45, 65, 85):
             self.assertIsNotNone(guard.update(lux, lux))
         self.assertEqual("targeted", guard.update(105, 105))
-        self.assertEqual("dc", guard.last_decision["context"])
+        self.assertEqual("targeted", guard.last_decision["context"])
         self.assertEqual("login-or-dc", guard.update(25, 125))
+        self.assertEqual("dc", guard.last_decision["context"])
         self.assertEqual(2, guard.last_decision["stage"])
+        self.assertEqual("game", guard.update(85, 185))
+        self.assertEqual("return-from-targeted", guard.last_decision["context"])
 
 
 if __name__ == "__main__":

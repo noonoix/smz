@@ -84,8 +84,8 @@ class LiveLightGuardTests(unittest.TestCase):
         self.assertEqual("dc", guard.last_decision["context"])
         self.assertEqual(2, guard.last_decision["stage"])
         # DC falls back to stage 2; the next fresh stable profiles must progress
-        # through stages 2, 3, and 4 before Game can be accepted again.
-        for lux, profile in ((25, "login-or-dc"), (45, "character-dashboard"),
+        # through stages 3 and 4 before Game can be accepted again.
+        for lux, profile in ((45, "character-dashboard"),
                              (65, "entering-game-loading")):
             self.assertEqual(profile, guard.update(lux, 125 + lux))
             self.assertTrue(guard.last_decision["execute"])

@@ -1,9 +1,12 @@
+import json
+import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "CIRCUITPY"))
-from live_light_guard import LightStateGuard, state_spec
+from live_light_guard import GuardBundleError, LightStateGuard, ROUTE_FILES, load_guard_bundle, state_spec
 
 
 class LiveLightGuardTests(unittest.TestCase):
@@ -82,6 +85,86 @@ class LiveLightGuardTests(unittest.TestCase):
         self.assertEqual(2, guard.last_decision["stage"])
         self.assertEqual("game", guard.update(85, 185))
         self.assertEqual("return-from-targeted", guard.last_decision["context"])
+
+    def _bundle(self, include_resumable=True):
+        root = tempfile.TemporaryDirectory()
+        manifest_routes = dict(ROUTE_FILES)
+        manifest = {
+            "format": 1,
+            "runtime": "combined-pico-guard-executor",
+            "calibrationRevision": "guard-test-rev",
+            "routes": manifest_routes,
+            "profiles": [
+                {"id": pid, "center": index * 100.0, "tolerance": 5.0, "stableMs": 750}
+                for index, pid in enumerate((
+                    "desktop", "login-or-dc", "character-dashboard",
+                    "entering-game-loading", "game", "targeted"))
+            ],
+        }
+        calibration = {
+            "format": 1,
+            "revision": "guard-test-rev",
+            "profiles": {
+                item["id"]: {"center": item["center"], "tolerance": item["tolerance"], "stable_ms": item["stableMs"]}
+                for item in manifest["profiles"]
+            },
+        }
+        Path(root.name, "guard-transition.json").write_text(json.dumps(manifest), encoding="utf-8")
+        Path(root.name, "guard-calibration.json").write_text(json.dumps(calibration), encoding="utf-8")
+        for route in manifest_routes.values():
+            if include_resumable or route != "resumable_steps.txt":
+                Path(root.name, route).write_text("PLAN|2\n", encoding="utf-8")
+        return root, manifest, calibration
+
+    def test_valid_bundle_loads_and_keeps_metadata(self):
+        root, _, _ = self._bundle()
+        try:
+            bundle = load_guard_bundle(root.name)
+            self.assertEqual("guard-test-rev", bundle["revision"])
+            self.assertEqual(6, len(bundle["states"]))
+            guard = LightStateGuard.from_bundle(root.name)
+            self.assertEqual("guard-test-rev", guard.bundle["revision"])
+            self.assertIsNotNone(guard.transition)
+        finally:
+            root.cleanup()
+
+    def test_bundle_rejects_missing_route_and_resumable(self):
+        root, _, _ = self._bundle(include_resumable=False)
+        try:
+            with self.assertRaises(GuardBundleError):
+                load_guard_bundle(root.name)
+        finally:
+            root.cleanup()
+
+    def test_bundle_rejects_revision_mismatch(self):
+        root, manifest, calibration = self._bundle()
+        try:
+            calibration["revision"] = "other-revision"
+            Path(root.name, "guard-calibration.json").write_text(json.dumps(calibration), encoding="utf-8")
+            with self.assertRaisesRegex(GuardBundleError, "revision mismatch"):
+                load_guard_bundle(root.name)
+        finally:
+            root.cleanup()
+
+    def test_bundle_rejects_profile_mismatch(self):
+        root, manifest, calibration = self._bundle()
+        try:
+            calibration["profiles"]["game"]["tolerance"] = 6.0
+            Path(root.name, "guard-calibration.json").write_text(json.dumps(calibration), encoding="utf-8")
+            with self.assertRaisesRegex(GuardBundleError, "profile mismatch"):
+                load_guard_bundle(root.name)
+        finally:
+            root.cleanup()
+
+    def test_bundle_rejects_incomplete_route_map(self):
+        root, manifest, _ = self._bundle()
+        try:
+            manifest["routes"].pop("Resumable")
+            Path(root.name, "guard-transition.json").write_text(json.dumps(manifest), encoding="utf-8")
+            with self.assertRaisesRegex(GuardBundleError, "route map"):
+                load_guard_bundle(root.name)
+        finally:
+            root.cleanup()
 
 
 if __name__ == "__main__":

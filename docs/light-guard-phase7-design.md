@@ -10,9 +10,9 @@ The Guard observes the BH1750 and reports a stable light profile to Classroom St
 
 - regular Raspberry Pi Pico, not Pico W;
 - BH1750/GY-30: SDA=GP20/pin 26, SCL=GP21/pin 27, VCC=3V3, GND=GND, ADDR=GND/0x23;
-- GP4 to GND: Start/Stop; hold for three seconds to enter calibration;
-- GP3 to GND: Pass/Next calibration stage;
-- passive piezo on GP6 for stage notes and success melody;
+- blue square GP4 to GND: Start/Stop; hold for three seconds to enter or exit calibration;
+- yellow round GP3 to GND: Pass/Save;
+- passive piezo on GP6 for position notes, stage-success notes and the complete-set melody;
 - no Pro Micro, BSS138, UART, HID, keyboard, mouse, macro, motor, relay or actuator.
 
 GP6 is allowed only in this new isolated Guard firmware. It must not be added to the Phase 6 read-only firmware or connected as the old integrated buzzer path.
@@ -30,17 +30,30 @@ There are six optical profiles:
 
 Login and DC intentionally share one optical profile. Their difference is an application/pipeline action: DC has its own ESC behavior. The profile is not split into two optical calibration records.
 
-## Physical calibration flow
+## Two-button partial calibration flow
 
-1. Hold GP4 for at least three seconds.
-2. Pico enters calibration-ready stage 1 and plays the stage-1 note.
-3. Press GP3 to start a five-second sample window.
-4. The Pico computes median, minimum, maximum and spread.
-5. If the spread is too large, the stage is rejected and can be retried.
-6. If accepted, the stage center and tolerance are stored and a completion note is played.
-7. Press GP3 again to advance to the next stage; the next stage note identifies it.
-8. After stage 6, press GP3 once more to persist the complete set and play the success melody.
-9. A short GP4 press during calibration cancels without replacing the last complete set.
+The two physical buttons have separate responsibilities:
+
+- **Blue square / GP4 — navigation and session control**
+  - hold for 3 seconds outside calibration: enter at position 1;
+  - short press during calibration: move to the next of the six positions;
+  - hold for 3 seconds during calibration: exit safely;
+  - short press outside calibration: toggle Guard observation.
+- **Yellow round / GP3 — sample and save**
+  - short press when the selected position is ready: start the five-second sample;
+  - short press after a successful sample: save the selected position locally.
+
+The position note plays whenever a position is entered. The five-second sample uses median and spread/stability gating. A successful sample plays that position's completion note but is not committed until the yellow button is pressed. A blue navigation press or blue long-hold is rejected while an unsaved successful sample is pending, so a result cannot be lost accidentally.
+
+The flow supports a targeted repair instead of forcing a full six-position recalibration:
+
+1. Hold blue GP4 for three seconds to enter at `desktop`.
+2. Short-press blue until the damaged position, for example `character-dashboard`, is announced by its distinct note.
+3. Press yellow GP3 to start the five-second sample.
+4. When the sample succeeds and the completion note plays, press yellow again to save that position.
+5. Hold blue GP4 for three seconds to exit. Only positions saved with yellow are changed; the other five retain their previous values.
+
+If all six positions are saved during one session, the success melody for the complete set also plays. Classroom Studio remains the source of truth and must later synchronize its six records with one revision.
 
 ## App synchronization
 
@@ -52,13 +65,13 @@ CALSET|<revision>|<profile-id>|<center>|<tolerance>|<stable-ms>
 
 The Pico stores a local copy in `guard-calibration.json`. A revision mismatch is visible and fails closed; the Pico must not silently merge two calibration sets.
 
-The Classroom Studio Phase 7 adapter now provides a visible Guard panel with:
+The Classroom Studio Phase 7 adapter provides a visible Guard panel with:
 
 - Guard identity and six-profile validation from `PING`;
 - `CALGET` revision/count display;
 - app-side deterministic revision derived from the six canonical profiles;
 - sequential upload and final verification of all six `CALSET` records;
-- physical `EVT|CAL` stage/retry/cancel/complete display;
+- physical `EVT|CAL` stage/retry/save/exit display;
 - Guard state and enabled/disabled observation display.
 
 `Guard ON` is fail-closed until the current session has uploaded and verified all six records with one revision. Saving the app-side light profiles invalidates that trust and requires a fresh sync.
@@ -79,13 +92,14 @@ No event causes a Pico-side key, mouse, HID, macro or actuator operation. The Cl
 
 ## Hardware acceptance
 
-Physical testing is not yet accepted. Use [`light-guard-phase7-hardware-acceptance-checklist.md`](./light-guard-phase7-hardware-acceptance-checklist.md) for the isolated wiring, firmware identity, six-stage calibration, synchronization, negative tests and required evidence. The checklist explicitly prohibits the Phase 6 wiring, Pro Micro, BSS138, UART, HID and actuator paths.
+Physical testing is not yet accepted. Use [`light-guard-phase7-hardware-acceptance-checklist.md`](./light-guard-phase7-hardware-acceptance-checklist.md) for the isolated wiring, firmware identity, targeted/partial calibration, synchronization, negative tests and required evidence. The checklist explicitly prohibits the Phase 6 wiring, Pro Micro, BSS138, UART, HID and actuator paths.
 
 ## Failure conditions
 
 - unknown or duplicate profile IDs;
 - invalid center, tolerance or stable duration;
 - unstable five-second sample;
+- unsaved successful sample being skipped;
 - incomplete six-profile calibration;
 - revision mismatch between app and Pico;
 - sensor missing, I2C failure or stale observation;

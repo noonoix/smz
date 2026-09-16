@@ -6,6 +6,7 @@ model = (root / "ams-shell/src/Ams.UI/Models/PipelineWorkspace.cs").read_text(en
 viewmodel = (root / "ams-shell/src/Ams.UI/ViewModels/MainViewModel.PipelineTabs.cs").read_text(encoding="utf-8")
 serializer = (root / "ams-shell/src/Ams.UI/Services/PipelineWorkspaceSerializer.cs").read_text(encoding="utf-8")
 spec = (root / "docs/light-guard-phase7-tab-migration.md").read_text(encoding="utf-8")
+matrix = (root / "docs/light-guard-phase7-transition-matrix.md").read_text(encoding="utf-8")
 
 # The visible order is the Guard optical profile order, followed by Resumable.
 for kind in (
@@ -57,4 +58,24 @@ assert "legacyPipelines" in spec
 assert "no old Step is silently deleted or reassigned" in spec
 assert "do not by themselves authorize automatic execution" in spec
 
-print("pipeline tabs migration contract: seven visible tabs, resumable tab, and legacy preservation verified")
+# The approved matrix keeps stages 1–5 ordered, treats Targeted as a side-state,
+# and sends DC from the active game context back to stage 2.
+for phrase in (
+    "strictly ordered",
+    "fall back to stage 2",
+    "independent `DC` Classroom Studio context",
+    "It is not stage 6",
+    "DC has priority",
+    "one-shot execution",
+):
+    assert phrase in matrix
+for stage in (
+    "`desktop` / `Desktop`",
+    "`login-or-dc` / `Login / DC`",
+    "`character-dashboard` / `Character Dashboard`",
+    "`entering-game-loading` / `Entering Game / Loading`",
+    "`game` / `Game`",
+):
+    assert stage in matrix
+
+print("pipeline tabs migration contract: seven tabs, ordered stages, DC fallback, and Targeted side-state verified")

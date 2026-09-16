@@ -60,6 +60,11 @@ jobs:
           grep -q 'PROFILEs' "$runtime" || grep -q 'PROFILES' "$runtime"
           grep -q 'CALGET' "$runtime"
           grep -q 'CALSET' "$runtime"
+          grep -q 'HASHED_BUNDLE_FILES' "$runtime"
+          grep -q 'def _hash_manifest' "$runtime"
+          grep -q 'self._replace_text("/SHA256SUMS.txt", self._hash_manifest())' "$runtime"
+          grep -q 'old_hashes = self._read_text("/SHA256SUMS.txt")' "$runtime"
+          grep -q '("/SHA256SUMS.txt", old_hashes)' "$runtime"
           ! grep -Eq 'usb_hid\.disable|role=light-guard.*hid=off|RunEngine' "$runtime"
 
       - name: Test combined Guard calibration protocol

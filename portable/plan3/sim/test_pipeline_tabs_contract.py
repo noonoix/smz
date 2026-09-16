@@ -9,6 +9,7 @@ controller = (root / "ams-shell/src/Ams.UI/Services/LightGuardTransitionControll
 ui = (root / "ams-shell/src/Ams.UI/LightGuardUiBootstrap.cs").read_text(encoding="utf-8")
 spec = (root / "docs/light-guard-phase7-tab-migration.md").read_text(encoding="utf-8")
 matrix = (root / "docs/light-guard-phase7-transition-matrix.md").read_text(encoding="utf-8")
+portable = (root / "docs/portable-output-architecture.md").read_text(encoding="utf-8")
 
 # The visible order is the Guard optical profile order, followed by Resumable.
 for kind in (
@@ -65,7 +66,7 @@ assert "do not by themselves authorize automatic execution" in spec
 for phrase in (
     "strictly ordered",
     "fall back to stage 2",
-    "independent `DC` Classroom Studio context",
+    "independent `DC` portable context",
     "It is not stage 6",
     "DC has priority",
     "one-shot execution",
@@ -94,5 +95,13 @@ assert "LightGuardEntryContext.Disconnect" in controller
 assert "LightGuardEntryContext.Targeted" in controller
 assert "All actions are observation/calibration protocol only" in ui
 assert "RunEngine" not in ui
+for phrase in (
+    "Classroom Studio is the authoring kitchen",
+    "runtime source of truth",
+    "atomic bundle",
+    "does not execute pipeline Steps",
+    "portable runtime on the board",
+):
+    assert phrase in portable
 
-print("pipeline tabs migration contract: seven tabs, ordered stages, DC fallback, Targeted side-state, and portable execution boundary verified")
+print("pipeline tabs migration contract: seven tabs, ordered stages, DC fallback, Targeted side-state, and portable output boundary verified")

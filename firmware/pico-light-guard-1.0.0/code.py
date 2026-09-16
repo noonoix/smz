@@ -2,7 +2,7 @@
 # Version: pico-light-guard 1.0.0
 # Hardware: regular Raspberry Pi Pico, BH1750/GY-30, two buttons and passive piezo
 # BH1750: SDA=GP20/pin 26, SCL=GP21/pin 27, ADDR=GND/0x23
-# Buttons: GP4=Guard Start/Stop + 3s calibration hold, GP3=Pass/Next
+# Buttons: GP4=blue Start/Stop + 3s calibration enter/exit, GP3=yellow Pass/Save
 # Piezo: GP6 PWM
 # This firmware intentionally has no HID, UART, keyboard, mouse, macro or actuator path.
 
@@ -55,6 +55,8 @@ _cal_sampling = False
 _cal_started = 0.0
 _cal_values = []
 _cal_stage_result = None
+_cal_stage_saved = False
+_cal_saved_ids = set()
 
 _tone = None
 
@@ -262,26 +264,113 @@ def guard_sample(value, now):
 
 def start_calibration():
     global _calibrating, _cal_stage, _cal_sampling, _cal_stage_result
+    global _cal_stage_saved, _cal_saved_ids
     _calibrating = True
     _cal_stage = 0
     _cal_sampling = False
     _cal_stage_result = None
+    _cal_stage_saved = False
+    _cal_saved_ids = set()
     stage_note(_cal_stage)
-    emit("EVT|CAL|mode=ready|stage=1|id=%s|seconds=5" % PROFILE_IDS[_cal_stage])
+    emit("EVT|CAL|mode=ready|stage=1|id=%s|seconds=5|saved=0" % PROFILE_IDS[_cal_stage])
 
 
-def cancel_calibration(reason="button"):
+def reset_calibration_state():
     global _calibrating, _cal_sampling, _cal_values, _cal_stage_result
+    global _cal_stage_saved, _cal_saved_ids
     _calibrating = False
     _cal_sampling = False
     _cal_values = []
     _cal_stage_result = None
+    _cal_stage_saved = False
+    _cal_saved_ids = set()
+
+
+def cancel_calibration(reason="button"):
+    reset_calibration_state()
     error_sound()
     emit("EVT|CAL|mode=cancelled|reason=%s" % reason)
 
 
-def begin_or_advance_calibration():
-    global _cal_sampling, _cal_started, _cal_values, _cal_stage_result, _cal_stage
+def save_current_calibration_stage():
+    global _cal_stage_saved
+    if _cal_stage_result is None or _cal_stage_saved:
+        return False
+    pid = PROFILE_IDS[_cal_stage]
+    previous = profiles.get(pid)
+    profiles[pid] = dict(_cal_stage_result)
+    try:
+        # Only a yellow-button save changes the local stored value. A later blue
+        # long-hold can therefore exit after fixing one position without touching
+        # unsaved stages or discarding the other five positions.
+        save_calibration()
+    except Exception:
+        if previous is None:
+            profiles.pop(pid, None)
+        else:
+            profiles[pid] = previous
+        error_sound()
+        emit("ERR|CAL|SAVE|stage=%d" % (_cal_stage + 1))
+        return False
+    _cal_stage_saved = True
+    _cal_saved_ids.add(pid)
+    emit("EVT|CAL|mode=saved-stage|stage=%d|id=%s|saved=%d" %
+         (_cal_stage + 1, pid, len(_cal_saved_ids)))
+    if len(_cal_saved_ids) == len(PROFILE_IDS):
+        success_sound()
+        emit("EVT|CAL|mode=complete-set|count=6|revision=%s" % calibration_revision)
+    return True
+
+
+def advance_calibration_stage():
+    global _cal_stage, _cal_stage_result, _cal_stage_saved
+    if not _calibrating:
+        return
+    if _cal_sampling:
+        error_sound()
+        emit("ERR|CAL|BUSY|stage=%d" % (_cal_stage + 1))
+        return
+    if _cal_stage_result is not None and not _cal_stage_saved:
+        error_sound()
+        emit("ERR|CAL|UNSAVED|stage=%d" % (_cal_stage + 1))
+        return
+    if _cal_stage >= len(PROFILE_IDS) - 1:
+        stage_note(_cal_stage)
+        emit("EVT|CAL|mode=last|stage=6|id=%s|saved=%d" %
+             (PROFILE_IDS[_cal_stage], len(_cal_saved_ids)))
+        return
+    _cal_stage += 1
+    _cal_stage_result = None
+    _cal_stage_saved = False
+    stage_note(_cal_stage)
+    emit("EVT|CAL|mode=ready|stage=%d|id=%s|seconds=5|saved=%d" %
+         (_cal_stage + 1, PROFILE_IDS[_cal_stage], len(_cal_saved_ids)))
+
+
+def finish_calibration():
+    if not _calibrating:
+        return
+    if _cal_sampling:
+        error_sound()
+        emit("ERR|CAL|BUSY|stage=%d" % (_cal_stage + 1))
+        return
+    if _cal_stage_result is not None and not _cal_stage_saved:
+        error_sound()
+        emit("ERR|CAL|UNSAVED|stage=%d" % (_cal_stage + 1))
+        return
+    try:
+        save_calibration()
+    except Exception:
+        error_sound()
+        emit("ERR|CAL|SAVE")
+        return
+    saved_count = len(_cal_saved_ids)
+    reset_calibration_state()
+    emit("EVT|CAL|mode=exited|saved=%d" % saved_count)
+
+
+def begin_or_save_calibration():
+    global _cal_sampling, _cal_started, _cal_values
     if not _calibrating:
         return
     if _cal_sampling:
@@ -295,24 +384,11 @@ def begin_or_advance_calibration():
         _cal_values = []
         _cal_started = time.monotonic()
         _cal_sampling = True
-        emit("EVT|CAL|mode=started|stage=%d|id=%s|seconds=5" %
-             (_cal_stage + 1, PROFILE_IDS[_cal_stage]))
+        emit("EVT|CAL|mode=started|stage=%d|id=%s|seconds=5|saved=%d" %
+             (_cal_stage + 1, PROFILE_IDS[_cal_stage], len(_cal_saved_ids)))
         return
-    if _cal_stage < len(PROFILE_IDS) - 1:
-        _cal_stage += 1
-        _cal_stage_result = None
-        stage_note(_cal_stage)
-        emit("EVT|CAL|mode=ready|stage=%d|id=%s|seconds=5" %
-             (_cal_stage + 1, PROFILE_IDS[_cal_stage]))
-        return
-    try:
-        save_calibration()
-        success_sound()
-        emit("EVT|CAL|mode=complete|count=6|revision=%s" % calibration_revision)
-    except Exception:
-        error_sound()
-        emit("ERR|CAL|SAVE")
-    cancel_calibration("complete")
+    if save_current_calibration_stage():
+        beep(NOTE_HZ[_cal_stage], 220)
 
 
 def calibration_tick(now):
@@ -345,16 +421,16 @@ def calibration_tick(now):
         emit("ERR|CAL|UNSTABLE|stage=%d|median=%.1f|spread=%.1f" %
              (_cal_stage + 1, center, spread))
         return
-    profiles[PROFILE_IDS[_cal_stage]] = {
+    _cal_stage_result = {
         "center": float(center),
         "tolerance": max(2.0, spread * 1.5),
         "stable_ms": 750,
     }
-    _cal_stage_result = profiles[PROFILE_IDS[_cal_stage]]
+    _cal_stage_saved = False
     beep(NOTE_HZ[_cal_stage], 220)
-    emit("EVT|CAL|mode=complete-stage|stage=%d|id=%s|center=%.1f|spread=%.1f|tolerance=%.1f" %
+    emit("EVT|CAL|mode=complete-stage|stage=%d|id=%s|center=%.1f|spread=%.1f|tolerance=%.1f|saved=0" %
          (_cal_stage + 1, PROFILE_IDS[_cal_stage], center, spread,
-          profiles[PROFILE_IDS[_cal_stage]]["tolerance"]))
+          _cal_stage_result["tolerance"]))
     _cal_values = []
 
 
@@ -435,19 +511,20 @@ start_button = Button(board.GP4)
 pass_button = Button(board.GP3)
 load_calibration()
 
-emit("pico-light-guard %s | GP4=Start/Stop hold3s=calibration | GP3=Pass/Next | GP6=piezo" % VERSION)
-last_watch = 0.0
+emit("pico-light-guard %s | blue GP4=Start/Stop hold3s=calibration enter/exit | yellow GP3=Pass/Save | GP6=piezo" % VERSION)
 last_guard_sample = 0.0
 
 while True:
     now = time.monotonic()
     event = start_button.poll(now)
     if event == "long":
-        if not _calibrating:
+        if _calibrating:
+            finish_calibration()
+        else:
             start_calibration()
     elif event == "up" and not start_button.long_fired:
         if _calibrating:
-            cancel_calibration("start-button")
+            advance_calibration_stage()
         else:
             _guard_enabled = not _guard_enabled
             emit("EVT|GUARD|enabled=%s" % ("true" if _guard_enabled else "false"))
@@ -455,7 +532,7 @@ while True:
 
     event = pass_button.poll(now)
     if event == "up" and not pass_button.long_fired:
-        begin_or_advance_calibration()
+        begin_or_save_calibration()
 
     calibration_tick(now)
     if _guard_enabled and not _calibrating and now - last_guard_sample >= 0.25:
@@ -467,8 +544,6 @@ while True:
             except Exception:
                 emit("ERR|GUARD|I2C")
 
-    if now - last_watch >= 0.02:
-        last_watch = now
     if sys.stdin and getattr(sys.stdin, "in_waiting", 0):
         line = sys.stdin.readline().strip()
         if line:

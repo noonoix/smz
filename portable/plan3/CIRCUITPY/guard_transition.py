@@ -1,6 +1,6 @@
 # guard_transition.py - portable Guard + Executor transition policy
 # The Pico runtime uses this module after the bundle is copied to CIRCUITPY.
-# It is deliberately independent from Classroom Studio and RunEngine.
+# It is deliberately independent from Classroom Studio and desktop authoring tools.
 
 PROFILE_TO_ROUTE = {
     "desktop": "desktop_steps.txt",

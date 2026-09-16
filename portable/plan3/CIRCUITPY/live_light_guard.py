@@ -1,6 +1,10 @@
-# live_light_guard.py - portable BH1750 state guard (runtime v2)
-# Debounces light samples and, when the canonical Phase 7 profiles are present,
-# applies the portable GuardTransition ordered-stage policy before a route changes.
+# live_light_guard.py - portable BH1750 state guard (runtime v3)
+# Debounces light samples and applies the canonical Phase 7 GuardTransition policy.
+# The bundle loader below is deliberately independent from Classroom Studio and RunEngine.
+
+import json
+import math
+import os
 
 try:
     from guard_transition import GuardTransition, PROFILE_TO_ROUTE
@@ -9,8 +13,118 @@ except ImportError:  # keep the generic legacy light guard usable by older bundl
     PROFILE_TO_ROUTE = {}
 
 
+PROFILE_IDS = (
+    "desktop",
+    "login-or-dc",
+    "character-dashboard",
+    "entering-game-loading",
+    "game",
+    "targeted",
+)
+ROUTE_FILES = {
+    "Desktop": "desktop_steps.txt",
+    "LoginOrDc": "login_or_dc_steps.txt",
+    "CharacterDashboard": "character_dashboard_steps.txt",
+    "EnteringGameLoading": "entering_game_loading_steps.txt",
+    "Game": "game_steps.txt",
+    "Targeted": "targeted_steps.txt",
+    "Resumable": "resumable_steps.txt",
+}
+
+
+class GuardBundleError(ValueError):
+    pass
+
+
+def _read_json(root, name):
+    try:
+        with open(os.path.join(root, name), "r") as fh:
+            return json.load(fh)
+    except Exception as exc:
+        raise GuardBundleError("cannot read " + name) from exc
+
+
+def _finite_nonnegative(value, label):
+    if not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+        raise GuardBundleError("invalid " + label)
+    return float(value)
+
+
+def load_guard_bundle(root="/"):
+    """Load and fail closed on the exported transition/calibration contract.
+
+    The manifest and calibration revision must agree, all seven route files must be
+    present, and the six optical profiles must be unique and numerically valid. This
+    is intentionally a pure filesystem check so the Pico can reject a stale or partial
+    CIRCUITPY copy before STATELOOP executes a route.
+    """
+    manifest = _read_json(root, "guard-transition.json")
+    calibration = _read_json(root, "guard-calibration.json")
+    if manifest.get("format") != 1 or manifest.get("runtime") != "combined-pico-guard-executor":
+        raise GuardBundleError("unsupported Guard manifest")
+    if calibration.get("format") != 1:
+        raise GuardBundleError("unsupported Guard calibration")
+
+    routes = manifest.get("routes")
+    if routes != ROUTE_FILES:
+        raise GuardBundleError("Guard route map is incomplete or changed")
+    manifest_revision = manifest.get("calibrationRevision")
+    calibration_revision = calibration.get("revision")
+    if not isinstance(manifest_revision, str) or not manifest_revision:
+        raise GuardBundleError("Guard manifest has no calibration revision")
+    if manifest_revision != calibration_revision:
+        raise GuardBundleError("Guard calibration revision mismatch")
+
+    raw_profiles = manifest.get("profiles")
+    if not isinstance(raw_profiles, list) or {p.get("id") for p in raw_profiles} != set(PROFILE_IDS):
+        raise GuardBundleError("Guard manifest needs exactly six optical profiles")
+    calibration_profiles = calibration.get("profiles")
+    if not isinstance(calibration_profiles, dict) or set(calibration_profiles) != set(PROFILE_IDS):
+        raise GuardBundleError("Guard calibration needs exactly six optical profiles")
+
+    states = []
+    for item in raw_profiles:
+        pid = item.get("id")
+        center = _finite_nonnegative(item.get("center"), pid + " center")
+        tolerance = _finite_nonnegative(item.get("tolerance"), pid + " tolerance")
+        stable_ms = int(_finite_nonnegative(item.get("stableMs"), pid + " stableMs"))
+        cal = calibration_profiles[pid]
+        if abs(center - _finite_nonnegative(cal.get("center"), pid + " calibration center")) > 1e-9 \
+                or abs(tolerance - _finite_nonnegative(cal.get("tolerance"), pid + " calibration tolerance")) > 1e-9 \
+                or stable_ms != int(_finite_nonnegative(cal.get("stable_ms"), pid + " calibration stable_ms")):
+            raise GuardBundleError("Guard manifest/calibration profile mismatch: " + pid)
+        route = PROFILE_TO_ROUTE.get(pid)
+        if route is None:
+            raise GuardBundleError("Guard profile has no runtime route: " + pid)
+        route_path = os.path.join(root, route)
+        if not os.path.isfile(route_path):
+            raise GuardBundleError("missing Guard route file: " + route)
+        states.append(state_spec(pid, int(math.floor(max(0, center - tolerance))),
+                                 int(math.ceil(center + tolerance)), route))
+
+    # Resumable is not an optical profile but remains a required exported route.
+    if not os.path.isfile(os.path.join(root, ROUTE_FILES["Resumable"])):
+        raise GuardBundleError("missing Guard route file: " + ROUTE_FILES["Resumable"])
+    return {
+        "manifest": manifest,
+        "calibration": calibration,
+        "revision": manifest_revision,
+        "states": states,
+        "stable_ms": max((int(s.get("stableMs", 0)) for s in raw_profiles), default=750),
+        "hysteresis": 1,
+        "sensor_timeout_ms": 1500,
+    }
+
+
 class LightStateGuard:
     """Debounced, hysteretic light-state selector with optional ordered routing."""
+
+    @classmethod
+    def from_bundle(cls, root="/"):
+        bundle = load_guard_bundle(root)
+        guard = cls(bundle["states"], bundle["stable_ms"], bundle["hysteresis"], bundle["sensor_timeout_ms"])
+        guard.bundle = bundle
+        return guard
 
     def __init__(self, states, stable_ms=750, hysteresis=0, sensor_timeout_ms=1500):
         self.states = tuple(states or ())
@@ -22,6 +136,7 @@ class LightStateGuard:
         self.candidate_since = None
         self.last_sample_ms = None
         self.last_decision = None
+        self.bundle = None
         ids = {str(state.get("id")) for state in self.states}
         self.transition = (
             GuardTransition()
@@ -114,6 +229,7 @@ class LightStateGuard:
         self.candidate_since = None
         self.last_sample_ms = None
         self.last_decision = None
+        self.bundle = None
         if self.transition is not None:
             self.transition.reset()
 

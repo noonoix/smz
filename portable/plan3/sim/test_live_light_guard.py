@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import sys
@@ -8,6 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "CIRCUITPY"))
 from live_light_guard import (
     GuardBundleError,
+    HASHED_BUNDLE_FILES,
     LightStateGuard,
     REQUIRED_BUNDLE_FILES,
     ROUTE_FILES,
@@ -129,7 +131,15 @@ class LiveLightGuardTests(unittest.TestCase):
                 Path(root.name, route).write_text("PLAN|2\n", encoding="utf-8")
         for filename in REQUIRED_BUNDLE_FILES:
             Path(root.name, filename).write_text("# test runtime placeholder\n", encoding="utf-8")
+        self._refresh_hashes(root.name)
         return root, manifest, calibration
+
+    def _refresh_hashes(self, root):
+        lines = []
+        for filename in sorted(set(HASHED_BUNDLE_FILES)):
+            digest = hashlib.sha256(Path(root, filename).read_bytes()).hexdigest()
+            lines.append(digest + "  " + filename)
+        Path(root, "SHA256SUMS.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     def test_valid_bundle_loads_and_keeps_metadata(self):
         root, _, _ = self._bundle()
@@ -177,6 +187,15 @@ class LiveLightGuardTests(unittest.TestCase):
             manifest["routes"].pop("Resumable")
             Path(root.name, "guard-transition.json").write_text(json.dumps(manifest), encoding="utf-8")
             with self.assertRaisesRegex(GuardBundleError, "route map"):
+                load_guard_bundle(root.name)
+        finally:
+            root.cleanup()
+
+    def test_bundle_rejects_tampered_file_hash(self):
+        root, _, _ = self._bundle()
+        try:
+            Path(root.name, "game_steps.txt").write_text("tampered\n", encoding="utf-8")
+            with self.assertRaisesRegex(GuardBundleError, "hash mismatch"):
                 load_guard_bundle(root.name)
         finally:
             root.cleanup()

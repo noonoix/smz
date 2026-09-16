@@ -2,6 +2,7 @@
 # Debounces light samples and applies the canonical Phase 7 GuardTransition policy.
 # The bundle loader below is deliberately independent from Classroom Studio and RunEngine.
 
+import hashlib
 import json
 import math
 import os
@@ -42,6 +43,9 @@ REQUIRED_BUNDLE_FILES = (
     "combined_guard_runtime.py",
     "SHA256SUMS.txt",
 )
+HASHED_BUNDLE_FILES = tuple(
+    filename for filename in REQUIRED_BUNDLE_FILES if filename != "SHA256SUMS.txt"
+) + tuple(ROUTE_FILES.values()) + ("guard-transition.json", "guard-calibration.json")
 
 
 class GuardBundleError(ValueError):
@@ -62,13 +66,60 @@ def _finite_nonnegative(value, label):
     return float(value)
 
 
+def _file_sha256(root, name):
+    digest = hashlib.sha256()
+    try:
+        with open(os.path.join(root, name), "rb") as fh:
+            while True:
+                chunk = fh.read(4096)
+                if not chunk:
+                    break
+                digest.update(chunk)
+    except Exception as exc:
+        raise GuardBundleError("cannot hash Guard file: " + name) from exc
+    return digest.hexdigest().lower()
+
+
+def _verify_hash_manifest(root):
+    expected = set(HASHED_BUNDLE_FILES)
+    seen = {}
+    try:
+        with open(os.path.join(root, "SHA256SUMS.txt"), "r") as fh:
+            for raw in fh:
+                fields = raw.strip().split()
+                if not fields:
+                    continue
+                if len(fields) != 2 or len(fields[0]) != 64 \
+                        or any(character not in "0123456789abcdefABCDEF" for character in fields[0]):
+                    raise GuardBundleError("invalid SHA256SUMS entry")
+                digest, name = fields[0].lower(), fields[1]
+                if name not in expected or name in seen:
+                    raise GuardBundleError("unexpected or duplicate SHA256SUMS file: " + name)
+                seen[name] = digest
+    except GuardBundleError:
+        raise
+    except Exception as exc:
+        raise GuardBundleError("cannot read SHA256SUMS.txt") from exc
+
+    if set(seen) != expected:
+        missing = sorted(expected - set(seen))
+        extra = sorted(set(seen) - expected)
+        detail = "missing=" + ",".join(missing)
+        if extra:
+            detail += "; extra=" + ",".join(extra)
+        raise GuardBundleError("SHA256SUMS file set mismatch: " + detail)
+    for name, expected_digest in seen.items():
+        if _file_sha256(root, name) != expected_digest:
+            raise GuardBundleError("SHA256SUMS hash mismatch: " + name)
+
+
 def load_guard_bundle(root="/"):
     """Load and fail closed on the exported transition/calibration contract.
 
-    The manifest and calibration revision must agree, all seven route files and all
-    combined runtime files must be present, and the six optical profiles must be
-    unique and numerically valid. This is intentionally a pure filesystem check so
-    the Pico can reject a stale or partial CIRCUITPY copy before STATELOOP executes.
+    The manifest and calibration revision must agree, every exported runtime and
+    route file must be present and hash-verified, and the six optical profiles must
+    be unique and numerically valid. This pure filesystem check lets the Pico reject
+    a stale or partial CIRCUITPY copy before STATELOOP executes a route.
     """
     manifest = _read_json(root, "guard-transition.json")
     calibration = _read_json(root, "guard-calibration.json")
@@ -80,6 +131,7 @@ def load_guard_bundle(root="/"):
     for filename in REQUIRED_BUNDLE_FILES:
         if not os.path.isfile(os.path.join(root, filename)):
             raise GuardBundleError("missing Guard runtime file: " + filename)
+    _verify_hash_manifest(root)
 
     routes = manifest.get("routes")
     if routes != ROUTE_FILES:

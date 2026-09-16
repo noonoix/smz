@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Offline preflight contract for the combined Guard CIRCUITPY bundle."""
+import hashlib
 import json
 import sys
 import tempfile
@@ -9,6 +10,7 @@ root = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(root / "portable/plan3/CIRCUITPY"))
 from live_light_guard import (
     GuardBundleError,
+    HASHED_BUNDLE_FILES,
     LightStateGuard,
     REQUIRED_BUNDLE_FILES,
     ROUTE_FILES,
@@ -24,6 +26,14 @@ PROFILE_IDS = (
     "targeted",
 )
 REVISION = "guard-offline-test"
+
+
+def refresh_hashes(path):
+    lines = []
+    for filename in sorted(set(HASHED_BUNDLE_FILES)):
+        digest = hashlib.sha256((path / filename).read_bytes()).hexdigest()
+        lines.append(digest + "  " + filename)
+    (path / "SHA256SUMS.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def write_bundle(path):
@@ -48,6 +58,7 @@ def write_bundle(path):
         (path / filename).write_text("PLAN|2\n", encoding="utf-8")
     for filename in REQUIRED_BUNDLE_FILES:
         (path / filename).write_text("# offline preflight placeholder\n", encoding="utf-8")
+    refresh_hashes(path)
 
 
 def expect_rejected(path, label):
@@ -95,4 +106,8 @@ with tempfile.TemporaryDirectory() as temporary:
     (bundle / "plan_engine.py").unlink()
     expect_rejected(bundle, "missing plan engine")
 
-print("combined Guard bundle preflight: exact six profiles, seven routes, runtime completeness, revision parity and fail-closed rejection verified")
+    write_bundle(bundle)
+    (bundle / ROUTE_FILES["Game"]).write_text("tampered\n", encoding="utf-8")
+    expect_rejected(bundle, "tampered route hash")
+
+print("combined Guard bundle preflight: exact six profiles, seven routes, runtime completeness, SHA256 integrity, revision parity and fail-closed rejection verified")

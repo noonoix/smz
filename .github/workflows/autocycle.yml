@@ -9,6 +9,8 @@ on:
       - 'firmware/autocycle-hostusb-v5/**'
       - 'portable/plan3/**'
       - 'tests/LightTelemetryTests/**'
+      - 'tools/ClassroomStudio.Companion/**'
+      - 'tools/ClassroomStudio.Companion.ContractTests/**'
       - '.github/workflows/autocycle.yml'
 
 permissions:
@@ -84,6 +86,21 @@ jobs:
           dotnet run --project tests/LightTelemetryTests/LightTelemetryTests.csproj -c Release 2>&1 | Tee-Object light-telemetry-tests.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (Select-String -Path light-telemetry-tests.log -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
+      - name: Build and stage software-only companion
+        if: success()
+        shell: pwsh
+        run: |
+          $out = 'ams-shell/src/Ams.UI/bin/Release/net8.0-windows'
+          $companion = Join-Path $out 'ClassroomStudio.Companion'
+          dotnet publish tools/ClassroomStudio.Companion/ClassroomStudio.Companion.csproj -c Release -r win-x64 --self-contained false -o $companion 2>&1 | Tee-Object companion-publish.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item tools/ClassroomStudio.Companion/README.md (Join-Path $companion 'README.md') -Force
+          @(
+            'Classroom Studio companion MCP v0.1',
+            'Software-only UI Automation, screenshots, logs, export staging, and hash validation.',
+            'No serial, USB, HID, firmware flashing, reset, actuator, Guard, Run/Stop, or release operations.',
+            'No hardware connection or physical test is performed by this artifact.'
+          ) | Set-Content (Join-Path $companion 'SCOPE.txt') -Encoding utf8
       - name: Stage Windows test output
         if: success()
         shell: pwsh
@@ -105,6 +122,7 @@ jobs:
             ams-shell/src/Ams.UI/bin/Release/net8.0-windows/**
             windows-tests.log
             light-telemetry-tests.log
+            companion-publish.log
           retention-days: 14
           if-no-files-found: error
       - name: Report Windows failure tail
@@ -113,7 +131,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const names=['windows-restore.log','windows-build.log','windows-testrunner-build.log','windows-tests.log','light-telemetry-tests.log'];
+            const names=['windows-restore.log','windows-build.log','windows-testrunner-build.log','windows-tests.log','light-telemetry-tests.log','companion-publish.log'];
             const text=names.map(n=>fs.existsSync(n)?('=== '+n+' ===\n'+fs.readFileSync(n,'utf8')):'').join('\n');
             const lines=text.split('\n');
             const failures=lines.filter(line=>line.includes('FAIL:')||line.includes('Unhandled exception')||line.includes('Results:')).join('\n');

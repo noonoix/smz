@@ -6,7 +6,14 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "CIRCUITPY"))
-from live_light_guard import GuardBundleError, LightStateGuard, ROUTE_FILES, load_guard_bundle, state_spec
+from live_light_guard import (
+    GuardBundleError,
+    LightStateGuard,
+    REQUIRED_BUNDLE_FILES,
+    ROUTE_FILES,
+    load_guard_bundle,
+    state_spec,
+)
 
 
 class LiveLightGuardTests(unittest.TestCase):
@@ -120,6 +127,8 @@ class LiveLightGuardTests(unittest.TestCase):
         for route in manifest_routes.values():
             if include_resumable or route != "resumable_steps.txt":
                 Path(root.name, route).write_text("PLAN|2\n", encoding="utf-8")
+        for filename in REQUIRED_BUNDLE_FILES:
+            Path(root.name, filename).write_text("# test runtime placeholder\n", encoding="utf-8")
         return root, manifest, calibration
 
     def test_valid_bundle_loads_and_keeps_metadata(self):

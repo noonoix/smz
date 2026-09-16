@@ -5,7 +5,7 @@ namespace Ams.UI.Services;
 public static class AutoCycleFirmwareBundle
 {
     private const string PatchManifest = "autocycle_h6_patch.json";
-    private static readonly string[] RuntimeFiles={"plan_cycle.py","cycle_runtime.py","restart_windows.py","auto_resume_boot.py","resume_essentials_runtime.py","live_light_guard.py","guard_transition.py"};
+    private static readonly string[] RuntimeFiles={"plan_cycle.py","cycle_runtime.py","restart_windows.py","auto_resume_boot.py","resume_essentials_runtime.py"};
     public static IReadOnlyList<string> Export(string codePyPath,IEnumerable<StepNode> steps,string machine,string loopMode,int loopCount,int loopSeconds,bool keyboardOnArm)
     {
         var runtimeDir=Path.Combine(AppContext.BaseDirectory,"portable-runtime");

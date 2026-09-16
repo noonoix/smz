@@ -137,7 +137,10 @@ class LiveLightGuardTests(unittest.TestCase):
     def _refresh_hashes(self, root):
         lines = []
         for filename in sorted(set(HASHED_BUNDLE_FILES)):
-            digest = hashlib.sha256(Path(root, filename).read_bytes()).hexdigest()
+            path = Path(root, filename)
+            if not path.is_file():
+                continue
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
             lines.append(digest + "  " + filename)
         Path(root, "SHA256SUMS.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 

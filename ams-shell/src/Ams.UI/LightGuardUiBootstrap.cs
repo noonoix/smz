@@ -15,6 +15,8 @@ internal static class LightGuardUiBootstrap
 {
     private static readonly DependencyProperty InstalledProperty = DependencyProperty.RegisterAttached(
         "LightGuardUiInstalled", typeof(bool), typeof(LightGuardUiBootstrap), new PropertyMetadata(false));
+    private static readonly DependencyProperty RetryHookInstalledProperty = DependencyProperty.RegisterAttached(
+        "LightGuardUiRetryHookInstalled", typeof(bool), typeof(LightGuardUiBootstrap), new PropertyMetadata(false));
 
     [ModuleInitializer]
     internal static void Initialize()
@@ -25,17 +27,34 @@ internal static class LightGuardUiBootstrap
     {
         if (sender is not MainWindow window || window.GetValue(InstalledProperty) is true
             || window.DataContext is not MainViewModel vm) return;
-        window.SetValue(InstalledProperty, true);
-        window.Dispatcher.BeginInvoke(new Action(() => Install(window, vm)),
-            System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        if (TryInstall(window, vm)) return;
+        if (window.GetValue(RetryHookInstalledProperty) is true) return;
+        window.SetValue(RetryHookInstalledProperty, true);
+
+        EventHandler? layoutHandler = null;
+        layoutHandler = (_, _) =>
+        {
+            if (!TryInstall(window, vm)) return;
+            window.LayoutUpdated -= layoutHandler;
+        };
+        window.LayoutUpdated += layoutHandler;
+        window.Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (TryInstall(window, vm)) window.LayoutUpdated -= layoutHandler;
+        }), System.Windows.Threading.DispatcherPriority.ContextIdle);
     }
 
-    private static void Install(MainWindow window, MainViewModel vm)
+    private static bool TryInstall(MainWindow window, MainViewModel vm)
     {
         var body = FindStatusBody(window);
-        if (body is null) return;
-        vm.InitializeLightGuardAdapter();
+        if (body is null) return false;
+        if (ContainsText(body, "Light Guard — Phase 7"))
+        {
+            window.SetValue(InstalledProperty, true);
+            return true;
+        }
 
+        vm.InitializeLightGuardAdapter();
         var content = new StackPanel();
         content.Children.Add(Text("Light Guard — Phase 7", 16, "#F5F7FA", FontWeights.SemiBold));
         content.Children.Add(Text(
@@ -69,6 +88,8 @@ internal static class LightGuardUiBootstrap
             Child = content,
         };
         body.Children.Insert(Math.Max(0, body.Children.Count - 1), card);
+        window.SetValue(InstalledProperty, true);
+        return true;
     }
 
     private static WpfButton Action(string label, string background, Func<Task> action)
@@ -102,12 +123,20 @@ internal static class LightGuardUiBootstrap
         for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
         {
             var child = VisualTreeHelper.GetChild(root, i);
-            if (child is TextBlock { Text: "وضعیت زنده‌ی سنسور نور" } title
+            if (child is TextBlock title && title.Text.Contains("سنسور نور", StringComparison.Ordinal)
                 && VisualTreeHelper.GetParent(title) is StackPanel body) return body;
             var found = FindStatusBody(child);
             if (found is not null) return found;
         }
         return null;
+    }
+
+    private static bool ContainsText(DependencyObject root, string text)
+    {
+        if (root is TextBlock block && block.Text == text) return true;
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+            if (ContainsText(VisualTreeHelper.GetChild(root, i), text)) return true;
+        return false;
     }
 
     private static SolidColorBrush Brush(string color)

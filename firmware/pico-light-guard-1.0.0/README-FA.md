@@ -1,72 +1,83 @@
-# Firmware نگهبان نور — Phase 7
+# Firmware ترکیبی Pico Guard + Portable Executor — Phase 7
 
-این firmware یک مسیر جدا از `pico-light-readonly` است. هدف آن مشاهدهٔ دائمی نور، کالیبراسیون شش موقعیت و اعلام state به Classroom Studio است؛ هیچ execution انجام نمی‌دهد.
+این firmware برای یک Raspberry Pi Pico معمولی طراحی شده است. Pico پس از کپی دستی bundle به `CIRCUITPY`، هم Guard نوری و هم اجرای Portable Steps را بر عهده دارد. Classroom Studio فقط محل authoring، تست دستی با RunEngine، export و همگام‌سازی revision است؛ پس از قطع کامپیوتر runtime به Windows وابسته نیست.
 
 ## سخت‌افزار مجاز
 
 - Raspberry Pi Pico معمولی، نه Pico W
-- BH1750 / GY-30
-- `SDA` → `GP20` / physical pin 26
-- `SCL` → `GP21` / physical pin 27
-- `VCC` → `3V3`
-- `GND` → `GND`
-- `ADDR` → `GND` / address `0x23`
-- دکمهٔ آبی مربعی Start/Stop: `GP4` به `GND` با pull-up داخلی
-- دکمهٔ زرد دایره‌ای Pass/Save: `GP3` به `GND` با pull-up داخلی
+- BH1750 / GY-30:
+  - `SDA` -> `GP20` / physical pin 26
+  - `SCL` -> `GP21` / physical pin 27
+  - `VCC` -> `3V3`
+  - `GND` -> `GND`
+  - `ADDR` -> `GND` / address `0x23`
+- دکمه آبی مربعی: `GP4` به `GND` با pull-up داخلی
+- دکمه زرد دایره‌ای: `GP3` به `GND` با pull-up داخلی
 - passive piezo: `GP6`
+- UART0 به Arduino arm: `GP16 TX -> Arduino RX`، `GP17 RX <- Arduino TX`، GND مشترک، `57600 8N1`
+- USB HID خود Pico مسیر keyboard برای Portable Steps است.
 
-هیچ Pro Micro، BSS138، UART، HID، keyboard، mouse، buzzer قدیمی، motor، relay یا actuator به این setup وصل نشود.
+Arduino arm حذف نمی‌شود و مسئول mouse و sound است. هیچ Pro Micro یا BSS138 لازم نیست.
 
 ## رفتار دکمه‌ها
 
-- نگه‌داشتن دکمهٔ آبی `GP4` به‌مدت ۳ ثانیه خارج از calibration: ورود به کالیبراسیون در موقعیت اول.
-- فشار کوتاه دکمهٔ آبی داخل calibration: رفتن به موقعیت بعدی از شش موقعیت؛ در موقعیت ششم، همان موقعیت باقی می‌ماند.
-- نگه‌داشتن دوبارهٔ دکمهٔ آبی به‌مدت ۳ ثانیه داخل calibration: خروج امن از calibration و نگه‌داشتن فقط موقعیت‌هایی که با زرد ذخیره شده‌اند.
-- فشار کوتاه دکمهٔ آبی خارج از calibration: روشن/خاموش‌کردن Guard observation.
-- فشار کوتاه دکمهٔ زرد در موقعیت آماده: شروع نمونه‌برداری پنج‌ثانیه‌ای.
-- فشار کوتاه دکمهٔ زرد پس از پایان موفق نمونه‌برداری: ذخیرهٔ همان موقعیت در حافظهٔ محلی.
-- جابه‌جایی با آبی یا خروج با آبی در حالی که یک نمونهٔ موفق هنوز با زرد ذخیره نشده، مسدود می‌شود تا داده دور ریخته نشود.
-- بعد از ذخیره، بازر صدای موفقیت همان موقعیت را پخش می‌کند و بازرِ موقعیت بعدی هنگام ورود، نوت مخصوص خودش را پخش می‌کند.
-- اگر هر شش موقعیت در همان جلسه ذخیره شوند، success melody کلی نیز پخش می‌شود؛ خروج همچنان با نگه‌داشتن آبی انجام می‌شود.
-- اصلاح جزئی مجاز است: مثلاً می‌توان فقط به `character-dashboard` رفت، نمونه گرفت، با زرد ذخیره کرد و با نگه‌داشتن آبی خارج شد؛ پنج موقعیت دیگر بدون تغییر باقی می‌مانند.
+### Portable runtime
 
-شش موقعیت به‌ترتیب:
+- فشار کوتاه آبی `GP4`: Start/Stop اجرای Portable plan
+- فشار کوتاه زرد `GP3`: Pause/Resume اجرای Portable plan
+- نگه‌داشتن آبی `GP4` به‌مدت ۳ ثانیه، فقط وقتی runtime متوقف است: ورود به calibration
 
-1. Desktop
-2. Login/DC
-3. Character Dashboard
-4. Entering Game Loading
-5. Game
-6. Targeted
+### Calibration
 
-Login و DC یک کالیبر نوری مشترک دارند؛ تفاوت DC باید در pipeline/action برنامه باشد، نه در نورسنجی.
+- فشار کوتاه آبی: رفتن به profile بعدی؛ در profile ششم همان profile باقی می‌ماند.
+- نگه‌داشتن آبی ۳ ثانیه: خروج امن.
+- فشار کوتاه زرد پیش از sample: شروع sample پنج‌ثانیه‌ای.
+- فشار کوتاه زرد بعد از sample موفق: ذخیره profile انتخاب‌شده.
+- navigation یا خروج هنگام sample موفق ذخیره‌نشده مسدود می‌شود.
+- eventهای calibration هرگز به Start/Stop یا Pause/Resume runtime تبدیل نمی‌شوند.
 
-## کالیبراسیون
+شش profile به‌ترتیب:
 
-هر موقعیت با ۵ ثانیه نمونه‌برداری می‌شود. firmware median، کمینه، بیشینه و spread را محاسبه می‌کند. اگر spread از حد مجاز بیشتر باشد، مرحله رد می‌شود و همان موقعیت برای تلاش دوباره باقی می‌ماند. پایان موفق نمونه‌برداری یک صدای موفقیت موقعیتی دارد، اما مقدار تا فشار دکمهٔ زرد ذخیره‌شده تلقی نمی‌شود.
+1. `desktop`
+2. `login-or-dc`
+3. `character-dashboard`
+4. `entering-game-loading`
+5. `game`
+6. `targeted`
 
-لغو/خروج با نگه‌داشتن آبی فقط نتایج تأییدشده با زرد را حفظ می‌کند و نمونهٔ ذخیره‌نشده را کنار می‌گذارد. اگر کاربر بخواهد مقدار ذخیره‌شده را به Classroom Studio منتقل کند، برنامه باید شش مقدار منبع حقیقت خود را با revision جدید از طریق `CALSET` همگام کند.
+Login و DC یک calibration record مشترک دارند؛ تفاوت آن‌ها context انتقال است، نه نورسنجی.
 
-منبع اصلی کالیبراسیون Classroom Studio است. برنامه می‌تواند برای هر profile فرمان زیر را به Pico بفرستد:
+## Bundle و runtime
+
+فایل‌های روی `CIRCUITPY` منبع حقیقت runtime هستند. Bundle معتبر شامل این موارد است:
+
+- `code.py`, `boot.py`
+- `plan.txt`
+- `desktop_steps.txt`, `login_or_dc_steps.txt`, `character_dashboard_steps.txt`, `entering_game_loading_steps.txt`, `game_steps.txt`, `targeted_steps.txt`, `resumable_steps.txt`
+- `plan_engine.py` و runtime moduleهای لازم
+- `guard-transition.json`, `guard-calibration.json`
+- `SHA256SUMS.txt`
+
+Loader پیش از استفاده، manifest، هفت route، شش profile، revision و runtime files را بررسی می‌کند و bundle ناقص یا stale را رد می‌کند.
+
+## Transition policy
+
+- progression اصلی strictly ordered است: Desktop -> Login/DC -> Character Dashboard -> Entering Game/Loading -> Game.
+- DC در stageهای فعال یا Targeted به stage 2 برمی‌گردد و بعد progression را از Login/DC ادامه می‌دهد.
+- Targeted stage ششم نیست؛ side-state است، Steps خودش را یک بار اجرا می‌کند و پس از مشاهده fresh و stable Game بدون اجرای دوباره Game Steps برمی‌گردد.
+- stable optical state تکراری دوباره route را اجرا نمی‌کند.
+- Stop/HALT اجرای plan را متوقف و arm را safely release می‌کند.
+
+## CALGET و CALSET
 
 ```text
+CALGET
 CALSET|<revision>|<profile-id>|<center>|<tolerance>|<stable-ms>
 ```
 
-شناسه‌های مجاز:
-
-```text
-desktop
-login-or-dc
-character-dashboard
-entering-game-loading
-game
-targeted
-```
+revision باید token امن باشد؛ profile فقط یکی از شش ID canonical است و مقادیر عددی باید finite و non-negative باشند. انتشار CALSET هر دو `guard-transition.json` و `guard-calibration.json` را به‌صورت موقت/اتمی می‌نویسد، reload و validation می‌کند و در خطا rollback دارد.
 
 ## فرمان‌های USB
-
-فرمان‌های قابل استفاده:
 
 - `PING`
 - `LUX?`
@@ -75,14 +86,15 @@ targeted
 - `GUARD|ON`
 - `GUARD|OFF`
 - `HALT`
-- `BYE`
 
-`GUARD|ON` فقط مشاهده و اعلام `EVT|GUARD|...` را فعال می‌کند. هیچ فرمانی برای Run، Launch، Recovery، Auto Resume، Keyboard، Mouse، HID یا actuator در این firmware وجود ندارد.
-
-## پاسخ هویت مورد انتظار
+پاسخ هویت مورد انتظار:
 
 ```text
-OK|PONG|pico-light-guard 1.0.0|role=light-guard|hid=off|uart=off|actuator=off|sensor=BH1750|button=GP4,GP3|buzzer=GP6|profiles=6
+OK|PONG|combined-pico-guard-executor|hid=on|uart=on|profiles=6
 ```
 
-این بسته جایگزین firmware read-only قبلی نیست و هنوز به‌تنهایی پذیرش سخت‌افزاری Guard را کامل نمی‌کند. بعد از تکمیل adapter برنامه، تست قرارداد، تست نویز/قطع سنسور و تست فیزیکی جداگانه لازم است.
+`GUARD|ON` فقط وقتی plan را فعال می‌کند که bundle معتبر باشد؛ transition و route execution روی Pico انجام می‌شود. Guard eventها هیچ‌وقت RunEngine یا دکمه‌های Run/Stop دسکتاپ را trigger نمی‌کنند.
+
+## وضعیت پذیرش
+
+CI و Windows build جایگزین Hardware Acceptance نیستند. این package هنوز نباید روی setup قبلی نصب یا flash شود. پذیرش فیزیکی جداگانه باید با SHA دقیق package، wiring مصوب، evidence کالیبراسیون، CALSET/CALGET، transitionهای ordered، Targeted/DC، keyboard HID، Arduino mouse/sound و مسیر HALT انجام شود. تا آن زمان PR Draft می‌ماند و هیچ Hardware Acceptance یا production-readiness ادعایی مجاز نیست.

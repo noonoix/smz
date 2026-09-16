@@ -8,40 +8,40 @@ The Windows application must not be required for normal portable execution and m
 
 ## Desktop Step test boundary
 
-`RunEngine` remains available in Classroom Studio as a manual authoring test tool. It is used to run the Steps currently written in a selected tab so the author can verify the sequence before export. The existing in-app Run/Stop controls belong to this test boundary only.
+`RunEngine` remains available in Classroom Studio as a manual authoring test tool. It runs the Steps currently written in a selected tab so the author can verify the sequence before export. The existing in-app Run/Stop controls belong to this test boundary only.
 
 Guard events must never consume, hijack or indirectly trigger the Classroom Studio Run/Stop buttons. Guard observation, portable export and desktop Step testing are separate paths:
 
 ```text
-write/edit Steps → manual RunEngine test → approve/export bundle → copy to CIRCUITPY
+write/edit Steps -> manual RunEngine test -> approve/export bundle -> copy to CIRCUITPY
 ```
 
-A successful desktop test does not replace portable-runtime validation and does not make the Windows application a runtime dependency.
+A successful desktop test does not replace portable-runtime validation and does not make the Windows application a runtime dependency. The desktop application itself does not execute pipeline Steps as a Guard callback.
 
 ## Output boundary
 
-A portable pipeline export must be an atomic bundle containing:
+A combined portable export is an atomic bundle containing:
 
 - the main `PLAN|2` entry plan;
 - one compiled `PLAN|2` file for each canonical visible pipeline tab;
 - the `Resumable` plan file;
-- the portable plan engine and its required runtime modules;
-- the Guard transition/profile manifest and the calibration file required by the selected firmware;
-- a README that identifies the target Pico/Arduino wiring, firmware contract and copy location.
+- the portable plan engine and required runtime modules;
+- `guard-transition.json` and `guard-calibration.json`;
+- the combined Pico firmware files and `SHA256SUMS.txt`.
 
-Unsupported Steps, missing runtime files, stale revisions and invalid transition mappings must block the export before any bundle file is published. A partial bundle is never a valid portable release.
+Unsupported Steps, missing runtime files, stale revisions and invalid transition mappings must block export before any bundle file is published. A partial bundle is never a valid portable release.
 
-## Guard separation
+## Combined Guard separation
 
-The isolated Phase 7 `pico-light-guard` firmware remains a calibration and observation artifact. Its hardware contract is regular Pico + BH1750 + GP4 + GP3 + GP6, with HID/UART/keyboard/mouse/macro/actuator disabled. It reports stable optical states; it does not execute pipeline Steps.
+The combined Phase 7 firmware owns optical observation, ordered transition policy and Portable Step execution on the regular Pico. The Arduino arm remains the mouse/sound component. Pico USB HID remains the keyboard path. The old isolated observation-only firmware is retained only as a historical/diagnostic artifact and must not be confused with the combined runtime contract.
 
-The portable execution firmware/plan bundle is a separate output path. If Guard state routing is added to that path, the routing policy must be encoded in the exported manifest/plan and executed by the portable runtime on the board—not by a desktop callback.
+Classroom Studio may display identity, calibration and revision status, but it does not become the Guard execution target. Guard decisions are exported through the manifest and consumed by the portable runtime on the board.
 
 ## Approved routing policy
 
-The portable transition manifest must encode:
+The portable transition manifest encodes:
 
-- ordered stages 1 → 2 → 3 → 4 → 5;
+- ordered stages 1 -> 2 -> 3 -> 4 -> 5;
 - DC detection from the shared `login-or-dc` optical profile falling back to stage 2;
 - independent Login/DC context in the portable runtime;
 - `Targeted` as a side-state with its own Steps and a return to Game;
@@ -52,4 +52,4 @@ The portable transition manifest must encode:
 
 ## Acceptance
 
-A Windows build or a successful Classroom Studio export is not hardware acceptance. Portable acceptance must inspect the exact generated files, verify their hashes, boot the specified Pico firmware, and test only the approved board/wiring scope for that artifact.
+A Windows build or a successful Classroom Studio export is not hardware acceptance. Portable acceptance must inspect the exact generated files, verify their hashes, manually copy the approved bundle to the specified Pico only during the separate acceptance pass, and test the approved Pico/Arduino wiring scope for that artifact. Until that pass is run and evidenced, no install, flash, release or acceptance claim is authorized.

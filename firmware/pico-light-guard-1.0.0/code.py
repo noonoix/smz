@@ -113,6 +113,11 @@ def _memory_safe_init(self):
 
 # The six calibration positions use distinct ascending notes: C4 through A4.
 _CAL_NOTES = (262, 294, 330, 349, 392, 440)
+_GUARD_START_NOTE = 784
+_GUARD_STOP_NOTE = 392
+_GUARD_PAUSE_NOTE = 523
+_GUARD_RESUME_NOTE = 659
+_GUARD_STATUS_TONE_MS = 2000
 
 def _cal_beep(self, frequency, duration_ms):
     tone = None
@@ -148,6 +153,18 @@ def _cal_complete_melody(self):
     for note in _CAL_NOTES:
         self._cal_beep(note, 90)
         runtime.time.sleep(.035)
+
+def _guard_start_tone(self):
+    self._cal_beep(_GUARD_START_NOTE, _GUARD_STATUS_TONE_MS)
+
+def _guard_stop_tone(self):
+    self._cal_beep(_GUARD_STOP_NOTE, _GUARD_STATUS_TONE_MS)
+
+def _guard_pause_tone(self):
+    self._cal_beep(_GUARD_PAUSE_NOTE, _GUARD_STATUS_TONE_MS)
+
+def _guard_resume_tone(self):
+    self._cal_beep(_GUARD_RESUME_NOTE, _GUARD_STATUS_TONE_MS)
 
 _original_start_cal = runtime.Combined.start_cal
 _original_next_cal = runtime.Combined.next_cal
@@ -197,7 +214,13 @@ def _repeatable_yellow_action(self):
     # Handle both first samples and same-position retries explicitly. A saved
     # value remains active during a retry and is replaced only after the fresh
     # result completes and the user presses yellow again to save it.
-    if not self.calibrating or self.result == "sampling":
+    if not self.calibrating:
+        was_paused = self.controls.paused
+        _original_yellow_action(self)
+        if self.controls.running and self.controls.paused != was_paused:
+            self.guard_pause_tone() if self.controls.paused else self.guard_resume_tone()
+        return
+    if self.result == "sampling":
         _original_yellow_action(self)
         return
     if isinstance(self.result, dict) and not self.saved:
@@ -210,6 +233,26 @@ def _repeatable_yellow_action(self):
     self.emit("EVT|CAL|mode=started|stage=%d|id=%s|seconds=5|saved=%d|retry=%d" %
         (self.stage + 1, runtime.PROFILES[self.stage], len(self.saved_ids), retry))
     self.cal_record_start_tone()
+
+def _audible_buttons(self):
+    now = runtime.time.monotonic()
+    blue = self.blue.poll(now)
+    yellow = self.yellow.poll(now)
+    if blue == "long":
+        self.end_cal() if self.calibrating else self.start_cal()
+    elif blue == "up" and not self.blue.long:
+        if self.calibrating:
+            self.next_cal()
+        elif self.controls.running:
+            self.controls.stop()
+            self.guard_stop_tone()
+        else:
+            self.guard.reset()
+            self.controls.start()
+            self.guard_start_tone()
+    if yellow == "up" and not self.yellow.long:
+        self.yellow_action()
+    self.cal_tick()
 
 # Live Classroom Studio commands that execute entirely on the Pico must not
 # depend on an attached Pro Micro arm. SCREEN/SETRES is metadata; BEEP drives
@@ -242,9 +285,13 @@ def _live_host_poll(self):
             elif line.startswith("CALSET|"):
                 reply = self.calset(line)
             elif line == "GUARD|ON":
-                self.controls.start(); reply = "OK|GUARD|ON"
+                self.controls.start()
+                self.guard_start_tone()
+                reply = "OK|GUARD|ON"
             elif line in ("GUARD|OFF", "HALT"):
-                self.controls.stop(); reply = "OK|GUARD|OFF"
+                self.controls.stop()
+                self.guard_stop_tone()
+                reply = "OK|GUARD|OFF"
             elif line == "LUX?":
                 reply = "OK|LUX|lux=%.1f|sensor=ok" % self.sensor.lux()
             elif line.startswith("SETRES|"):
@@ -280,9 +327,14 @@ runtime.Combined.cal_record_start_tone = _cal_record_start_tone
 runtime.Combined.cal_stage_complete_tone = _cal_stage_complete_tone
 runtime.Combined.cal_save_success_tone = _cal_save_success_tone
 runtime.Combined.cal_complete_melody = _cal_complete_melody
+runtime.Combined.guard_start_tone = _guard_start_tone
+runtime.Combined.guard_stop_tone = _guard_stop_tone
+runtime.Combined.guard_pause_tone = _guard_pause_tone
+runtime.Combined.guard_resume_tone = _guard_resume_tone
 runtime.Combined.start_cal = _audible_start_cal
 runtime.Combined.next_cal = _audible_next_cal
 runtime.Combined.cal_tick = _audible_cal_tick
 runtime.Combined.save_cal = _audible_save_cal
 runtime.Combined.yellow_action = _repeatable_yellow_action
+runtime.Combined.buttons = _audible_buttons
 main()

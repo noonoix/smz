@@ -27,6 +27,16 @@ internal static class LightGuardCalibrationProtocolContract
             "game", new[] { 1.0, 2.0, 3.0, 8.0, 9.0 }, 750, 5.0);
         Check(unstable is null, "unstable spread is rejected");
 
+        var wideStable = LightGuardCalibrationProtocol.Compute(
+            "targeted", new[] { 70.0, 74.0, 72.0, 71.0, 73.0 }, 750, 5.0);
+        Check(wideStable is not null
+              && wideStable.Center == 72.0
+              && wideStable.Spread == 4.0
+              && wideStable.Tolerance == 6.0
+              && wideStable.StableDurationMs == 750
+              && wideStable.SampleCount == 5,
+            "Classroom Studio calibration math matches Pico physical calibration formula");
+
         var command = LightGuardCalibrationProtocol.BuildCalSet("rev-1", stable!);
         Check(command == "CALSET|rev-1|desktop|10.1|2|750",
             "CALSET is deterministic and invariant-culture formatted");

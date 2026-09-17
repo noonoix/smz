@@ -9,6 +9,7 @@ namespace Ams.UI.Services;
 public static class PortableGuardBundle
 {
     public const string ExporterVersion = "0.9.67";
+    private const string PortableOpSentinel = "__COMBINED_GUARD_PORTABLE_OP__";
 
     private static readonly IReadOnlyDictionary<PipelineKind, string> RouteFiles = new Dictionary<PipelineKind, string>
     {
@@ -25,7 +26,6 @@ public static class PortableGuardBundle
     {
         "plan_engine.py", "live_light_guard.py", "guard_transition.py", "guard_calibration_protocol.py", "error_policy.py", "combined_guard_runtime.py",
     };
-
     private static readonly string[] CombinedFirmwareFiles = { "code.py", "boot.py" };
 
     public static readonly IReadOnlyList<string> ExpectedBundleFiles = new[]
@@ -58,14 +58,11 @@ public static class PortableGuardBundle
         if (missing.Length > 0) throw new IOException("فایل runtime Combined Guard پیدا نشد: " + string.Join(", ", missing));
 
         var routeTexts = workspace.Tabs.ToDictionary(tab => tab.Kind, tab => tab.Steps.Count == 0 ? "PLAN|2\n" :
-            PlanExporter.CompileOnce(tab.Steps.ToList(), settings, screenW, screenH, sourceName + "#" + tab.Kind, machine).Text);
+            CompileRoute(tab.Steps, settings, screenW, screenH, sourceName + "#" + tab.Kind, machine));
         var written = new List<string>();
         var codePath = Path.Combine(directory, "code.py");
         written.AddRange(PicoFirmwareExporter.Export(codePath, workspace.Tabs.SelectMany(tab => tab.Steps).ToList(), machine, "once", 1, 0, false));
 
-        // The legacy per-system exporter provides compatibility files, but its README and
-        // metadata describe the old four-file/adafruit_hid package. Replace both before
-        // hashing so a Combined Guard bundle can never ship stale installation guidance.
         var picoCalibrationPath = Path.Combine(directory, "pico-calibration.json");
         AtomicWrite(picoCalibrationPath, Encoding.UTF8.GetBytes(BuildPicoCalibrationMetadata(profiles, machine)));
         var readmePath = Path.Combine(directory, "README-FLASH.md");
@@ -111,6 +108,68 @@ public static class PortableGuardBundle
         return written.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
+    /// <summary>Compiles a Guard route after translating the first-class buzzer step into
+    /// board-owned PLAN|2 BEEP/DELAY operations. This adapter is deliberately scoped to the
+    /// Combined Guard runtime, which provides ctx.beep on GP6.</summary>
+    private static string CompileRoute(IEnumerable<StepNode> steps, AppSettings settings,
+        int screenW, int screenH, string sourceName, string machine)
+    {
+        var normalized = NormalizePortableSteps(steps);
+        var text = PlanExporter.CompileOnce(normalized, settings, screenW, screenH, sourceName, machine).Text;
+        return string.Join("\n", text.Split('\n').Select(line =>
+            line.StartsWith("# " + PortableOpSentinel, StringComparison.Ordinal)
+                ? line[(2 + PortableOpSentinel.Length)..]
+                : line));
+    }
+
+    private static List<StepNode> NormalizePortableSteps(IEnumerable<StepNode> nodes)
+    {
+        var result = new List<StepNode>();
+        foreach (var source in nodes)
+        {
+            if (source.Type == "buzzer" && !source.IsDisabled)
+            {
+                foreach (var command in StepDefinitions.BuildBuzzerCommands(source.Props))
+                {
+                    var portable = command.StartsWith("DLY|", StringComparison.Ordinal)
+                        ? "DELAY|" + command[4..]
+                        : command;
+                    result.Add(new StepNode
+                    {
+                        Type = "comment", Name = source.Name, IsDisabled = false,
+                        Props = new Dictionary<string, object?> { ["text"] = PortableOpSentinel + portable },
+                    });
+                }
+                if (source.Delay > 0 || source.DelayMax > 0)
+                {
+                    result.Add(new StepNode
+                    {
+                        Type = "delay", IsDisabled = false,
+                        Props = new Dictionary<string, object?>
+                        {
+                            ["minMs"] = source.Delay,
+                            ["maxMs"] = source.DelayMax > 0 ? source.DelayMax : source.Delay,
+                        },
+                    });
+                }
+                continue;
+            }
+
+            var clone = new StepNode
+            {
+                Type = source.Type, Name = source.Name, Delay = source.Delay, DelayMax = source.DelayMax,
+                IsDisabled = source.IsDisabled, Props = new Dictionary<string, object?>(source.Props),
+            };
+            foreach (var child in NormalizePortableSteps(source.Children))
+            {
+                child.Parent = clone;
+                clone.Children.Add(child);
+            }
+            result.Add(clone);
+        }
+        return result;
+    }
+
     public static string BuildEntryPlan(IReadOnlyList<LightStateProfile> profiles)
     {
         ValidateProfiles(profiles);
@@ -147,8 +206,7 @@ public static class PortableGuardBundle
         var payload = new
         {
             generator = "Classroom Studio v" + ExporterVersion,
-            bundle = "combined-pico-guard-executor",
-            system = machine,
+            bundle = "combined-pico-guard-executor", system = machine,
             generatedUtc = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture),
             hardwareCalibrationVerified = false,
             calibrationRevision = LightGuardAppAdapter.ComputeRevision(profiles),
@@ -206,17 +264,20 @@ All files must stay together at the root of the staging directory. `SHA256SUMS.t
         if (profiles.Count != LightGuardCalibrationProtocol.ProfileIds.Count || LightGuardCalibrationProtocol.ProfileIds.Any(id => profiles.Count(p => p.Id == id) != 1) || profiles.Any(p => !p.IsValid))
             throw new InvalidDataException("Combined Portable bundle requires exactly six valid Guard profiles.");
     }
+
     private static void ValidateWorkspace(PipelineWorkspace workspace)
     {
         if (workspace.Tabs.Count != RouteFiles.Count || workspace.Tabs.Select(t => t.Kind).Distinct().Count() != RouteFiles.Count || RouteFiles.Keys.Any(k => !workspace.Tabs.Any(t => t.Kind == k)))
             throw new InvalidDataException("Combined Portable bundle requires the seven canonical route tabs.");
     }
+
     private static PipelineKind KindFor(string id) => id switch
     {
         "desktop" => PipelineKind.Desktop, "login-or-dc" => PipelineKind.LoginOrDc, "character-dashboard" => PipelineKind.CharacterDashboard,
         "entering-game-loading" => PipelineKind.EnteringGameLoading, "game" => PipelineKind.Game, "targeted" => PipelineKind.Targeted,
         _ => throw new InvalidDataException("Unknown Guard profile: " + id),
     };
+
     private static void AtomicWrite(string path, byte[] bytes)
     {
         var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";

@@ -1,13 +1,24 @@
 # Combined Phase 7 firmware entry point for the regular Raspberry Pi Pico.
-# Load the large plan engine first, on a compact freshly collected heap. The
-# combined runtime imports it again from sys.modules without the fragmented
-# 3 KB allocation that previously failed during board startup.
+# Keep the 57 KB plan engine out of the boot/control-plane heap. It is loaded
+# only when a route actually asks for an executor symbol.
 import gc
+import sys
 
-gc.collect()
-import plan_engine
+class _DeferredPlanEngine:
+    def __init__(self):
+        self.module = None
 
-gc.collect()
+    def __getattr__(self, name):
+        if self.module is None:
+            # Remove the proxy during the real import to avoid resolving back to
+            # ourselves, compact the heap, then cache the resulting module.
+            del sys.modules["plan_engine"]
+            gc.collect()
+            self.module = __import__("plan_engine")
+            sys.modules["plan_engine"] = self.module
+        return getattr(self.module, name)
+
+sys.modules["plan_engine"] = _DeferredPlanEngine()
 from combined_guard_runtime import main
 
 main()

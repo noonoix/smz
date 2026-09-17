@@ -1,8 +1,32 @@
 # Combined Phase 7 firmware entry point for the regular Raspberry Pi Pico.
-# Parse and validate the small Guard bundle on a fresh heap, before importing
-# the larger hardware runtime. Defer the 57 KB plan engine until route use.
+# Parse the Guard bundle on a fresh heap, provide the os.path subset absent on
+# CircuitPython, and defer the 57 KB plan engine until route execution.
 import gc
 import sys
+import os as _real_os
+
+class _PathCompat:
+    @staticmethod
+    def join(root, name):
+        if not root or root == "/":
+            return "/" + name.lstrip("/")
+        return root.rstrip("/") + "/" + name.lstrip("/")
+
+    @staticmethod
+    def isfile(path):
+        try:
+            return (_real_os.stat(path)[0] & 0x4000) == 0
+        except OSError:
+            return False
+
+class _OsCompat:
+    path = _PathCompat()
+
+    def __getattr__(self, name):
+        return getattr(_real_os, name)
+
+if not hasattr(_real_os, "path"):
+    sys.modules["os"] = _OsCompat()
 
 class _DeferredPlanEngine:
     def __init__(self):

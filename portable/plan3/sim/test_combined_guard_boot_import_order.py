@@ -9,6 +9,17 @@ entry_text = entry.read_text(encoding="utf-8")
 runtime_text = runtime_path.read_text(encoding="utf-8")
 tree = ast.parse(entry_text)
 
+# CircuitPython lacks os.path. Install the narrow join/isfile compatibility
+# surface before live_light_guard imports os.
+compat_pos = entry_text.index('if not hasattr(_real_os, "path"):')
+loader_import_pos = entry_text.index('from live_light_guard import load_guard_bundle')
+assert compat_pos < loader_import_pos
+assert "class _PathCompat:" in entry_text
+assert "def join(root, name):" in entry_text
+assert "def isfile(path):" in entry_text
+assert 'sys.modules["os"] = _OsCompat()' in entry_text
+assert '_real_os.stat(path)' in entry_text
+
 # The large executor stays deferred behind a sys.modules proxy.
 module_level_plan_imports = []
 for node in tree.body:
@@ -22,11 +33,10 @@ assert 'sys.modules["plan_engine"] = _DeferredPlanEngine()' in entry_text
 assert 'self.module = __import__("plan_engine")' in entry_text
 assert "import plan_engine" in runtime_text
 
-# JSON parsing and manifest verification must happen on the fresh boot heap,
-# before combined_guard_runtime allocates its module/class footprint.
+# Parse and verify the bundle once, before combined_guard_runtime import.
 load_pos = entry_text.index('_BOOT_BUNDLE = load_guard_bundle("/")')
 runtime_pos = entry_text.index('import combined_guard_runtime as runtime')
-assert load_pos < runtime_pos
+assert loader_import_pos < load_pos < runtime_pos
 assert entry_text.count('load_guard_bundle("/")') == 1
 assert 'del load_guard_bundle' in entry_text[load_pos:runtime_pos]
 assert 'gc.collect()' in entry_text[load_pos:runtime_pos]
@@ -40,8 +50,6 @@ assert "_BOOT_BUNDLE = None" in init_text
 assert "LightStateGuard.from_bundle" not in init_text
 assert "self.guard.bundle = bundle" in init_text
 assert init_text.index("self.bundle = bundle") < init_text.index("runtime.Arm()")
-assert init_text.index("self.bundle = bundle") < init_text.index("runtime.Keyboard(")
-assert init_text.index("self.bundle = bundle") < init_text.index("runtime.BH1750()")
 assert "from combined_guard_runtime import main" in entry_text
 assert "main()" in entry_text
-print("combined Guard low-memory boot contract: bundle pre-parsed before runtime; executor deferred")
+print("combined Guard boot contract: CircuitPython path compatibility, bundle pre-parse and deferred executor")

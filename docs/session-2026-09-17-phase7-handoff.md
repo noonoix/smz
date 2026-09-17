@@ -11,8 +11,8 @@ This is the durable GitHub mirror of the live Notion session **«ادامه جل
 - Code branch: `phase7/light-guard-calibration`
 - Old Draft PR: https://github.com/c4haztex/smc-1/pull/175 (PR metadata itself was not migrated; branch content was mirrored.)
 - Last validated pre-migration code head: `388bc0551bb9196dcf2a2933b45d7f3d33ccbac3`
-- Latest active branch head: `d1bfaf7689beac560eae6ff0ba72c38fecc7a9cd`
-- Latest functional code change: `d1bfaf7689beac560eae6ff0ba72c38fecc7a9cd`
+- Latest active branch head: `31ebd5645ac3cbf8a0cb3761fa6787e431fcf793`
+- Latest functional code change: `31ebd5645ac3cbf8a0cb3761fa6787e431fcf793`
 - Current Windows artifact run before migration: https://github.com/c4haztex/smc-1/actions/runs/35261951361
 - CI: pre-migration head had 12 executable checks succeeded; post-migration cleanup has not yet produced a validated artifact.
 - Installed hardware bundle remains `stage12`; it does not contain the latest calibration/control-audio changes.
@@ -202,3 +202,58 @@ The currently installed `stage14.zip` does not include this Stop-on-down fix; a 
 3. Export Combined Portable Guard into a clean staging folder.
 4. Send the resulting archive with a new name such as `stage14-rhythm.zip` for provenance and content validation.
 5. Do not copy anything to `CIRCUITPY`, do not send `GUARD|ON`, and do not continue hardware calibration until validation passes.
+
+
+## `stage16.zip` validation and Stop hardware result
+
+The user provided `light-state-windows-output(27).zip` and `stage16.zip`, produced after commit `4a4108b3d72eced92948b3eacd1735872c4d2b0f`.
+
+### `light-state-windows-output(27).zip`
+
+- ZIP SHA-256: `6c48bc598010de13231758fb690f4dbcb93e07a79fe7a33f268bc0db3246c3e2`
+- 83 entries.
+- No unsafe paths.
+- Commit marker: `4a4108b3d72eced92948b3eacd1735872c4d2b0f`.
+- Contains `_immediate_audible_stop`.
+
+### `stage16.zip`
+
+- ZIP SHA-256: `cfb73c1355db7ae6491e62a0e3cc08a7c94316412ec307b98c999951490d9831`
+- 21 entries and no unsafe paths.
+- All required runtime files are present.
+- `SHA256SUMS.txt`: 20 entries, zero duplicate, missing, or mismatched hashes.
+- JSON files parse successfully.
+- Calibration revision: `guard-bf2929070db779e4`.
+- `hardwareCalibrationVerified: false`.
+- Python syntax: 8 files, zero errors.
+- `code.py` SHA-256: `42a04d97f5ef12cee464779ca88e5cd851fa53e485e0dcbb8c593bd36cff90da`.
+- `combined_guard_runtime.py` SHA-256: `2b5007117b105c4b8fd24447036ca26c2e15557521cd7b22ed30e5a56c8e34f5`.
+- Runtime normalized size: 20,200 bytes.
+- Confirmed contracts: immediate Stop helper, fail-safe state before Stop cue, keyboard release before Stop cue, Stop tone before `arm.abort()`, blue-down Stop trigger, consumed-press guard, host `GUARD|OFF`/`HALT` immediate path, rhythmic Start/Stop/Pause/Resume patterns, record/save/retry cues, `role=brain`, no `adafruit_hid`, no `class Keycode`.
+
+Hardware result after installation: the user confirmed Stop is fixed.
+
+## Immediate Start-on-press fix
+
+New hardware report: Stop works, but Start requires two or three physical presses before the Start cue is heard. Root cause: Start still waited for a short blue-button release so it could be distinguished from the three-second long-hold calibration gesture.
+
+The new fix makes Start audible on the first physical blue-button down while preserving calibration safety:
+
+- Commit: `31ebd5645ac3cbf8a0cb3761fa6787e431fcf793`
+- If GP4/blue goes down while not calibrating and Guard is not running, the firmware immediately resets the guard, starts the control state, marks the press as pending/consumed, and plays the rhythmic Start cue.
+- Route execution is gated until the same press is released. This prevents a held Start press from triggering route execution before the firmware knows whether it is actually a long-hold calibration request.
+- If that same press becomes a long hold, the pending Start is cancelled, fail-safe state is restored, and calibration entry happens directly with the position-1 cue.
+- Stop remains immediate on blue-button down while Guard is running.
+- The static audio contract was expanded to cover `blue_start_pending`, `blue_start_consumed`, immediate Start-on-down, pending-start cancellation into calibration, and route gating while Start is pending.
+- Local syntax check and the focused static contract test passed before push.
+- PR #3 check runs after this commit: 11 checks completed successfully; the main Windows app build-test was still in progress at the moment this checkpoint was saved.
+- Artifact/run link for the new build: https://github.com/bermoods/smm/actions/runs/35286694567
+
+## Updated exact next action
+
+1. Wait for the Windows app build-test in run `35286694567` to finish.
+2. If CI finishes green, download the new `light-state-windows-output` artifact from https://github.com/bermoods/smm/actions/runs/35286694567.
+3. Export Combined Portable Guard into a clean staging folder and send the new package, e.g. `stage17-start-down.zip`, for validation.
+4. Do not install it on `CIRCUITPY` until the package validation passes.
+5. After install, verify Boot/control-plane first, then check that Start and Stop both sound on the first physical press.
+6. Keep `GUARD|ON`, operational routes, HID actions, actuator execution, merge, and release blocked until the relevant gates are explicitly reopened.

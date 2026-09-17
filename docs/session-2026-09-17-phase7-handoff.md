@@ -11,8 +11,8 @@ This is the durable GitHub mirror of the live Notion session **«ادامه جل
 - Code branch: `phase7/light-guard-calibration`
 - Old Draft PR: https://github.com/c4haztex/smc-1/pull/175 (PR metadata itself was not migrated; branch content was mirrored.)
 - Last validated pre-migration code head: `388bc0551bb9196dcf2a2933b45d7f3d33ccbac3`
-- Latest active branch head after rescue cleanup: `3c97560ea0f0200543d4e9abd68d5100fb7e5f79`
-- Latest functional code change: `2c2a9c8700ba617d6431b2b8410e4bb17765811c`
+- Latest active branch head: `4c14f7e422ff2c74f338d1aa7649cee0e5af7762`
+- Latest functional code change: `4c14f7e422ff2c74f338d1aa7649cee0e5af7762`
 - Current Windows artifact run before migration: https://github.com/c4haztex/smc-1/actions/runs/35261951361
 - CI: pre-migration head had 12 executable checks succeeded; post-migration cleanup has not yet produced a validated artifact.
 - Installed hardware bundle remains `stage12`; it does not contain the latest calibration/control-audio changes.
@@ -158,6 +158,21 @@ The user provided `stage13.zip` from the migrated repository artifact flow. Vali
 
 Important: the package's `guard-calibration.json` contains the exported/default calibration values with revision `guard-bf2929070db779e4`, not the five profiles physically saved on the board. A full copy of this package to `CIRCUITPY` would overwrite the board's current physical calibration. Before installing `stage13`, copy the current board `guard-calibration.json`, `guard-transition.json`, and `SHA256SUMS.txt` out of `CIRCUITPY` and validate/merge them, or intentionally accept resetting calibration.
 
+## Rhythmic board-control audio update
+
+The previous two-second continuous Start/Stop/Pause/Resume tones were replaced with short rhythmic signatures. This avoids a stuck-alarm feel and makes the four board-owned controls easier to distinguish.
+
+- Commit: `4c14f7e422ff2c74f338d1aa7649cee0e5af7762`
+- Start: rising 5-event pattern, about 880 ms total.
+- Stop/HALT: descending 5-event pattern, about 920 ms total.
+- Pause: repeated 3-note pattern with rests, about 900 ms total.
+- Resume: rising/moving 5-note pattern, about 900 ms total.
+- Static contract updated to require 3-6 audible notes per pattern, total duration 850-1100 ms, valid frequency range, four distinct patterns, and the existing Start/Stop/Pause/Resume bindings.
+- Local static test passed before commit.
+- PR #3 CI after commit: 12 executable checks succeeded; downloadable package skipped by branch condition. Main Windows artifact run: https://github.com/bermoods/smm/actions/runs/35283172213
+
+The user log after replacing the previous package shows the board booting and connecting successfully on COM31 with `combined-pico-guard-executor|hid=on|uart=on|profiles=6|role=brain`. This confirms Boot/control-plane connectivity for the installed package, but the rhythmic update requires a new artifact/package from commit `4c14f7e...` before hardware audio confirmation.
+
 ## Active safety gates
 
 - Do not send `GUARD|ON`.
@@ -170,7 +185,7 @@ Important: the package's `guard-calibration.json` contains the exported/default 
 ## Exact next action
 
 1. Continue from `bermoods/smm` on branch `phase7/light-guard-calibration`.
-2. Ensure GitHub Actions are enabled on the new repository and run/observe CI for head `3c97560ea0f0200543d4e9abd68d5100fb7e5f79`.
-3. Build/download a fresh Windows artifact from the new repository, then export Combined Portable Guard into a clean staging folder.
-4. Send the resulting archive with a new name such as `stage14.zip` for provenance and content validation.
+2. Download the new Windows artifact from run `35283172213`, produced after commit `4c14f7e422ff2c74f338d1aa7649cee0e5af7762`.
+3. Export Combined Portable Guard into a clean staging folder.
+4. Send the resulting archive with a new name such as `stage14-rhythm.zip` for provenance and content validation.
 5. Do not copy anything to `CIRCUITPY`, do not send `GUARD|ON`, and do not continue hardware calibration until validation passes.

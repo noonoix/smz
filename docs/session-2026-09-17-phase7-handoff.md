@@ -14,12 +14,11 @@ This is the durable GitHub mirror of the live Notion session **«ادامه جل
 - Latest active branch head after rescue cleanup: `3c97560ea0f0200543d4e9abd68d5100fb7e5f79`
 - Latest functional code change: `2c2a9c8700ba617d6431b2b8410e4bb17765811c`
 - Current Windows artifact run before migration: https://github.com/c4haztex/smc-1/actions/runs/35261951361
-- CI: new Draft PR #3 on `bermoods/smm` completed successfully: 12 executable checks succeeded; downloadable package skipped by branch condition.
-- Current Windows artifact run after migration: https://github.com/bermoods/smm/actions/runs/35281421528
+- CI: pre-migration head had 12 executable checks succeeded; post-migration cleanup has not yet produced a validated artifact.
 - Installed hardware bundle remains `stage12`; it does not contain the latest calibration/control-audio changes.
 - Board: COM30/COM31 hot-plug detected; COM31 automatically selected; `role=brain` confirmed.
 - Hardware passed: Boot, control plane, compact light telemetry, `SETRES`, live Buzzer Step, calibration-entry cue, and stable Desktop sample-complete cue.
-- Next package: download the new Windows artifact from run `35281421528`, export Combined Portable Guard, and validate a fresh `stage14.zip`.
+- Next package: export and validate a fresh package from run `35261951361`; use a new name such as `stage14.zip` to avoid confusing it with any package made from the previous run.
 
 ## Repository rescue and active remote
 
@@ -41,18 +40,6 @@ The active Phase 7 branch now includes board-owned two-second feedback tones for
 - Resume: distinct two-second tone.
 
 These tones are played by the Pico on GP6 and do not depend on the route engine or Arduino arm. The static audio contract test now also asserts these bindings. The Classroom Studio calibration protocol contract now includes a parity case proving the same median/spread/tolerance/stable-ms math used by physical button calibration: median center, reject spread over 5 lux, `tolerance=max(2.0, spread*1.5)`, and `stable_ms=750`.
-
-## New repository PR and CI
-
-A new Draft PR was created on the migrated repository so Phase 7 remains reviewable and CI-backed.
-
-- Draft PR: https://github.com/bermoods/smm/pull/3
-- Head: `3c97560ea0f0200543d4e9abd68d5100fb7e5f79`
-- CI run family: https://github.com/bermoods/smm/actions/runs/35281421528
-- Result: 12 executable checks succeeded.
-- `autocycle / downloadable test package` was skipped by the existing branch condition, as before.
-
-The next hardware package must be produced from this migrated repository artifact, not from the old `c4haztex/smc-1` run.
 
 ## Fixed wiring and controls
 
@@ -148,6 +135,29 @@ The user confirmed audible Buzzer output, calibration-entry audio, and the stabl
 
 The board still runs a bundle without the latest workflow code unless a package exported from the corresponding new artifact is installed. Merely launching a newer Windows build does not update Pico firmware. The retry logic has now also been rewritten explicitly and covered by static contract tests, but hardware confirmation requires a newly exported and validated bundle.
 
+## `stage13.zip` validation
+
+The user provided `stage13.zip` from the migrated repository artifact flow. Validation passed.
+
+- ZIP SHA-256: `c5e7332341d122e0b9f45fdabbc990df61924a08cf62a634b4c35336735c71ba`
+- Exactly 21 files.
+- No unsafe paths.
+- `SHA256SUMS.txt`: 20 entries, 0 missing files, 0 hash mismatches.
+- JSON files parse successfully: `guard-calibration.json`, `guard-transition.json`, `pico-calibration.json`.
+- Generator: `Classroom Studio v0.9.67`.
+- `hardwareCalibrationVerified: false`.
+- Python syntax: 8 files, 0 syntax errors.
+- `code.py` SHA-256: `1efde414f4b593c53345f6acac60ea5fa7a9b1ec6a24c99a24f11280cf7a6625`.
+- `combined_guard_runtime.py` SHA-256: `2b5007117b105c4b8fd24447036ca26c2e15557521cd7b22ed30e5a56c8e34f5`.
+- Runtime normalized size remains 20,200 bytes.
+- No real `adafruit_hid` import and no `class Keycode`.
+- Internal `Keyboard` and `release_all()` remain present.
+- New audio contracts are present: record-start `660 Hz / 65 ms`, save-success `880 → 1320 Hz`, and distinct two-second Start/Stop/Pause/Resume tones.
+- Same-position retry marker and final-position wrap are present.
+- Pico-local host `BEEP` and `role=brain` remain present.
+
+Important: the package's `guard-calibration.json` contains the exported/default calibration values with revision `guard-bf2929070db779e4`, not the five profiles physically saved on the board. A full copy of this package to `CIRCUITPY` would overwrite the board's current physical calibration. Before installing `stage13`, copy the current board `guard-calibration.json`, `guard-transition.json`, and `SHA256SUMS.txt` out of `CIRCUITPY` and validate/merge them, or intentionally accept resetting calibration.
+
 ## Active safety gates
 
 - Do not send `GUARD|ON`.
@@ -160,7 +170,7 @@ The board still runs a bundle without the latest workflow code unless a package 
 ## Exact next action
 
 1. Continue from `bermoods/smm` on branch `phase7/light-guard-calibration`.
-2. Download `light-state-windows-output` from the new repository run `35281421528`.
-3. Extract into a completely new Windows folder and launch that build.
-4. Export Combined Portable Guard into a clean staging folder and send the resulting archive with a new name such as `stage14.zip` for provenance and content validation.
+2. Ensure GitHub Actions are enabled on the new repository and run/observe CI for head `3c97560ea0f0200543d4e9abd68d5100fb7e5f79`.
+3. Build/download a fresh Windows artifact from the new repository, then export Combined Portable Guard into a clean staging folder.
+4. Send the resulting archive with a new name such as `stage14.zip` for provenance and content validation.
 5. Do not copy anything to `CIRCUITPY`, do not send `GUARD|ON`, and do not continue hardware calibration until validation passes.

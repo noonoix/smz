@@ -136,6 +136,11 @@ def _cal_stage_complete_tone(self):
     runtime.time.sleep(.06)
     self._cal_beep(note, 190)
 
+def _cal_save_success_tone(self):
+    self._cal_beep(880, 90)
+    runtime.time.sleep(.05)
+    self._cal_beep(1320, 180)
+
 def _cal_complete_melody(self):
     for note in _CAL_NOTES:
         self._cal_beep(note, 90)
@@ -153,7 +158,18 @@ def _audible_start_cal(self):
 
 def _audible_next_cal(self):
     previous = self.stage
-    _original_next_cal(self)
+    can_wrap = (self.calibrating and
+        self.stage == len(runtime.PROFILES) - 1 and
+        self.result != "sampling" and
+        not (self.result is not None and not self.saved))
+    if can_wrap:
+        self.stage = 0
+        self.result = None
+        self.saved = False
+        self.emit("EVT|CAL|mode=ready|stage=1|id=" + runtime.PROFILES[0] +
+            "|seconds=5|saved=%d" % len(self.saved_ids))
+    else:
+        _original_next_cal(self)
     if self.calibrating and self.stage != previous:
         self.cal_position_tone()
 
@@ -166,8 +182,12 @@ def _audible_cal_tick(self):
 def _audible_save_cal(self):
     saved_before = len(self.saved_ids)
     _original_save_cal(self)
-    if saved_before < len(runtime.PROFILES) and len(self.saved_ids) == len(runtime.PROFILES):
-        self.cal_complete_melody()
+    saved_after = len(self.saved_ids)
+    if saved_after == saved_before + 1:
+        if saved_after == len(runtime.PROFILES):
+            self.cal_complete_melody()
+        else:
+            self.cal_save_success_tone()
 
 # Live Classroom Studio commands that execute entirely on the Pico must not
 # depend on an attached Pro Micro arm. SCREEN/SETRES is metadata; BEEP drives
@@ -235,6 +255,7 @@ runtime.Combined.host_poll = _live_host_poll
 runtime.Combined._cal_beep = _cal_beep
 runtime.Combined.cal_position_tone = _cal_position_tone
 runtime.Combined.cal_stage_complete_tone = _cal_stage_complete_tone
+runtime.Combined.cal_save_success_tone = _cal_save_success_tone
 runtime.Combined.cal_complete_melody = _cal_complete_melody
 runtime.Combined.start_cal = _audible_start_cal
 runtime.Combined.next_cal = _audible_next_cal

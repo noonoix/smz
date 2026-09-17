@@ -130,6 +130,9 @@ def _cal_beep(self, frequency, duration_ms):
 def _cal_position_tone(self):
     self._cal_beep(_CAL_NOTES[self.stage], 220)
 
+def _cal_record_start_tone(self):
+    self._cal_beep(660, 65)
+
 def _cal_stage_complete_tone(self):
     note = _CAL_NOTES[self.stage]
     self._cal_beep(note, 110)
@@ -191,18 +194,22 @@ def _audible_save_cal(self):
             self.cal_save_success_tone()
 
 def _repeatable_yellow_action(self):
-    # After a successful save, another short yellow press immediately starts a
-    # fresh five-second sample for the same position. The previously persisted
-    # value remains valid unless and until the replacement sample is completed
-    # and explicitly saved with the next yellow press.
-    if self.calibrating and self.saved and isinstance(self.result, dict):
-        self.samples = []
-        self.sample_started = runtime.time.monotonic()
-        self.result = "sampling"
-        self.emit("EVT|CAL|mode=started|stage=%d|id=%s|seconds=5|saved=%d|retry=1" %
-            (self.stage + 1, runtime.PROFILES[self.stage], len(self.saved_ids)))
+    # Handle both first samples and same-position retries explicitly. A saved
+    # value remains active during a retry and is replaced only after the fresh
+    # result completes and the user presses yellow again to save it.
+    if not self.calibrating or self.result == "sampling":
+        _original_yellow_action(self)
         return
-    _original_yellow_action(self)
+    if isinstance(self.result, dict) and not self.saved:
+        self.save_cal()
+        return
+    retry = 1 if self.saved and isinstance(self.result, dict) else 0
+    self.samples = []
+    self.sample_started = runtime.time.monotonic()
+    self.result = "sampling"
+    self.emit("EVT|CAL|mode=started|stage=%d|id=%s|seconds=5|saved=%d|retry=%d" %
+        (self.stage + 1, runtime.PROFILES[self.stage], len(self.saved_ids), retry))
+    self.cal_record_start_tone()
 
 # Live Classroom Studio commands that execute entirely on the Pico must not
 # depend on an attached Pro Micro arm. SCREEN/SETRES is metadata; BEEP drives
@@ -269,6 +276,7 @@ runtime.Combined._live_host_beep = _live_host_beep
 runtime.Combined.host_poll = _live_host_poll
 runtime.Combined._cal_beep = _cal_beep
 runtime.Combined.cal_position_tone = _cal_position_tone
+runtime.Combined.cal_record_start_tone = _cal_record_start_tone
 runtime.Combined.cal_stage_complete_tone = _cal_stage_complete_tone
 runtime.Combined.cal_save_success_tone = _cal_save_success_tone
 runtime.Combined.cal_complete_melody = _cal_complete_melody

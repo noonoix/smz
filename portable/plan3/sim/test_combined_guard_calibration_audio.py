@@ -25,6 +25,10 @@ assert "duty_cycle=32768" in entry_text
 assert 'self.emit("ERR|CAL|AUDIO")' in entry_text
 assert "tone.deinit()" in entry_text
 assert "def _cal_position_tone" in entry_text
+assert "def _cal_record_start_tone" in entry_text
+assert "self._cal_beep(660, 65)" in entry_text
+assert "runtime.Combined.cal_record_start_tone = _cal_record_start_tone" in entry_text
+assert "self.cal_record_start_tone()" in entry_text
 assert "def _cal_stage_complete_tone" in entry_text
 assert "def _cal_save_success_tone" in entry_text
 assert "self._cal_beep(880, 90)" in entry_text
@@ -48,15 +52,16 @@ assert "not (self.result is not None and not self.saved)" in entry_text
 assert "self.stage = 0" in entry_text
 assert 'self.emit("EVT|CAL|mode=ready|stage=1|id=" + runtime.PROFILES[0]' in entry_text
 
-# A short yellow press after a successful save starts a fresh sample in place.
-# The saved profile remains durable until the replacement completes and is saved.
+# Yellow explicitly owns first sample, save, and same-position retry.
 assert "def _repeatable_yellow_action" in entry_text
-assert "self.calibrating and self.saved and isinstance(self.result, dict)" in entry_text
+assert 'if not self.calibrating or self.result == "sampling":' in entry_text
+assert "if isinstance(self.result, dict) and not self.saved:" in entry_text
+assert "self.save_cal()" in entry_text
+assert "retry = 1 if self.saved and isinstance(self.result, dict) else 0" in entry_text
 assert "self.samples = []" in entry_text
 assert "self.sample_started = runtime.time.monotonic()" in entry_text
 assert 'self.result = "sampling"' in entry_text
-assert "|retry=1" in entry_text
-assert "_original_yellow_action(self)" in entry_text
+assert "|retry=%d" in entry_text
 assert "runtime.Combined.yellow_action = _repeatable_yellow_action" in entry_text
 
 # Live Classroom Studio must reach a Pico-local buzzer step without a Pro Micro.
@@ -76,4 +81,4 @@ assert 'if yellow == "up" and not self.yellow.long: self.yellow_action()' in run
 assert 'if self.result is not None: self.save_cal(); return' in runtime_text
 assert 'self.result = "sampling"' in runtime_text
 
-print("combined Guard audible calibration, save cue, cyclic positions, same-position retry, live buzzer and two-button contract: PASS")
+print("combined Guard audible record start, save cue, cyclic positions, explicit same-position retry and live buzzer contract: PASS")

@@ -9,8 +9,7 @@ entry_text = entry.read_text(encoding="utf-8")
 runtime_text = runtime_path.read_text(encoding="utf-8")
 tree = ast.parse(entry_text)
 
-# Boot must install a small sys.modules proxy before importing the combined
-# runtime. The 57 KB executor is loaded only on first symbol access.
+# The large executor stays deferred behind a sys.modules proxy.
 module_level_plan_imports = []
 for node in tree.body:
     if isinstance(node, ast.Import):
@@ -21,20 +20,28 @@ assert not module_level_plan_imports
 assert 'class _DeferredPlanEngine:' in entry_text
 assert 'sys.modules["plan_engine"] = _DeferredPlanEngine()' in entry_text
 assert 'self.module = __import__("plan_engine")' in entry_text
-assert entry_text.index('sys.modules["plan_engine"] = _DeferredPlanEngine()') < entry_text.index('import combined_guard_runtime as runtime')
 assert "import plan_engine" in runtime_text
 
-# Bundle JSON must be loaded exactly once, before allocating hardware objects.
+# JSON parsing and manifest verification must happen on the fresh boot heap,
+# before combined_guard_runtime allocates its module/class footprint.
+load_pos = entry_text.index('_BOOT_BUNDLE = load_guard_bundle("/")')
+runtime_pos = entry_text.index('import combined_guard_runtime as runtime')
+assert load_pos < runtime_pos
+assert entry_text.count('load_guard_bundle("/")') == 1
+assert 'del load_guard_bundle' in entry_text[load_pos:runtime_pos]
+assert 'gc.collect()' in entry_text[load_pos:runtime_pos]
+
 init_start = entry_text.index("def _memory_safe_init(self):")
 init_end = entry_text.index("runtime.Combined.__init__ = _memory_safe_init")
 init_text = entry_text[init_start:init_end]
-assert init_text.count('runtime.load_guard_bundle("/")') == 1
+assert "load_guard_bundle" not in init_text
+assert "bundle = _BOOT_BUNDLE" in init_text
+assert "_BOOT_BUNDLE = None" in init_text
 assert "LightStateGuard.from_bundle" not in init_text
-assert init_text.index('runtime.load_guard_bundle("/")') < init_text.index("runtime.Arm()")
-assert init_text.index('runtime.load_guard_bundle("/")') < init_text.index("runtime.Keyboard(")
-assert init_text.index('runtime.load_guard_bundle("/")') < init_text.index("runtime.BH1750()")
-assert "guard.bundle = bundle" in init_text
-assert "runtime.Combined.__init__ = _memory_safe_init" in entry_text
+assert "self.guard.bundle = bundle" in init_text
+assert init_text.index("self.bundle = bundle") < init_text.index("runtime.Arm()")
+assert init_text.index("self.bundle = bundle") < init_text.index("runtime.Keyboard(")
+assert init_text.index("self.bundle = bundle") < init_text.index("runtime.BH1750()")
 assert "from combined_guard_runtime import main" in entry_text
 assert "main()" in entry_text
-print("combined Guard low-memory boot contract: deferred executor and bundle-first single parse")
+print("combined Guard low-memory boot contract: bundle pre-parsed before runtime; executor deferred")

@@ -1,6 +1,6 @@
 # Combined Phase 7 firmware entry point for the regular Raspberry Pi Pico.
-# Keep the 57 KB plan engine out of the boot/control-plane heap. It is loaded
-# only when a route actually asks for an executor symbol.
+# Parse and validate the small Guard bundle on a fresh heap, before importing
+# the larger hardware runtime. Defer the 57 KB plan engine until route use.
 import gc
 import sys
 
@@ -10,8 +10,6 @@ class _DeferredPlanEngine:
 
     def __getattr__(self, name):
         if self.module is None:
-            # Remove the proxy during the real import to avoid resolving back to
-            # ourselves, compact the heap, then cache the resulting module.
             del sys.modules["plan_engine"]
             gc.collect()
             self.module = __import__("plan_engine")
@@ -19,19 +17,24 @@ class _DeferredPlanEngine:
         return getattr(self.module, name)
 
 sys.modules["plan_engine"] = _DeferredPlanEngine()
+
+from live_light_guard import load_guard_bundle
+_BOOT_BUNDLE = load_guard_bundle("/")
+del load_guard_bundle
+gc.collect()
+
 import combined_guard_runtime as runtime
 from combined_guard_runtime import main
 
 def _memory_safe_init(self):
-    # Validate and parse the bundle before allocating UART, HID, I2C and GPIO
-    # objects. Reuse the parsed bundle instead of loading both JSON files twice.
-    bundle = runtime.load_guard_bundle("/")
-    guard = runtime.LightStateGuard(
+    global _BOOT_BUNDLE
+    bundle = _BOOT_BUNDLE
+    _BOOT_BUNDLE = None
+    self.bundle = bundle
+    self.guard = runtime.LightStateGuard(
         bundle["states"], bundle["stable_ms"], bundle["hysteresis"],
         bundle["sensor_timeout_ms"])
-    guard.bundle = bundle
-    self.bundle = bundle
-    self.guard = guard
+    self.guard.bundle = bundle
     gc.collect()
 
     self.arm = runtime.Arm()

@@ -19,7 +19,7 @@ jobs:
   mirror:
     name: Mirror all refs and preserve bundle
     runs-on: ubuntu-latest
-    if: ${{ vars.MIRROR_TARGET != '' && secrets.MIRROR_PUSH_TOKEN != '' }}
+    if: ${{ vars.MIRROR_TARGET != '' }}
     steps:
       - name: Validate mirror configuration
         shell: bash

@@ -61,7 +61,10 @@ public static class PortableGuardBundle
             CompileRoute(tab.Steps, settings, screenW, screenH, sourceName + "#" + tab.Kind, machine));
         var written = new List<string>();
         var codePath = Path.Combine(directory, "code.py");
-        written.AddRange(PicoFirmwareExporter.Export(codePath, workspace.Tabs.SelectMany(tab => tab.Steps).ToList(), machine, "once", 1, 0, false));
+        // This legacy exporter is used only to stage compatibility metadata. The combined
+        // firmware and every route are written below, so feeding it real route steps would
+        // compile the buzzer a second time through the strict legacy PlanExporter.
+        written.AddRange(PicoFirmwareExporter.Export(codePath, new List<StepNode>(), machine, "once", 1, 0, false));
 
         var picoCalibrationPath = Path.Combine(directory, "pico-calibration.json");
         AtomicWrite(picoCalibrationPath, Encoding.UTF8.GetBytes(BuildPicoCalibrationMetadata(profiles, machine)));
@@ -108,9 +111,6 @@ public static class PortableGuardBundle
         return written.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
-    /// <summary>Compiles a Guard route after translating the first-class buzzer step into
-    /// board-owned PLAN|2 BEEP/DELAY operations. This adapter is deliberately scoped to the
-    /// Combined Guard runtime, which provides ctx.beep on GP6.</summary>
     private static string CompileRoute(IEnumerable<StepNode> steps, AppSettings settings,
         int screenW, int screenH, string sourceName, string machine)
     {

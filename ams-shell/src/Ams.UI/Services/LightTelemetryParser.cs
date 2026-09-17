@@ -4,7 +4,7 @@ using Ams.UI.Models;
 
 namespace Ams.UI.Services;
 
-/// <summary>Strict parser for the phase-one LUX? response contract.</summary>
+/// <summary>Strict, backward-compatible parser for Pico LUX? replies.</summary>
 public static class LightTelemetryParser
 {
     public static LightTelemetrySample Parse(string reply, DateTimeOffset? receivedAt = null)
@@ -24,8 +24,8 @@ public static class LightTelemetryParser
             return new(errorStatus.Value, null, null, null, at, raw);
 
         var parts = raw.Split('|', StringSplitOptions.None);
-        if (parts.Length != 6 || parts[0] != "OK" || parts[1] != "LUX")
-            throw new LightTelemetryProtocolException(raw, "Expected the exact OK|LUX response shape.");
+        if (parts.Length < 4 || parts.Length > 6 || parts[0] != "OK" || parts[1] != "LUX")
+            throw new LightTelemetryProtocolException(raw, "Expected an OK|LUX response.");
 
         var fields = new Dictionary<string, string>(StringComparer.Ordinal);
         for (var i = 2; i < parts.Length; i++)
@@ -37,14 +37,32 @@ public static class LightTelemetryParser
                 throw new LightTelemetryProtocolException(raw, "Telemetry field is duplicated.");
         }
 
-        if (fields.Count != 4 || !fields.TryGetValue("seq", out var seqText)
-            || !uint.TryParse(seqText, NumberStyles.None, CultureInfo.InvariantCulture, out var sequence)
+        // Combined Guard emits the compact shape:
+        // OK|LUX|lux=10.8|sensor=ok
+        // Older telemetry firmware may additionally include seq and mode. Both shapes are valid;
+        // required values stay strict and optional values are validated when present.
+        if (fields.Keys.Any(k => k is not ("seq" or "lux" or "mode" or "sensor"))
             || !fields.TryGetValue("lux", out var luxText)
             || !double.TryParse(luxText, NumberStyles.Float, CultureInfo.InvariantCulture, out var lux)
             || !double.IsFinite(lux) || lux < 0
-            || !fields.TryGetValue("mode", out var mode) || mode is not ("hires" or "lowres")
             || !fields.TryGetValue("sensor", out var sensor) || sensor != "ok")
             throw new LightTelemetryProtocolException(raw, "Telemetry fields are invalid.");
+
+        uint? sequence = null;
+        if (fields.TryGetValue("seq", out var seqText))
+        {
+            if (!uint.TryParse(seqText, NumberStyles.None, CultureInfo.InvariantCulture, out var parsedSequence))
+                throw new LightTelemetryProtocolException(raw, "Telemetry sequence is invalid.");
+            sequence = parsedSequence;
+        }
+
+        string? mode = null;
+        if (fields.TryGetValue("mode", out var modeText))
+        {
+            if (modeText is not ("hires" or "lowres"))
+                throw new LightTelemetryProtocolException(raw, "Telemetry mode is invalid.");
+            mode = modeText;
+        }
 
         return new(LightTelemetryStatus.Ok, sequence, lux, mode, at, raw);
     }

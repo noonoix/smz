@@ -10,71 +10,6 @@ import pwmio
 import usb_cdc
 import usb_hid
 
-class Keycode:
-    # USB HID Usage Tables, keyboard/keypad page.
-    A = 4
-    B = 5
-    C = 6
-    D = 7
-    E = 8
-    F = 9
-    G = 10
-    H = 11
-    I = 12
-    J = 13
-    K = 14
-    L = 15
-    M = 16
-    N = 17
-    O = 18
-    P = 19
-    Q = 20
-    R = 21
-    S = 22
-    T = 23
-    U = 24
-    V = 25
-    W = 26
-    X = 27
-    Y = 28
-    Z = 29
-    ONE = 30
-    TWO = 31
-    THREE = 32
-    FOUR = 33
-    FIVE = 34
-    SIX = 35
-    SEVEN = 36
-    EIGHT = 37
-    NINE = 38
-    ZERO = 39
-    ENTER = 40
-    ESCAPE = 41
-    BACKSPACE = 42
-    TAB = 43
-    SPACE = 44
-    F1 = 58
-    F2 = 59
-    F3 = 60
-    F4 = 61
-    F5 = 62
-    F6 = 63
-    F7 = 64
-    F8 = 65
-    F9 = 66
-    F10 = 67
-    F11 = 68
-    F12 = 69
-    RIGHT_ARROW = 79
-    LEFT_ARROW = 80
-    DOWN_ARROW = 81
-    UP_ARROW = 82
-    LEFT_CONTROL = 224
-    LEFT_SHIFT = 225
-    LEFT_ALT = 226
-    LEFT_GUI = 227
-
-
 class Keyboard:
     """Small boot-keyboard driver; avoids an undeclared adafruit_hid dependency."""
     def __init__(self, devices):
@@ -286,10 +221,26 @@ class Combined:
         self.blue = Button(board.GP4); self.yellow = Button(board.GP3); self.usb = usb_cdc.data or usb_cdc.console; self.host = bytearray()
         self.calibrating = False; self.stage = 0; self.samples = []; self.sample_started = 0; self.result = None; self.saved = False; self.saved_ids = set()
     def key(self, vk):
-        if 65 <= vk <= 90: return getattr(Keycode, chr(vk))
-        if 48 <= vk <= 57: return getattr(Keycode, ("ZERO","ONE","TWO","THREE","FOUR","FIVE","SIX","SEVEN","EIGHT","NINE")[vk-48])
-        if 112 <= vk <= 123: return getattr(Keycode, "F" + str(vk - 111))
-        return {13:Keycode.ENTER, 27:Keycode.ESCAPE, 32:Keycode.SPACE, 9:Keycode.TAB, 8:Keycode.BACKSPACE, 37:Keycode.LEFT_ARROW,38:Keycode.UP_ARROW,39:Keycode.RIGHT_ARROW,40:Keycode.DOWN_ARROW,160:Keycode.LEFT_SHIFT,162:Keycode.LEFT_CONTROL,164:Keycode.LEFT_ALT,91:Keycode.LEFT_GUI}.get(vk, Keycode.E)
+        # Convert Windows virtual-key values directly to USB HID usages.
+        # Keep this branch-only mapping allocation-free on CircuitPython's small heap.
+        if 65 <= vk <= 90: return vk - 61
+        if 49 <= vk <= 57: return vk - 19
+        if vk == 48: return 39
+        if 112 <= vk <= 123: return vk - 54
+        if vk == 13: return 40
+        if vk == 27: return 41
+        if vk == 8: return 42
+        if vk == 9: return 43
+        if vk == 32: return 44
+        if vk == 37: return 80
+        if vk == 38: return 82
+        if vk == 39: return 79
+        if vk == 40: return 81
+        if vk == 160: return 225
+        if vk == 162: return 224
+        if vk == 164: return 226
+        if vk == 91: return 227
+        return 8
     def type_text(self, text, hmin, hmax, ctx):
         for ch in text:
             if not ctx.gate(): raise plan_engine.PlanAbort()

@@ -111,6 +111,8 @@ def _memory_safe_init(self):
     self.saved = False
     self.saved_ids = set()
     self.blue_stop_consumed = False
+    self.blue_start_consumed = False
+    self.blue_start_pending = False
 
 # The six calibration positions use distinct ascending notes: C4 through A4.
 _CAL_NOTES = (262, 294, 330, 349, 392, 440)
@@ -190,6 +192,38 @@ def _immediate_audible_stop(self):
     self.guard_stop_tone()
     self.arm.abort()
 
+def _immediate_audible_start(self):
+    # Acknowledge Start on the physical press, not on release. Route execution
+    # remains gated until the press resolves, so a held blue button can still
+    # become the long-hold calibration gesture without executing a route.
+    self.guard.reset()
+    self.controls.start()
+    self.blue_start_pending = True
+    self.blue_start_consumed = True
+    self.guard_start_tone()
+
+def _enter_calibration_from_pending_start(self):
+    # The user held the same blue press that initially cued Start. Cancel the
+    # not-yet-routable start state and enter calibration directly, without
+    # playing a Stop cue or waiting on optional arm cleanup.
+    self.blue_start_pending = False
+    self.controls.running = False
+    self.controls.paused = False
+    self.controls.aborted = True
+    try:
+        self.keyboard.release_all()
+    except Exception:
+        pass
+    self.calibrating = True
+    self.stage = 0
+    self.samples = []
+    self.sample_started = 0
+    self.result = None
+    self.saved = False
+    self.saved_ids = set()
+    self.emit("EVT|CAL|mode=ready|stage=1|id=" + runtime.PROFILES[0] + "|seconds=5|saved=0")
+    self.cal_position_tone()
+
 _original_start_cal = runtime.Combined.start_cal
 _original_next_cal = runtime.Combined.next_cal
 _original_cal_tick = runtime.Combined.cal_tick
@@ -268,24 +302,54 @@ def _audible_buttons(self):
         # re-start the Guard or enter calibration accidentally.
         self.blue_stop_consumed = True
         self.immediate_audible_stop()
+    elif blue == "down" and not self.calibrating and not self.controls.running:
+        # Start must also acknowledge on the first physical press. Keep route
+        # execution pending until release so the same press can still become
+        # the long-hold calibration gesture safely.
+        self.immediate_audible_start()
     elif blue == "long":
         if self.blue_stop_consumed:
             pass
+        elif getattr(self, "blue_start_pending", False):
+            self.blue_start_consumed = True
+            self.enter_calibration_from_pending_start()
         else:
             self.end_cal() if self.calibrating else self.start_cal()
     elif blue == "up":
-        consumed = self.blue_stop_consumed
+        stop_consumed = self.blue_stop_consumed
+        start_consumed = getattr(self, "blue_start_consumed", False)
         self.blue_stop_consumed = False
-        if not consumed and not self.blue.long:
+        self.blue_start_consumed = False
+        if getattr(self, "blue_start_pending", False):
+            self.blue_start_pending = False
+        if not stop_consumed and not start_consumed and not self.blue.long:
             if self.calibrating:
                 self.next_cal()
-            else:
-                self.guard.reset()
-                self.controls.start()
-                self.guard_start_tone()
     if yellow == "up" and not self.yellow.long:
         self.yellow_action()
     self.cal_tick()
+
+
+def _audible_loop(self):
+    self.emit("combined-pico-guard-executor|GP4 start/stop hold3s=calibration|GP3 pause/resume|GP6 piezo")
+    last = 0
+    while True:
+        self.host_poll()
+        self.buttons()
+        self.arm.pump()
+        if (self.controls.running and not self.calibrating and
+                not getattr(self, "blue_start_pending", False) and
+                runtime.time.monotonic() - last >= .25):
+            last = runtime.time.monotonic()
+            try:
+                self.guard.update(self.sensor.lux(), int(last * 1000))
+                if self.guard.last_decision is not None:
+                    self.route(self.guard.last_decision)
+            except Exception as exc:
+                self.immediate_audible_stop()
+                self.emit("ERR|GUARD|FAIL|" + str(exc)[:60])
+        runtime.time.sleep(.01)
+
 
 # Live Classroom Studio commands that execute entirely on the Pico must not
 # depend on an attached Pro Micro arm. SCREEN/SETRES is metadata; BEEP drives
@@ -365,10 +429,13 @@ runtime.Combined.guard_stop_tone = _guard_stop_tone
 runtime.Combined.guard_pause_tone = _guard_pause_tone
 runtime.Combined.guard_resume_tone = _guard_resume_tone
 runtime.Combined.immediate_audible_stop = _immediate_audible_stop
+runtime.Combined.immediate_audible_start = _immediate_audible_start
+runtime.Combined.enter_calibration_from_pending_start = _enter_calibration_from_pending_start
 runtime.Combined.start_cal = _audible_start_cal
 runtime.Combined.next_cal = _audible_next_cal
 runtime.Combined.cal_tick = _audible_cal_tick
 runtime.Combined.save_cal = _audible_save_cal
 runtime.Combined.yellow_action = _repeatable_yellow_action
 runtime.Combined.buttons = _audible_buttons
+runtime.Combined.loop = _audible_loop
 main()

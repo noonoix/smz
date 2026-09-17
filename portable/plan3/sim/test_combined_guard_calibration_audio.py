@@ -112,10 +112,22 @@ assert "runtime.Combined.buttons = _audible_buttons" in entry_text
 assert "_GUARD_STATUS_TONE_MS" not in entry_text
 
 assert "self.blue_stop_consumed = False" in entry_text
+assert "self.blue_start_consumed = False" in entry_text
+assert "self.blue_start_pending = False" in entry_text
 assert 'if blue == "down" and not self.calibrating and self.controls.running:' in entry_text
 assert "self.blue_stop_consumed = True" in entry_text
 assert "consumes the blue press" in entry_text
-assert "not consumed and not self.blue.long" in entry_text
+assert 'elif blue == "down" and not self.calibrating and not self.controls.running:' in entry_text
+assert "def _immediate_audible_start" in entry_text
+assert "self.immediate_audible_start()" in entry_text
+assert "self.blue_start_pending = True" in entry_text
+assert "self.blue_start_consumed = True" in entry_text
+assert "def _enter_calibration_from_pending_start" in entry_text
+assert "self.enter_calibration_from_pending_start()" in entry_text
+assert 'not getattr(self, "blue_start_pending", False)' in entry_text
+assert "runtime.Combined.immediate_audible_start = _immediate_audible_start" in entry_text
+assert "runtime.Combined.enter_calibration_from_pending_start = _enter_calibration_from_pending_start" in entry_text
+assert "runtime.Combined.loop = _audible_loop" in entry_text
 
 # Physical button calibration and Classroom Studio calibration must keep the same math.
 assert "spread > 5" in runtime_text

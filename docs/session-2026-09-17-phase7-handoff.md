@@ -246,14 +246,13 @@ The new fix makes Start audible on the first physical blue-button down while pre
 - Stop remains immediate on blue-button down while Guard is running.
 - The static audio contract was expanded to cover `blue_start_pending`, `blue_start_consumed`, immediate Start-on-down, pending-start cancellation into calibration, and route gating while Start is pending.
 - Local syntax check and the focused static contract test passed before push.
-- PR #3 check runs after this commit: 11 checks completed successfully; the main Windows app build-test was still in progress at the moment this checkpoint was saved.
+- PR #3 CI after this commit completed: 12 executable checks succeeded; the downloadable test package check was skipped by branch condition.
 - Artifact/run link for the new build: https://github.com/bermoods/smm/actions/runs/35286694567
 
 ## Updated exact next action
 
-1. Wait for the Windows app build-test in run `35286694567` to finish.
-2. If CI finishes green, download the new `light-state-windows-output` artifact from https://github.com/bermoods/smm/actions/runs/35286694567.
-3. Export Combined Portable Guard into a clean staging folder and send the new package, e.g. `stage17-start-down.zip`, for validation.
-4. Do not install it on `CIRCUITPY` until the package validation passes.
-5. After install, verify Boot/control-plane first, then check that Start and Stop both sound on the first physical press.
-6. Keep `GUARD|ON`, operational routes, HID actions, actuator execution, merge, and release blocked until the relevant gates are explicitly reopened.
+1. Download the new `light-state-windows-output` artifact from https://github.com/bermoods/smm/actions/runs/35286694567.
+2. Export Combined Portable Guard into a clean staging folder and send the new package, e.g. `stage17-start-down.zip`, for validation.
+3. Do not install it on `CIRCUITPY` until the package validation passes.
+4. After install, verify Boot/control-plane first, then check that Start and Stop both sound on the first physical press.
+5. Keep `GUARD|ON`, operational routes, HID actions, actuator execution, merge, and release blocked until the relevant gates are explicitly reopened.

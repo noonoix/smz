@@ -176,6 +176,20 @@ def _guard_pause_tone(self):
 def _guard_resume_tone(self):
     self._guard_pattern(_GUARD_RESUME_PATTERN)
 
+def _immediate_audible_stop(self):
+    # Make Stop audible immediately even when the optional Arduino arm is not
+    # replying. Set the fail-safe state and release keyboard first, then play
+    # the Stop cue before slower arm cleanup/timeout work.
+    self.controls.running = False
+    self.controls.paused = False
+    self.controls.aborted = True
+    try:
+        self.keyboard.release_all()
+    except Exception:
+        pass
+    self.guard_stop_tone()
+    self.arm.abort()
+
 _original_start_cal = runtime.Combined.start_cal
 _original_next_cal = runtime.Combined.next_cal
 _original_cal_tick = runtime.Combined.cal_tick
@@ -252,9 +266,8 @@ def _audible_buttons(self):
         # Stop is fail-safe and should acknowledge immediately on press. This
         # consumes the blue press so the later release/long-hold path cannot
         # re-start the Guard or enter calibration accidentally.
-        self.controls.stop()
         self.blue_stop_consumed = True
-        self.guard_stop_tone()
+        self.immediate_audible_stop()
     elif blue == "long":
         if self.blue_stop_consumed:
             pass
@@ -309,8 +322,7 @@ def _live_host_poll(self):
                 self.guard_start_tone()
                 reply = "OK|GUARD|ON"
             elif line in ("GUARD|OFF", "HALT"):
-                self.controls.stop()
-                self.guard_stop_tone()
+                self.immediate_audible_stop()
                 reply = "OK|GUARD|OFF"
             elif line == "LUX?":
                 reply = "OK|LUX|lux=%.1f|sensor=ok" % self.sensor.lux()
@@ -352,6 +364,7 @@ runtime.Combined.guard_start_tone = _guard_start_tone
 runtime.Combined.guard_stop_tone = _guard_stop_tone
 runtime.Combined.guard_pause_tone = _guard_pause_tone
 runtime.Combined.guard_resume_tone = _guard_resume_tone
+runtime.Combined.immediate_audible_stop = _immediate_audible_stop
 runtime.Combined.start_cal = _audible_start_cal
 runtime.Combined.next_cal = _audible_next_cal
 runtime.Combined.cal_tick = _audible_cal_tick

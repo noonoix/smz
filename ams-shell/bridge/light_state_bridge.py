@@ -33,7 +33,15 @@ _original_open_link = core.open_link
 
 def _command_with_light_alias(self, cmd, timeout=5.0):
     if cmd != "LUX?":
-        return _original_command(self, cmd, timeout)
+        reply = _original_command(self, cmd, timeout)
+        # Phase 7 combined runtime identifies itself by bundle name rather than
+        # the legacy pico-light/role=brain markers. Normalize only that trusted
+        # PING reply so PicoLink.connect keeps the open Pico path and never falls
+        # through to encrypted direct-arm BoardLink/ams_key.json.
+        if (cmd == "PING" and "combined-pico-guard-executor" in reply
+                and "role=brain" not in reply and "pico-light" not in reply):
+            return reply + "|role=brain"
+        return reply
 
     if self.ser is None:
         raise core.PicoError("not connected")

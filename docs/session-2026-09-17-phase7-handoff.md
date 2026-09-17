@@ -9,24 +9,24 @@ This is the durable GitHub mirror of the live Notion session **«ادامه جل
 - Repository: `c4haztex/smc-1`
 - Code branch: `phase7/light-guard-calibration`
 - Draft PR: https://github.com/c4haztex/smc-1/pull/175
-- Current validated code head: `172528e1fb2c1430ef03f7395c74f7e92a43a1f5`
-- Current Windows artifact run: https://github.com/c4haztex/smc-1/actions/runs/35259238518
+- Current validated code head: `388bc0551bb9196dcf2a2933b45d7f3d33ccbac3`
+- Current Windows artifact run: https://github.com/c4haztex/smc-1/actions/runs/35261951361
 - CI: 12 executable checks succeeded; downloadable package skipped by branch condition.
-- Installed hardware bundle: `stage12` (does not yet include the latest workflow refinements).
+- Installed hardware bundle remains `stage12`; it does not contain the latest calibration state-machine changes.
 - Board: COM30/COM31 hot-plug detected; COM31 automatically selected; `role=brain` confirmed.
 - Hardware passed: Boot, control plane, compact light telemetry, `SETRES`, live Buzzer Step, calibration-entry cue, and stable Desktop sample-complete cue.
-- Next package to build and validate: `stage13` from the current artifact.
+- Next package: export and validate a fresh package from run `35261951361`; use a new name such as `stage14.zip` to avoid confusing it with any package made from the previous run.
 
 ## Fixed wiring and controls
 
 - BH1750/GY-30: 3V3, GND, SDA=GP20, SCL=GP21, address `0x23`.
-- GP4 blue square button: long hold enters/exits calibration; short press advances position; after position 6 it wraps to position 1 when no sample or unsaved result is pending.
-- GP3 yellow round button: held during boot for maintenance; inside calibration it starts a sample, saves a completed sample, and—after a successful save—starts a fresh sample for the same position when pressed again.
+- GP4 blue square button: long hold enters/exits calibration; short press advances position; after position 6 it wraps to position 1 only when no sample or unsaved result is pending.
+- GP3 yellow round button: held during boot for maintenance; inside calibration it starts sampling, saves a completed sample, and after a successful save can start a fresh sample for the same position.
 - GP6: passive piezo.
 - UART0 to arm: GP16 TX, GP17 RX, 57600 8N1, common ground.
-- Keep Light Watch off during physical calibration; keep Classroom Studio connected and green.
+- Light Watch must remain off during physical calibration; Classroom Studio may remain connected and green.
 
-## Calibration profiles and audio contract
+## Calibration profiles
 
 1. `desktop` — 262 Hz
 2. `login-or-dc` — 294 Hz
@@ -35,64 +35,63 @@ This is the durable GitHub mirror of the live Notion session **«ادامه جل
 5. `game` — 392 Hz
 6. `targeted` — 440 Hz
 
-Audio meanings:
-
-- One position-specific note: entered/advanced/wrapped to that profile.
-- Two pulses of the current profile note: five-second sample completed successfully and is ready to save.
-- Ascending `880 → 1320 Hz`: save/re-save succeeded.
-- Six-note melody after the first successful save of all six profiles: full calibration set completed.
-- No success tone is emitted after a failed save.
-
 Sampling uses a five-second window, median center, minimum five readings, maximum spread 5 lux, tolerance `max(2.0, spread * 1.5)`, and `stable_ms=750`.
 
-## Current button state machine
+## Final audio contract
 
-For one profile:
+- Position entry/advance/wrap: one 220 ms position-specific note.
+- Yellow accepted for recording or re-recording: one short `660 Hz / 65 ms` cue immediately when sampling begins.
+- Stable sample completed: two pulses of the current position note (`110 ms`, pause, `190 ms`).
+- Save or re-save succeeded: ascending `880 Hz → 1320 Hz` success cue.
+- First successful completion of all six profiles: six-note completion melody.
+- Failed saves do not produce a success cue.
 
-1. Yellow short press while ready → begin five-second sample.
-2. Successful sample → double current-profile tone; result is pending and not yet saved.
-3. Yellow short press → persist the result; success melody confirms storage.
-4. Yellow short press again while still on the same saved profile → start a fresh five-second sample in place (`retry=1`).
-5. The previously persisted value remains valid during this retry. It is replaced only after the retry completes successfully and yellow is pressed again to save.
-6. Blue short press → advance to the next profile; from profile 6, wrap to profile 1 when safe.
+## Explicit yellow-button state machine
 
-Safety rules:
+The yellow workflow is now implemented as explicit branches rather than relying on the legacy `result is not None` delegation:
 
-- Do not advance or wrap while sampling.
-- Do not advance or wrap while a completed result is awaiting save.
-- A failed/unstable retry does not erase the previously persisted calibration.
+1. If not calibrating, retain Pause/Resume behavior.
+2. If already sampling, emit Busy and do not start a second sample.
+3. If a completed unsaved dictionary result exists, save it.
+4. Otherwise, begin a fresh sample explicitly:
+   - `retry=0` for the first sample at that position;
+   - `retry=1` when the same position had already been saved.
+5. Emit the `mode=started` event and immediately play the short 660 Hz record-start cue.
+6. During same-position retry, the previous persisted calibration remains valid. It is replaced only after the new sample completes and yellow is pressed again to save.
 
-## Relevant fixes
+Expected sequence for a saved profile:
+
+```text
+short yellow → 660 Hz start cue
+wait 5 seconds → double position-note completion cue
+short yellow → 880→1320 Hz save-success cue
+short yellow again → 660 Hz retry-start cue for the same position
+```
+
+## Relevant commits
 
 | Commit | Change |
 |---|---|
 | `67ab1edf2cae12985d344ec37f5ad97a1b2071d0` | Filesystem persistence and GP3 maintenance contract. |
-| `dd006a370bf6b43c17ed5f17709ca7815fd76ab5` | Calibration audio cues and six distinct profile notes. |
+| `dd006a370bf6b43c17ed5f17709ca7815fd76ab5` | Calibration audio cues and six position notes. |
 | `9d32e09bd6e53fc506f847bff3fc28ad1fa64a8c` | Compact light-response parser. |
 | `a84849447fe6773dd1a006ec0e8582c1161c56c5` | Pico-local live `SETRES`/`BEEP` and GP6 output. |
 | `88ff59fcbb8d6c0613e2f76ee77c9f9da766f893` | Buzzer-to-`BEEP/DELAY` Combined Guard route adapter. |
-| `79b4618700bd5a275d6241363d1e00ba43573184` | Removed the second legacy strict-plan export rejection path. |
+| `79b4618700bd5a275d6241363d1e00ba43573184` | Removed the second legacy export rejection path. |
 | `1be2b9342bcdbb7be69bba6328dcbe665c6f8027` | Added save-success cue and safe profile-6-to-profile-1 wrap. |
-| `172528e1fb2c1430ef03f7395c74f7e92a43a1f5` | Added same-profile resampling after save and preserved the prior saved value until explicit replacement. |
+| `172528e1fb2c1430ef03f7395c74f7e92a43a1f5` | First same-position retry implementation. |
+| `388bc0551bb9196dcf2a2933b45d7f3d33ccbac3` | Reworked yellow into explicit sample/save/retry branches and added the 660 Hz record-start cue. |
 
 Earlier Boot fixes remain in force: low-memory import ordering/deferred plan engine, CircuitPython `os.path` compatibility, 20-payload manifest alignment, and `hashlib.new("sha256")` compatibility.
 
 ## Bundle and hardware evidence
-
-### `stage11`
-
-- ZIP SHA-256: `1293441adaf1122e6587b4ee8bc3c3c1f1376615a0097dc84ca630f52d2e039e`
-- Auto-port, persistence, calibration audio, and compact light parser baseline.
 
 ### `stage12`
 
 - ZIP SHA-256: `6ad814f2311d9ee25c3d9554cf3d85410e8d696b11fee9b8a35c279265613c25`
 - Exactly 21 files and 20 manifest entries.
 - Zero hash mismatches, unsafe paths, or Python syntax errors.
-- Boot/GP3, `role=brain`, `SETRES`, `BEEP`, GP6, and six calibration notes present.
-- Installed successfully on the Pico.
-
-Hardware evidence:
+- Installed successfully; live Buzzer Step passed.
 
 ```text
 hot-plug: board detected on COM30, COM31 — connecting automatically
@@ -106,7 +105,11 @@ connected: ...|profiles=6|role=brain
 run finished
 ```
 
-Every live BEEP received `OK|BEEP`; the user confirmed audible output. With Light Watch disabled, a long GP4 hold produced the calibration-entry cue. A short yellow press followed by a stable wait produced the expected successful sample-complete alarm for Desktop. Classroom Studio currently does not surface unsolicited physical-button `EVT|CAL|...` lines in its UI log; audio is therefore the immediate physical feedback.
+The user confirmed audible Buzzer output, calibration-entry audio, and the stable sample-complete alarm. Classroom Studio currently does not surface unsolicited physical-button `EVT|CAL|...` lines in its UI log, so audio is the immediate physical feedback.
+
+## Diagnosis of “behavior did not change”
+
+The board still runs a bundle without the latest workflow code unless a package exported from the corresponding new artifact is installed. Merely launching a newer Windows build does not update Pico firmware. The retry logic has now also been rewritten explicitly and covered by static contract tests, but hardware confirmation requires a newly exported and validated bundle.
 
 ## Active safety gates
 
@@ -115,13 +118,12 @@ Every live BEEP received `OK|BEEP`; the user confirmed audible output. With Ligh
 - Do not create or copy `ams_key.json`.
 - Keep PR #175 Draft; do not merge or release.
 - Route serialization and first non-empty-route memory behavior remain separate unapproved gates.
-- Do not continue real calibration on `stage12`; it lacks the new save-success, wrap, and same-position retry behavior.
+- Do not continue real calibration on the old installed bundle.
 
 ## Exact next action
 
-1. Download `light-state-windows-output` from run `35259238518`.
-2. Extract it into a new Windows folder and launch that build.
+1. Download `light-state-windows-output` from run `35261951361`.
+2. Extract into a completely new Windows folder and launch that build.
 3. Export Combined Portable Guard into a clean staging folder.
-4. Send the archive as `stage13.zip` for validation before copying anything to `CIRCUITPY`.
-5. After validation, install the 20 payload files and replace `SHA256SUMS.txt` last while booted in GP3 maintenance mode.
-6. Re-run the controlled audio/state-machine checks before continuing profile calibration.
+4. Send the resulting archive with a new name such as `stage14.zip` for provenance and content validation.
+5. Do not copy anything to `CIRCUITPY` until validation passes.

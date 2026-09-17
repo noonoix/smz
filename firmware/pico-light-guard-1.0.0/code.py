@@ -169,7 +169,69 @@ def _audible_save_cal(self):
     if saved_before < len(runtime.PROFILES) and len(self.saved_ids) == len(runtime.PROFILES):
         self.cal_complete_melody()
 
+# Live Classroom Studio commands that execute entirely on the Pico must not
+# depend on an attached Pro Micro arm. SCREEN/SETRES is metadata; BEEP drives
+# the passive piezo on GP6 directly.
+def _live_host_beep(self, frequency, duration_ms):
+    tone = None
+    try:
+        tone = runtime.pwmio.PWMOut(runtime.board.GP6, duty_cycle=32768,
+            frequency=int(frequency), variable_frequency=True)
+        runtime.time.sleep(duration_ms / 1000)
+    finally:
+        if tone is not None:
+            try: tone.duty_cycle = 0; tone.deinit()
+            except Exception: pass
+
+def _live_host_poll(self):
+    if self.usb.in_waiting:
+        self.host.extend(self.usb.read(self.usb.in_waiting))
+    while b"\n" in self.host:
+        raw, self.host = self.host.split(b"\n", 1)
+        line = raw.decode("utf-8", "replace").strip()
+        if not line:
+            continue
+        head = line.split("|", 1)[0]
+        try:
+            if line == "PING":
+                reply = "OK|PONG|combined-pico-guard-executor|hid=on|uart=on|profiles=6|role=brain"
+            elif line == "CALGET":
+                reply = self.calget()
+            elif line.startswith("CALSET|"):
+                reply = self.calset(line)
+            elif line == "GUARD|ON":
+                self.controls.start(); reply = "OK|GUARD|ON"
+            elif line in ("GUARD|OFF", "HALT"):
+                self.controls.stop(); reply = "OK|GUARD|OFF"
+            elif line == "LUX?":
+                reply = "OK|LUX|lux=%.1f|sensor=ok" % self.sensor.lux()
+            elif line.startswith("SETRES|"):
+                fields = line.split("|", 1)[1].split(",")
+                if len(fields) != 2:
+                    raise ValueError("SETRES needs width,height")
+                width, height = int(fields[0]), int(fields[1])
+                if width < 1 or height < 1:
+                    raise ValueError("SETRES dimensions")
+                self.host_screen = (width, height)
+                reply = "OK|SETRES"
+            elif line.startswith("BEEP|"):
+                fields = line.split("|", 1)[1].split(",")
+                if len(fields) != 2:
+                    raise ValueError("BEEP needs frequency,duration")
+                frequency, duration_ms = int(fields[0]), int(fields[1])
+                if not 30 <= frequency <= 20000 or not 0 <= duration_ms <= 60000:
+                    raise ValueError("BEEP range")
+                self._live_host_beep(frequency, duration_ms)
+                reply = "OK|BEEP"
+            else:
+                reply = "ERR|UNKNOWN|" + head
+        except Exception:
+            reply = "ERR|EXEC|" + head
+        self.emit(reply)
+
 runtime.Combined.__init__ = _memory_safe_init
+runtime.Combined._live_host_beep = _live_host_beep
+runtime.Combined.host_poll = _live_host_poll
 runtime.Combined._cal_beep = _cal_beep
 runtime.Combined.cal_position_tone = _cal_position_tone
 runtime.Combined.cal_stage_complete_tone = _cal_stage_complete_tone

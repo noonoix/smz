@@ -35,10 +35,21 @@ assert "if self.calibrating and self.stage != previous:" in entry_text
 assert 'was_sampling = self.result == "sampling"' in entry_text
 assert "len(self.saved_ids) == len(runtime.PROFILES)" in entry_text
 
+# Live Classroom Studio must reach a Pico-local buzzer step without a Pro Micro.
+assert "def _live_host_beep" in entry_text
+assert 'reply = "OK|SETRES"' in entry_text
+assert 'reply = "OK|BEEP"' in entry_text
+assert "30 <= frequency <= 20000" in entry_text
+assert "0 <= duration_ms <= 60000" in entry_text
+assert "runtime.Combined._live_host_beep = _live_host_beep" in entry_text
+assert "runtime.Combined.host_poll = _live_host_poll" in entry_text
+assert 'reply = "ERR|EXEC|" + head' in entry_text
+assert "role=brain" in entry_text
+
 # Preserve the planned two-button responsibilities in the underlying runtime.
 assert 'self.next_cal() if self.calibrating' in runtime_text
 assert 'if yellow == "up" and not self.yellow.long: self.yellow_action()' in runtime_text
 assert 'if self.result is not None: self.save_cal(); return' in runtime_text
 assert 'self.result = "sampling"' in runtime_text
 
-print("combined Guard audible six-position and two-button contract: PASS")
+print("combined Guard audible calibration, live buzzer and two-button contract: PASS")

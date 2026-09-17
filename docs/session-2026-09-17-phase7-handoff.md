@@ -6,16 +6,40 @@ This is the durable GitHub mirror of the live Notion session **«ادامه جل
 
 ## Current state
 
-- Repository: `c4haztex/smc-1`
+- Active repository: `bermoods/smm`
+- Original repository mirror source: `c4haztex/smc-1`
 - Code branch: `phase7/light-guard-calibration`
-- Draft PR: https://github.com/c4haztex/smc-1/pull/175
-- Current validated code head: `388bc0551bb9196dcf2a2933b45d7f3d33ccbac3`
-- Current Windows artifact run: https://github.com/c4haztex/smc-1/actions/runs/35261951361
-- CI: 12 executable checks succeeded; downloadable package skipped by branch condition.
-- Installed hardware bundle remains `stage12`; it does not contain the latest calibration state-machine changes.
+- Old Draft PR: https://github.com/c4haztex/smc-1/pull/175 (PR metadata itself was not migrated; branch content was mirrored.)
+- Last validated pre-migration code head: `388bc0551bb9196dcf2a2933b45d7f3d33ccbac3`
+- Latest active branch head after rescue cleanup: `3c97560ea0f0200543d4e9abd68d5100fb7e5f79`
+- Latest functional code change: `2c2a9c8700ba617d6431b2b8410e4bb17765811c`
+- Current Windows artifact run before migration: https://github.com/c4haztex/smc-1/actions/runs/35261951361
+- CI: pre-migration head had 12 executable checks succeeded; post-migration cleanup has not yet produced a validated artifact.
+- Installed hardware bundle remains `stage12`; it does not contain the latest calibration/control-audio changes.
 - Board: COM30/COM31 hot-plug detected; COM31 automatically selected; `role=brain` confirmed.
 - Hardware passed: Boot, control plane, compact light telemetry, `SETRES`, live Buzzer Step, calibration-entry cue, and stable Desktop sample-complete cue.
 - Next package: export and validate a fresh package from run `35261951361`; use a new name such as `stage14.zip` to avoid confusing it with any package made from the previous run.
+
+## Repository rescue and active remote
+
+The old repository was mirrored to `bermoods/smm` after Actions on the old account became unavailable. The local rescue verified a complete Git bundle with 233 refs and pushed all normal branches and tags to the new private repository. GitHub-internal `refs/pull/*` refs were rejected by design and are not required because their source branches were preserved.
+
+- New active repository: https://github.com/bermoods/smm
+- New `main` after removing the temporary rescue workflow: `e064bfbcd8e7cf8ddb928d28bf41ea7826ae8316`
+- New `phase7/light-guard-calibration` after removing the temporary rescue workflow: `3c97560ea0f0200543d4e9abd68d5100fb7e5f79`
+- Functional code commit added before rescue cleanup: `2c2a9c8700ba617d6431b2b8410e4bb17765811c`
+- Local offline rescue bundle verified by the user: `C:\Users\wasteland\repo-backups\smc-1-complete-rescue.bundle`
+
+## Post-migration functional changes
+
+The active Phase 7 branch now includes board-owned two-second feedback tones for the non-calibration controls:
+
+- Guard Start: distinct two-second tone.
+- Guard Stop/HALT: distinct two-second tone.
+- Pause: distinct two-second tone.
+- Resume: distinct two-second tone.
+
+These tones are played by the Pico on GP6 and do not depend on the route engine or Arduino arm. The static audio contract test now also asserts these bindings. The Classroom Studio calibration protocol contract now includes a parity case proving the same median/spread/tolerance/stable-ms math used by physical button calibration: median center, reject spread over 5 lux, `tolerance=max(2.0, spread*1.5)`, and `stable_ms=750`.
 
 ## Fixed wiring and controls
 
@@ -122,8 +146,8 @@ The board still runs a bundle without the latest workflow code unless a package 
 
 ## Exact next action
 
-1. Download `light-state-windows-output` from run `35261951361`.
-2. Extract into a completely new Windows folder and launch that build.
-3. Export Combined Portable Guard into a clean staging folder.
+1. Continue from `bermoods/smm` on branch `phase7/light-guard-calibration`.
+2. Ensure GitHub Actions are enabled on the new repository and run/observe CI for head `3c97560ea0f0200543d4e9abd68d5100fb7e5f79`.
+3. Build/download a fresh Windows artifact from the new repository, then export Combined Portable Guard into a clean staging folder.
 4. Send the resulting archive with a new name such as `stage14.zip` for provenance and content validation.
-5. Do not copy anything to `CIRCUITPY` until validation passes.
+5. Do not copy anything to `CIRCUITPY`, do not send `GUARD|ON`, and do not continue hardware calibration until validation passes.

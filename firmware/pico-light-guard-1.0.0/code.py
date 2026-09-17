@@ -20,6 +20,7 @@ class _DeferredPlanEngine:
 
 sys.modules["plan_engine"] = _DeferredPlanEngine()
 import combined_guard_runtime as runtime
+from combined_guard_runtime import main
 
 def _memory_safe_init(self):
     # Validate and parse the bundle before allocating UART, HID, I2C and GPIO
@@ -51,4 +52,4 @@ def _memory_safe_init(self):
     self.saved_ids = set()
 
 runtime.Combined.__init__ = _memory_safe_init
-runtime.main()
+main()

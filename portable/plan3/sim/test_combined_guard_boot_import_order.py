@@ -35,5 +35,6 @@ assert init_text.index('runtime.load_guard_bundle("/")') < init_text.index("runt
 assert init_text.index('runtime.load_guard_bundle("/")') < init_text.index("runtime.BH1750()")
 assert "guard.bundle = bundle" in init_text
 assert "runtime.Combined.__init__ = _memory_safe_init" in entry_text
-assert "runtime.main()" in entry_text
+assert "from combined_guard_runtime import main" in entry_text
+assert "main()" in entry_text
 print("combined Guard low-memory boot contract: deferred executor and bundle-first single parse")

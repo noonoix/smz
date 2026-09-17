@@ -1,3 +1,4 @@
+# CI retry after repository transfer; this file is also the HID fail-closed contract.
 import ast
 from pathlib import Path
 

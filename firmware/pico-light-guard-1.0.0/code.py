@@ -111,5 +111,71 @@ def _memory_safe_init(self):
     self.saved = False
     self.saved_ids = set()
 
+# The six calibration positions use distinct ascending notes: C4 through A4.
+_CAL_NOTES = (262, 294, 330, 349, 392, 440)
+
+def _cal_beep(self, frequency, duration_ms):
+    tone = None
+    try:
+        tone = runtime.pwmio.PWMOut(runtime.board.GP6, duty_cycle=32768,
+            frequency=int(frequency), variable_frequency=True)
+        runtime.time.sleep(duration_ms / 1000)
+    except Exception:
+        self.emit("ERR|CAL|AUDIO")
+    finally:
+        if tone is not None:
+            try: tone.duty_cycle = 0; tone.deinit()
+            except Exception: pass
+
+def _cal_position_tone(self):
+    self._cal_beep(_CAL_NOTES[self.stage], 220)
+
+def _cal_stage_complete_tone(self):
+    note = _CAL_NOTES[self.stage]
+    self._cal_beep(note, 110)
+    runtime.time.sleep(.06)
+    self._cal_beep(note, 190)
+
+def _cal_complete_melody(self):
+    for note in _CAL_NOTES:
+        self._cal_beep(note, 90)
+        runtime.time.sleep(.035)
+
+_original_start_cal = runtime.Combined.start_cal
+_original_next_cal = runtime.Combined.next_cal
+_original_cal_tick = runtime.Combined.cal_tick
+_original_save_cal = runtime.Combined.save_cal
+
+def _audible_start_cal(self):
+    _original_start_cal(self)
+    if self.calibrating and self.stage == 0:
+        self.cal_position_tone()
+
+def _audible_next_cal(self):
+    previous = self.stage
+    _original_next_cal(self)
+    if self.calibrating and self.stage != previous:
+        self.cal_position_tone()
+
+def _audible_cal_tick(self):
+    was_sampling = self.result == "sampling"
+    _original_cal_tick(self)
+    if was_sampling and isinstance(self.result, dict):
+        self.cal_stage_complete_tone()
+
+def _audible_save_cal(self):
+    saved_before = len(self.saved_ids)
+    _original_save_cal(self)
+    if saved_before < len(runtime.PROFILES) and len(self.saved_ids) == len(runtime.PROFILES):
+        self.cal_complete_melody()
+
 runtime.Combined.__init__ = _memory_safe_init
+runtime.Combined._cal_beep = _cal_beep
+runtime.Combined.cal_position_tone = _cal_position_tone
+runtime.Combined.cal_stage_complete_tone = _cal_stage_complete_tone
+runtime.Combined.cal_complete_melody = _cal_complete_melody
+runtime.Combined.start_cal = _audible_start_cal
+runtime.Combined.next_cal = _audible_next_cal
+runtime.Combined.cal_tick = _audible_cal_tick
+runtime.Combined.save_cal = _audible_save_cal
 main()

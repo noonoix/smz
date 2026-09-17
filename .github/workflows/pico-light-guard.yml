@@ -7,6 +7,7 @@ on:
       - 'firmware/pico-light-guard-1.0.0/**'
       - 'portable/plan3/CIRCUITPY/**'
       - 'portable/plan3/sim/test_combined_guard_hid.py'
+      - 'portable/plan3/sim/test_combined_guard_calibration_audio.py'
       - '.github/workflows/pico-light-guard.yml'
 
 permissions:
@@ -30,7 +31,8 @@ jobs:
             firmware/pico-light-guard-1.0.0/combined_guard_runtime.py \
             firmware/pico-light-guard-1.0.0/guard_calibration_protocol.py \
             portable/plan3/CIRCUITPY/guard_calibration_protocol.py \
-            portable/plan3/sim/test_combined_guard_hid.py
+            portable/plan3/sim/test_combined_guard_hid.py \
+            portable/plan3/sim/test_combined_guard_calibration_audio.py
 
       - name: Enforce combined Guard boundary
         shell: bash
@@ -38,12 +40,18 @@ jobs:
           set -euo pipefail
           root=firmware/pico-light-guard-1.0.0
           runtime="$root/combined_guard_runtime.py"
+          entry="$root/code.py"
           grep -q 'usb_cdc.enable(console=True, data=True)' "$root/boot.py"
           grep -q 'usb_hid' "$root/boot.py"
           grep -q 'storage.remount("/", readonly=False)' "$root/boot.py"
           grep -q 'if _maintenance.value:' "$root/boot.py"
           grep -q 'board.GP3' "$root/boot.py"
-          grep -q 'from combined_guard_runtime import main' "$root/code.py"
+          grep -q 'from combined_guard_runtime import main' "$entry"
+          grep -q '_CAL_NOTES = (262, 294, 330, 349, 392, 440)' "$entry"
+          grep -q 'runtime.Combined.start_cal = _audible_start_cal' "$entry"
+          grep -q 'runtime.Combined.next_cal = _audible_next_cal' "$entry"
+          grep -q 'runtime.Combined.cal_tick = _audible_cal_tick' "$entry"
+          grep -q 'runtime.Combined.save_cal = _audible_save_cal' "$entry"
           grep -q 'from guard_calibration_protocol import build_calibration_get, parse_calibration_set' "$runtime"
           grep -q 'class Keyboard' "$runtime"
           grep -q 'self.keyboard.release_all()' "$runtime"
@@ -81,6 +89,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 portable/plan3/sim/test_combined_guard_calibration_protocol.py
+          python3 portable/plan3/sim/test_combined_guard_calibration_audio.py
           python3 portable/plan3/sim/test_combined_guard_hid.py
 
       - name: Package combined Guard core source artifact

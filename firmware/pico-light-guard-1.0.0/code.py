@@ -42,9 +42,14 @@ class _DeferredPlanEngine:
 
 sys.modules["plan_engine"] = _DeferredPlanEngine()
 
-from live_light_guard import load_guard_bundle
-_BOOT_BUNDLE = load_guard_bundle("/")
-del load_guard_bundle
+import live_light_guard as _guard_bundle
+# Classroom Studio's complete 21-file export hashes every payload except the
+# hash manifest itself. Keep the board verifier aligned with that inventory.
+for _name in ("pico-calibration.json", "README-FLASH.md"):
+    if _name not in _guard_bundle.HASHED_BUNDLE_FILES:
+        _guard_bundle.HASHED_BUNDLE_FILES += (_name,)
+_BOOT_BUNDLE = _guard_bundle.load_guard_bundle("/")
+del _name, _guard_bundle
 gc.collect()
 
 import combined_guard_runtime as runtime

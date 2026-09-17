@@ -37,8 +37,8 @@ assert "runtime.Combined.save_cal = _audible_save_cal" in entry_text
 assert "runtime.Combined.cal_save_success_tone = _cal_save_success_tone" in entry_text
 assert "if self.calibrating and self.stage != previous:" in entry_text
 assert 'was_sampling = self.result == "sampling"' in entry_text
-assert "saved_after == saved_before + 1" in entry_text
-assert "saved_after == len(runtime.PROFILES)" in entry_text
+assert "had_pending_result and self.saved" in entry_text
+assert "not profile_was_saved" in entry_text
 
 # Short blue presses wrap from the final calibration position back to Desktop,
 # but never while sampling or while an unsaved result is pending.
@@ -47,6 +47,17 @@ assert 'self.result != "sampling"' in entry_text
 assert "not (self.result is not None and not self.saved)" in entry_text
 assert "self.stage = 0" in entry_text
 assert 'self.emit("EVT|CAL|mode=ready|stage=1|id=" + runtime.PROFILES[0]' in entry_text
+
+# A short yellow press after a successful save starts a fresh sample in place.
+# The saved profile remains durable until the replacement completes and is saved.
+assert "def _repeatable_yellow_action" in entry_text
+assert "self.calibrating and self.saved and isinstance(self.result, dict)" in entry_text
+assert "self.samples = []" in entry_text
+assert "self.sample_started = runtime.time.monotonic()" in entry_text
+assert 'self.result = "sampling"' in entry_text
+assert "|retry=1" in entry_text
+assert "_original_yellow_action(self)" in entry_text
+assert "runtime.Combined.yellow_action = _repeatable_yellow_action" in entry_text
 
 # Live Classroom Studio must reach a Pico-local buzzer step without a Pro Micro.
 assert "def _live_host_beep" in entry_text
@@ -59,10 +70,10 @@ assert "runtime.Combined.host_poll = _live_host_poll" in entry_text
 assert 'reply = "ERR|EXEC|" + head' in entry_text
 assert "role=brain" in entry_text
 
-# Preserve the planned two-button responsibilities in the underlying runtime.
+# Preserve the underlying two-button responsibilities.
 assert 'self.next_cal() if self.calibrating' in runtime_text
 assert 'if yellow == "up" and not self.yellow.long: self.yellow_action()' in runtime_text
 assert 'if self.result is not None: self.save_cal(); return' in runtime_text
 assert 'self.result = "sampling"' in runtime_text
 
-print("combined Guard audible calibration, save cue, cyclic positions, live buzzer and two-button contract: PASS")
+print("combined Guard audible calibration, save cue, cyclic positions, same-position retry, live buzzer and two-button contract: PASS")

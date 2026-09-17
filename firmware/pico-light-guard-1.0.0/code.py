@@ -150,6 +150,7 @@ _original_start_cal = runtime.Combined.start_cal
 _original_next_cal = runtime.Combined.next_cal
 _original_cal_tick = runtime.Combined.cal_tick
 _original_save_cal = runtime.Combined.save_cal
+_original_yellow_action = runtime.Combined.yellow_action
 
 def _audible_start_cal(self):
     _original_start_cal(self)
@@ -180,14 +181,28 @@ def _audible_cal_tick(self):
         self.cal_stage_complete_tone()
 
 def _audible_save_cal(self):
-    saved_before = len(self.saved_ids)
+    profile_was_saved = runtime.PROFILES[self.stage] in self.saved_ids
+    had_pending_result = isinstance(self.result, dict) and not self.saved
     _original_save_cal(self)
-    saved_after = len(self.saved_ids)
-    if saved_after == saved_before + 1:
-        if saved_after == len(runtime.PROFILES):
+    if had_pending_result and self.saved:
+        if not profile_was_saved and len(self.saved_ids) == len(runtime.PROFILES):
             self.cal_complete_melody()
         else:
             self.cal_save_success_tone()
+
+def _repeatable_yellow_action(self):
+    # After a successful save, another short yellow press immediately starts a
+    # fresh five-second sample for the same position. The previously persisted
+    # value remains valid unless and until the replacement sample is completed
+    # and explicitly saved with the next yellow press.
+    if self.calibrating and self.saved and isinstance(self.result, dict):
+        self.samples = []
+        self.sample_started = runtime.time.monotonic()
+        self.result = "sampling"
+        self.emit("EVT|CAL|mode=started|stage=%d|id=%s|seconds=5|saved=%d|retry=1" %
+            (self.stage + 1, runtime.PROFILES[self.stage], len(self.saved_ids)))
+        return
+    _original_yellow_action(self)
 
 # Live Classroom Studio commands that execute entirely on the Pico must not
 # depend on an attached Pro Micro arm. SCREEN/SETRES is metadata; BEEP drives
@@ -261,4 +276,5 @@ runtime.Combined.start_cal = _audible_start_cal
 runtime.Combined.next_cal = _audible_next_cal
 runtime.Combined.cal_tick = _audible_cal_tick
 runtime.Combined.save_cal = _audible_save_cal
+runtime.Combined.yellow_action = _repeatable_yellow_action
 main()

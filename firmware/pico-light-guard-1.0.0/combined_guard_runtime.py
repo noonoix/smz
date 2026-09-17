@@ -9,8 +9,123 @@ import digitalio
 import pwmio
 import usb_cdc
 import usb_hid
-from adafruit_hid.keyboard import Keyboard
-from adafruit_hid.keycode import Keycode
+
+class Keycode:
+    # USB HID Usage Tables, keyboard/keypad page.
+    A = 4
+    B = 5
+    C = 6
+    D = 7
+    E = 8
+    F = 9
+    G = 10
+    H = 11
+    I = 12
+    J = 13
+    K = 14
+    L = 15
+    M = 16
+    N = 17
+    O = 18
+    P = 19
+    Q = 20
+    R = 21
+    S = 22
+    T = 23
+    U = 24
+    V = 25
+    W = 26
+    X = 27
+    Y = 28
+    Z = 29
+    ONE = 30
+    TWO = 31
+    THREE = 32
+    FOUR = 33
+    FIVE = 34
+    SIX = 35
+    SEVEN = 36
+    EIGHT = 37
+    NINE = 38
+    ZERO = 39
+    ENTER = 40
+    ESCAPE = 41
+    BACKSPACE = 42
+    TAB = 43
+    SPACE = 44
+    F1 = 58
+    F2 = 59
+    F3 = 60
+    F4 = 61
+    F5 = 62
+    F6 = 63
+    F7 = 64
+    F8 = 65
+    F9 = 66
+    F10 = 67
+    F11 = 68
+    F12 = 69
+    RIGHT_ARROW = 79
+    LEFT_ARROW = 80
+    DOWN_ARROW = 81
+    UP_ARROW = 82
+    LEFT_CONTROL = 224
+    LEFT_SHIFT = 225
+    LEFT_ALT = 226
+    LEFT_GUI = 227
+
+
+class Keyboard:
+    """Small boot-keyboard driver; avoids an undeclared adafruit_hid dependency."""
+    def __init__(self, devices):
+        self.device = None
+        for device in devices:
+            if getattr(device, "usage_page", None) == 0x01 and getattr(device, "usage", None) == 0x06:
+                self.device = device
+                break
+        if self.device is None:
+            raise RuntimeError("USB HID keyboard device is unavailable")
+        self.report = bytearray(8)
+
+    @staticmethod
+    def _modifier(code):
+        return code - 224 if 224 <= code <= 231 else None
+
+    def _send(self):
+        self.device.send_report(self.report)
+
+    def press(self, *codes):
+        for code in codes:
+            modifier = self._modifier(code)
+            if modifier is not None:
+                self.report[0] |= 1 << modifier
+                continue
+            if code in self.report[2:]:
+                continue
+            for index in range(2, 8):
+                if self.report[index] == 0:
+                    self.report[index] = code
+                    break
+            else:
+                raise ValueError("USB HID keyboard supports at most six simultaneous keys")
+        self._send()
+
+    def release(self, *codes):
+        for code in codes:
+            modifier = self._modifier(code)
+            if modifier is not None:
+                self.report[0] &= ~(1 << modifier)
+                continue
+            for index in range(2, 8):
+                if self.report[index] == code:
+                    self.report[index] = 0
+        self._send()
+
+    def release_all(self):
+        for index in range(8):
+            self.report[index] = 0
+        self._send()
+
 import plan_engine
 from guard_calibration_protocol import build_calibration_get, parse_calibration_set
 from live_light_guard import (
@@ -101,9 +216,13 @@ class Button:
         return None
 
 class Controls:
-    def __init__(self, arm): self.arm = arm; self.running = False; self.paused = False; self.aborted = False
+    def __init__(self, arm, keyboard): self.arm = arm; self.keyboard = keyboard; self.running = False; self.paused = False; self.aborted = False
     def start(self): self.running = True; self.paused = False; self.aborted = False
-    def stop(self): self.running = False; self.paused = False; self.aborted = True; self.arm.abort()
+    def stop(self):
+        self.running = False; self.paused = False; self.aborted = True
+        try: self.keyboard.release_all()
+        except Exception: pass
+        self.arm.abort()
     def gate(self):
         while self.paused and self.running: self.arm.pump(); time.sleep(.01)
         return self.running and not self.aborted
@@ -162,7 +281,7 @@ class PlanContext:
 
 class Combined:
     def __init__(self):
-        self.arm = Arm(); self.controls = Controls(self.arm); self.keyboard = Keyboard(usb_hid.devices); self.sensor = BH1750()
+        self.arm = Arm(); self.keyboard = Keyboard(usb_hid.devices); self.controls = Controls(self.arm, self.keyboard); self.sensor = BH1750()
         self.bundle = load_guard_bundle("/"); self.guard = LightStateGuard.from_bundle("/"); self.routes = {}
         self.blue = Button(board.GP4); self.yellow = Button(board.GP3); self.usb = usb_cdc.data or usb_cdc.console; self.host = bytearray()
         self.calibrating = False; self.stage = 0; self.samples = []; self.sample_started = 0; self.result = None; self.saved = False; self.saved_ids = set()
@@ -242,7 +361,7 @@ class Combined:
             return "ERR|CALSET|SAVE"
         return "OK|CALSET|%s|revision=%s|count=%d" % (payload["id"], payload["revision"], self.calibration_count())
     def start_cal(self):
-        self.controls.stop(); self.calibrating = True; self.stage = 0; self.samples = []; self.result = None; self.saved = False; self.saved_ids = set(); self.emit("EVT|CAL|mode=ready|stage=1|id=" + PROFILES[0] + "|seconds=5|saved=0")
+        self.controls.stop(); self.calibrating = True; self.stage = 0; self.samples = []; self.sample_started = 0; self.result = None; self.saved = False; self.saved_ids = set(); self.emit("EVT|CAL|mode=ready|stage=1|id=" + PROFILES[0] + "|seconds=5|saved=0")
     def end_cal(self):
         if self.result is not None and self.result != "sampling" and not self.saved: self.emit("ERR|CAL|UNSAVED|stage=%d" % (self.stage + 1)); return
         self.calibrating = False; self.result = None; self.emit("EVT|CAL|mode=exited|saved=%d" % len(self.saved_ids))

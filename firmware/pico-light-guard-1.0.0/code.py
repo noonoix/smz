@@ -113,11 +113,13 @@ def _memory_safe_init(self):
 
 # The six calibration positions use distinct ascending notes: C4 through A4.
 _CAL_NOTES = (262, 294, 330, 349, 392, 440)
-_GUARD_START_NOTE = 784
-_GUARD_STOP_NOTE = 392
-_GUARD_PAUSE_NOTE = 523
-_GUARD_RESUME_NOTE = 659
-_GUARD_STATUS_TONE_MS = 2000
+# Board control cues are short rhythmic signatures instead of long continuous tones.
+# Each pattern stays near one second and uses 3-6 notes so Start/Stop/Pause/Resume
+# remain recognizable without sounding like a stuck alarm.
+_GUARD_START_PATTERN = ((784, 160), (988, 160), (1175, 200), (0, 80), (1175, 280))
+_GUARD_STOP_PATTERN = ((392, 180), (330, 160), (262, 260), (0, 60), (196, 260))
+_GUARD_PAUSE_PATTERN = ((523, 180), (0, 100), (523, 180), (0, 100), (523, 340))
+_GUARD_RESUME_PATTERN = ((659, 150), (784, 150), (988, 150), (784, 150), (988, 300))
 
 def _cal_beep(self, frequency, duration_ms):
     tone = None
@@ -154,17 +156,24 @@ def _cal_complete_melody(self):
         self._cal_beep(note, 90)
         runtime.time.sleep(.035)
 
+def _guard_pattern(self, pattern):
+    for frequency, duration_ms in pattern:
+        if frequency <= 0:
+            runtime.time.sleep(duration_ms / 1000)
+        else:
+            self._cal_beep(frequency, duration_ms)
+
 def _guard_start_tone(self):
-    self._cal_beep(_GUARD_START_NOTE, _GUARD_STATUS_TONE_MS)
+    self._guard_pattern(_GUARD_START_PATTERN)
 
 def _guard_stop_tone(self):
-    self._cal_beep(_GUARD_STOP_NOTE, _GUARD_STATUS_TONE_MS)
+    self._guard_pattern(_GUARD_STOP_PATTERN)
 
 def _guard_pause_tone(self):
-    self._cal_beep(_GUARD_PAUSE_NOTE, _GUARD_STATUS_TONE_MS)
+    self._guard_pattern(_GUARD_PAUSE_PATTERN)
 
 def _guard_resume_tone(self):
-    self._cal_beep(_GUARD_RESUME_NOTE, _GUARD_STATUS_TONE_MS)
+    self._guard_pattern(_GUARD_RESUME_PATTERN)
 
 _original_start_cal = runtime.Combined.start_cal
 _original_next_cal = runtime.Combined.next_cal
@@ -327,6 +336,7 @@ runtime.Combined.cal_record_start_tone = _cal_record_start_tone
 runtime.Combined.cal_stage_complete_tone = _cal_stage_complete_tone
 runtime.Combined.cal_save_success_tone = _cal_save_success_tone
 runtime.Combined.cal_complete_melody = _cal_complete_melody
+runtime.Combined._guard_pattern = _guard_pattern
 runtime.Combined.guard_start_tone = _guard_start_tone
 runtime.Combined.guard_stop_tone = _guard_stop_tone
 runtime.Combined.guard_pause_tone = _guard_pause_tone

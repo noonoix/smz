@@ -22,14 +22,31 @@ assert notes == (262, 294, 330, 349, 392, 440)
 assert len(notes) == 6 and len(set(notes)) == 6
 assert all(30 <= note <= 20000 for note in notes)
 
-for name in (
-    "_GUARD_START_NOTE",
-    "_GUARD_STOP_NOTE",
-    "_GUARD_PAUSE_NOTE",
-    "_GUARD_RESUME_NOTE",
-):
-    assert name in entry_text
-assert "_GUARD_STATUS_TONE_MS = 2000" in entry_text
+patterns = {}
+for node in tree.body:
+    if isinstance(node, ast.Assign):
+        for target in node.targets:
+            if isinstance(target, ast.Name) and target.id in (
+                "_GUARD_START_PATTERN",
+                "_GUARD_STOP_PATTERN",
+                "_GUARD_PAUSE_PATTERN",
+                "_GUARD_RESUME_PATTERN",
+            ):
+                patterns[target.id] = ast.literal_eval(node.value)
+
+assert set(patterns) == {
+    "_GUARD_START_PATTERN",
+    "_GUARD_STOP_PATTERN",
+    "_GUARD_PAUSE_PATTERN",
+    "_GUARD_RESUME_PATTERN",
+}
+for pattern in patterns.values():
+    audible = [note for note in pattern if note[0] > 0]
+    total_duration_ms = sum(duration for _, duration in pattern)
+    assert 3 <= len(audible) <= 6
+    assert 850 <= total_duration_ms <= 1100
+    assert all((frequency == 0 or 30 <= frequency <= 20000) and duration > 0 for frequency, duration in pattern)
+assert len({patterns[name] for name in patterns}) == 4
 
 assert "runtime.pwmio.PWMOut(runtime.board.GP6" in entry_text
 assert "duty_cycle=32768" in entry_text
@@ -80,17 +97,19 @@ assert 'self.result = "sampling"' in entry_text
 assert "|retry=%d" in entry_text
 assert "runtime.Combined.yellow_action = _repeatable_yellow_action" in entry_text
 
-# Board-owned Start/Stop/Pause/Resume controls have distinct two-second tones.
+# Board-owned Start/Stop/Pause/Resume controls have distinct rhythmic tones.
+assert "def _guard_pattern" in entry_text
 assert "def _guard_start_tone" in entry_text
 assert "def _guard_stop_tone" in entry_text
 assert "def _guard_pause_tone" in entry_text
 assert "def _guard_resume_tone" in entry_text
+assert "runtime.Combined._guard_pattern = _guard_pattern" in entry_text
 assert "def _audible_buttons" in entry_text
 assert "self.guard_start_tone()" in entry_text
 assert "self.guard_stop_tone()" in entry_text
 assert "self.guard_pause_tone() if self.controls.paused else self.guard_resume_tone()" in entry_text
 assert "runtime.Combined.buttons = _audible_buttons" in entry_text
-assert entry_text.count("_GUARD_STATUS_TONE_MS") >= 5
+assert "_GUARD_STATUS_TONE_MS" not in entry_text
 
 # Physical button calibration and Classroom Studio calibration must keep the same math.
 assert "spread > 5" in runtime_text
@@ -117,4 +136,4 @@ assert 'if yellow == "up" and not self.yellow.long: self.yellow_action()' in run
 assert 'if self.result is not None: self.save_cal(); return' in runtime_text
 assert 'self.result = "sampling"' in runtime_text
 
-print("combined Guard audible record start, save cue, cyclic positions, Start/Stop/Pause/Resume tones, calibration parity and live buzzer contract: PASS")
+print("combined Guard audible record start, save cue, cyclic positions, rhythmic Start/Stop/Pause/Resume tones, calibration parity and live buzzer contract: PASS")

@@ -11,8 +11,8 @@ This is the durable GitHub mirror of the live Notion session **«ادامه جل
 - Code branch: `phase7/light-guard-calibration`
 - Old Draft PR: https://github.com/c4haztex/smc-1/pull/175 (PR metadata itself was not migrated; branch content was mirrored.)
 - Last validated pre-migration code head: `388bc0551bb9196dcf2a2933b45d7f3d33ccbac3`
-- Latest active branch head: `4c14f7e422ff2c74f338d1aa7649cee0e5af7762`
-- Latest functional code change: `4c14f7e422ff2c74f338d1aa7649cee0e5af7762`
+- Latest active branch head: `d1bfaf7689beac560eae6ff0ba72c38fecc7a9cd`
+- Latest functional code change: `d1bfaf7689beac560eae6ff0ba72c38fecc7a9cd`
 - Current Windows artifact run before migration: https://github.com/c4haztex/smc-1/actions/runs/35261951361
 - CI: pre-migration head had 12 executable checks succeeded; post-migration cleanup has not yet produced a validated artifact.
 - Installed hardware bundle remains `stage12`; it does not contain the latest calibration/control-audio changes.
@@ -173,30 +173,18 @@ The previous two-second continuous Start/Stop/Pause/Resume tones were replaced w
 
 The user log after replacing the previous package shows the board booting and connecting successfully on COM31 with `combined-pico-guard-executor|hid=on|uart=on|profiles=6|role=brain`. This confirms Boot/control-plane connectivity for the installed package, but the rhythmic update requires a new artifact/package from commit `4c14f7e...` before hardware audio confirmation.
 
-## `stage14.zip` rhythmic package validation
+## Immediate Stop on blue press
 
-The user provided `stage14.zip`, exported from the rhythmic Windows artifact. Validation passed.
+The user confirmed the rhythmic tones are good, but Stop only sounded after holding/releasing the blue button path. The cause was the previous short-press state machine: outside calibration, Start/Stop was triggered on blue-button release so it could be distinguished from a long hold. Stop is now treated as fail-safe and acknowledged immediately on button down while Guard is running.
 
-- ZIP SHA-256: `7a8a275f026d53d9fec6a3460ba9f722eb418fe0f9c4fc94f7f72b7542f144f3`
-- Size: 38,124 bytes.
-- Exactly 21 files and no unsafe paths.
-- Required files present: `boot.py`, `code.py`, `combined_guard_runtime.py`, Guard protocol/transition/runtime files, `guard-calibration.json`, `guard-transition.json`, `pico-calibration.json`, `README-FLASH.md`, and `SHA256SUMS.txt`.
-- `SHA256SUMS.txt`: 20 entries, no duplicates, no missing files, no hash mismatches.
-- JSON files parse successfully and `guard-calibration.json` matches `guard-transition.json` for all six profiles.
-- Calibration revision remains `guard-bf2929070db779e4`; `hardwareCalibrationVerified` remains false. This is expected because the user accepted resetting/redoing calibration.
-- Python syntax: 8 files, 0 errors.
-- `code.py` SHA-256: `514aa01a36658f59222ba803c6b603137f08b1308d196ac9cc4d7e85296b4fcb`.
-- `combined_guard_runtime.py` SHA-256: `2b5007117b105c4b8fd24447036ca26c2e15557521cd7b22ed30e5a56c8e34f5`; normalized runtime size remains 20,200 bytes.
-- Calibration position notes remain `(262, 294, 330, 349, 392, 440)`.
-- Rhythmic control patterns are present and valid:
-  - Start: 4 audible notes, 880 ms total.
-  - Stop/HALT: 4 audible notes, 920 ms total.
-  - Pause: 3 audible notes, 900 ms total.
-  - Resume: 5 audible notes, 900 ms total.
-- The old continuous two-second tone constant is absent.
-- Record-start `660 Hz / 65 ms`, save-success `880 → 1320 Hz`, retry marker, final-position wrap, Pico-local host `BEEP`, `role=brain`, no real `adafruit_hid` import, no `class Keycode`, internal `Keyboard`, and `release_all()` all passed.
+- Commit: `d1bfaf7689beac560eae6ff0ba72c38fecc7a9cd`
+- Behavior: when `controls.running` is true and GP4/blue goes down outside calibration, the firmware immediately calls `controls.stop()`, marks the press consumed, and plays the rhythmic Stop cue.
+- The consumed press prevents the later release or long-hold path from accidentally restarting Guard or entering calibration.
+- Start remains on short release while not running, so long hold can still enter calibration from idle.
+- Static contract updated to assert the immediate down-trigger and consumed-press guard.
+- PR #3 CI after commit: 12 executable checks succeeded; downloadable package skipped by branch condition. Main Windows artifact run: https://github.com/bermoods/smm/actions/runs/35284798949
 
-Installation gate is open for controlled copy of `stage14.zip` to `CIRCUITPY`, with `SHA256SUMS.txt` copied last. After reboot, validate Boot/control plane with PING, LUX?, and CALGET before any calibration or Guard/route execution.
+The currently installed `stage14.zip` does not include this Stop-on-down fix; a fresh artifact/export package is required before hardware confirmation.
 
 ## Active safety gates
 
@@ -210,7 +198,7 @@ Installation gate is open for controlled copy of `stage14.zip` to `CIRCUITPY`, w
 ## Exact next action
 
 1. Continue from `bermoods/smm` on branch `phase7/light-guard-calibration`.
-2. Install validated `stage14.zip` to `CIRCUITPY` with every payload copied first and `SHA256SUMS.txt` copied last.
-3. Eject/safely remove the drive, reconnect the board, and validate Boot/control-plane only: PING, LUX?, and CALGET.
-4. If Boot/control-plane passes, begin physical calibration from the start with Light Watch off and Guard/route execution still disabled.
-5. Do not send `GUARD|ON` or execute routes until calibration is complete and separately validated.
+2. Download the new Windows artifact from run `35283172213`, produced after commit `4c14f7e422ff2c74f338d1aa7649cee0e5af7762`.
+3. Export Combined Portable Guard into a clean staging folder.
+4. Send the resulting archive with a new name such as `stage14-rhythm.zip` for provenance and content validation.
+5. Do not copy anything to `CIRCUITPY`, do not send `GUARD|ON`, and do not continue hardware calibration until validation passes.

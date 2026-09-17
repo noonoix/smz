@@ -110,6 +110,7 @@ def _memory_safe_init(self):
     self.result = None
     self.saved = False
     self.saved_ids = set()
+    self.blue_stop_consumed = False
 
 # The six calibration positions use distinct ascending notes: C4 through A4.
 _CAL_NOTES = (262, 294, 330, 349, 392, 440)
@@ -247,18 +248,28 @@ def _audible_buttons(self):
     now = runtime.time.monotonic()
     blue = self.blue.poll(now)
     yellow = self.yellow.poll(now)
-    if blue == "long":
-        self.end_cal() if self.calibrating else self.start_cal()
-    elif blue == "up" and not self.blue.long:
-        if self.calibrating:
-            self.next_cal()
-        elif self.controls.running:
-            self.controls.stop()
-            self.guard_stop_tone()
+    if blue == "down" and not self.calibrating and self.controls.running:
+        # Stop is fail-safe and should acknowledge immediately on press. This
+        # consumes the blue press so the later release/long-hold path cannot
+        # re-start the Guard or enter calibration accidentally.
+        self.controls.stop()
+        self.blue_stop_consumed = True
+        self.guard_stop_tone()
+    elif blue == "long":
+        if self.blue_stop_consumed:
+            pass
         else:
-            self.guard.reset()
-            self.controls.start()
-            self.guard_start_tone()
+            self.end_cal() if self.calibrating else self.start_cal()
+    elif blue == "up":
+        consumed = self.blue_stop_consumed
+        self.blue_stop_consumed = False
+        if not consumed and not self.blue.long:
+            if self.calibrating:
+                self.next_cal()
+            else:
+                self.guard.reset()
+                self.controls.start()
+                self.guard_start_tone()
     if yellow == "up" and not self.yellow.long:
         self.yellow_action()
     self.cal_tick()

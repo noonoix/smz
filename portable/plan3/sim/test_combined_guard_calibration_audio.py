@@ -111,6 +111,12 @@ assert "self.guard_pause_tone() if self.controls.paused else self.guard_resume_t
 assert "runtime.Combined.buttons = _audible_buttons" in entry_text
 assert "_GUARD_STATUS_TONE_MS" not in entry_text
 
+assert "self.blue_stop_consumed = False" in entry_text
+assert 'if blue == "down" and not self.calibrating and self.controls.running:' in entry_text
+assert "self.blue_stop_consumed = True" in entry_text
+assert "consumes the blue press" in entry_text
+assert "not consumed and not self.blue.long" in entry_text
+
 # Physical button calibration and Classroom Studio calibration must keep the same math.
 assert "spread > 5" in runtime_text
 assert '"tolerance":max(2.0,spread*1.5)' in runtime_text

@@ -6,6 +6,7 @@ on:
     paths:
       - 'firmware/pico-light-guard-1.0.0/**'
       - 'portable/plan3/CIRCUITPY/**'
+      - 'portable/plan3/sim/test_combined_guard_hid.py'
       - '.github/workflows/pico-light-guard.yml'
 
 permissions:
@@ -28,7 +29,8 @@ jobs:
             firmware/pico-light-guard-1.0.0/code.py \
             firmware/pico-light-guard-1.0.0/combined_guard_runtime.py \
             firmware/pico-light-guard-1.0.0/guard_calibration_protocol.py \
-            portable/plan3/CIRCUITPY/guard_calibration_protocol.py
+            portable/plan3/CIRCUITPY/guard_calibration_protocol.py \
+            portable/plan3/sim/test_combined_guard_hid.py
 
       - name: Enforce combined Guard boundary
         shell: bash
@@ -40,6 +42,9 @@ jobs:
           grep -q 'usb_hid' "$root/boot.py"
           grep -q 'from combined_guard_runtime import main' "$root/code.py"
           grep -q 'from guard_calibration_protocol import build_calibration_get, parse_calibration_set' "$runtime"
+          grep -q 'class Keyboard' "$runtime"
+          grep -q 'self.keyboard.release_all()' "$runtime"
+          ! grep -q 'from adafruit_hid' "$runtime"
           grep -q 'board.GP20' "$runtime"
           grep -q 'board.GP21' "$runtime"
           grep -q 'board.GP4' "$runtime"
@@ -68,11 +73,12 @@ jobs:
           grep -q 'NOT a complete CIRCUITPY runtime bundle' "$root/SAFE-MANIFEST.txt"
           ! grep -Eq 'usb_hid\.disable|role=light-guard.*hid=off|RunEngine' "$runtime"
 
-      - name: Test combined Guard calibration protocol
+      - name: Test combined Guard calibration and HID contracts
         shell: bash
         run: |
           set -euo pipefail
           python3 portable/plan3/sim/test_combined_guard_calibration_protocol.py
+          python3 portable/plan3/sim/test_combined_guard_hid.py
 
       - name: Package combined Guard core source artifact
         shell: bash

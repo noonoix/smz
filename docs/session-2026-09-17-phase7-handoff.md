@@ -300,3 +300,25 @@ The user observed that clicking the Light Watch `توقف پایش` button playe
 - CI result: all executable checks succeeded; downloadable package skipped by branch condition.
 
 Next: download the Windows artifact from this run, export a new Combined Portable Guard package, send it for validation, then install only after validation passes. Do not use the current stage17 package to verify the silent-stop behavior.
+
+## Current checkpoint — stage21 and calibration persistence
+
+- `stage21.zip` was validated before installation: SHA-256 `dfacb8475b2861e26ba77260414488742b74cf6d899adf996041d6e57aea1ad0`; 21 entries, no unsafe paths, 20 manifest hashes with zero mismatch, and 8 Python files with valid syntax.
+- The package contains the silent shutdown contract `HALT|SILENT`; the latest Windows CI run is [35317438521](https://github.com/bermoods/smm/actions/runs/35317438521) and is green.
+- Combined Guard identity is now accepted and displayed correctly on COM31: `combined-pico-guard-executor`, role `brain`, 6/6 profiles.
+- The user re-ran the six-position physical calibration. The application showed Pico revision `pending` while the program revision remained `guard-bf2929070db779e4`; this is not proof that calibration was persisted to CIRCUITPY.
+- The latest files presented as board copies still contain the export/default values. `guard-calibration.json` SHA-256 is `0410aca5c16971ba65820c197ba8d2640d7b6db4697fcbdf0d4a167e54c15063`; profiles remain `desktop=0`, `login-or-dc=25`, `character-dashboard=31`, `entering-game-loading=5`, `game=26`, `targeted=20`, all with tolerance 2 and `stable_ms=750`.
+- The matching `guard-transition.json` and `SHA256SUMS.txt` previously supplied also corresponded to those default values. If these files truly came from the CIRCUITPY root, physical calibration was not persisted or was overwritten; if they came from staging, the copy source was wrong.
+
+<callout icon="⚠️" color="yellow_bg">
+تا وقتی فایل واقعی calibration با مقادیر فیزیکی تأیید نشده است، Sync شش پروفایل، `GUARD|ON`، route عملیاتی، HID و actuator ممنوع بمانند. این checkpoint فقط نتیجهٔ بررسی persistence را ثبت می‌کند و موفقیت کالیبراسیون فیزیکی را تأیید نمی‌کند.
+</callout>
+
+### Exact next diagnostic
+
+1. فقط profile `desktop` را دوباره کالیبره کن؛ پس از نمونه‌برداری و ذخیره، برنامه را نبند و Sync یا Export نکن.
+2. بلافاصله `guard-calibration.json` را مستقیماً از ریشهٔ `CIRCUITPY` کپی کن و بفرست.
+3. اگر مقدار `desktop.center` هنوز 0 بود، مشکل در persistence firmware است؛ اگر تغییر کرده بود، مشکل از مسیر copy/reboot یا staging قبلی بوده است.
+4. پس از اثبات persistence، هر شش profile را تکرار، فایل‌ها را حفظ و سپس `CALGET`/Sync را بررسی می‌کنیم.
+
+- درخواست UI کاربر برای انتقال تب وضعیت به header و پنجرهٔ جداگانه ثبت شد؛ اجرای آن بعد از حل persistence انجام می‌شود.

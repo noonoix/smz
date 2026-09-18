@@ -322,3 +322,54 @@ Next: download the Windows artifact from this run, export a new Combined Portabl
 4. پس از اثبات persistence، هر شش profile را تکرار، فایل‌ها را حفظ و سپس `CALGET`/Sync را بررسی می‌کنیم.
 
 - درخواست UI کاربر برای انتقال تب وضعیت به header و پنجرهٔ جداگانه ثبت شد؛ اجرای آن بعد از حل persistence انجام می‌شود.
+
+
+## Latest checkpoint — writable CIRCUITPY and six-profile persistence
+
+The persistence investigation is now separated into two paths: physical Pico calibration and the Windows-side six-profile Sync action.
+
+### Fixes and validated packages
+
+- Persistence/read-back diagnostics: `17058d555ebaeebf0262204cb9bf6609441309ce`.
+- `CALSTATUS` protocol and UI reporting: `29d7a431d7a18053e621ba19f37625c4404ce23d` and `ee86df1a57711eaa06fc28699dabfcade8fe438c`.
+- Explicit writable CIRCUITPY remount and write verification: `b94a2257cf888af6ceef085eba17423a1a7c5371`.
+- `stage26.zip` SHA-256: `7ca04ca560e95b5533b587952c14e02bc778be3ea1f0fd733890e064e0e62ca5`; 21 files, 20 manifest hashes, zero mismatches, no unsafe paths, valid Python syntax.
+- Windows artifact `Classroom-Studio-final-fixes(2).zip` SHA-256: `7e56585f764fda18be85a9ba8ae45921e0fe62fef2aca53b2ea89918e47d6ba6`; 72 entries, no unsafe paths, and includes writable remount, `CALSTATUS`, and verified writes.
+
+### Physical calibration evidence
+
+After stage26 was installed, the board reported:
+
+```text
+OK|CALSTATUS|revision=pending|count=6|profiles=desktop:32.5;login-or-dc:25.0;character-dashboard:31.0;entering-game-loading:5.0;game:26.0;targeted:20.0|last_error=none
+```
+
+The latest `guard-calibration.json` copied from the board has SHA-256 `4123a643595ffd951af3c58aa076bc5e507958b730b1cba4f274ad3c140ec7ef` and contains six physically updated profiles:
+
+- `desktop=32.5`, tolerance `3.75`
+- `login-or-dc=0.0`, tolerance `5.0`
+- `character-dashboard=11.666664`, tolerance `5.0`
+- `entering-game-loading=35.0`, tolerance approximately `5.0`
+- `game=22.5`, tolerance approximately `5.0`
+- `targeted=20.83333`, tolerance `3.75`
+- `stable_ms=750` for all profiles; revision remains `pending`.
+
+This board file is the authoritative evidence that physical persistence for all six profiles is working. The export/default JSON must not overwrite it.
+
+### Separate unresolved Windows Sync error
+
+The current Status screen still shows:
+
+```text
+WriteFile failed: PermissionError(13, "The device does not recognize the command.", None, 22)
+```
+
+This is a Windows-side Sync/write-path failure, not evidence that Pico-side physical persistence failed. `pending` means the board's calibration is stored but has not yet been reconciled with the application revision. Guard remains OFF; operational routes, HID, and actuators remain blocked.
+
+## Exact next action
+
+1. Preserve the board's current `guard-calibration.json`, `guard-transition.json`, and `SHA256SUMS.txt`; do not overwrite them with export defaults.
+2. Run `Guard / CALGET` and confirm `count=6` and the six persisted values.
+3. Fix or bypass the Windows `Sync شش پروفایل` WriteFile path; treat the board JSON as source of truth until that path is proven.
+4. Only after the revision mismatch is resolved should Guard ON be considered, with route/HID/actuator gates still separate.
+5. The requested Status-tab move to the header/separate window remains a later UI task, after persistence and Sync are stable.

@@ -12,6 +12,7 @@ public partial class MainViewModel
     private string _lightStateConfidenceDisplay = "—";
     private string _lightStateWarning = "";
     private string _lightProfileSaveStatus = "اعداد فعلی فرضی و قابل تنظیم‌اند.";
+    private LightGuardDefaultSettings _lightGuardDefaults = LightGuardDefaultsStore.Load();
 
     public ObservableCollection<LightStateProfile> LightStateProfiles { get; }
         = new(LightStateProfileStore.Load());
@@ -38,6 +39,28 @@ public partial class MainViewModel
     {
         get => _lightProfileSaveStatus;
         private set => SetProperty(ref _lightProfileSaveStatus, value);
+    }
+
+    public double LightGuardDefaultTolerance
+    {
+        get => _lightGuardDefaults.Tolerance;
+        set { if (value >= 0 && double.IsFinite(value)) { _lightGuardDefaults = _lightGuardDefaults with { Tolerance = value }; OnPropertyChanged(); } }
+    }
+    public int LightGuardDefaultStableDurationMs
+    {
+        get => _lightGuardDefaults.StableDurationMs;
+        set { if (value >= 0) { _lightGuardDefaults = _lightGuardDefaults with { StableDurationMs = value }; OnPropertyChanged(); } }
+    }
+    public double LightGuardDefaultHysteresisLux
+    {
+        get => _lightGuardDefaults.HysteresisLux;
+        set { if (value >= 0 && double.IsFinite(value)) { _lightGuardDefaults = _lightGuardDefaults with { HysteresisLux = value }; OnPropertyChanged(); } }
+    }
+
+    public bool SaveLightGuardDefaults()
+    {
+        try { LightGuardDefaultsStore.Save(_lightGuardDefaults); LightProfileSaveStatus = "تنظیمات پیش‌فرض calibration ذخیره شد؛ روی مقادیر فعلی برد اثری ندارد."; return true; }
+        catch (Exception ex) { LightProfileSaveStatus = "ذخیره تنظیمات پیش‌فرض ناموفق: " + ex.Message; return false; }
     }
 
     /// <summary>Called only after a new median sample has completed its UI update.</summary>
@@ -95,7 +118,13 @@ public partial class MainViewModel
         var preferredCalibrationProfileId = SelectedLightCalibrationProfile?.Id;
         RevokeLightAuthorizationDiagnostic(LightAuthorizationReasonCode.ProfileChanged);
         LightStateProfiles.Clear();
-        foreach (var profile in LightStateDefaults.CreateInitialProfiles()) LightStateProfiles.Add(profile);
+        foreach (var profile in LightStateDefaults.CreateInitialProfiles())
+        {
+            profile.LuxTolerance = LightGuardDefaultTolerance;
+            profile.StableDurationMs = LightGuardDefaultStableDurationMs;
+            profile.HysteresisLux = LightGuardDefaultHysteresisLux;
+            LightStateProfiles.Add(profile);
+        }
         ResetLightCalibrationProfileSelection(preferredCalibrationProfileId);
         SaveLightStateProfiles();
     }

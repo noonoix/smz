@@ -61,11 +61,25 @@ internal static class LightGuardUiBootstrap
             "Guard جدا از Phase 6 است: BH1750 روی GP20/GP21، GP4 شروع/توقف و hold سه‌ثانیه‌ای کالیبراسیون، GP3 Pass/Next، و GP6 passive piezo. هیچ RunEngine، HID، UART یا actuator در این مسیر نیست.",
             12, "#AAB3C2"));
         content.Children.Add(Text("کالیبراسیون فیزیکی: GP4 را ۳ ثانیه نگه دارید؛ برای هر جایگاه GP3 را بزنید. بعد از هر مرحلهٔ موفق، GP3 مرحلهٔ بعد را آماده می‌کند.", 12, "#DE9255"));
+        content.Children.Add(Text("پیش‌فرض پروفایل جدید — فقط برای ایجاد/Reset؛ روی کالیبراسیون فعلی اثر ندارد", 12, "#AAB3C2"));
+        var defaults = new WrapPanel { Margin = new Thickness(0, 4, 0, 4) };
+        var tolerance = new TextBox { Width = 70, Text = vm.LightGuardDefaultTolerance.ToString("0.###"), Margin = new Thickness(4) };
+        var stable = new TextBox { Width = 80, Text = vm.LightGuardDefaultStableDurationMs.ToString(), Margin = new Thickness(4) };
+        var hysteresis = new TextBox { Width = 70, Text = vm.LightGuardDefaultHysteresisLux.ToString("0.###"), Margin = new Thickness(4) };
+        defaults.Children.Add(Text("تلورانس", 11, "#D9DEE7")); defaults.Children.Add(tolerance);
+        defaults.Children.Add(Text("پایداری ms", 11, "#D9DEE7")); defaults.Children.Add(stable);
+        defaults.Children.Add(Text("hysteresis", 11, "#D9DEE7")); defaults.Children.Add(hysteresis);
+        defaults.Children.Add(Action("ذخیره تنظیمات", "#4B5563", () =>
+        {
+            if (double.TryParse(tolerance.Text, out var t) && int.TryParse(stable.Text, out var s) && double.TryParse(hysteresis.Text, out var h))
+            { vm.LightGuardDefaultTolerance = t; vm.LightGuardDefaultStableDurationMs = s; vm.LightGuardDefaultHysteresisLux = h; vm.SaveLightGuardDefaults(); }
+            return Task.CompletedTask;
+        }));
+        content.Children.Add(defaults);
 
         var actions = new WrapPanel { Margin = new Thickness(0, 10, 0, 6) };
         actions.Children.Add(Action("شناسایی Guard / CALGET", "#5E9FE8", async () => await vm.RefreshLightGuardIdentityAsync()));
-        actions.Children.Add(Action("دریافت از Pico", "#5E9FE8", async () => await vm.PullLightGuardCalibrationAsync()));
-        actions.Children.Add(Action("ارسال به Pico", "#3D6B55", async () => await vm.SyncLightGuardCalibrationAsync()));
+        actions.Children.Add(Action("Sync شش پروفایل", "#3D6B55", async () => await vm.SyncLightGuardCalibrationAsync()));
         actions.Children.Add(Action("Guard ON", "#3D6B55", async () => await vm.EnableLightGuardAsync()));
         actions.Children.Add(Action("Guard OFF", "#333740", async () => await vm.DisableLightGuardAsync()));
         content.Children.Add(actions);

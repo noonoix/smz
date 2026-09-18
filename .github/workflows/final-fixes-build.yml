@@ -120,21 +120,6 @@ jobs:
               return s
           rw(p,fa)
 
-          # Add the copy button and keep the existing status bindings intact.
-          p='ams-shell/src/Ams.UI/MainWindow.FooterUi.cs'
-          def footer(s):
-              needle='        MoveChildren(connection, connectionWrap);\n        Grid.SetRow(connectionWrap, 0);'
-              ins='''        MoveChildren(connection, connectionWrap);
-                  var copy = new Button { Content = "📋 کپی مشخصات اتصال", Padding = new Thickness(10, 3, 10, 3), Margin = new Thickness(8, 3, 4, 3), ToolTip = "کپی متن کامل وضعیت اتصال" };
-                  copy.Click += (_, _) =>
-                  {
-                      var text = string.Join(Environment.NewLine, connectionWrap.Children.OfType<TextBlock>().Select(x => x.Text).Where(x => !string.IsNullOrWhiteSpace(x)));
-                      if (!string.IsNullOrWhiteSpace(text)) Clipboard.SetText(text);
-                  };
-                  connectionWrap.Children.Add(copy);
-                  Grid.SetRow(connectionWrap, 0);'''
-              return add(s,needle,ins,'footer copy')
-          rw(p,footer)
 
           # Firmware templates: accept one atomic BEEPSEQ command and keep PWM alive for the sequence.
           for p in ['ams-shell/src/Ams.UI/Services/PicoFirmwareExporter.cs','firmware/autocycle-hostusb-v5/code.py']:

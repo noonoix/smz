@@ -250,12 +250,32 @@ class Combined:
     def emit(self, line):
         try: self.usb.write((line + "\n").encode())
         except Exception: pass
+    def _write_verified_text(self, path, text):
+        # CircuitPython can acknowledge a filesystem write before the USB
+        # volume has committed it. Flush, close, and read back the exact text
+        # before allowing calibration to proceed.
+        with open(path, "w") as fh:
+            fh.write(text)
+            try: fh.flush()
+            except Exception: pass
+        with open(path, "r") as fh:
+            if fh.read() != text:
+                raise RuntimeError("write verification mismatch: " + path)
+
     def _replace_text(self, path, text):
         temp = path + ".tmp"
-        with open(temp, "w") as fh: fh.write(text)
-        try: os.remove(path)
-        except Exception: pass
-        os.rename(temp, path)
+        try:
+            self._write_verified_text(temp, text)
+            try: os.remove(path)
+            except Exception: pass
+            os.rename(temp, path)
+            with open(path, "r") as fh:
+                if fh.read() != text:
+                    raise RuntimeError("rename verification mismatch: " + path)
+        except Exception:
+            try: os.remove(temp)
+            except Exception: pass
+            raise
     def _read_text(self, path):
         with open(path, "r") as fh: return fh.read()
     def _replace_json(self, path, text):
@@ -284,7 +304,8 @@ class Combined:
             self._replace_text("/SHA256SUMS.txt", self._hash_manifest())
             new_bundle = load_guard_bundle("/")
             new_guard = LightStateGuard.from_bundle("/")
-        except Exception:
+        except Exception as exc:
+            self.emit("ERR|CAL|SAVE|" + type(exc).__name__ + "|" + str(exc)[:80])
             rollback_error = None
             for path, text in (
                 ("/guard-transition.json", old_manifest),
@@ -319,7 +340,9 @@ class Combined:
     def save_cal(self):
         if not isinstance(self.result, dict): self.emit("ERR|CAL|BUSY|stage=%d" % (self.stage + 1)); return
         try: self._publish_calibration(PENDING_REVISION, PROFILES[self.stage], self.result)
-        except Exception: self.emit("ERR|CAL|SAVE|stage=%d" % (self.stage + 1)); return
+        except Exception as exc:
+            self.emit("ERR|CAL|SAVE|stage=%d|detail=%s" % (self.stage + 1, str(exc)[:80]))
+            return
         self.saved = True; self.saved_ids.add(PROFILES[self.stage]); self.emit("EVT|CAL|mode=saved-stage|stage=%d|id=%s|saved=%d" % (self.stage+1, PROFILES[self.stage], len(self.saved_ids)))
     def yellow_action(self):
         if not self.calibrating: self.controls.paused = not self.controls.paused; return

@@ -373,3 +373,13 @@ This is a Windows-side Sync/write-path failure, not evidence that Pico-side phys
 3. Fix or bypass the Windows `Sync شش پروفایل` WriteFile path; treat the board JSON as source of truth until that path is proven.
 4. Only after the revision mismatch is resolved should Guard ON be considered, with route/HID/actuator gates still separate.
 5. The requested Status-tab move to the header/separate window remains a later UI task, after persistence and Sync are stable.
+
+
+## Latest board-file confirmation after CALGET discrepancy
+
+- A fresh `guard-calibration.json` was copied from the board after the earlier CALGET screenshot.
+- SHA-256: `55790ee9c92a83c47381e32961fb072ee8dc8675b136fba722d1e9da31d3c759`.
+- All six profiles now contain non-default persisted values with `stable_ms=750`: `desktop=31.66667` (tolerance≈3.75), `login-or-dc=0.0` (3.75), `character-dashboard=11.666664` (5.0), `entering-game-loading=35.0` (≈5.0), `game=21.66667` (≈5.0), and `targeted=22.5` (≈5.0).
+- Revision remains `pending`. This proves the physical file currently copied from the board contains six updated profiles.
+- The earlier CALGET screenshot showed export defaults, so it was stale or was captured before the latest physical calibration/default-file replacement. The next verification is to run CALGET again and compare its live output with this file.
+- Keep Guard OFF and do not run Sync, routes, HID, or actuators until the live CALGET values match.

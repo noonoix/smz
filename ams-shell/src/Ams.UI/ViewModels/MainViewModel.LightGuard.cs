@@ -58,14 +58,16 @@ public partial class MainViewModel
             if (!LightGuardCalibrationProtocol.TryParseIdentity(pong, out var identity) || identity is null)
             {
                 LightGuardIdentityValid = false;
-                LightGuardIdentityDisplay = "هویت نامعتبر — این پورت pico-light-guard نیست";
+                LightGuardIdentityDisplay = "هویت نامعتبر — این پورت Guard شناخته‌شده نیست";
                 LightGuardRevisionComparison = "همگام‌سازی مسدود شد: هویت Guard معتبر نیست.";
                 Log("phase7 Guard: identity mismatch; CALSET blocked");
                 return;
             }
             LightGuardIdentityValid = identity.ProfileCount == 6;
             LightGuardIdentityDisplay = LightGuardIdentityValid
-                ? $"Guard معتبر · {identity.Version} · ۶ پروفایل · HID/UART/actuator خاموش"
+                ? identity.Role == "brain"
+                    ? $"Combined Guard معتبر · {identity.Version} · نقش brain · ۶ پروفایل · کانال سخت‌افزار فعال"
+                    : $"Guard معتبر · {identity.Version} · ۶ پروفایل · HID/UART/actuator خاموش"
                 : $"Guard نامعتبر · profiles={identity.ProfileCount} (باید 6 باشد)";
             if (!LightGuardIdentityValid) return;
 

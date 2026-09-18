@@ -103,23 +103,29 @@ public static class LightGuardCalibrationProtocol
         }
 
         if (!values.TryGetValue("role", out var role)
-            || !string.Equals(role, "light-guard", StringComparison.Ordinal)) return false;
-        if (!values.TryGetValue("hid", out var hid)
-            || !string.Equals(hid, "off", StringComparison.Ordinal)) return false;
-        if (!values.TryGetValue("uart", out var uart)
-            || !string.Equals(uart, "off", StringComparison.Ordinal)) return false;
-        if (!values.TryGetValue("actuator", out var actuator)
-            || !string.Equals(actuator, "off", StringComparison.Ordinal)) return false;
-        if (!values.TryGetValue("profiles", out var count)
+            || !values.TryGetValue("hid", out var hid)
+            || !values.TryGetValue("uart", out var uart)
+            || !values.TryGetValue("profiles", out var count)
             || !int.TryParse(count, NumberStyles.Integer, CultureInfo.InvariantCulture, out var profileCount)) return false;
-        if (!fields[2].StartsWith("pico-light-guard ", StringComparison.Ordinal)) return false;
+
+        var legacy = string.Equals(role, "light-guard", StringComparison.Ordinal)
+            && string.Equals(hid, "off", StringComparison.Ordinal)
+            && string.Equals(uart, "off", StringComparison.Ordinal)
+            && values.TryGetValue("actuator", out var actuator)
+            && string.Equals(actuator, "off", StringComparison.Ordinal)
+            && fields[2].StartsWith("pico-light-guard ", StringComparison.Ordinal);
+        var combinedBrain = string.Equals(role, "brain", StringComparison.Ordinal)
+            && string.Equals(hid, "on", StringComparison.Ordinal)
+            && string.Equals(uart, "on", StringComparison.Ordinal)
+            && fields[2].StartsWith("combined-pico-guard-executor", StringComparison.Ordinal);
+        if (!legacy && !combinedBrain) return false;
 
         identity = new LightGuardIdentity(
-            fields[2]["pico-light-guard ".Length..],
+            legacy ? fields[2]["pico-light-guard ".Length..] : fields[2],
             role,
-            HidOff: true,
-            UartOff: true,
-            ActuatorOff: true,
+            HidOff: legacy,
+            UartOff: legacy,
+            ActuatorOff: legacy,
             profileCount);
         return true;
     }

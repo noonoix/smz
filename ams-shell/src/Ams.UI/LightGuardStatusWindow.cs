@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using WpfControl = System.Windows.Controls.Control;
 using System.Windows.Data;
 using System.Windows.Media;
 using WpfColor = System.Windows.Media.Color;
@@ -78,7 +79,7 @@ internal static class LightGuardStatusWindow
         return new TabItem { Header = "کالیبراسیون", Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } };
     }
 
-    private static StackPanel Labeled(string label, Control input)
+    private static StackPanel Labeled(string label, WpfControl input)
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 5, 0, 5) };
         row.Children.Add(Text(label, 13, FontWeights.Normal, "#D9DEE7"));

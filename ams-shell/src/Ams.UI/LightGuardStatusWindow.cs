@@ -27,11 +27,14 @@ internal static class LightGuardStatusWindow
         actions.Children.Add(Action("CALGET", "#4B5563", () => vm.RefreshLightGuardIdentityAsync()));
         actions.Children.Add(Action("Guard OFF", "#333740", () => vm.DisableLightGuardAsync()));
         actions.Children.Add(Action("Guard ON", "#3D6B55", () => vm.EnableLightGuardAsync()));
+        actions.Children.Add(Action("اجرای dry-run چرخهٔ ۵گانه", "#8A6D3B", () => vm.RunSessionCycleDryRunAsync()));
+        actions.Children.Add(Action("لغو dry-run", "#7A3E3E", () => { vm.CancelSessionCycleDryRun(); return Task.CompletedTask; }));
         stack.Children.Add(actions);
+        stack.Children.Add(Bound(vm, nameof(MainViewModel.SessionCycleDryRunStatus), "#9CC7F2"));
         var profiles = new ItemsControl();
         profiles.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(MainViewModel.LightGuardProfileDisplays)) { Source = vm });
         stack.Children.Add(profiles);
-        _window = new Window { Title = "Guard Status", Owner = owner, Width = 720, Height = 520, MinWidth = 560, MinHeight = 360, WindowStartupLocation = WindowStartupLocation.CenterOwner, Background = Brush("#22262D"), Content = new ScrollViewer { Content = stack, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } };
+        _window = new Window { Title = "Guard Status", Owner = owner, Width = 760, Height = 560, MinWidth = 600, MinHeight = 380, WindowStartupLocation = WindowStartupLocation.CenterOwner, Background = Brush("#22262D"), Content = new ScrollViewer { Content = stack, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } };
         _window.Closed += (_, _) => _window = null; _window.Show();
     }
     private static Button Action(string label, string background, Func<Task> action)

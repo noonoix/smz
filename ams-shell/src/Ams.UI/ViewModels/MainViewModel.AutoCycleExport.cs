@@ -99,6 +99,6 @@ public partial class MainViewModel
         }
     }
 
-    // ExportAutoCyclePicoPlan and ExportAutoCyclePicoFirmware remain available to
-    // older serialized commands, but their UI hooks are intentionally disabled.
+    // Legacy PipelinePlanBundle.Export remains source-compatible for old serialized plans,
+    // but it is intentionally not called by the board export UI anymore.
 }

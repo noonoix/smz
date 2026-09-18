@@ -9,6 +9,7 @@ import digitalio
 import pwmio
 import usb_cdc
 import usb_hid
+import storage
 
 class Keyboard:
     """Small boot-keyboard driver; avoids an undeclared adafruit_hid dependency."""
@@ -250,6 +251,17 @@ class Combined:
     def emit(self, line):
         try: self.usb.write((line + "\n").encode())
         except Exception: pass
+    def _ensure_calibration_storage_writable(self):
+        # Calibration is an approved runtime write path. Keep CIRCUITPY
+        # writable so JSON persistence does not depend on a boot button state.
+        try:
+            remount = getattr(storage, "remount", None)
+            if remount is None:
+                raise RuntimeError("storage.remount unavailable")
+            remount("/", readonly=False)
+        except Exception as exc:
+            raise RuntimeError("calibration filesystem is not writable: " + str(exc)[:80])
+
     def _write_verified_text(self, path, text):
         # CircuitPython can acknowledge a filesystem write before the USB
         # volume has committed it. Flush, close, and read back the exact text
@@ -295,6 +307,7 @@ class Combined:
         calibration["revision"] = revision
         calibration.setdefault("profiles", {})[profile_id] = {
             "center": profile["center"], "tolerance": profile["tolerance"], "stable_ms": profile["stable_ms"]}
+        self._ensure_calibration_storage_writable()
         old_manifest = self._read_text("/guard-transition.json")
         old_calibration = self._read_text("/guard-calibration.json")
         old_hashes = self._read_text("/SHA256SUMS.txt")

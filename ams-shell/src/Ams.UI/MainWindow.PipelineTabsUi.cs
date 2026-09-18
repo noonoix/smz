@@ -99,8 +99,9 @@ internal static class PipelineTabsUiBootstrap
         };
         statusButton.Click += (_, _) =>
         {
-            statusPanel.Visibility = Visibility.Visible;
-            Paint(buttons, null);
+            vm.InitializeLightGuardAdapter();
+            LightGuardStatusWindow.Show(window, vm);
+            Paint(buttons, vm.ActivePipelineTab);
             PaintStatus(statusButton, true);
         };
         if (window.FindName("HeaderActions") is WpfPanel headerActions)

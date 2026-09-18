@@ -219,7 +219,7 @@ class Combined:
         self.arm = Arm(); self.keyboard = Keyboard(usb_hid.devices); self.controls = Controls(self.arm, self.keyboard); self.sensor = BH1750()
         self.bundle = load_guard_bundle("/"); self.guard = LightStateGuard.from_bundle("/"); self.routes = {}
         self.blue = Button(board.GP4); self.yellow = Button(board.GP3); self.usb = usb_cdc.data or usb_cdc.console; self.host = bytearray()
-        self.calibrating = False; self.stage = 0; self.samples = []; self.sample_started = 0; self.result = None; self.saved = False; self.saved_ids = set()
+        self.calibrating = False; self.stage = 0; self.samples = []; self.sample_started = 0; self.result = None; self.saved = False; self.saved_ids = set(); self.last_cal_error = None
     def key(self, vk):
         # Convert Windows virtual-key values directly to USB HID usages.
         # Keep this branch-only mapping allocation-free on CircuitPython's small heap.
@@ -305,7 +305,8 @@ class Combined:
             new_bundle = load_guard_bundle("/")
             new_guard = LightStateGuard.from_bundle("/")
         except Exception as exc:
-            self.emit("ERR|CAL|SAVE|" + type(exc).__name__ + "|" + str(exc)[:80])
+            self.last_cal_error = type(exc).__name__ + ":" + str(exc)[:80]
+            self.emit("ERR|CAL|SAVE|" + self.last_cal_error)
             rollback_error = None
             for path, text in (
                 ("/guard-transition.json", old_manifest),
@@ -318,11 +319,20 @@ class Combined:
                     if rollback_error is None: rollback_error = exc
             if rollback_error is not None: raise RuntimeError("calibration rollback failed") from rollback_error
             raise
-        self.bundle = new_bundle; self.guard = new_guard
+        self.bundle = new_bundle; self.guard = new_guard; self.last_cal_error = None
     def calibration_count(self):
         return len(self.bundle.get("calibration", {}).get("profiles", {}))
     def calget(self):
         return build_calibration_get(self.bundle["revision"], self.calibration_count())
+    def calstatus(self):
+        profiles = self.bundle.get("calibration", {}).get("profiles", {})
+        parts = []
+        for pid in PROFILES:
+            item = profiles.get(pid, {})
+            parts.append("%s:%.1f" % (pid, float(item.get("center", 0))))
+        error = (self.last_cal_error or "none").replace("|", "/").replace("\n", " ")[:80]
+        return "OK|CALSTATUS|revision=%s|count=%d|profiles=%s|last_error=%s" % (
+            self.bundle.get("revision", "unknown"), len(profiles), ";".join(parts), error)
     def calset(self, line):
         if self.controls.running or self.calibrating: return "ERR|CALSET|BUSY"
         payload, error = parse_calibration_set(line)
@@ -341,7 +351,8 @@ class Combined:
         if not isinstance(self.result, dict): self.emit("ERR|CAL|BUSY|stage=%d" % (self.stage + 1)); return
         try: self._publish_calibration(PENDING_REVISION, PROFILES[self.stage], self.result)
         except Exception as exc:
-            self.emit("ERR|CAL|SAVE|stage=%d|detail=%s" % (self.stage + 1, str(exc)[:80]))
+            self.last_cal_error = type(exc).__name__ + ":" + str(exc)[:80]
+            self.emit("ERR|CAL|SAVE|stage=%d|detail=%s" % (self.stage + 1, self.last_cal_error))
             return
         self.saved = True; self.saved_ids.add(PROFILES[self.stage]); self.emit("EVT|CAL|mode=saved-stage|stage=%d|id=%s|saved=%d" % (self.stage+1, PROFILES[self.stage], len(self.saved_ids)))
     def yellow_action(self):
@@ -382,6 +393,7 @@ class Combined:
             try:
                 if line == "PING": reply = "OK|PONG|combined-pico-guard-executor|hid=on|uart=on|profiles=6"
                 elif line == "CALGET": reply = self.calget()
+                elif line == "CALSTATUS": reply = self.calstatus()
                 elif line.startswith("CALSET|"): reply = self.calset(line)
                 elif line == "GUARD|ON": self.controls.start(); reply = "OK|GUARD|ON"
                 elif line in ("GUARD|OFF", "HALT"): self.controls.stop(); reply = "OK|GUARD|OFF"

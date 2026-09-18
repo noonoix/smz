@@ -113,6 +113,7 @@ def _memory_safe_init(self):
     self.blue_stop_consumed = False
     self.blue_start_consumed = False
     self.blue_start_pending = False
+    self.last_cal_error = None
 
 # The six calibration positions use distinct ascending notes: C4 through A4.
 _CAL_NOTES = (262, 294, 330, 349, 392, 440)
@@ -394,6 +395,8 @@ def _live_host_poll(self):
                 reply = "OK|PONG|combined-pico-guard-executor|hid=on|uart=on|profiles=6|role=brain"
             elif line == "CALGET":
                 reply = self.calget()
+            elif line == "CALSTATUS":
+                reply = self.calstatus()
             elif line.startswith("CALSET|"):
                 reply = self.calset(line)
             elif line == "GUARD|ON":

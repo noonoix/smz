@@ -258,7 +258,7 @@ class Combined:
             remount = getattr(storage, "remount", None)
             if remount is None:
                 raise RuntimeError("storage.remount unavailable")
-            remount("/", readonly=False)
+            remount("/", readonly=False, disable_concurrent_write_protection=True)
         except Exception as exc:
             raise RuntimeError("calibration filesystem is not writable: " + str(exc)[:80])
 

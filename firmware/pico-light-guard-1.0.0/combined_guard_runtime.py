@@ -342,7 +342,11 @@ class Combined:
         parts = []
         for pid in PROFILES:
             item = profiles.get(pid, {})
-            parts.append("%s:%.1f" % (pid, float(item.get("center", 0))))
+            parts.append("%s:%.3f:%.3f:%d" % (
+                pid,
+                float(item.get("center", 0)),
+                float(item.get("tolerance", 0)),
+                int(item.get("stable_ms", 750))))
         error = (self.last_cal_error or "none").replace("|", "/").replace("\n", " ")[:80]
         return "OK|CALSTATUS|revision=%s|count=%d|profiles=%s|last_error=%s" % (
             self.bundle.get("revision", "unknown"), len(profiles), ";".join(parts), error)

@@ -256,3 +256,34 @@ The new fix makes Start audible on the first physical blue-button down while pre
 3. Do not install it on `CIRCUITPY` until the package validation passes.
 4. After install, verify Boot/control-plane first, then check that Start and Stop both sound on the first physical press.
 5. Keep `GUARD|ON`, operational routes, HID actions, actuator execution, merge, and release blocked until the relevant gates are explicitly reopened.
+
+
+## `stage17.zip` validation — Start-on-press fix
+
+The user provided `stage17.zip` and `light-state-windows-output(28).zip` after the Start-on-press fix.
+
+### Windows artifact
+
+- File: `light-state-windows-output(28).zip`
+- SHA-256: `8a2c43b08734105e8453a599f260e674ac8230b4449e78a0eed74d989796449e`
+- 83 entries; zero unsafe paths.
+- `ClassroomStudio.exe` is present.
+- `LIGHT-STATE-TEST.txt` identifies source commit `31ebd5645ac3cbf8a0cb3761fa6787e431fcf793`.
+
+### Pico package
+
+- File: `stage17.zip`
+- SHA-256: `3d0ed36443044255d44239c6a8d7a89b06b92f664d069261dde27632ba1af498`
+- Exactly 21 entries; zero unsafe paths and duplicate names.
+- Required payload files are present.
+- `SHA256SUMS.txt`: 20 entries; zero missing, duplicate, or mismatched hashes.
+- All 3 JSON files parse successfully; revision `guard-bf2929070db779e4` and `hardwareCalibrationVerified: false`.
+- Python syntax: 8 files, zero errors.
+- `code.py` SHA-256: `c256f7db5daac3fbcff8ef5bed9ce9689558301fc2df4cfbb0a4d4971d9e123f`.
+- `combined_guard_runtime.py` SHA-256: `2b5007117b105c4b8fd24447036ca26c2e15557521cd7b22ed30e5a56c8e34f5`.
+- Normalized runtime size: 20,200 bytes.
+- Start-on-press, pending-start route gate, long-hold calibration handoff, immediate Stop, rhythmic cues, `role=brain`, internal keyboard driver, and no real `adafruit_hid` import are present.
+
+### Installation gate
+
+`stage17.zip` passed static validation and is approved for controlled installation. Preserve any real board calibration files before copying because the package still carries `hardwareCalibrationVerified: false` and export/default calibration metadata. Copy payload files first and `SHA256SUMS.txt` last; reboot; verify only `PING`, `LUX?`, and `CALGET` before any operational Guard or route test.

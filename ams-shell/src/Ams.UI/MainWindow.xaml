@@ -97,10 +97,12 @@
 
         <!-- ══ Header (menu + always-visible Guard status) ══ -->
         <DockPanel Grid.Row="0" Background="{StaticResource BgPanelBrush}" LastChildFill="True">
-        <Button DockPanel.Dock="Right" Content="وضعیت Guard" Click="OpenGuardStatusWindow_Click"
-                Padding="14,4" Margin="4,2" FontSize="13"
-                Background="#5E9FE8" Foreground="#FFFFFF"
-                ToolTip="باز کردن پنجرهٔ مستقل وضعیت Light Guard" />
+        <StackPanel x:Name="HeaderActions" DockPanel.Dock="Right" Orientation="Horizontal">
+            <Button Content="Guard" Click="OpenGuardStatusWindow_Click"
+                    Padding="14,4" Margin="4,2" FontSize="13"
+                    Background="#5E9FE8" Foreground="#FFFFFF"
+                    ToolTip="باز کردن پنجرهٔ مستقل وضعیت Guard" />
+        </StackPanel>
         <Menu Padding="4,2"
               Background="{StaticResource BgPanelBrush}"
               Foreground="{StaticResource TextPrimaryBrush}" FontSize="13">

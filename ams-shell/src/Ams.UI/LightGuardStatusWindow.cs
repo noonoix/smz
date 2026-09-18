@@ -20,21 +20,21 @@ internal static class LightGuardStatusWindow
     {
         if (_window is { IsVisible: true }) { _window.Activate(); return; }
         var stack = new StackPanel { Margin = new Thickness(18) };
-        stack.Children.Add(Text("وضعیت و تنظیمات برد", 19, FontWeights.SemiBold));
-        stack.Children.Add(Text("همهٔ گزینه‌های وضعیت نسخهٔ قدیمی، در پنجرهٔ مستقل", 13, FontWeights.Normal, "#9CC7F2"));
+        stack.Children.Add(Text("وضعیت زندهٔ سنسور نور", 19, FontWeights.SemiBold));
+        stack.Children.Add(Text("پایش فقط خواندنی است؛ تغییر نور هیچ ماکرو یا فرمان Armed را اجرا نمی‌کند.", 13, FontWeights.Normal, "#9CC7F2"));
 
         var overview = new Grid { Margin = new Thickness(0, 12, 0, 8) };
         for (var i = 0; i < 3; i++) overview.ColumnDefinitions.Add(new ColumnDefinition());
-        AddMetric(overview, vm, 0, 0, "نور فعلی (Lux)", nameof(MainViewModel.CurrentLuxDisplay), "#F5F7FA");
-        AddMetric(overview, vm, 1, 0, "آخرین نمونه", nameof(MainViewModel.LastLightSampleText), "#D9DEE7");
-        AddMetric(overview, vm, 2, 0, "اتصال", nameof(MainViewModel.LightGuardIdentityDisplay), "#72BC8F");
+        AddCard(overview, vm, 0, "نور فعلی (Lux)", nameof(MainViewModel.CurrentLuxDisplay), "#F5F7FA");
+        AddCard(overview, vm, 1, "آخرین نمونه", nameof(MainViewModel.LastLightSampleText), "#D9DEE7");
+        AddCard(overview, vm, 2, "اتصال", nameof(MainViewModel.LightGuardIdentityDisplay), "#72BC8F");
         stack.Children.Add(overview);
 
         var watch = new WpfGroupBox { Header = "وضعیت نور و پایش", Foreground = Brush("#F5F7FA"), Margin = new Thickness(0, 4, 0, 8) };
         var watchPanel = new StackPanel { Margin = new Thickness(10) };
         var watchGrid = new Grid();
         for (var i = 0; i < 4; i++) watchGrid.ColumnDefinitions.Add(new ColumnDefinition());
-        for (var i = 0; i < 3; i++) watchGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        for (var i = 0; i < 2; i++) watchGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         AddMetric(watchGrid, vm, 0, 0, "وضعیت سنسور", nameof(MainViewModel.LightSensorStatus), "#72BC8F");
         AddMetric(watchGrid, vm, 1, 0, "حالت سنسور", nameof(MainViewModel.LightSensorMode), "#D9DEE7");
         AddMetric(watchGrid, vm, 2, 0, "تازگی داده", nameof(MainViewModel.LightFreshnessText), "#9CC7F2");
@@ -57,11 +57,16 @@ internal static class LightGuardStatusWindow
         watch.Content = watchPanel;
         stack.Children.Add(watch);
 
-        stack.Children.Add(Text("تشخیص وضعیت نور و Guard", 16, FontWeights.SemiBold));
-        stack.Children.Add(Bound(vm, nameof(MainViewModel.LightGuardStateDisplay), "#F5F7FA"));
-        stack.Children.Add(Bound(vm, nameof(MainViewModel.LightGuardObservationStatus), "#D9DEE7"));
-        stack.Children.Add(Bound(vm, nameof(MainViewModel.LightGuardRevisionComparison), "#DE9255"));
-        stack.Children.Add(Bound(vm, nameof(MainViewModel.SessionCycleDryRunStatus), "#9CC7F2"));
+        stack.Children.Add(Text("تشخیص وضعیت نور", 16, FontWeights.SemiBold));
+        var diagnosis = new Grid { Margin = new Thickness(0, 4, 0, 8) };
+        for (var i = 0; i < 3; i++) diagnosis.ColumnDefinitions.Add(new ColumnDefinition());
+        AddCard(diagnosis, vm, 0, "وضعیت فعلی", nameof(MainViewModel.LightGuardStateDisplay), "#F5F7FA");
+        AddCard(diagnosis, vm, 1, "اطمینان نمایشی", nameof(MainViewModel.LightGuardObservationStatus), "#D9DEE7");
+        AddCard(diagnosis, vm, 2, "آمادگی Launch / Auto Resume", nameof(MainViewModel.SessionCycleDryRunStatus), "#DE9255");
+        stack.Children.Add(diagnosis);
+        var warning = new Border { Background = Brush("#4A3020"), BorderBrush = Brush("#8A5A38"), BorderThickness = new Thickness(1), Padding = new Thickness(10), Margin = new Thickness(0, 2, 0, 10) };
+        warning.Child = Bound(vm, nameof(MainViewModel.LightGuardRevisionComparison), "#F0B37E");
+        stack.Children.Add(warning);
 
         stack.Children.Add(Text("وضعیت Guard — Phase 7", 18, FontWeights.SemiBold));
         stack.Children.Add(Bound(vm, nameof(MainViewModel.LightGuardRevisionDisplay)));
@@ -93,6 +98,17 @@ internal static class LightGuardStatusWindow
         };
         _window.Closed += (_, _) => _window = null;
         _window.Show();
+    }
+
+    private static void AddCard(Grid grid, MainViewModel vm, int column, string label, string binding, string color)
+    {
+        var border = new Border { Background = Brush("#252A32"), BorderBrush = Brush("#353C47"), BorderThickness = new Thickness(1), Padding = new Thickness(10), Margin = new Thickness(4) };
+        var panel = new StackPanel();
+        panel.Children.Add(Text(label, 11, FontWeights.Normal, "#AEB8C8"));
+        panel.Children.Add(Bound(vm, binding, color));
+        border.Child = panel;
+        Grid.SetColumn(border, column);
+        grid.Children.Add(border);
     }
 
     private static void AddMetric(Grid grid, MainViewModel vm, int column, int row, string label, string binding, string color)

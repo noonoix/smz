@@ -158,11 +158,15 @@ public partial class MainViewModel
         });
     }
 
-    private void OnLightWatchFaulted(Exception ex) => RunOnUi(() =>
+    private void OnLightWatchFaulted(Exception ex) => RunOnUi(async () =>
     {
+        // A transport/write failure means the current serial session is no longer usable.
+        // Stop the polling loop immediately; otherwise it retries every 250 ms and floods
+        // the bridge with the same WriteFile error while the UI still says Watch is active.
         RevokeLightAuthorizationDiagnostic(LightAuthorizationReasonCode.StaleGateResult);
-        LightSensorStatus = "خطای دریافت داده";
-        Log("light watch: " + ex.Message);
+        LightSensorStatus = "خطای ارتباط با Pico — پایش متوقف شد";
+        Log("light watch stopped after transport error: " + ex.Message);
+        await StopLightWatchAsync();
     });
 
     private void OnLightSampleReceived(LightTelemetrySample sample) => RunOnUi(() => ApplyLightSample(sample));

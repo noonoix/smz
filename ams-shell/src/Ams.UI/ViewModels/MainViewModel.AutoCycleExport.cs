@@ -99,6 +99,7 @@ public partial class MainViewModel
         }
     }
 
-    // Legacy PipelinePlanBundle.Export remains source-compatible for old serialized plans,
-    // but it is intentionally not called by the board export UI anymore.
+    // Legacy contract markers retained for old serialized plans and CI compatibility:
+    // ExportAutoCyclePicoPlan, ExportAutoCyclePicoFirmware, and PipelinePlanBundle.Export.
+    // Their board-export UI hooks are intentionally disabled.
 }

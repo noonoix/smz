@@ -36,12 +36,31 @@ public static class LightStateProfileStore
         File.Move(temporary, path, overwrite: true);
     }
 
-    /// <summary>Rejects malformed and duplicate IDs without rewriting valid user calibration values.</summary>
+    /// <summary>
+    /// Normalizes old profile files without discarding valid user values. Older builds
+    /// could persist only five rows; missing canonical Guard profiles are now backfilled
+    /// from defaults, including the combined Login / DC profile.
+    /// </summary>
     public static List<LightStateProfile> Normalize(IEnumerable<LightStateProfile>? profiles)
     {
-        if (profiles is null) return LightStateDefaults.CreateInitialProfiles();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        var valid = profiles.Where(p => p is not null && p.IsValid && seen.Add(p.Id)).ToList();
-        return valid.Count == 0 ? LightStateDefaults.CreateInitialProfiles() : valid;
+        var defaults = LightStateDefaults.CreateInitialProfiles();
+        if (profiles is null) return defaults;
+
+        var valid = profiles
+            .Where(p => p is not null && p.IsValid)
+            .GroupBy(p => p.Id, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+
+        // Canonical order is part of the UI/protocol contract. Existing values win;
+        // a missing row is inserted with the safe default rather than being omitted.
+        var normalized = defaults
+            .Select(d => valid.TryGetValue(d.Id, out var existing) ? existing : d)
+            .ToList();
+
+        // Preserve any future/unknown valid rows after the canonical six instead of
+        // silently deleting user data.
+        var known = defaults.Select(d => d.Id).ToHashSet(StringComparer.Ordinal);
+        normalized.AddRange(valid.Values.Where(p => !known.Contains(p.Id)));
+        return normalized;
     }
 }

@@ -155,7 +155,11 @@ public partial class MainViewModel
             {
                 var profile = LightStateProfiles.FirstOrDefault(x => x.Id == profileId);
                 if (profile is null) throw new InvalidOperationException("پروفایل ناقص: " + profileId);
-                var reply = await _bridge.SendAsync(LightGuardAppAdapter.BuildCalSet(revision, profile));
+                // CALSET persists the complete six-profile bundle and rebuilds its hash manifest
+                // on the Pico filesystem. It is intentionally longer than the 5s bridge default.
+                var reply = await _bridge.SendAsync(
+                    LightGuardAppAdapter.BuildCalSet(revision, profile),
+                    timeoutSeconds: 30);
                 if (!reply.StartsWith("OK|CALSET|", StringComparison.Ordinal))
                     throw new InvalidOperationException($"CALSET {profileId} رد شد: {reply}");
             }

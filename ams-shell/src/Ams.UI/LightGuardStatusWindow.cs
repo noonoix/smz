@@ -21,8 +21,13 @@ internal static class LightGuardStatusWindow
         stack.Children.Add(Bound(vm, nameof(MainViewModel.LightGuardRevisionComparison), "#DE9255"));
         stack.Children.Add(Bound(vm, nameof(MainViewModel.LightGuardCalibrationStatus), "#72BC8F"));
         stack.Children.Add(Bound(vm, nameof(MainViewModel.LightGuardObservationStatus)));
+        stack.Children.Add(Bound(vm, nameof(MainViewModel.LightGuardComparisonStatus), "#DE9255"));
+        var comparison = new ItemsControl();
+        comparison.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(MainViewModel.LightGuardComparisonDisplays)) { Source = vm });
+        stack.Children.Add(comparison);
         var actions = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) };
         actions.Children.Add(Action("دریافت از Pico", "#5E9FE8", () => vm.PullLightGuardCalibrationAsync()));
+        actions.Children.Add(Action("مقایسه با Pico", "#B8893D", () => vm.CompareLightGuardCalibrationAsync()));
         actions.Children.Add(Action("ارسال به Pico", "#3D6B55", () => vm.SyncLightGuardCalibrationAsync()));
         actions.Children.Add(Action("CALGET", "#4B5563", () => vm.RefreshLightGuardIdentityAsync()));
         actions.Children.Add(Action("Guard OFF", "#333740", () => vm.DisableLightGuardAsync()));

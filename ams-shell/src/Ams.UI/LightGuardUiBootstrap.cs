@@ -78,8 +78,10 @@ internal static class LightGuardUiBootstrap
         content.Children.Add(defaults);
 
         var actions = new WrapPanel { Margin = new Thickness(0, 10, 0, 6) };
+        actions.Children.Add(Action("باز کردن پنجره وضعیت", "#6B5E9E", () => { LightGuardStatusWindow.Show(window, vm); return Task.CompletedTask; }));
+        actions.Children.Add(Action("دریافت از Pico", "#5E9FE8", async () => await vm.PullLightGuardCalibrationAsync()));
         actions.Children.Add(Action("شناسایی Guard / CALGET", "#5E9FE8", async () => await vm.RefreshLightGuardIdentityAsync()));
-        actions.Children.Add(Action("Sync شش پروفایل", "#3D6B55", async () => await vm.SyncLightGuardCalibrationAsync()));
+        actions.Children.Add(Action("ارسال به Pico", "#3D6B55", async () => await vm.SyncLightGuardCalibrationAsync()));
         actions.Children.Add(Action("Guard ON", "#3D6B55", async () => await vm.EnableLightGuardAsync()));
         actions.Children.Add(Action("Guard OFF", "#333740", async () => await vm.DisableLightGuardAsync()));
         content.Children.Add(actions);

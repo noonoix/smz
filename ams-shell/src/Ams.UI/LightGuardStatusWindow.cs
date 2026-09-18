@@ -2,6 +2,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
+using WpfColor = System.Windows.Media.Color;
+using WpfColorConverter = System.Windows.Media.ColorConverter;
 using Ams.UI.ViewModels;
 
 namespace Ams.UI;
@@ -36,5 +38,5 @@ internal static class LightGuardStatusWindow
     { var b = new Button { Content = label, Padding = new Thickness(12, 7, 12, 7), Margin = new Thickness(4), Background = Brush(background), Foreground = Brush("#F5F7FA") }; b.Click += async (_, _) => await action(); return b; }
     private static TextBlock Bound(MainViewModel vm, string path, string color = "#D9DEE7") { var t = Text("", 13, FontWeights.Normal, color); t.SetBinding(TextBlock.TextProperty, new Binding(path) { Source = vm }); return t; }
     private static TextBlock Text(string value, double size, FontWeight weight, string color = "#F5F7FA") => new() { Text = value, FontSize = size, FontWeight = weight, Foreground = Brush(color), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(3) };
-    private static SolidColorBrush Brush(string value) => new((Color)ColorConverter.ConvertFromString(value));
+    private static SolidColorBrush Brush(string value) => new((WpfColor)WpfColorConverter.ConvertFromString(value));
 }

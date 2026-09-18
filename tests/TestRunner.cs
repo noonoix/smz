@@ -4162,6 +4162,16 @@ class TestRunner
                && cycle.State.CycleNumber == 5,
             "fifth cycle completes with safe stop");
 
+        var dryEvents = new List<string>();
+        var dry = new SessionCycleDryRunExecutor(dryEvents.Add);
+        dry.ConfigureBootLoaderAsync().GetAwaiter().GetResult();
+        dry.RunPipelineAsync(new SessionCycleExecutionRequest(
+            cycle.State, PipelineKind.Desktop, true, false, "dry-run test")).GetAwaiter().GetResult();
+        dry.RequestRestartAsync().GetAwaiter().GetResult();
+        Assert(dry.Events.Count == 3 && dryEvents.Count == 3
+               && dry.Events[1].Contains("pipeline=Desktop"),
+            "cycle executor records boot, pipeline and restart in dry-run only");
+
         var dc = new SessionCycleOrchestrator();
         Assert(dc.Start().Accepted, "DC scenario starts");
         AdvanceToGame(dc);

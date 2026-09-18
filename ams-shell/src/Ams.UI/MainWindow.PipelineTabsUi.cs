@@ -61,6 +61,7 @@ internal static class PipelineTabsUiBootstrap
 
         var tabs = new StackPanel { Orientation = Orientation.Horizontal, FlowDirection = FlowDirection.LeftToRight };
         var buttons = new List<Button>();
+        Button? statusButton = null;
         foreach (var tab in vm.PipelineTabs)
         {
             var button = new Button
@@ -87,6 +88,24 @@ internal static class PipelineTabsUiBootstrap
             tabs.Children.Add(button);
         }
 
+        statusButton = new Button
+        {
+            Content = "وضعیت",
+            Padding = new Thickness(14, 4, 14, 4),
+            Margin = new Thickness(4, 2, 4, 2),
+            BorderThickness = new Thickness(1),
+            Cursor = WpfCursors.Hand,
+            ToolTip = "نمایش وضعیت زندهٔ سنسور نور",
+        };
+        statusButton.Click += (_, _) =>
+        {
+            statusPanel.Visibility = Visibility.Visible;
+            Paint(buttons, null);
+            PaintStatus(statusButton, true);
+        };
+        window.FindName("HeaderActions") is WpfPanel headerActions
+            ? headerActions.Children.Add(statusButton)
+            : tabs.Children.Add(statusButton);
         strip.Children.Add(tabs);
         Grid.SetRow(strip, 0);
         host.Children.Add(strip);
@@ -96,6 +115,7 @@ internal static class PipelineTabsUiBootstrap
             statusPanel.Visibility = Visibility.Collapsed;
             UpdateTabKeyBindings(window, vm);
             Paint(buttons, vm.ActivePipelineTab);
+            PaintStatus(statusButton!, false);
         }
 
         vm.PropertyChanged += (_, args) =>
@@ -273,6 +293,8 @@ internal static class PipelineTabsUiBootstrap
             PaintButton(button, selected);
         }
     }
+
+    private static void PaintStatus(Button button, bool selected) => PaintButton(button, selected);
 
     private static void PaintButton(Button button, bool selected)
     {

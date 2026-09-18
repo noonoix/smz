@@ -16,7 +16,6 @@ public partial class MainViewModel
     private bool _lightGuardIdentityValid;
     private bool _lightGuardCalibrationSynchronized;
     private bool _lightGuardObservationEnabled;
-    private LightGuardDeviceStatus? _lightGuardDeviceStatus;
 
     public ObservableCollection<string> LightGuardProfileDisplays { get; } = new();
 
@@ -29,7 +28,6 @@ public partial class MainViewModel
     public bool LightGuardIdentityValid { get => _lightGuardIdentityValid; private set => SetProperty(ref _lightGuardIdentityValid, value); }
     public bool LightGuardCalibrationSynchronized { get => _lightGuardCalibrationSynchronized; private set => SetProperty(ref _lightGuardCalibrationSynchronized, value); }
     public bool LightGuardObservationEnabled { get => _lightGuardObservationEnabled; private set => SetProperty(ref _lightGuardObservationEnabled, value); }
-    public LightGuardDeviceStatus? LightGuardDeviceStatus { get => _lightGuardDeviceStatus; private set => SetProperty(ref _lightGuardDeviceStatus, value); }
 
     public void InitializeLightGuardAdapter()
     {
@@ -83,25 +81,12 @@ public partial class MainViewModel
             var appRevision = LightGuardAppAdapter.ComputeRevision(LightStateProfiles);
             var revisionMatches = device.Count == 6 && device.Revision == appRevision;
             LightGuardRevisionDisplay = $"نسخهٔ Pico: {device.Revision:-} · رکوردها: {device.Count}/6 · نسخهٔ برنامه: {appRevision}";
-            var calstatus = await _bridge.SendAsync("CALSTATUS");
-            if (LightGuardAppAdapter.TryParseCalStatus(calstatus, out var boardStatus) && boardStatus is not null)
-            {
-                LightGuardDeviceStatus = boardStatus;
-                var boardValues = string.Join("؛ ", LightGuardCalibrationProtocol.ProfileIds
-                    .Where(id => boardStatus.Centers.ContainsKey(id))
-                    .Select(id => $"{id}:{boardStatus.Centers[id]:0.###}"));
-                LightGuardCalibrationStatus = $"مقادیر واقعی Pico · {boardValues} · last_error=none";
-            }
-            else
-            {
-                LightGuardDeviceStatus = null;
-                LightGuardCalibrationStatus = "CALSTATUS نامعتبر؛ مقدارهای برد نمایش داده نشدند.";
-            }
             LightGuardRevisionComparison = revisionMatches
                 ? "revision یکسان است؛ برای اعتماد این جلسه باید هر شش CALSET دوباره تأیید شوند."
-                : LightGuardDeviceStatus is { Count: 6 }
-                    ? "برد ۶ مقدار معتبر دارد؛ Sync یک‌طرفه برای جلوگیری از overwrite مسدود است."
-                    : "عدم تطابق یا کالیبراسیون ناقص؛ قبل از استفاده Sync را اجرا کنید.";
+                : "عدم تطابق یا کالیبراسیون ناقص؛ قبل از استفاده Sync را اجرا کنید.";
+            LightGuardCalibrationStatus = revisionMatches
+                ? "هویت معتبر است، اما Guard تا تأیید شش CALSET در این جلسه روشن نمی‌شود."
+                : "کالیبراسیون Pico با منبع حقیقت برنامه همگام نیست.";
             Log($"phase7 Guard: {LightGuardIdentityDisplay}; CALGET revision={device.Revision}, count={device.Count}");
         }
         catch (Exception ex)
@@ -110,6 +95,44 @@ public partial class MainViewModel
             LightGuardIdentityDisplay = "خطا در شناسایی Guard — fail closed";
             LightGuardRevisionComparison = "همگام‌سازی انجام نشد: " + ex.Message;
             Log("phase7 Guard identity failed: " + ex.Message);
+        }
+    }
+
+    public async Task PullLightGuardCalibrationAsync()
+    {
+        InitializeLightGuardAdapter();
+        if (_bridge is null || Connection != ConnectionState.Connected)
+        {
+            LightGuardCalibrationStatus = "دریافت مسدود شد: برد متصل نیست.";
+            return;
+        }
+        try
+        {
+            var reply = await _bridge.SendAsync("CALSTATUS");
+            if (!LightGuardAppAdapter.TryParseCalStatus(reply, out var board) || board is null || board.Count != 6)
+                throw new InvalidOperationException("CALSTATUS ناقص یا نامعتبر است.");
+            foreach (var profile in LightStateProfiles)
+            {
+                if (!board.Profiles.TryGetValue(profile.Id, out var device))
+                    throw new InvalidOperationException("پروفایل برد ناقص: " + profile.Id);
+                profile.LuxCenter = device.Center;
+                profile.LuxTolerance = device.Tolerance;
+                profile.StableDurationMs = device.StableMs;
+            }
+            LightStateProfileStore.Save(LightStateProfiles.ToList());
+            _lightStateClassifier = new LightStateClassifier(LightStateProfiles);
+            RefreshLightGateDiagnosticProfiles();
+            RefreshLightGuardProfileDisplays();
+            LightGuardCalibrationSynchronized = false;
+            LightStateWarning = DescribeProfileOverlaps(LightStateProfiles);
+            LightProfileSaveStatus = "کالیبراسیون از Pico دریافت و در پروفایل‌های برنامه ذخیره شد.";
+            LightGuardCalibrationStatus = "دریافت از Pico موفق شد؛ برای تأیید دوطرفه هنوز ارسال به Pico را اجرا نکنید.";
+            Log("phase7 Guard: calibration pulled from Pico and saved to app profiles");
+        }
+        catch (Exception ex)
+        {
+            LightGuardCalibrationStatus = "دریافت از Pico ناموفق — fail closed: " + ex.Message;
+            Log("phase7 Guard pull failed: " + ex.Message);
         }
     }
 
@@ -128,9 +151,6 @@ public partial class MainViewModel
         try
         {
             var revision = LightGuardAppAdapter.ComputeRevision(LightStateProfiles);
-            if (LightGuardDeviceStatus is { Count: 6 } board
-                && !string.Equals(board.Revision, revision, StringComparison.Ordinal))
-                throw new InvalidOperationException("Sync مسدود شد: برد calibration معتبر دارد اما revision برنامه متفاوت است؛ ابتدا مقدارهای برد را به فرم برنامه منتقل و تأیید کنید.");
             foreach (var profileId in LightGuardCalibrationProtocol.ProfileIds)
             {
                 var profile = LightStateProfiles.FirstOrDefault(x => x.Id == profileId);

@@ -19,10 +19,12 @@ public sealed record LightGuardCalibrationEvent(
 
 public sealed record LightGuardDeviceCalibration(string Revision, int Count);
 
+public sealed record LightGuardDeviceProfile(double Center, double Tolerance, int StableMs);
+
 public sealed record LightGuardDeviceStatus(
     string Revision,
     int Count,
-    IReadOnlyDictionary<string, double> Centers);
+    IReadOnlyDictionary<string, LightGuardDeviceProfile> Profiles);
 
 /// <summary>
 /// Phase 7 app-side adapter. It owns only the Guard protocol, revision identity and
@@ -86,16 +88,20 @@ public static class LightGuardAppAdapter
             || count < 0
             || !TryValue(fields, "profiles", out var profilesText)) return false;
 
-        var centers = new Dictionary<string, double>(StringComparer.Ordinal);
+        var profiles = new Dictionary<string, LightGuardDeviceProfile>(StringComparer.Ordinal);
         foreach (var item in profilesText.Split(';', StringSplitOptions.RemoveEmptyEntries))
         {
-            var at = item.IndexOf(':');
-            if (at <= 0
-                || !double.TryParse(item[(at + 1)..], NumberStyles.Float, CultureInfo.InvariantCulture, out var center)
+            var parts = item.Split(':');
+            if (parts.Length < 2 || !double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var center)
                 || !double.IsFinite(center) || center < 0) return false;
-            centers[item[..at]] = center;
+            var tolerance = parts.Length >= 3 && double.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedTolerance)
+                ? parsedTolerance : 0;
+            var stableMs = parts.Length >= 4 && int.TryParse(parts[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedStable)
+                ? parsedStable : 750;
+            if (!double.IsFinite(tolerance) || tolerance < 0 || stableMs < 0) return false;
+            profiles[parts[0]] = new LightGuardDeviceProfile(center, tolerance, stableMs);
         }
-        result = new LightGuardDeviceStatus(revision, count, centers);
+        result = new LightGuardDeviceStatus(revision, count, profiles);
         return true;
     }
 

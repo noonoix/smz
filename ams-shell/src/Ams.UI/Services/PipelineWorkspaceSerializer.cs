@@ -48,18 +48,15 @@ public static class PipelineWorkspaceSerializer
             throw new InvalidDataException("Unsupported AMS pipeline document.");
 
         var workspace = new PipelineWorkspace();
-        if (envelope.pipelineVersion == PipelineWorkspace.FormatVersion)
-        {
-            foreach (var pair in envelope.legacyPipelines)
-                workspace.LegacyPipelines[pair.Key] = pair.Value;
-        }
+        foreach (var pair in envelope.legacyPipelines)
+            workspace.LegacyPipelines[pair.Key] = pair.Value;
 
         var currentNames = workspace.Tabs.Select(tab => tab.Kind.ToString()).ToHashSet(StringComparer.Ordinal);
         foreach (var pair in envelope.pipelines)
         {
             if (currentNames.Contains(pair.Key)) continue;
-            if (envelope.pipelineVersion == 1 && LegacyToCurrent.TryGetValue(pair.Key, out var migrated))
-                continue;
+            // Preserve the original tree as migration backup even when it is also
+            // migrated into a canonical current tab below.
             workspace.LegacyPipelines[pair.Key] = pair.Value;
         }
 

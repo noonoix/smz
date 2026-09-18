@@ -81,12 +81,11 @@ public sealed class LightWatchService : IAsyncDisposable
         {
             if (runner is not null)
             {
-                // Break an in-flight LUX? command immediately. Cancellation stops the local
-                // wait; the out-of-band abort also stops the sidecar/board command so Stop
-                // cannot leave a polling request alive after the UI reports stopped.
-                try { await _bridge.SendAbortAsync().ConfigureAwait(false); }
-                catch { /* best effort: cancellation still unwinds the local runner */ }
-
+                // Light Watch is read-only telemetry. Cancellation is enough to unwind the
+                // in-flight LUX? request; do not send the global HALT/abort command here.
+                // HALT is reserved for an actual Guard/Run stop and intentionally plays the
+                // board Stop cue. Stopping the sensor chart must be silent and must not alter
+                // Guard state.
                 try { await runner.ConfigureAwait(false); }
                 catch (OperationCanceledException) { }
             }

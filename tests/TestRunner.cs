@@ -4121,6 +4121,54 @@ class TestRunner
         }
         finally { if (Directory.Exists(essentialsTmp)) Directory.Delete(essentialsTmp, true); }
 
+        // ── Session-cycle orchestrator: deterministic five-cycle simulation ──
+        var cycle = new SessionCycleOrchestrator();
+        Assert(cycle.Start().Accepted && cycle.State.CycleNumber == 1
+               && cycle.State.Phase == SessionCyclePhase.Desktop,
+            "session cycle starts at Desktop cycle 1");
+        Assert(cycle.MarkBootLoaderConfigured().Accepted && cycle.State.BootLoaderConfigured,
+            "boot loader configuration is authorized once");
+        Assert(!cycle.MarkBootLoaderConfigured().Accepted,
+            "boot loader configuration is rejected on repeat");
+
+        static void AdvanceToGame(SessionCycleOrchestrator c)
+        {
+            Assert(c.ObserveProfile("login-or-dc").Accepted, "cycle login/DC transition");
+            Assert(c.ObserveProfile("character-dashboard").Accepted, "cycle character dashboard transition");
+            Assert(c.ObserveProfile("entering-game-loading").Accepted, "cycle loading transition");
+            Assert(c.ObserveProfile("game").Accepted, "cycle game transition");
+        }
+
+        AdvanceToGame(cycle);
+        Assert(cycle.StartResumable().Accepted && cycle.CompleteResumable().Accepted,
+            "Resumable returns to Game");
+        Assert(cycle.ObserveProfile("targeted").Accepted && cycle.ObserveProfile("game").Accepted,
+            "Targeted returns to Game without replaying Game entry");
+        Assert(cycle.RequestRestart().Accepted && cycle.MarkRestartIssued().Accepted
+               && cycle.ObserveRebootedDesktop().Accepted && cycle.State.CycleNumber == 2,
+            "restart returns to next cycle and preserves Boot Loader gate");
+
+        for (var expectedCycle = 2; expectedCycle <= 4; expectedCycle++)
+        {
+            AdvanceToGame(cycle);
+            Assert(cycle.RequestRestart().Accepted && cycle.MarkRestartIssued().Accepted
+                   && cycle.ObserveRebootedDesktop().Accepted
+                   && cycle.State.CycleNumber == expectedCycle + 1,
+                $"cycle {expectedCycle} completes and reboots");
+        }
+        AdvanceToGame(cycle);
+        Assert(cycle.RequestRestart().Accepted && !cycle.State.Running
+               && cycle.State.Phase == SessionCyclePhase.Completed
+               && cycle.State.CycleNumber == 5,
+            "fifth cycle completes with safe stop");
+
+        var dc = new SessionCycleOrchestrator();
+        Assert(dc.Start().Accepted, "DC scenario starts");
+        AdvanceToGame(dc);
+        Assert(dc.ObserveProfile("login-or-dc").Accepted
+               && dc.State.Phase == SessionCyclePhase.LoginOrDc,
+            "DC from Game returns to Login/DC");
+
         Console.WriteLine($"=== Results: {passed} passed, {failed} failed ===");
         Environment.Exit(failed > 0 ? 1 : 0);
     }

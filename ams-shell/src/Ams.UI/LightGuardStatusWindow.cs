@@ -19,20 +19,26 @@ internal static class LightGuardStatusWindow
     public static void Show(Window owner, MainViewModel vm)
     {
         if (_window is { IsVisible: true }) { _window.Activate(); return; }
-
         var stack = new StackPanel { Margin = new Thickness(18) };
         stack.Children.Add(Text("وضعیت و تنظیمات برد", 19, FontWeights.SemiBold));
-        stack.Children.Add(Text("پایش نور و تنظیمات Guard در یک پنجرهٔ مستقل", 13, FontWeights.Normal, "#9CC7F2"));
+        stack.Children.Add(Text("همهٔ گزینه‌های وضعیت نسخهٔ قدیمی، در پنجرهٔ مستقل", 13, FontWeights.Normal, "#9CC7F2"));
 
-        var watch = new WpfGroupBox { Header = "وضعیت نور و پایش", Foreground = Brush("#F5F7FA"), Margin = new Thickness(0, 12, 0, 8) };
+        var overview = new Grid { Margin = new Thickness(0, 12, 0, 8) };
+        for (var i = 0; i < 3; i++) overview.ColumnDefinitions.Add(new ColumnDefinition());
+        AddMetric(overview, vm, 0, 0, "نور فعلی (Lux)", nameof(MainViewModel.CurrentLuxDisplay), "#F5F7FA");
+        AddMetric(overview, vm, 1, 0, "آخرین نمونه", nameof(MainViewModel.LastLightSampleText), "#D9DEE7");
+        AddMetric(overview, vm, 2, 0, "اتصال", nameof(MainViewModel.LightGuardIdentityDisplay), "#72BC8F");
+        stack.Children.Add(overview);
+
+        var watch = new WpfGroupBox { Header = "وضعیت نور و پایش", Foreground = Brush("#F5F7FA"), Margin = new Thickness(0, 4, 0, 8) };
         var watchPanel = new StackPanel { Margin = new Thickness(10) };
         var watchGrid = new Grid();
         for (var i = 0; i < 4; i++) watchGrid.ColumnDefinitions.Add(new ColumnDefinition());
-        for (var i = 0; i < 2; i++) watchGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        AddMetric(watchGrid, vm, 0, 0, "نور فعلی (Lux)", nameof(MainViewModel.CurrentLuxDisplay), "#F5F7FA");
-        AddMetric(watchGrid, vm, 1, 0, "وضعیت سنسور", nameof(MainViewModel.LightSensorStatus), "#72BC8F");
-        AddMetric(watchGrid, vm, 2, 0, "حالت سنسور", nameof(MainViewModel.LightSensorMode), "#D9DEE7");
-        AddMetric(watchGrid, vm, 3, 0, "تازگی داده", nameof(MainViewModel.LightFreshnessText), "#9CC7F2");
+        for (var i = 0; i < 3; i++) watchGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        AddMetric(watchGrid, vm, 0, 0, "وضعیت سنسور", nameof(MainViewModel.LightSensorStatus), "#72BC8F");
+        AddMetric(watchGrid, vm, 1, 0, "حالت سنسور", nameof(MainViewModel.LightSensorMode), "#D9DEE7");
+        AddMetric(watchGrid, vm, 2, 0, "تازگی داده", nameof(MainViewModel.LightFreshnessText), "#9CC7F2");
+        AddMetric(watchGrid, vm, 3, 0, "فاصله نمونه", nameof(MainViewModel.SelectedLightWatchIntervalMs), "#D9DEE7");
         AddMetric(watchGrid, vm, 0, 1, "کمینه", nameof(MainViewModel.LightMinimumDisplay), "#D9DEE7");
         AddMetric(watchGrid, vm, 1, 1, "میانگین", nameof(MainViewModel.LightAverageDisplay), "#D9DEE7");
         AddMetric(watchGrid, vm, 2, 1, "بیشینه", nameof(MainViewModel.LightMaximumDisplay), "#D9DEE7");
@@ -47,17 +53,19 @@ internal static class LightGuardStatusWindow
         watchButton.SetBinding(Button.ContentProperty, new Binding(nameof(MainViewModel.LightWatchButtonText)) { Source = vm });
         watchButton.SetBinding(Button.CommandProperty, new Binding(nameof(MainViewModel.ToggleLightWatchCommand)) { Source = vm });
         controls.Children.Add(watchButton);
-        controls.Children.Add(Bound(vm, nameof(MainViewModel.LastLightSampleText), "#9CC7F2"));
         watchPanel.Children.Add(controls);
         watch.Content = watchPanel;
         stack.Children.Add(watch);
 
-        stack.Children.Add(Text("وضعیت Guard — Phase 7", 18, FontWeights.SemiBold));
-        stack.Children.Add(Bound(vm, nameof(MainViewModel.LightGuardIdentityDisplay)));
-        stack.Children.Add(Bound(vm, nameof(MainViewModel.LightGuardRevisionDisplay)));
+        stack.Children.Add(Text("تشخیص وضعیت نور و Guard", 16, FontWeights.SemiBold));
+        stack.Children.Add(Bound(vm, nameof(MainViewModel.LightGuardStateDisplay), "#F5F7FA"));
+        stack.Children.Add(Bound(vm, nameof(MainViewModel.LightGuardObservationStatus), "#D9DEE7"));
         stack.Children.Add(Bound(vm, nameof(MainViewModel.LightGuardRevisionComparison), "#DE9255"));
+        stack.Children.Add(Bound(vm, nameof(MainViewModel.SessionCycleDryRunStatus), "#9CC7F2"));
+
+        stack.Children.Add(Text("وضعیت Guard — Phase 7", 18, FontWeights.SemiBold));
+        stack.Children.Add(Bound(vm, nameof(MainViewModel.LightGuardRevisionDisplay)));
         stack.Children.Add(Bound(vm, nameof(MainViewModel.LightGuardCalibrationStatus), "#72BC8F"));
-        stack.Children.Add(Bound(vm, nameof(MainViewModel.LightGuardObservationStatus)));
         var actions = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) };
         actions.Children.Add(Action("دریافت از Pico", "#5E9FE8", () => vm.PullLightGuardCalibrationAsync()));
         actions.Children.Add(Action("ارسال به Pico", "#3D6B55", () => vm.SyncLightGuardCalibrationAsync()));
@@ -67,7 +75,6 @@ internal static class LightGuardStatusWindow
         actions.Children.Add(Action("اجرای dry-run چرخهٔ ۵گانه", "#8A6D3B", () => vm.RunSessionCycleDryRunAsync()));
         actions.Children.Add(Action("لغو dry-run", "#7A3E3E", () => { vm.CancelSessionCycleDryRun(); return Task.CompletedTask; }));
         stack.Children.Add(actions);
-        stack.Children.Add(Bound(vm, nameof(MainViewModel.SessionCycleDryRunStatus), "#9CC7F2"));
         var profiles = new ItemsControl();
         profiles.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(MainViewModel.LightGuardProfileDisplays)) { Source = vm });
         stack.Children.Add(profiles);
@@ -76,10 +83,10 @@ internal static class LightGuardStatusWindow
         {
             Title = "Status — Guard / Light",
             Owner = owner,
-            Width = 900,
-            Height = 700,
-            MinWidth = 720,
-            MinHeight = 520,
+            Width = 980,
+            Height = 760,
+            MinWidth = 760,
+            MinHeight = 560,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Background = Brush("#22262D"),
             Content = new ScrollViewer { Content = stack, VerticalScrollBarVisibility = ScrollBarVisibility.Auto },

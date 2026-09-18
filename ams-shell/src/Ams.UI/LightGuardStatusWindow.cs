@@ -1,3 +1,5 @@
+using System;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -20,7 +22,8 @@ internal static class LightGuardStatusWindow
         stack.Children.Add(Text("وضعیت و تنظیمات برد", 19, FontWeights.SemiBold));
         stack.Children.Add(Text("پایش نور و تنظیمات Guard در یک پنجرهٔ مستقل", 13, FontWeights.Normal, "#9CC7F2"));
 
-        var watch = new GroupBox { Header = "وضعیت نور و پایش", Foreground = Brush("#F5F7FA"), Margin = new Thickness(0, 12, 0, 8), Padding = new Thickness(10) };
+        var watch = new GroupBox { Header = "وضعیت نور و پایش", Foreground = Brush("#F5F7FA"), Margin = new Thickness(0, 12, 0, 8) };
+        var watchPanel = new StackPanel { Margin = new Thickness(10) };
         var watchGrid = new Grid();
         for (var i = 0; i < 4; i++) watchGrid.ColumnDefinitions.Add(new ColumnDefinition());
         for (var i = 0; i < 2; i++) watchGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -32,6 +35,7 @@ internal static class LightGuardStatusWindow
         AddMetric(watchGrid, vm, 1, 1, "میانگین", nameof(MainViewModel.LightAverageDisplay), "#D9DEE7");
         AddMetric(watchGrid, vm, 2, 1, "بیشینه", nameof(MainViewModel.LightMaximumDisplay), "#D9DEE7");
         AddMetric(watchGrid, vm, 3, 1, "دامنه تغییر", nameof(MainViewModel.LightSpreadDisplay), "#D9DEE7");
+        watchPanel.Children.Add(watchGrid);
         var controls = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(2, 8, 2, 0) };
         controls.Children.Add(new TextBlock { Text = "فاصله نمونه‌برداری:", Foreground = Brush("#D9DEE7"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(3) });
         var interval = new ComboBox { Width = 100, Margin = new Thickness(4), ItemsSource = vm.LightWatchIntervalsMs };
@@ -42,8 +46,6 @@ internal static class LightGuardStatusWindow
         watchButton.SetBinding(Button.CommandProperty, new Binding(nameof(MainViewModel.ToggleLightWatchCommand)) { Source = vm });
         controls.Children.Add(watchButton);
         controls.Children.Add(Bound(vm, nameof(MainViewModel.LastLightSampleText), "#9CC7F2"));
-        var watchPanel = new StackPanel();
-        watchPanel.Children.Add(watchGrid);
         watchPanel.Children.Add(controls);
         watch.Content = watchPanel;
         stack.Children.Add(watch);

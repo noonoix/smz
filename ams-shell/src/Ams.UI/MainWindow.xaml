@@ -95,8 +95,13 @@
             <RowDefinition Height="Auto" />   <!-- status bar -->
         </Grid.RowDefinitions>
 
-        <!-- ══ Menu bar (design doc section 2) — all items wired ══ -->
-        <Menu Grid.Row="0" Padding="4,2"
+        <!-- ══ Header (menu + always-visible Guard status) ══ -->
+        <DockPanel Grid.Row="0" Background="{StaticResource BgPanelBrush}" LastChildFill="True">
+        <Button DockPanel.Dock="Right" Content="وضعیت Guard" Click="OpenGuardStatusWindow_Click"
+                Padding="14,4" Margin="4,2" FontSize="13"
+                Background="#5E9FE8" Foreground="#FFFFFF"
+                ToolTip="باز کردن پنجرهٔ مستقل وضعیت Light Guard" />
+        <Menu Padding="4,2"
               Background="{StaticResource BgPanelBrush}"
               Foreground="{StaticResource TextPrimaryBrush}" FontSize="13">
             <MenuItem Header="_File">
@@ -135,7 +140,6 @@
                 <Separator />
                 <MenuItem Header="Batch Edit _Delays…" Command="{Binding BatchDelaysCommand}" />
             </MenuItem>
-            <MenuItem Header="وضعیت Guard" Click="OpenGuardStatusWindow_Click" ToolTip="نمایش وضعیت مستقل Light Guard" />
             <MenuItem Header="_Insert">
                 <MenuItem Header="Mouse _Click" Command="{Binding AddStepCommand}" CommandParameter="mouseClick" />
                 <MenuItem Header="Mouse _Position" Command="{Binding AddStepCommand}" CommandParameter="mouseMove" />
@@ -175,6 +179,7 @@
                 <MenuItem Header="_Board Preparation… (USB identity)" Command="{Binding BoardPrepCommand}" />
             </MenuItem>
         </Menu>
+        </DockPanel>
 
         <!-- ══ Main content ══ -->
         <Grid Grid.Row="1">

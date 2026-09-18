@@ -192,6 +192,21 @@ def _immediate_audible_stop(self):
     self.guard_stop_tone()
     self.arm.abort()
 
+def _silent_shutdown(self):
+    # Disconnect/shutdown must leave the board fail-safe without replaying the
+    # user-facing Stop cue. Physical blue Stop and GUARD|OFF remain audible.
+    self.controls.running = False
+    self.controls.paused = False
+    self.controls.aborted = True
+    try:
+        self.keyboard.release_all()
+    except Exception:
+        pass
+    try:
+        self.arm.abort()
+    except Exception:
+        pass
+
 def _immediate_audible_start(self):
     # Acknowledge Start on the physical press, not on release. Route execution
     # remains gated until the press resolves, so a held blue button can still
@@ -385,6 +400,9 @@ def _live_host_poll(self):
                 self.controls.start()
                 self.guard_start_tone()
                 reply = "OK|GUARD|ON"
+            elif line == "HALT|SILENT":
+                self.silent_shutdown()
+                reply = "OK|GUARD|OFF"
             elif line in ("GUARD|OFF", "HALT"):
                 self.immediate_audible_stop()
                 reply = "OK|GUARD|OFF"
@@ -429,6 +447,7 @@ runtime.Combined.guard_stop_tone = _guard_stop_tone
 runtime.Combined.guard_pause_tone = _guard_pause_tone
 runtime.Combined.guard_resume_tone = _guard_resume_tone
 runtime.Combined.immediate_audible_stop = _immediate_audible_stop
+runtime.Combined.silent_shutdown = _silent_shutdown
 runtime.Combined.immediate_audible_start = _immediate_audible_start
 runtime.Combined.enter_calibration_from_pending_start = _enter_calibration_from_pending_start
 runtime.Combined.start_cal = _audible_start_cal

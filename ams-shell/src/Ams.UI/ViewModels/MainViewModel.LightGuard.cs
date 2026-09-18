@@ -18,6 +18,10 @@ public partial class MainViewModel
     private bool _lightGuardObservationEnabled;
 
     public ObservableCollection<string> LightGuardProfileDisplays { get; } = new();
+    public ObservableCollection<string> LightGuardComparisonDisplays { get; } = new();
+    private string _lightGuardComparisonStatus = "مقایسه با Pico هنوز انجام نشده است.";
+
+    public string LightGuardComparisonStatus { get => _lightGuardComparisonStatus; private set => SetProperty(ref _lightGuardComparisonStatus, value); }
 
     public string LightGuardIdentityDisplay { get => _lightGuardIdentityDisplay; private set => SetProperty(ref _lightGuardIdentityDisplay, value); }
     public string LightGuardRevisionDisplay { get => _lightGuardRevisionDisplay; private set => SetProperty(ref _lightGuardRevisionDisplay, value); }
@@ -181,6 +185,51 @@ public partial class MainViewModel
             Log("phase7 Guard CALSET failed: " + ex.Message);
         }
     }
+
+    public async Task CompareLightGuardCalibrationAsync()
+    {
+        InitializeLightGuardAdapter();
+        if (_bridge is null || Connection != ConnectionState.Connected)
+        {
+            LightGuardComparisonStatus = "مقایسه انجام نشد: برد متصل نیست.";
+            return;
+        }
+        try
+        {
+            var reply = await _bridge.SendAsync("CALSTATUS");
+            if (!LightGuardAppAdapter.TryParseCalStatus(reply, out var board) || board is null || board.Count != 6)
+                throw new InvalidOperationException("CALSTATUS ناقص یا نامعتبر است.");
+            LightGuardComparisonDisplays.Clear();
+            var same = 0;
+            foreach (var id in LightGuardCalibrationProtocol.ProfileIds)
+            {
+                var app = LightStateProfiles.FirstOrDefault(x => x.Id == id);
+                var hasBoard = app is not null && board.Profiles.TryGetValue(id, out var device);
+                var equal = hasBoard && NearlyEqual(app!.LuxCenter, device!.Center)
+                    && NearlyEqual(app.LuxTolerance, device.Tolerance)
+                    && app.StableDurationMs == device.StableMs;
+                if (equal) same++;
+                var boardText = hasBoard
+                    ? $"مرکز {device!.Center:0.###} · تلورانس ±{device.Tolerance:0.###} · ثبات {device.StableMs}ms"
+                    : "در Pico موجود نیست";
+                var appText = app is null
+                    ? "در برنامه موجود نیست"
+                    : $"مرکز {app.LuxCenter:0.###} · تلورانس ±{app.LuxTolerance:0.###} · ثبات {app.StableDurationMs}ms";
+                LightGuardComparisonDisplays.Add($"{id} · برنامه: {appText} · Pico: {boardText} · {(equal ? "یکسان" : "متفاوت")}");
+            }
+            LightGuardComparisonStatus = same == 6
+                ? "مقایسه موفق: هر ۶ پروفایل کاملاً یکسان هستند."
+                : $"مقایسه انجام شد: {same}/6 یکسان؛ موارد باقی‌مانده نیاز به اصلاح یا Sync دارند.";
+            Log($"phase7 Guard compare: {same}/6 profiles match");
+        }
+        catch (Exception ex)
+        {
+            LightGuardComparisonStatus = "مقایسه ناموفق — fail closed: " + ex.Message;
+            Log("phase7 Guard compare failed: " + ex.Message);
+        }
+    }
+
+    private static bool NearlyEqual(double a, double b) => Math.Abs(a - b) <= 0.0005;
 
     public async Task EnableLightGuardAsync()
     {

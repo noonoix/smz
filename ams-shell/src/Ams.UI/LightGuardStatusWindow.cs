@@ -6,6 +6,8 @@ using System.Windows.Data;
 using System.Windows.Media;
 using WpfColor = System.Windows.Media.Color;
 using WpfColorConverter = System.Windows.Media.ColorConverter;
+using WpfComboBox = System.Windows.Controls.ComboBox;
+using WpfGroupBox = System.Windows.Controls.GroupBox;
 using Ams.UI.ViewModels;
 
 namespace Ams.UI;
@@ -22,7 +24,7 @@ internal static class LightGuardStatusWindow
         stack.Children.Add(Text("وضعیت و تنظیمات برد", 19, FontWeights.SemiBold));
         stack.Children.Add(Text("پایش نور و تنظیمات Guard در یک پنجرهٔ مستقل", 13, FontWeights.Normal, "#9CC7F2"));
 
-        var watch = new GroupBox { Header = "وضعیت نور و پایش", Foreground = Brush("#F5F7FA"), Margin = new Thickness(0, 12, 0, 8) };
+        var watch = new WpfGroupBox { Header = "وضعیت نور و پایش", Foreground = Brush("#F5F7FA"), Margin = new Thickness(0, 12, 0, 8) };
         var watchPanel = new StackPanel { Margin = new Thickness(10) };
         var watchGrid = new Grid();
         for (var i = 0; i < 4; i++) watchGrid.ColumnDefinitions.Add(new ColumnDefinition());
@@ -38,8 +40,8 @@ internal static class LightGuardStatusWindow
         watchPanel.Children.Add(watchGrid);
         var controls = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(2, 8, 2, 0) };
         controls.Children.Add(new TextBlock { Text = "فاصله نمونه‌برداری:", Foreground = Brush("#D9DEE7"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(3) });
-        var interval = new ComboBox { Width = 100, Margin = new Thickness(4), ItemsSource = vm.LightWatchIntervalsMs };
-        interval.SetBinding(ComboBox.SelectedItemProperty, new Binding(nameof(MainViewModel.SelectedLightWatchIntervalMs)) { Source = vm, Mode = BindingMode.TwoWay });
+        var interval = new WpfComboBox { Width = 100, Margin = new Thickness(4), ItemsSource = vm.LightWatchIntervalsMs };
+        interval.SetBinding(WpfComboBox.SelectedItemProperty, new Binding(nameof(MainViewModel.SelectedLightWatchIntervalMs)) { Source = vm, Mode = BindingMode.TwoWay });
         controls.Children.Add(interval);
         var watchButton = new Button { Padding = new Thickness(12, 6, 12, 6), Margin = new Thickness(4), Background = Brush("#5E9FE8"), Foreground = Brush("#F5F7FA") };
         watchButton.SetBinding(Button.ContentProperty, new Binding(nameof(MainViewModel.LightWatchButtonText)) { Source = vm });

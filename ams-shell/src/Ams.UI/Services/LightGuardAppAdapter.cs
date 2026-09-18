@@ -19,6 +19,11 @@ public sealed record LightGuardCalibrationEvent(
 
 public sealed record LightGuardDeviceCalibration(string Revision, int Count);
 
+public sealed record LightGuardDeviceStatus(
+    string Revision,
+    int Count,
+    IReadOnlyDictionary<string, double> Centers);
+
 /// <summary>
 /// Phase 7 app-side adapter. It owns only the Guard protocol, revision identity and
 /// observation/calibration display data; it has no RunEngine, HID, keyboard, mouse or actuator path.
@@ -67,6 +72,30 @@ public static class LightGuardAppAdapter
             || count < 0)
             return false;
         result = new LightGuardDeviceCalibration(revision, count);
+        return true;
+    }
+
+    public static bool TryParseCalStatus(string? line, out LightGuardDeviceStatus? result)
+    {
+        result = null;
+        var fields = SplitFields(line, "OK", "CALSTATUS");
+        if (fields is null
+            || !TryValue(fields, "revision", out var revision)
+            || !TryValue(fields, "count", out var countText)
+            || !int.TryParse(countText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var count)
+            || count < 0
+            || !TryValue(fields, "profiles", out var profilesText)) return false;
+
+        var centers = new Dictionary<string, double>(StringComparer.Ordinal);
+        foreach (var item in profilesText.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var at = item.IndexOf(':');
+            if (at <= 0
+                || !double.TryParse(item[(at + 1)..], NumberStyles.Float, CultureInfo.InvariantCulture, out var center)
+                || !double.IsFinite(center) || center < 0) return false;
+            centers[item[..at]] = center;
+        }
+        result = new LightGuardDeviceStatus(revision, count, centers);
         return true;
     }
 

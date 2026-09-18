@@ -16,6 +16,18 @@ public static class PipelineWorkspaceSerializer
 
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
 
+    // v1 .amsj files used five semantic buckets. Keep this mapping explicit instead
+    // of silently opening the file as seven empty tabs.
+    private static readonly IReadOnlyDictionary<string, string> LegacyToCurrent =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["Launch"] = "Desktop",
+            ["LaunchRecovery"] = "LoginOrDc",
+            ["Main"] = "Game",
+            ["MainRecovery"] = "Targeted",
+            ["ResumeEssentials"] = "Resumable",
+        };
+
     public static string Serialize(PipelineWorkspace workspace)
     {
         var envelope = new Envelope();
@@ -32,6 +44,8 @@ public static class PipelineWorkspaceSerializer
             ?? throw new InvalidDataException("Not an AMS pipeline document.");
         if (envelope.app != "AMS")
             throw new InvalidDataException("Unsupported AMS pipeline document.");
+        if (envelope.pipelineVersion is not (1 or PipelineWorkspace.FormatVersion))
+            throw new InvalidDataException("Unsupported AMS pipeline document.");
 
         var workspace = new PipelineWorkspace();
         if (envelope.pipelineVersion == PipelineWorkspace.FormatVersion)
@@ -39,24 +53,28 @@ public static class PipelineWorkspaceSerializer
             foreach (var pair in envelope.legacyPipelines)
                 workspace.LegacyPipelines[pair.Key] = pair.Value;
         }
-        else if (envelope.pipelineVersion != 1)
-        {
-            throw new InvalidDataException("Unsupported AMS pipeline document.");
-        }
 
         var currentNames = workspace.Tabs.Select(tab => tab.Kind.ToString()).ToHashSet(StringComparer.Ordinal);
         foreach (var pair in envelope.pipelines)
         {
-            // Version-1 Launch/Main/Recovery/Resume Essentials trees are retained as
-            // migration data instead of being guessed into a new optical position.
-            if (!currentNames.Contains(pair.Key))
-                workspace.LegacyPipelines[pair.Key] = pair.Value;
+            if (currentNames.Contains(pair.Key)) continue;
+            if (envelope.pipelineVersion == 1 && LegacyToCurrent.TryGetValue(pair.Key, out var migrated))
+                continue;
+            workspace.LegacyPipelines[pair.Key] = pair.Value;
         }
 
         foreach (var tab in workspace.Tabs)
         {
             tab.Steps.Clear();
-            if (!envelope.pipelines.TryGetValue(tab.Kind.ToString(), out var roots)) continue;
+            List<StepNode>? roots = null;
+            if (envelope.pipelines.TryGetValue(tab.Kind.ToString(), out var currentRoots))
+                roots = currentRoots;
+            else if (envelope.pipelineVersion == 1)
+            {
+                var legacyKey = LegacyToCurrent.FirstOrDefault(x => x.Value == tab.Kind.ToString()).Key;
+                if (!string.IsNullOrEmpty(legacyKey)) envelope.pipelines.TryGetValue(legacyKey, out roots);
+            }
+            if (roots is null) continue;
             foreach (var root in roots)
             {
                 DocumentService.FixParents(root, null);

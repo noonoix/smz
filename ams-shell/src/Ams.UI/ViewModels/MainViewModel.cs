@@ -1909,6 +1909,18 @@ public partial class MainViewModel : ObservableObject
 
             }
 
+            // Phase 7: make physical calibration state visible immediately after connect.
+            // This is read-only and must never change Guard or write to the Pico.
+            try
+            {
+                var calibrationStatus = await _bridge.SendAsync("CALSTATUS", timeoutSeconds: 5);
+                Log("calibration status: " + calibrationStatus);
+            }
+            catch (Exception ex)
+            {
+                Log("calibration status probe failed: " + ex.Message);
+            }
+
         }
 
         catch (Exception ex)

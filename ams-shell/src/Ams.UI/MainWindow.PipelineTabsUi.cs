@@ -103,9 +103,10 @@ internal static class PipelineTabsUiBootstrap
             Paint(buttons, null);
             PaintStatus(statusButton, true);
         };
-        window.FindName("HeaderActions") is WpfPanel headerActions
-            ? headerActions.Children.Add(statusButton)
-            : tabs.Children.Add(statusButton);
+        if (window.FindName("HeaderActions") is WpfPanel headerActions)
+            headerActions.Children.Add(statusButton);
+        else
+            tabs.Children.Add(statusButton);
         strip.Children.Add(tabs);
         Grid.SetRow(strip, 0);
         host.Children.Add(strip);

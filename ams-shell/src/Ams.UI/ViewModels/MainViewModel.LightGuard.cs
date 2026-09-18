@@ -204,7 +204,8 @@ public partial class MainViewModel
             foreach (var id in LightGuardCalibrationProtocol.ProfileIds)
             {
                 var app = LightStateProfiles.FirstOrDefault(x => x.Id == id);
-                var hasBoard = app is not null && board.Profiles.TryGetValue(id, out var device);
+                LightGuardDeviceProfile? device = null;
+                var hasBoard = app is not null && board.Profiles.TryGetValue(id, out device);
                 var equal = hasBoard && NearlyEqual(app!.LuxCenter, device!.Center)
                     && NearlyEqual(app.LuxTolerance, device.Tolerance)
                     && app.StableDurationMs == device.StableMs;

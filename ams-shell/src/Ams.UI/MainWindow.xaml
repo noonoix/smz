@@ -135,6 +135,7 @@
                 <Separator />
                 <MenuItem Header="Batch Edit _Delays…" Command="{Binding BatchDelaysCommand}" />
             </MenuItem>
+            <MenuItem Header="وضعیت Guard" Click="OpenGuardStatusWindow_Click" ToolTip="نمایش وضعیت مستقل Light Guard" />
             <MenuItem Header="_Insert">
                 <MenuItem Header="Mouse _Click" Command="{Binding AddStepCommand}" CommandParameter="mouseClick" />
                 <MenuItem Header="Mouse _Position" Command="{Binding AddStepCommand}" CommandParameter="mouseMove" />

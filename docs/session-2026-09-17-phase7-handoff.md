@@ -287,3 +287,16 @@ The user provided `stage17.zip` and `light-state-windows-output(28).zip` after t
 ### Installation gate
 
 `stage17.zip` passed static validation and is approved for controlled installation. Preserve any real board calibration files before copying because the package still carries `hardwareCalibrationVerified: false` and export/default calibration metadata. Copy payload files first and `SHA256SUMS.txt` last; reboot; verify only `PING`, `LUX?`, and `CALGET` before any operational Guard or route test.
+
+
+## Silent stop for read-only Light Watch
+
+The user observed that clicking the Light Watch `توقف پایش` button played the Guard Stop cue. Diagnosis: `LightWatchService.StopCoreAsync` called the bridge-wide `SendAbortAsync`, which emits `HALT`; the Pico correctly plays the Stop cue for HALT, but read-only sensor polling must not change Guard state or make an alarm.
+
+- Fix commit: `b4e551d60630223122f1478b3b465a30e9a1789d`.
+- `LightWatchService` now cancels and awaits its read-only polling task without sending the global HALT/abort command.
+- Actual Guard Stop remains unchanged and still acknowledges immediately with its Stop cue.
+- CI run: https://github.com/bermoods/smm/actions/runs/35313991381
+- CI result: all executable checks succeeded; downloadable package skipped by branch condition.
+
+Next: download the Windows artifact from this run, export a new Combined Portable Guard package, send it for validation, then install only after validation passes. Do not use the current stage17 package to verify the silent-stop behavior.

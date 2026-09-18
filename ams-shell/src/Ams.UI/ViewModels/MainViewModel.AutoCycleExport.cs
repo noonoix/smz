@@ -34,8 +34,8 @@ public partial class MainViewModel
                 Environment.MachineName).ToList();
 
             // One source of truth: cycle directives are embedded in the same root plan
-            // that carries the Guard routes. The separate plan/firmware exporters are no
-            // longer exposed, so two exports cannot overwrite each other.
+            // that carries the Guard routes. Separate plan/firmware exporters are hidden,
+            // so two exports cannot overwrite each other.
             var directory = Path.GetDirectoryName(Path.GetFullPath(dlg.FileName))
                 ?? throw new IOException("مسیر خروجی bundle نامعتبر است.");
             var planPath = Path.Combine(directory, "plan.txt");
@@ -43,8 +43,8 @@ public partial class MainViewModel
                 File.ReadAllText(planPath), _settings);
             WriteAtomic(planPath, new UTF8Encoding(false).GetBytes(decoratedPlan));
 
-            // plan.txt changed after the bundle writer created the manifest; rebuild the
-            // manifest so the board never receives a stale hash.
+            // plan.txt changed after bundle generation; rebuild hashes so the board
+            // never receives a stale manifest.
             var hashPath = Path.Combine(directory, "SHA256SUMS.txt");
             var hashFiles = written
                 .Where(path => !string.Equals(Path.GetFileName(path), "SHA256SUMS.txt", StringComparison.OrdinalIgnoreCase))
@@ -99,11 +99,6 @@ public partial class MainViewModel
         }
     }
 
-    // Kept for source compatibility with older plans; no longer exposed as a board-export button.
-    [RelayCommand]
-    private void ExportAutoCyclePicoPlan() { }
-
-    // Kept for source compatibility with older plans; no longer exposed as a board-export button.
-    [RelayCommand]
-    private void ExportAutoCyclePicoFirmware() { }
+    // ExportAutoCyclePicoPlan and ExportAutoCyclePicoFirmware remain available to
+    // older serialized commands, but their UI hooks are intentionally disabled.
 }

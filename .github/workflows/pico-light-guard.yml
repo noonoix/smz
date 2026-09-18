@@ -43,7 +43,7 @@ jobs:
           entry="$root/code.py"
           grep -q 'usb_cdc.enable(console=True, data=True)' "$root/boot.py"
           grep -q 'usb_hid' "$root/boot.py"
-          grep -q 'storage.remount("/", readonly=False)' "$root/boot.py"
+          grep -q 'storage.remount("/", readonly=False, disable_concurrent_write_protection=True)' "$root/boot.py"
           grep -q 'from combined_guard_runtime import main' "$entry"
           grep -q '_CAL_NOTES = (262, 294, 330, 349, 392, 440)' "$entry"
           grep -q 'runtime.Combined.start_cal = _audible_start_cal' "$entry"
@@ -82,6 +82,7 @@ jobs:
           grep -q 'self._replace_text("/SHA256SUMS.txt", self._hash_manifest())' "$runtime"
           grep -q 'old_hashes = self._read_text("/SHA256SUMS.txt")' "$runtime"
           grep -q '("/SHA256SUMS.txt", old_hashes)' "$runtime"
+          grep -q 'disable_concurrent_write_protection=True' "$runtime"
           grep -q 'NOT a complete CIRCUITPY runtime bundle' "$root/SAFE-MANIFEST.txt"
           ! grep -Eq 'usb_hid\.disable|role=light-guard.*hid=off|RunEngine' "$runtime"
 

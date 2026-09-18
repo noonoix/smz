@@ -80,6 +80,7 @@ internal static class LightGuardUiBootstrap
         var actions = new WrapPanel { Margin = new Thickness(0, 10, 0, 6) };
         actions.Children.Add(Action("باز کردن پنجره وضعیت", "#6B5E9E", () => { LightGuardStatusWindow.Show(window, vm); return Task.CompletedTask; }));
         actions.Children.Add(Action("دریافت از Pico", "#5E9FE8", async () => await vm.PullLightGuardCalibrationAsync()));
+        actions.Children.Add(Action("مقایسه با Pico", "#B8893D", async () => await vm.CompareLightGuardCalibrationAsync()));
         actions.Children.Add(Action("شناسایی Guard / CALGET", "#5E9FE8", async () => await vm.RefreshLightGuardIdentityAsync()));
         actions.Children.Add(Action("ارسال به Pico", "#3D6B55", async () => await vm.SyncLightGuardCalibrationAsync()));
         actions.Children.Add(Action("Guard ON", "#3D6B55", async () => await vm.EnableLightGuardAsync()));
@@ -92,6 +93,10 @@ internal static class LightGuardUiBootstrap
         content.Children.Add(Bound(nameof(MainViewModel.LightGuardCalibrationStatus), 12, "#72BC8F"));
         content.Children.Add(Bound(nameof(MainViewModel.LightGuardObservationStatus), 12, "#D9DEE7"));
         content.Children.Add(Bound(nameof(MainViewModel.LightGuardStateDisplay), 12, "#72BC8F", FontWeights.SemiBold));
+        content.Children.Add(Bound(nameof(MainViewModel.LightGuardComparisonStatus), 12, "#DE9255", FontWeights.SemiBold));
+        var comparison = new ItemsControl();
+        comparison.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(MainViewModel.LightGuardComparisonDisplays)));
+        content.Children.Add(comparison);
 
         var profiles = new ItemsControl();
         profiles.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(MainViewModel.LightGuardProfileDisplays)));

@@ -61,7 +61,6 @@ internal static class PipelineTabsUiBootstrap
 
         var tabs = new StackPanel { Orientation = Orientation.Horizontal, FlowDirection = FlowDirection.LeftToRight };
         var buttons = new List<Button>();
-        Button? statusButton = null;
         foreach (var tab in vm.PipelineTabs)
         {
             var button = new Button
@@ -83,28 +82,11 @@ internal static class PipelineTabsUiBootstrap
                     if (vm.SwitchPipelineCommand.CanExecute(current)) vm.SwitchPipelineCommand.Execute(current);
                 }
                 Paint(buttons, vm.ActivePipelineTab);
-                PaintStatus(statusButton!, false);
             };
             buttons.Add(button);
             tabs.Children.Add(button);
         }
 
-        statusButton = new Button
-        {
-            Content = "وضعیت",
-            Padding = new Thickness(14, 7, 14, 7),
-            Margin = new Thickness(6, 2, 3, 0),
-            BorderThickness = new Thickness(1),
-            Cursor = WpfCursors.Hand,
-            ToolTip = "Live read-only BH1750 telemetry",
-        };
-        statusButton.Click += (_, _) =>
-        {
-            statusPanel.Visibility = Visibility.Visible;
-            Paint(buttons, null);
-            PaintStatus(statusButton, true);
-        };
-        tabs.Children.Add(statusButton);
         strip.Children.Add(tabs);
         Grid.SetRow(strip, 0);
         host.Children.Add(strip);
@@ -114,7 +96,6 @@ internal static class PipelineTabsUiBootstrap
             statusPanel.Visibility = Visibility.Collapsed;
             UpdateTabKeyBindings(window, vm);
             Paint(buttons, vm.ActivePipelineTab);
-            PaintStatus(statusButton, false);
         }
 
         vm.PropertyChanged += (_, args) =>
@@ -292,8 +273,6 @@ internal static class PipelineTabsUiBootstrap
             PaintButton(button, selected);
         }
     }
-
-    private static void PaintStatus(Button button, bool selected) => PaintButton(button, selected);
 
     private static void PaintButton(Button button, bool selected)
     {

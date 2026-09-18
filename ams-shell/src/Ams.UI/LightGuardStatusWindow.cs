@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using WpfControl = System.Windows.Controls.Control;
+using WpfMessageBox = System.Windows.MessageBox;
 using System.Windows.Data;
 using System.Windows.Media;
 using WpfColor = System.Windows.Media.Color;
@@ -67,7 +68,7 @@ internal static class LightGuardStatusWindow
                 || !int.TryParse(stable.Text, out var st) || st < 0
                 || !double.TryParse(hysteresis.Text, out var h) || h < 0)
             {
-                MessageBox.Show("مقادیر کالیبراسیون معتبر نیستند.", "Guard", MessageBoxButton.OK, MessageBoxImage.Warning);
+                WpfMessageBox.Show("مقادیر کالیبراسیون معتبر نیستند.", "Guard", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return Task.CompletedTask;
             }
             vm.LightGuardDefaultTolerance = t;

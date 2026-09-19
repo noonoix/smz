@@ -9,6 +9,7 @@ for old,new in {
     if old in s: s=s.replace(old,new)
     elif new not in s: raise SystemExit('missing anchor: '+old)
 block='''_LIGHT_ROUTE_COMMANDS = {"PLAN", "SCREEN", "SPEED", "BEEP", "DELAY", "LOOP", "LOOPTIME", "ENDLOOP"}
+_VALID_ROUTE_NAMES = ("desktop_steps.txt", "login_or_dc_steps.txt", "character_dashboard_steps.txt", "entering_game_loading_steps.txt", "game_steps.txt", "targeted_steps.txt", "resumable_steps.txt")
 
 
 def _light_gate(owner, expected_state):
@@ -44,7 +45,6 @@ def _light_beep(owner, frequency, duration, expected_state):
 
 
 def _run_light_route(owner, name):
-    # No PlanContext, route cache, whole-file read, command list or link table.
     gc.collect()
     owner.emit("EVT|DEBUG|MEM/route-enter free=%d" % gc.mem_free())
     expected = getattr(owner, "debug_last_state", None)
@@ -109,7 +109,7 @@ def _diagnostic_route(self, decision):
     if not decision.get("execute"):
         return
     name = decision.get("route")
-    if name not in runtime.PROFILE_TO_ROUTE.values():
+    if name not in _VALID_ROUTE_NAMES:
         raise runtime.GuardBundleError("unvalidated route")
     _run_light_route(self, name)
     self.arm.flush()

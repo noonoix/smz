@@ -140,27 +140,36 @@ def _debug_file_read():
 
 def _debug_persist(self):
     try:
-        # Merge both stores, then write NVM first. NVM survives Reset and does
-        # not depend on Windows releasing the CIRCUITPY volume.
-        previous = _debug_file_read() or _debug_nvm_read()
-        payload = _debug_trim(previous + "".join(self.debug_events))
-        nvm_ok = _debug_nvm_write(payload)
+        # Re-open the filesystem for every persistence attempt. A host-side
+        # delete/remount can leave CircuitPython with a stale read-only view;
+        # doing this only after the NVM write was too late to recreate the file.
         try:
             remount = getattr(runtime.storage, "remount", None)
             if remount is not None:
                 remount("/", readonly=False, disable_concurrent_write_protection=True)
         except Exception:
             pass
+        # Merge the file and NVM journals. NVM survives reset; the file is the
+        # user-visible copy and must be restored whenever it was deleted.
+        file_text = _debug_file_read()
+        nvm_text = _debug_nvm_read()
+        previous = file_text or nvm_text
+        payload = _debug_trim(previous + "".join(self.debug_events))
         file_ok = False
         try:
             with open(_DEBUG_FILE, "w") as fh:
                 fh.write(payload)
+                try: fh.flush()
+                except Exception: pass
             file_ok = _debug_file_read() == payload
         except Exception:
             pass
-        if nvm_ok or file_ok:
+        nvm_ok = _debug_nvm_write(payload)
+        # Do not discard pending events merely because NVM succeeded: if the
+        # visible file failed, the next boot/event must retry its reconstruction.
+        if file_ok:
             self.debug_events = []
-            return True
+        return file_ok or nvm_ok
     except Exception:
         pass
     # Keep pending records for the next event/retry; never lose GP4/FAIL data.

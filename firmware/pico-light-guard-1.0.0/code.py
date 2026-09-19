@@ -526,6 +526,63 @@ def _diagnostic_beep(ctx, frequency, duration):
 runtime.PlanContext.setres = _diagnostic_setres
 runtime.PlanContext.beep = _diagnostic_beep
 
+_LIGHT_ROUTE_COMMANDS = {"SCREEN", "SPEED", "BEEP", "DELAY"}
+
+def _light_route_lines(text):
+    commands = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split("|", 1)
+        if len(parts) != 2 or parts[0].upper() not in _LIGHT_ROUTE_COMMANDS:
+            return None
+        commands.append((parts[0].upper(), parts[1].strip()))
+    return commands
+
+def _run_light_route(ctx, commands):
+    for command, args in commands:
+        if command == "SCREEN":
+            fields = args.replace(",", " ").split()
+            if len(fields) != 2:
+                raise ValueError("SCREEN needs width,height")
+            ctx.screen_w, ctx.screen_h = int(fields[0]), int(fields[1])
+            _debug_event(ctx.r, "STEP", "SCREEN metadata %dx%d" % (ctx.screen_w, ctx.screen_h), persist=True)
+        elif command == "SPEED":
+            # Speed is route metadata; BEEP/DELAY do not need the Arm.
+            continue
+        elif command == "DELAY":
+            ctx.sleep_ms(int(float(args)))
+        elif command == "BEEP":
+            fields = args.replace(",", " ").split()
+            if len(fields) != 2:
+                raise ValueError("BEEP needs frequency,duration")
+            ctx.beep(int(fields[0]), int(float(fields[1])))
+
+def _diagnostic_route(self, decision):
+    if not decision.get("execute"):
+        return
+    name = decision.get("route")
+    if name not in self.bundle["manifest"]["routes"].values():
+        raise GuardBundleError("unvalidated route")
+    if name not in self.routes:
+        with open("/" + name, "r") as fh:
+            text = fh.read()
+        commands = _light_route_lines(text)
+        if commands is not None:
+            # Keep simple Pico-only routes off the large plan_engine import.
+            self.routes[name] = ("light", commands)
+        else:
+            self.routes[name] = ("plan", plan_engine.parse_plan(text))
+    kind, route = self.routes[name]
+    if kind == "light":
+        _run_light_route(PlanContext(self), route)
+    else:
+        plan_engine.run_plan(route, PlanContext(self))
+    self.arm.flush()
+
+runtime.Combined.route = _diagnostic_route
+
 def _audible_loop(self):
     self.emit("combined-pico-guard-executor|GP4 start/stop hold3s=calibration|GP3 pause/resume|GP6 piezo")
     last = 0

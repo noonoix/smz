@@ -188,6 +188,16 @@ def _debug_get(self):
     return _debug_file_read() or _debug_nvm_read()
 
 
+def _debug_exception(exc):
+    # Some CircuitPython exceptions have an empty str(); preserve the type and
+    # repr so a route failure is actionable instead of appearing as FAIL|guard=.
+    kind = type(exc).__name__
+    detail = repr(exc)
+    if not detail or detail == "''":
+        detail = "<empty>"
+    return (kind + ":" + detail).replace("\n", " ")[:180]
+
+
 def _debug_clear(self):
     self.debug_events = []
     _debug_nvm_write("")
@@ -483,6 +493,20 @@ def _audible_buttons(self):
     self.cal_tick()
 
 
+_original_plan_setres = runtime.PlanContext.setres
+_original_plan_beep = runtime.PlanContext.beep
+
+def _diagnostic_setres(ctx, w, h):
+    _debug_event(ctx.r, "STEP", "SCREEN %dx%d -> SETRES" % (w, h), persist=True)
+    return _original_plan_setres(ctx, w, h)
+
+def _diagnostic_beep(ctx, frequency, duration):
+    _debug_event(ctx.r, "STEP", "BEEP %d,%d" % (frequency, duration), persist=True)
+    return _original_plan_beep(ctx, frequency, duration)
+
+runtime.PlanContext.setres = _diagnostic_setres
+runtime.PlanContext.beep = _diagnostic_beep
+
 def _audible_loop(self):
     self.emit("combined-pico-guard-executor|GP4 start/stop hold3s=calibration|GP3 pause/resume|GP6 piezo")
     last = 0
@@ -513,9 +537,10 @@ def _audible_loop(self):
                     else:
                         _debug_event(self, "STATE", "denied reason=%s lux=%.1f" % (decision.get("reason"), lux), persist=True)
             except Exception as exc:
-                _debug_event(self, "FAIL", "guard=%s" % str(exc)[:160], persist=True)
+                failure = _debug_exception(exc)
+                _debug_event(self, "FAIL", "guard=" + failure, persist=True)
                 self.immediate_audible_stop()
-                self.emit("ERR|GUARD|FAIL|" + str(exc)[:60])
+                self.emit("ERR|GUARD|FAIL|" + failure[:100])
         runtime.time.sleep(.01)
 
 

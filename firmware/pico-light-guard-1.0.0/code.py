@@ -212,11 +212,10 @@ def _immediate_audible_start(self):
     # Acknowledge Start on the physical press, not on release. Route execution
     # remains gated until the press resolves, so a held blue button can still
     # become the long-hold calibration gesture without executing a route.
+    # Defer Start until release so a held press can become calibration.
     self.guard.reset()
-    self.controls.start()
     self.blue_start_pending = True
     self.blue_start_consumed = True
-    self.guard_start_tone()
 
 def _enter_calibration_from_pending_start(self):
     # The user held the same blue press that initially cued Start. Cancel the
@@ -273,8 +272,7 @@ def _audible_cal_tick(self):
     _original_cal_tick(self)
     if was_sampling and isinstance(self.result, dict):
         self.cal_stage_complete_tone()
-        # Sampling completion is an implicit confirmation. The user no longer
-        # needs a second GP3 press after the success tone.
+        # Sampling completion is an implicit confirmation; save once.
         self.save_cal()
 
 def _audible_save_cal(self):

@@ -110,14 +110,26 @@ def _debug_persist(self):
             fh.write(payload)
         self.debug_events = []
     except Exception:
-        # Diagnostics must never stop Guard or alter route execution.
-        self.debug_events = []
+        # Keep pending events for a later retry. Diagnostics must never stop
+        # Guard, but silently discarding the only GP4/FAIL record defeats the
+        # purpose of the collector when CIRCUITPY is temporarily busy.
+        return False
+    self.debug_events = []
+    return True
 
 def _debug_event(self, kind, detail="", persist=False):
     stamp = int(runtime.time.monotonic())
     clean = str(detail).replace("|", "/").replace("\n", " ")[:180]
     line = "%d|%s|%s\n" % (stamp, kind, clean)
     self.debug_events.append(line)
+    if len(self.debug_events) > _DEBUG_MAX_LINES:
+        self.debug_events = self.debug_events[-_DEBUG_MAX_LINES:]
+    # Mirror diagnostics to the live USB stream so a host can capture a GP4
+    # event even while CIRCUITPY is mounted by Windows and file writes retry.
+    try:
+        self.emit("EVT|DEBUG|" + line.rstrip("\n").replace("|", "/"))
+    except Exception:
+        pass
     if persist or any(kind.startswith(prefix) for prefix in _DEBUG_PERSIST_EVENTS):
         _debug_persist(self)
 

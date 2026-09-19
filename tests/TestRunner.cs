@@ -1098,7 +1098,16 @@ class TestRunner
             Type = "randomMousePosition",
             Props = new Dictionary<string, object?> { ["x"] = 100, ["y"] = 100, ["w"] = 500, ["h"] = 400 },
         };
-        new RunEngine(fbS, _ => { }, 1920, 1080).RunAsync(new[] { rndStep2 }, CancellationToken.None).Wait();
+        // Keep this contract deterministic: production starts from the real cursor, so a
+        // coincidentally nearby cursor would legitimately produce a short path and make the
+        // density assertion flaky. Restore the user's cursor after the isolated test.
+        var savedCursor = System.Windows.Forms.Cursor.Position;
+        try
+        {
+            System.Windows.Forms.Cursor.Position = new System.Drawing.Point(0, 0);
+            new RunEngine(fbS, _ => { }, 1920, 1080).RunAsync(new[] { rndStep2 }, CancellationToken.None).Wait();
+        }
+        finally { System.Windows.Forms.Cursor.Position = savedCursor; }
         Assert(fbS.PathCalls == 1 && fbS.LastPath is { Count: > 10 } && !fbS.Sent.Any(c => c.StartsWith("MMOVE|")),
             $"randomMousePosition streams one dense path (calls={fbS.PathCalls}, pts={fbS.LastPath?.Count})");
         var lastPt = fbS.LastPath![^1];

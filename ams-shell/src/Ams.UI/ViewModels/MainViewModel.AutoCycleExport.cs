@@ -10,7 +10,7 @@ namespace Ams.UI.ViewModels;
 public partial class MainViewModel
 {
     [RelayCommand]
-    private void ExportCombinedPortableGuard()
+    private async Task ExportCombinedPortableGuard()
     {
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
@@ -57,10 +57,32 @@ public partial class MainViewModel
 
             foreach (var file in written) Log("complete Guard bundle: " + Path.GetFileName(file));
             Log("complete Guard bundle: AutoCycle embedded in plan.txt; manifest rebuilt");
+
+            // The one-click flow owns the complete hand-off. Give CircuitPython
+            // time to reload after a CIRCUITPY write, then reuse the normal
+            // identity/status/sync path. If the board is not connected, the
+            // bundle remains a valid offline export and no false sync is shown.
+            var syncMessage = "برد متصل نبود؛ پس از اتصال، فقط Sync کالیبراسیون را اجرا کن.";
+            if (_bridge is not null && Connection == ConnectionState.Connected)
+            {
+                await Task.Delay(1500);
+                await RefreshLightGuardIdentityAsync();
+                if (LightGuardIdentityValid)
+                {
+                    await SyncLightGuardCalibrationAsync();
+                    syncMessage = LightGuardCalibrationSynchronized
+                        ? "کالیبراسیون Pico نیز بررسی و Sync شد."
+                        : "Bundle ساخته شد؛ Sync کالیبراسیون ناموفق بود و باید جداگانه بررسی شود.";
+                }
+                else
+                {
+                    syncMessage = "Bundle ساخته شد؛ Pico هنوز پس از انتقال آمادهٔ Sync نبود.";
+                }
+            }
             MessageBox.Show(
                 $"بستهٔ کامل ساخته شد ({written.Count} فایل).\n\n"
                 + "تنظیمات AutoCycle، تمام Macro routeها، Recovery، Resumable، Guard، کالیبراسیون و manifest در همین بسته قرار دارند.\n\n"
-                + "خروجی جداگانهٔ Plan یا Firmware تولید نمی‌شود.",
+                + syncMessage,
                 "Complete Pico Guard bundle", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (PlanExporter.PlanBlockedException bx)

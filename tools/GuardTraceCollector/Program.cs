@@ -8,6 +8,7 @@ internal static class Program
     private const int Baud = 115200;
     private const long MaxLogBytes = 1_048_576;
     private const int KeepLogs = 5;
+    private const int ReconnectDelayMs = 500;
 
     public static int Main(string[] args)
     {
@@ -16,16 +17,23 @@ internal static class Program
         var requestHistory = args.Any(a => string.Equals(a, "--history", StringComparison.OrdinalIgnoreCase));
 
         Directory.CreateDirectory(outputDir);
-        using var serial = OpenBoard(portArg);
+        SerialPort? serial = OpenBoard(portArg);
         if (serial is null) return 2;
 
         var logPath = Path.Combine(outputDir, $"guard-trace-{DateTime.Now:yyyyMMdd-HHmmss}.log");
         using var writer = new StreamWriter(logPath, false, new UTF8Encoding(false)) { AutoFlush = true };
         Write(writer, $"COLLECTOR|start|port={serial.PortName}|baud={Baud}");
         Console.WriteLine($"Connected to {serial.PortName}. Recording: {logPath}");
-        Console.WriteLine("Press Ctrl+C to stop. The collector is passive after connection.");
+        Console.WriteLine("Press Ctrl+C to stop. USB reconnects are recorded automatically.");
 
-        Console.CancelKeyPress += (_, e) => { e.Cancel = true; serial.Close(); };
+        var stopping = false;
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true;
+            stopping = true;
+            try { serial?.Close(); } catch { }
+        };
+
         if (requestHistory)
         {
             Write(writer, "COLLECTOR|request|DEBUGGET");
@@ -34,7 +42,7 @@ internal static class Program
 
         try
         {
-            while (serial.IsOpen)
+            while (!stopping)
             {
                 try
                 {
@@ -45,27 +53,66 @@ internal static class Program
                     if (writer.BaseStream.Length >= MaxLogBytes)
                     {
                         Write(writer, "COLLECTOR|limit|rotating");
-                        writer.Flush();
                         break;
                     }
                 }
                 catch (TimeoutException) { }
+                catch (Exception ex) when (IsDisconnect(ex))
+                {
+                    var oldPort = serial.PortName;
+                    Write(writer, $"COLLECTOR|disconnect|port={oldPort}|error={ex.GetType().Name}:{Clean(ex.Message)}");
+                    Console.WriteLine($"Disconnected from {oldPort}. Waiting for the Pico to return...");
+                    try { serial.Close(); } catch { }
+                    serial.Dispose();
+
+                    serial = null;
+                    var waitingLogged = false;
+                    while (!stopping && serial is null)
+                    {
+                        if (!waitingLogged)
+                        {
+                            Write(writer, "COLLECTOR|waiting|usb");
+                            waitingLogged = true;
+                        }
+                        Thread.Sleep(ReconnectDelayMs);
+                        serial = OpenBoard(portArg, quiet: true);
+                    }
+
+                    if (serial is not null)
+                    {
+                        Write(writer, $"COLLECTOR|reconnect|port={serial.PortName}|baud={Baud}");
+                        Console.WriteLine($"Reconnected to {serial.PortName}. Continuing: {logPath}");
+                    }
+                }
             }
         }
-        catch (IOException ex) { Write(writer, "COLLECTOR|io-error|" + ex.Message); }
         finally
         {
             Write(writer, "COLLECTOR|stop");
-            serial.Close();
+            try { serial?.Close(); } catch { }
+            serial?.Dispose();
             Rotate(outputDir);
         }
         return 0;
     }
 
-    private static SerialPort? OpenBoard(string? requested)
+    private static bool IsDisconnect(Exception ex) =>
+        ex is OperationCanceledException
+        or IOException
+        or InvalidOperationException
+        or UnauthorizedAccessException;
+
+    private static string Clean(string value) =>
+        value.Replace("|", "/").Replace("\r", " ").Replace("\n", " ");
+
+    private static SerialPort? OpenBoard(string? requested, bool quiet = false)
     {
         var ports = requested is not null ? new[] { requested } : SerialPort.GetPortNames().OrderBy(x => x).ToArray();
-        if (ports.Length == 0) { Console.Error.WriteLine("No serial ports found."); return null; }
+        if (ports.Length == 0)
+        {
+            if (!quiet) Console.Error.WriteLine("No serial ports found.");
+            return null;
+        }
         foreach (var name in ports)
         {
             try
@@ -93,9 +140,12 @@ internal static class Program
                     catch (TimeoutException) { }
                 }
             }
-            catch (Exception ex) { Console.WriteLine($"{name}: {ex.Message}"); }
+            catch (Exception ex)
+            {
+                if (!quiet) Console.WriteLine($"{name}: {ex.Message}");
+            }
         }
-        Console.Error.WriteLine("No Pico brain answered PING. Use --port COMx to select a known Pico CDC port.");
+        if (!quiet) Console.Error.WriteLine("No Pico brain answered PING. Use --port COMx to select a known Pico CDC port.");
         return null;
     }
 

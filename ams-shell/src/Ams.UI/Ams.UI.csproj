@@ -49,4 +49,8 @@
     <None Include="..\..\..\firmware\pico-light-guard-1.0.0\guard_calibration_protocol.py"><Link>combined-runtime\guard_calibration_protocol.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
   </ItemGroup>
 
+  <Target Name="PatchPackagedCombinedGuardRuntime" AfterTargets="Build">
+    <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_combined_runtime_output.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />
+  </Target>
+
 </Project>

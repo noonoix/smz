@@ -56,6 +56,20 @@ public partial class MainViewModel
     {
         InitializePipelineTabs();
         CaptureActivePipeline();
+
+        // Legacy .amsj files were historically loaded into Main. The Combined
+        // Guard exporter writes the seven canonical route tabs and therefore
+        // silently emitted PLAN|2 for Desktop even while visible Main steps
+        // existed. Preserve those visible legacy steps as the Desktop route.
+        var main = _pipelineWorkspace[PipelineKind.Main];
+        var desktop = _pipelineWorkspace[PipelineKind.Desktop];
+        if (desktop.Steps.Count == 0 && main.Steps.Count > 0)
+        {
+            CopyTree(main.Steps, desktop.Steps);
+            desktop.IsDirty = true;
+            Log("combined Guard export: migrated legacy Main steps to Desktop — roots="
+                + desktop.Steps.Count + ", total=" + CountAll(desktop.Steps));
+        }
         return _pipelineWorkspace;
     }
 
@@ -77,8 +91,6 @@ public partial class MainViewModel
     {
         if (!_pipelineInitialized || _pipelineLoadInProgress || _activePipelineTab is null) return;
         RevokeLightAuthorizationDiagnostic(LightAuthorizationReasonCode.PipelineChanged);
-        // Keep the tab document current as soon as a root-level edit happens. Save still
-        // performs a full capture so nested edits and property changes are included too.
         CopyTree(Steps, _activePipelineTab.Steps);
         _activePipelineTab.IsDirty = true;
     }
@@ -144,6 +156,9 @@ public partial class MainViewModel
         if (!ConfirmDiscard()) return;
         InitializePipelineTabs();
         var targetKind = _activePipelineTab?.Kind ?? PipelineKind.Main;
+        var legacyTargetKind = targetKind is PipelineKind.Main or PipelineKind.Launch
+            ? PipelineKind.Desktop
+            : targetKind;
         var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "AMS pipeline (*.amsj)|*.amsj" };
         if (dialog.ShowDialog() != true) return;
         try
@@ -152,10 +167,12 @@ public partial class MainViewModel
             try { _pipelineWorkspace = PipelineWorkspaceSerializer.Deserialize(json); }
             catch (InvalidDataException)
             {
-                _pipelineWorkspace = PipelineWorkspace.FromLegacy(DocumentService.Load(dialog.FileName), targetKind);
+                _pipelineWorkspace = PipelineWorkspace.FromLegacy(DocumentService.Load(dialog.FileName), legacyTargetKind);
             }
             RevokeLightAuthorizationDiagnostic(LightAuthorizationReasonCode.PipelineChanged);
             _activePipelineTab = _pipelineWorkspace[targetKind];
+            if (_activePipelineTab.Steps.Count == 0 && legacyTargetKind != targetKind)
+                _activePipelineTab = _pipelineWorkspace[legacyTargetKind];
             _currentFile = dialog.FileName;
             _dirty = false;
             LoadActivePipeline();
@@ -166,7 +183,7 @@ public partial class MainViewModel
             OnPropertyChanged(nameof(IsLaunchPipeline));
             OnPropertyChanged(nameof(IsMainPipeline));
             UpdateFileText();
-            Log("pipeline workspace opened in " + targetKind + ": " + dialog.FileName + " — " + PipelineCounts());
+            Log("pipeline workspace opened in " + _activePipelineTab.Kind + ": " + dialog.FileName + " — " + PipelineCounts());
         }
         catch (Exception ex)
         {

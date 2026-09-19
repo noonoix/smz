@@ -83,8 +83,68 @@ gc.collect()
 import combined_guard_runtime as runtime
 from combined_guard_runtime import main
 
+_DEBUG_FILE = "/guard-debug.log"
+_DEBUG_MAX_BYTES = 8192
+_DEBUG_MAX_LINES = 96
+_DEBUG_PERSIST_EVENTS = ("BOOT", "GP4", "ROUTE", "FAIL", "STOP", "CAL")
+
+def _debug_trim(text):
+    lines = text.splitlines()[-_DEBUG_MAX_LINES:]
+    text = "\n".join(lines) + ("\n" if lines else "")
+    if len(text) > _DEBUG_MAX_BYTES:
+        text = text[-_DEBUG_MAX_BYTES:]
+        if "\n" in text:
+            text = text[text.index("\n") + 1:]
+    return text
+
+def _debug_persist(self):
+    try:
+        previous = ""
+        try:
+            with open(_DEBUG_FILE, "r") as fh:
+                previous = fh.read()
+        except Exception:
+            pass
+        payload = _debug_trim(previous + "".join(self.debug_events))
+        with open(_DEBUG_FILE, "w") as fh:
+            fh.write(payload)
+        self.debug_events = []
+    except Exception:
+        # Diagnostics must never stop Guard or alter route execution.
+        self.debug_events = []
+
+def _debug_event(self, kind, detail="", persist=False):
+    stamp = int(runtime.time.monotonic())
+    clean = str(detail).replace("|", "/").replace("\n", " ")[:180]
+    line = "%d|%s|%s\n" % (stamp, kind, clean)
+    self.debug_events.append(line)
+    if persist or any(kind.startswith(prefix) for prefix in _DEBUG_PERSIST_EVENTS):
+        _debug_persist(self)
+
+def _debug_get(self):
+    _debug_persist(self)
+    try:
+        with open(_DEBUG_FILE, "r") as fh:
+            return fh.read()
+    except Exception:
+        return ""
+
+def _debug_clear(self):
+    self.debug_events = []
+    try:
+        with open(_DEBUG_FILE, "w") as fh:
+            fh.write("")
+    except Exception:
+        pass
+
+def _debug_emit(self):
+    text = _debug_get(self)
+    for raw in text.splitlines():
+        self.emit("EVT|DEBUG|" + raw.replace("|", "/"))
+
 def _memory_safe_init(self):
     global _BOOT_BUNDLE
+    self.debug_events = []
     bundle = _BOOT_BUNDLE
     _BOOT_BUNDLE = None
     self.bundle = bundle
@@ -114,6 +174,8 @@ def _memory_safe_init(self):
     self.blue_start_consumed = False
     self.blue_start_pending = False
     self.last_cal_error = None
+    self.debug_last_state = None
+    _debug_event(self, "BOOT", "bundle=valid profiles=%d" % len(runtime.PROFILES), persist=True)
 
 # The six calibration positions use distinct ascending notes: C4 through A4.
 _CAL_NOTES = (262, 294, 330, 349, 392, 440)
@@ -313,6 +375,12 @@ def _audible_buttons(self):
     now = runtime.time.monotonic()
     blue = self.blue.poll(now)
     yellow = self.yellow.poll(now)
+    if blue == "down":
+        _debug_event(self, "GP4", "down running=%s calibrating=%s" % (self.controls.running, self.calibrating), persist=True)
+    elif blue == "long":
+        _debug_event(self, "GP4", "long calibrating=%s" % self.calibrating, persist=True)
+    elif blue == "up":
+        _debug_event(self, "GP4", "up", persist=True)
     if blue == "down" and not self.calibrating and self.controls.running:
         # Stop is fail-safe and should acknowledge immediately on press. This
         # consumes the blue press so the later release/long-hold path cannot
@@ -345,6 +413,7 @@ def _audible_buttons(self):
                 self.guard.reset()
                 self.controls.start()
                 self.guard_start_tone()
+                _debug_event(self, "GP4", "short-start running=1", persist=True)
         elif not stop_consumed and not start_consumed and not self.blue.long:
             if self.calibrating:
                 self.next_cal()
@@ -365,10 +434,25 @@ def _audible_loop(self):
                 runtime.time.monotonic() - last >= .25):
             last = runtime.time.monotonic()
             try:
-                self.guard.update(self.sensor.lux(), int(last * 1000))
-                if self.guard.last_decision is not None:
-                    self.route(self.guard.last_decision)
+                lux = self.sensor.lux()
+                active = self.guard.update(lux, int(last * 1000))
+                if active != self.debug_last_state:
+                    _debug_event(self, "STATE", "%s lux=%.1f" % (active or "unknown", lux), persist=active is None)
+                    self.debug_last_state = active
+                decision = self.guard.last_decision
+                # A decision is a one-shot transition. Clear it before running
+                # the route so the same Desktop macro is not replayed every poll.
+                self.guard.last_decision = None
+                if decision is not None:
+                    if decision.get("execute"):
+                        route_name = decision.get("route")
+                        _debug_event(self, "ROUTE", "start %s lux=%.1f" % (route_name, lux), persist=True)
+                        self.route(decision)
+                        _debug_event(self, "ROUTE", "complete %s" % route_name, persist=True)
+                    else:
+                        _debug_event(self, "STATE", "denied reason=%s lux=%.1f" % (decision.get("reason"), lux), persist=True)
             except Exception as exc:
+                _debug_event(self, "FAIL", "guard=%s" % str(exc)[:160], persist=True)
                 self.immediate_audible_stop()
                 self.emit("ERR|GUARD|FAIL|" + str(exc)[:60])
         runtime.time.sleep(.01)
@@ -417,7 +501,14 @@ def _live_host_poll(self):
                 self.immediate_audible_stop()
                 reply = "OK|GUARD|OFF"
             elif line == "LUX?":
-                reply = "OK|LUX|lux=%.1f|sensor=ok" % self.sensor.lux()
+                lux = self.sensor.lux()
+                reply = "OK|LUX|lux=%.1f|sensor=ok" % lux
+            elif line == "DEBUGGET":
+                _debug_emit(self)
+                reply = "OK|DEBUG|read"
+            elif line == "DEBUGCLEAR":
+                _debug_clear(self)
+                reply = "OK|DEBUG|cleared"
             elif line.startswith("SETRES|"):
                 fields = line.split("|", 1)[1].split(",")
                 if len(fields) != 2:
@@ -443,6 +534,10 @@ def _live_host_poll(self):
         self.emit(reply)
 
 runtime.Combined.__init__ = _memory_safe_init
+runtime.Combined.debug_event = _debug_event
+runtime.Combined.debug_get = _debug_get
+runtime.Combined.debug_clear = _debug_clear
+runtime.Combined.debug_emit = _debug_emit
 runtime.Combined._live_host_beep = _live_host_beep
 runtime.Combined.host_poll = _live_host_poll
 runtime.Combined._cal_beep = _cal_beep

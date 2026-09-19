@@ -149,8 +149,10 @@ public partial class MainViewModel
             LightGuardCalibrationStatus = "همگام‌سازی مسدود شد: برد متصل نیست.";
             return;
         }
-        // Sending is a direct app-to-Pico operation. Do not require CALGET/revision
-        // equality first; the six CALSET records are the operation that establishes it.
+        // Sending is direct, but a bundle that already matches the six app profiles
+        // must not be rewritten. Rewriting while CIRCUITPY is still committing an
+        // exported bundle can leave CALSET waiting forever; CALSTATUS is sufficient
+        // proof that the requested values are already present.
         try
         {
             var pong = await _bridge.SendAsync("PING");
@@ -159,6 +161,27 @@ public partial class MainViewModel
             LightGuardIdentityValid = true;
             LightGuardIdentityDisplay = $"Combined Guard معتبر · {identity.Version} · نقش {identity.Role} · ۶ پروفایل";
             var revision = LightGuardAppAdapter.ComputeRevision(LightStateProfiles);
+
+            var current = await _bridge.SendAsync("CALSTATUS");
+            if (!LightGuardAppAdapter.TryParseCalStatus(current, out var board) || board is null || board.Count != 6)
+                throw new InvalidOperationException("CALSTATUS ناقص یا نامعتبر است.");
+            var alreadySynchronized = board.Revision == revision
+                && LightGuardCalibrationProtocol.ProfileIds.All(id =>
+                    LightStateProfiles.FirstOrDefault(p => p.Id == id) is { } app
+                    && board.Profiles.TryGetValue(id, out var device)
+                    && NearlyEqual(app.LuxCenter, device.Center)
+                    && NearlyEqual(app.LuxTolerance, device.Tolerance)
+                    && app.StableDurationMs == device.StableMs);
+            if (alreadySynchronized)
+            {
+                LightGuardCalibrationSynchronized = true;
+                LightGuardRevisionDisplay = $"نسخهٔ Pico: {board.Revision} · رکوردها: {board.Count}/6 · نسخهٔ برنامه: {revision}";
+                LightGuardRevisionComparison = "شش پروفایل از قبل یکسان هستند؛ ارسال مجدد لازم نبود و Sync تأیید شد.";
+                LightGuardCalibrationStatus = "شش پروفایل Pico و برنامه یکسان‌اند؛ Guard آمادهٔ روشن‌شدن است.";
+                Log("phase7 Guard: six existing CALSTATUS profiles already match; CALSET skipped");
+                return;
+            }
+
             foreach (var profileId in LightGuardCalibrationProtocol.ProfileIds)
             {
                 var profile = LightStateProfiles.FirstOrDefault(x => x.Id == profileId);

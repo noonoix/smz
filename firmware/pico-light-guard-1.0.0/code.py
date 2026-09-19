@@ -273,6 +273,9 @@ def _audible_cal_tick(self):
     _original_cal_tick(self)
     if was_sampling and isinstance(self.result, dict):
         self.cal_stage_complete_tone()
+        # Sampling completion is an implicit confirmation. The user no longer
+        # needs a second GP3 press after the success tone.
+        self.save_cal()
 
 def _audible_save_cal(self):
     profile_was_saved = runtime.PROFILES[self.stage] in self.saved_ids
@@ -338,7 +341,13 @@ def _audible_buttons(self):
         self.blue_start_consumed = False
         if getattr(self, "blue_start_pending", False):
             self.blue_start_pending = False
-        if not stop_consumed and not start_consumed and not self.blue.long:
+            # Short GP4 press: start and play the Start cue on release only.
+            # Long GP4 press was consumed by the calibration branch above.
+            if not stop_consumed and not self.blue.long:
+                self.guard.reset()
+                self.controls.start()
+                self.guard_start_tone()
+        elif not stop_consumed and not start_consumed and not self.blue.long:
             if self.calibrating:
                 self.next_cal()
     if yellow == "up" and not self.yellow.long:

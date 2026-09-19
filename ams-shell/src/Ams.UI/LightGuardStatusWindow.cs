@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
 using WpfControl = System.Windows.Controls.Control;
+using WpfTabControl = System.Windows.Controls.TabControl;
+using WpfTabItem = System.Windows.Controls.TabItem;
 using WpfMessageBox = System.Windows.MessageBox;
 using System.Windows.Data;
 using System.Windows.Media;
@@ -38,8 +40,8 @@ internal static class LightGuardStatusWindow
         var profiles = new ItemsControl();
         profiles.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(MainViewModel.LightGuardProfileDisplays)) { Source = vm });
         stack.Children.Add(profiles);
-        var tabs = new TabControl();
-        tabs.Items.Add(new TabItem
+        var tabs = new WpfTabControl();
+        tabs.Items.Add(new WpfTabItem
         {
             Header = "وضعیت Guard",
             Content = new ScrollViewer { Content = stack, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }
@@ -49,7 +51,7 @@ internal static class LightGuardStatusWindow
         _window.Closed += (_, _) => _window = null; _window.Show();
     }
 
-    private static TabItem BuildCalibrationTab(MainViewModel vm)
+    private static WpfTabItem BuildCalibrationTab(MainViewModel vm)
     {
         var panel = new StackPanel { Margin = new Thickness(18) };
         panel.Children.Add(Text("تنظیمات کالیبراسیون برد", 18, FontWeights.SemiBold));
@@ -77,7 +79,7 @@ internal static class LightGuardStatusWindow
             vm.SaveLightGuardDefaults();
             return Task.CompletedTask;
         }));
-        return new TabItem { Header = "کالیبراسیون", Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } };
+        return new WpfTabItem { Header = "کالیبراسیون", Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } };
     }
 
     private static StackPanel Labeled(string label, WpfControl input)

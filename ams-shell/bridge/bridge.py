@@ -112,7 +112,13 @@ def detect_board_port():
                 ser.close()
         except Exception:
             continue
-    return cands[0].device if cands and score(cands[0]) >= 50 else None
+    # Never guess from USB metadata alone. A serial-looking device can be the
+    # Pro Micro console, a stale COM port, or another adapter. Guessing here
+    # caused AUTO to select COM30, then open_link fell back to encrypted
+    # BoardLink and failed on the missing private ams_key.json. AUTO must only
+    # return a port that answered the Pico/brain probe; direct Pro Micro
+    # connection remains an explicit manual-port operation.
+    return None
 
 
 class PicoError(Exception):
@@ -345,7 +351,9 @@ def main():
                 if op == "connect":
                     port = req.get("port") or "AUTO"
                     if port.strip().upper() in ("AUTO", ""):
-                        port = detect_board_port() or "AUTO"   # v0.9.5 — اسکن خودکار
+                        port = detect_board_port()   # v0.9.5 — probe, never guess
+                        if not port:
+                            raise PicoError("No compatible Pico brain answered PING; select the Pico data port manually or connect the board.")
                     emit({"event": "stage", "stage": "port_open", "port": port})
                     # v0.9.59 — مغز پیکو اول: لینک متن‌باز pico-light اگر PING با
                     # role=brain جواب داد؛ وگرنه همان BoardLink رمزشده برای پرو میکرو.

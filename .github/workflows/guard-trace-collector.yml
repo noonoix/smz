@@ -1,0 +1,38 @@
+name: Guard Trace Collector
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tools/GuardTraceCollector/**'
+      - '.github/workflows/guard-trace-collector.yml'
+  pull_request:
+    paths:
+      - 'tools/GuardTraceCollector/**'
+      - '.github/workflows/guard-trace-collector.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build portable Windows collector
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Publish single-file collector
+        shell: pwsh
+        run: dotnet publish tools/GuardTraceCollector/GuardTraceCollector.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o collector-out
+      - name: Add documentation and package
+        shell: pwsh
+        run: |
+          Copy-Item tools/GuardTraceCollector/README-FA.md collector-out/README-FA.md
+          Compress-Archive -Path collector-out/* -DestinationPath GuardTraceCollector-win-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GuardTraceCollector-win-x64
+          path: GuardTraceCollector-win-x64.zip
+          retention-days: 14

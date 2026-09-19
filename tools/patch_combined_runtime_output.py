@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Patch the packaged Combined Guard runtime used by Classroom Studio exports."""
+"""Idempotently patch the Combined Guard runtime packaged by Classroom Studio."""
 from pathlib import Path
 import re
 import sys
@@ -15,9 +15,10 @@ replacements = {
     '    if persist or any(kind.startswith(prefix) for prefix in _DEBUG_PERSIST_EVENTS):\n        _debug_persist(self)': '    if kind in ("BOOT", "FAIL"):\n        _debug_persist(self)',
 }
 for old, new in replacements.items():
-    if old not in text:
+    if old in text:
+        text = text.replace(old, new)
+    elif new not in text:
         raise SystemExit(f"runtime patch anchor missing: {old[:80]}")
-    text = text.replace(old, new)
 
 safe_persist = '''def _debug_persist(self):
     # Live tracing belongs to GuardTraceCollector. Never remount or rewrite
@@ -32,8 +33,10 @@ safe_persist = '''def _debug_persist(self):
         return False
 
 '''
-text, count = re.subn(r'def _debug_persist\(self\):\n.*?(?=def _debug_event\(self,)', safe_persist, text, count=1, flags=re.S)
-if count != 1:
-    raise SystemExit("runtime patch anchor missing: _debug_persist")
+if "Live tracing belongs to GuardTraceCollector" not in text:
+    text, count = re.subn(r'def _debug_persist\(self\):\n.*?(?=def _debug_event\(self,)', safe_persist, text, count=1, flags=re.S)
+    if count != 1:
+        raise SystemExit("runtime patch anchor missing: _debug_persist")
+
 path.write_text(text, encoding="utf-8", newline="\n")
-print(f"patched Combined Guard runtime: {path}")
+print(f"verified Combined Guard runtime patch: {path}")

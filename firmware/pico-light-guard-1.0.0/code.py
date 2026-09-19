@@ -66,9 +66,19 @@ class _DeferredPlanEngine:
 
     def __getattr__(self, name):
         if self.module is None:
-            del sys.modules["plan_engine"]
+            # The deferred loader installs a proxy under this name during boot.
+            # Removing it with del is not idempotent: a previous failed import
+            # or CircuitPython module cleanup can leave the key absent, turning
+            # the first route execution into KeyError('plan_engine').
+            sys.modules.pop("plan_engine", None)
             gc.collect()
-            self.module = __import__("plan_engine")
+            try:
+                self.module = __import__("plan_engine")
+            except Exception:
+                # Keep the proxy available for a controlled retry/diagnostic
+                # instead of leaving a missing sys.modules entry.
+                sys.modules["plan_engine"] = self
+                raise
             sys.modules["plan_engine"] = self.module
         return getattr(self.module, name)
 

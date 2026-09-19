@@ -573,12 +573,12 @@ def _diagnostic_route(self, decision):
             # Keep simple Pico-only routes off the large plan_engine import.
             self.routes[name] = ("light", commands)
         else:
-            self.routes[name] = ("plan", plan_engine.parse_plan(text))
+            self.routes[name] = ("plan", runtime.plan_engine.parse_plan(text))
     kind, route = self.routes[name]
     if kind == "light":
         _run_light_route(PlanContext(self), route)
     else:
-        plan_engine.run_plan(route, PlanContext(self))
+        runtime.plan_engine.run_plan(route, PlanContext(self))
     self.arm.flush()
 
 runtime.Combined.route = _diagnostic_route

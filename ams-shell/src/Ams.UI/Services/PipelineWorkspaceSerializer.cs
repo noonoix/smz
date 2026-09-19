@@ -28,6 +28,25 @@ public static class PipelineWorkspaceSerializer
 
     public static PipelineWorkspace Deserialize(string json)
     {
+        // A legacy .amsj document has the same app marker but a top-level
+        // "steps" array and no pipeline envelope.  System.Text.Json would
+        // otherwise deserialize it as an empty v2 workspace, so detect it
+        // explicitly and let MainViewModel.OpenPipelineWorkspace route it
+        // through DocumentService.Load + PipelineWorkspace.FromLegacy.
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object
+                || root.TryGetProperty("steps", out _)
+                || !root.TryGetProperty("pipelines", out _))
+                throw new InvalidDataException("Legacy AMS script document.");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidDataException("Not an AMS pipeline document.", ex);
+        }
+
         var envelope = JsonSerializer.Deserialize<Envelope>(json, Options)
             ?? throw new InvalidDataException("Not an AMS pipeline document.");
         if (envelope.app != "AMS")

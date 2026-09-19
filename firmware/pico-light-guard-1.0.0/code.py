@@ -5,6 +5,10 @@ import gc
 import sys
 import os as _real_os
 import hashlib as _real_hashlib
+try:
+    import microcontroller as _microcontroller
+except Exception:
+    _microcontroller = None
 
 class _PathCompat:
     @staticmethod
@@ -86,7 +90,9 @@ from combined_guard_runtime import main
 _DEBUG_FILE = "/guard-debug.log"
 _DEBUG_MAX_BYTES = 8192
 _DEBUG_MAX_LINES = 96
+_DEBUG_NVM_BYTES = 1536
 _DEBUG_PERSIST_EVENTS = ("BOOT", "GP4", "ROUTE", "FAIL", "STOP", "CAL")
+
 
 def _debug_trim(text):
     lines = text.splitlines()[-_DEBUG_MAX_LINES:]
@@ -97,33 +103,69 @@ def _debug_trim(text):
             text = text[text.index("\n") + 1:]
     return text
 
+
+def _debug_nvm_read():
+    try:
+        nvm = getattr(_microcontroller, "nvm", None)
+        if nvm is None:
+            return ""
+        raw = bytes(nvm[:_DEBUG_NVM_BYTES]).rstrip(b"\x00")
+        if not raw.startswith(b"CGD1\n"):
+            return ""
+        return raw[5:].decode("utf-8", "replace")
+    except Exception:
+        return ""
+
+
+def _debug_nvm_write(text):
+    try:
+        nvm = getattr(_microcontroller, "nvm", None)
+        if nvm is None:
+            return False
+        payload = (b"CGD1\n" + _debug_trim(text).encode("utf-8", "replace"))[:_DEBUG_NVM_BYTES]
+        padded = payload + (b"\x00" * (_DEBUG_NVM_BYTES - len(payload)))
+        nvm[:_DEBUG_NVM_BYTES] = padded
+        return bytes(nvm[:len(payload)]) == payload
+    except Exception:
+        return False
+
+
+def _debug_file_read():
+    try:
+        with open(_DEBUG_FILE, "r") as fh:
+            return fh.read()
+    except Exception:
+        return ""
+
+
 def _debug_persist(self):
     try:
-        # Windows may have CIRCUITPY mounted while the board is running.
-        # Re-assert the approved writable policy before persisting diagnostics.
+        # Merge both stores, then write NVM first. NVM survives Reset and does
+        # not depend on Windows releasing the CIRCUITPY volume.
+        previous = _debug_file_read() or _debug_nvm_read()
+        payload = _debug_trim(previous + "".join(self.debug_events))
+        nvm_ok = _debug_nvm_write(payload)
         try:
             remount = getattr(runtime.storage, "remount", None)
             if remount is not None:
                 remount("/", readonly=False, disable_concurrent_write_protection=True)
         except Exception:
             pass
-        previous = ""
+        file_ok = False
         try:
-            with open(_DEBUG_FILE, "r") as fh:
-                previous = fh.read()
+            with open(_DEBUG_FILE, "w") as fh:
+                fh.write(payload)
+            file_ok = _debug_file_read() == payload
         except Exception:
             pass
-        payload = _debug_trim(previous + "".join(self.debug_events))
-        with open(_DEBUG_FILE, "w") as fh:
-            fh.write(payload)
-        self.debug_events = []
+        if nvm_ok or file_ok:
+            self.debug_events = []
+            return True
     except Exception:
-        # Keep pending events for a later retry. Diagnostics must never stop
-        # Guard, but silently discarding the only GP4/FAIL record defeats the
-        # purpose of the collector when CIRCUITPY is temporarily busy.
-        return False
-    self.debug_events = []
-    return True
+        pass
+    # Keep pending records for the next event/retry; never lose GP4/FAIL data.
+    return False
+
 
 def _debug_event(self, kind, detail="", persist=False):
     stamp = int(runtime.time.monotonic())
@@ -132,8 +174,7 @@ def _debug_event(self, kind, detail="", persist=False):
     self.debug_events.append(line)
     if len(self.debug_events) > _DEBUG_MAX_LINES:
         self.debug_events = self.debug_events[-_DEBUG_MAX_LINES:]
-    # Mirror diagnostics to the live USB stream so a host can capture a GP4
-    # event even while CIRCUITPY is mounted by Windows and file writes retry.
+    # Live evidence is available even when both persistent stores are busy.
     try:
         self.emit("EVT|DEBUG|" + line.rstrip("\n").replace("|", "/"))
     except Exception:
@@ -141,21 +182,21 @@ def _debug_event(self, kind, detail="", persist=False):
     if persist or any(kind.startswith(prefix) for prefix in _DEBUG_PERSIST_EVENTS):
         _debug_persist(self)
 
+
 def _debug_get(self):
     _debug_persist(self)
-    try:
-        with open(_DEBUG_FILE, "r") as fh:
-            return fh.read()
-    except Exception:
-        return ""
+    return _debug_file_read() or _debug_nvm_read()
+
 
 def _debug_clear(self):
     self.debug_events = []
+    _debug_nvm_write("")
     try:
         with open(_DEBUG_FILE, "w") as fh:
             fh.write("")
     except Exception:
         pass
+
 
 def _debug_emit(self):
     text = _debug_get(self)

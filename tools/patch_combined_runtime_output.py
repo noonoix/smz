@@ -61,8 +61,12 @@ def _run_light_route(owner, name):
             line = raw.strip()
             if not line or line.startswith("#"): continue
             split = line.find("|")
-            if split < 1: raise ValueError("invalid route line")
-            op = line[:split].upper(); args = line[split + 1:]
+            if split < 0:
+                op = line.upper(); args = ""
+                if op != "ENDLOOP": raise ValueError("invalid route line")
+            else:
+                if split < 1: raise ValueError("invalid route line")
+                op = line[:split].upper(); args = line[split + 1:]
             if op == "PLAN":
                 if args != "2": raise ValueError("unsupported PLAN version")
             elif op == "SCREEN":

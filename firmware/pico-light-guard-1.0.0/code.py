@@ -99,6 +99,14 @@ def _debug_trim(text):
 
 def _debug_persist(self):
     try:
+        # Windows may have CIRCUITPY mounted while the board is running.
+        # Re-assert the approved writable policy before persisting diagnostics.
+        try:
+            remount = getattr(runtime.storage, "remount", None)
+            if remount is not None:
+                remount("/", readonly=False, disable_concurrent_write_protection=True)
+        except Exception:
+            pass
         previous = ""
         try:
             with open(_DEBUG_FILE, "r") as fh:

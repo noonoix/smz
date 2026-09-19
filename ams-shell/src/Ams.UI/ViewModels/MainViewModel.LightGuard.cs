@@ -130,7 +130,7 @@ public partial class MainViewModel
             LightGuardCalibrationSynchronized = false;
             LightStateWarning = DescribeProfileOverlaps(LightStateProfiles);
             LightProfileSaveStatus = "کالیبراسیون از Pico دریافت و در پروفایل‌های برنامه ذخیره شد.";
-            LightGuardCalibrationStatus = "دریافت از Pico موفق شد؛ برای تأیید دوطرفه هنوز ارسال به Pico را اجرا نکنید.";
+            LightGuardCalibrationStatus = "دریافت از Pico موفق شد؛ مقادیر برنامه با کالیبراسیون فیزیکی برد جایگزین شدند.";
             Log("phase7 Guard: calibration pulled from Pico and saved to app profiles");
         }
         catch (Exception ex)
@@ -149,11 +149,15 @@ public partial class MainViewModel
             LightGuardCalibrationStatus = "همگام‌سازی مسدود شد: برد متصل نیست.";
             return;
         }
-        await RefreshLightGuardIdentityAsync();
-        if (!LightGuardIdentityValid) return;
-
+        // Sending is a direct app-to-Pico operation. Do not require CALGET/revision
+        // equality first; the six CALSET records are the operation that establishes it.
         try
         {
+            var pong = await _bridge.SendAsync("PING");
+            if (!LightGuardCalibrationProtocol.TryParseIdentity(pong, out var identity) || identity is null || identity.ProfileCount != 6)
+                throw new InvalidOperationException("هویت Pico Guard معتبر نیست یا ۶ پروفایل ندارد.");
+            LightGuardIdentityValid = true;
+            LightGuardIdentityDisplay = $"Combined Guard معتبر · {identity.Version} · نقش {identity.Role} · ۶ پروفایل";
             var revision = LightGuardAppAdapter.ComputeRevision(LightStateProfiles);
             foreach (var profileId in LightGuardCalibrationProtocol.ProfileIds)
             {

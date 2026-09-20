@@ -10,37 +10,60 @@ on:
 
 permissions:
   contents: read
-  statuses: write
 
 jobs:
-  compile:
+  arduino-cli:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Install Arduino CLI, Pro Micro core and HID library
-        id: install
-        shell: bash
-        continue-on-error: true
+      - name: Install CLI
         run: |
-          set +e
-          mkdir -p "$RUNNER_TEMP/arduino-cli-bin"
-          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR="$RUNNER_TEMP/arduino-cli-bin" sh 2>&1 | tee arm27-install.log
-          echo "$RUNNER_TEMP/arduino-cli-bin" >> "$GITHUB_PATH"
-          CLI="$RUNNER_TEMP/arduino-cli-bin/arduino-cli"
-          code=0
-          "$CLI" version 2>&1 | tee -a arm27-install.log || code=1
-          "$CLI" config add board_manager.additional_urls https://raw.githubusercontent.com/sparkfun/Arduino_Boards/main/IDE_Board_Manager/package_sparkfun_index.json 2>&1 | tee -a arm27-install.log || code=1
-          "$CLI" core update-index 2>&1 | tee -a arm27-install.log || code=1
-          "$CLI" core install SparkFun:avr 2>&1 | tee -a arm27-install.log || code=1
-          "$CLI" lib install HID-Project 2>&1 | tee -a arm27-install.log || code=1
-          "$CLI" core list | tee -a arm27-install.log
-          "$CLI" lib list | grep -i HID | tee -a arm27-install.log
-          if ! "$CLI" core list | grep -q 'SparkFun:avr'; then code=1; fi
-          if ! "$CLI" lib list | grep -qi 'HID-Project'; then code=1; fi
-          echo "code=$code" >> "$GITHUB_OUTPUT"
-          exit 0
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR="$RUNNER_TEMP/bin" sh
+          "$RUNNER_TEMP/bin/arduino-cli" version
+
+  sparkfun-core:
+    runs-on: ubuntu-latest
+    needs: arduino-cli
+    steps:
+      - name: Install CLI and SparkFun AVR core
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR="$RUNNER_TEMP/bin" sh
+          CLI="$RUNNER_TEMP/bin/arduino-cli"
+          "$CLI" config add board_manager.additional_urls https://raw.githubusercontent.com/sparkfun/Arduino_Boards/main/IDE_Board_Manager/package_sparkfun_index.json
+          "$CLI" core update-index
+          "$CLI" core install SparkFun:avr
+          "$CLI" core list | grep 'SparkFun:avr'
+
+  hid-project:
+    runs-on: ubuntu-latest
+    needs: arduino-cli
+    steps:
+      - name: Install CLI and HID-Project
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR="$RUNNER_TEMP/bin" sh
+          CLI="$RUNNER_TEMP/bin/arduino-cli"
+          "$CLI" core update-index
+          "$CLI" lib install HID-Project
+          "$CLI" lib list | grep -i 'HID-Project'
+
+  compile:
+    runs-on: ubuntu-latest
+    needs: [sparkfun-core, hid-project]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR="$RUNNER_TEMP/bin" sh
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          CLI="$RUNNER_TEMP/bin/arduino-cli"
+          "$CLI" config add board_manager.additional_urls https://raw.githubusercontent.com/sparkfun/Arduino_Boards/main/IDE_Board_Manager/package_sparkfun_index.json
+          "$CLI" core update-index
+          "$CLI" core install SparkFun:avr
+          "$CLI" lib install HID-Project
       - name: Prepare deterministic sketch layout
-        if: steps.install.outputs.code == '0'
         run: |
           mkdir -p /tmp/arm27 /tmp/arm26
           cp firmware/arm27/ams_board27.ino /tmp/arm27/arm27.ino
@@ -48,42 +71,4 @@ jobs:
           cp firmware/arm26/ams_board26.ino /tmp/arm26/
           cp firmware/arm26/ams_key.h /tmp/arm26/
       - name: Compile for Pro Micro ATmega32U4 5V/16MHz
-        if: steps.install.outputs.code == '0'
-        id: avr
-        shell: bash
-        continue-on-error: true
-        run: |
-          set +e
-          arduino-cli compile --fqbn 'SparkFun:avr:promicro:cpu=16MHzatmega32U4' --warnings all /tmp/arm27 2>&1 | tee arm27-compile.log
-          code=${PIPESTATUS[0]}
-          echo "code=$code" >> "$GITHUB_OUTPUT"
-          exit 0
-      - name: Publish concise diagnostic status
-        if: steps.install.outputs.code != '0' || steps.avr.outputs.code != '0'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          INSTALL_CODE: ${{ steps.install.outputs.code }}
-          COMPILE_CODE: ${{ steps.avr.outputs.code }}
-        shell: bash
-        run: |
-          line=$(grep -m1 -E '(^|: )(fatal error|error:|Error:)' arm27-compile.log arm27-install.log 2>/dev/null | tail -c 105 || true)
-          desc="i=${INSTALL_CODE:-na} c=${COMPILE_CODE:-na} ${line:-see-actions-log}"
-          desc=${desc:0:135}
-          curl -fsS -X POST \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -d "$(jq -nc --arg d "$desc" --arg u "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:"failure",context:"arm27-diagnostic",description:$d,target_url:$u}')" || true
-      - name: Publish success status
-        if: steps.install.outputs.code == '0' && steps.avr.outputs.code == '0'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          curl -fsS -X POST \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -d "$(jq -nc '{state:"success",context:"arm27-diagnostic",description:"ARM 2.7 compiled for Pro Micro 5V/16MHz"}')"
-      - name: Enforce compiler result
-        if: steps.install.outputs.code != '0' || steps.avr.outputs.code != '0'
-        run: exit 1
+        run: arduino-cli compile --fqbn 'SparkFun:avr:promicro:cpu=16MHzatmega32U4' --warnings all /tmp/arm27

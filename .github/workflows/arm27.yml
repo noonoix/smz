@@ -21,7 +21,9 @@ jobs:
           "$CLI" core install arduino:avr
           "$CLI" core install SparkFun:avr
           "$CLI" lib install HID-Project
-      - name: Provide non-secret CI key
-        run: printf '#pragma once\n#include <Arduino.h>\nstatic const uint8_t AMS_PSK[16]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};\n' > firmware/arm26/ams_key.h
+      - name: Prepare non-secret CI sketch
+        run: |
+          cp firmware/arm27/ams_board27.ino firmware/arm27/arm27.ino
+          printf '#pragma once\n#include <Arduino.h>\nstatic const uint8_t AMS_PSK[16]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};\n' > firmware/arm26/ams_key.h
       - name: Compile for Pro Micro ATmega32U4 5V/16MHz
         run: arduino-cli compile --fqbn 'SparkFun:avr:promicro:cpu=16MHzatmega32U4' --warnings all firmware/arm27

@@ -49,23 +49,34 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
-          import subprocess
+          import os
 
-          log = Path('/tmp').joinpath('missing')
-          log = Path(__import__('os').environ['RUNNER_TEMP']) / 'arm27-build.log'
-          text = log.read_text(errors='replace')
+          root = Path(os.environ['RUNNER_TEMP'])
+          text = (root / 'arm27-build.log').read_text(errors='replace')
           for marker in ('USB_VID=0x1D50', 'USB_PID=0x615F'):
               if marker.lower() not in text.lower():
                   raise SystemExit(f'missing compiled USB identity marker: {marker}')
 
-          build = Path(__import__('os').environ['RUNNER_TEMP']) / 'arm27-build'
-          hex_files = list(build.glob('*.hex'))
+          hex_files = list((root / 'arm27-build').glob('*.hex'))
           if len(hex_files) != 1:
               raise SystemExit(f'expected one application HEX, found {len(hex_files)}')
-          binary = build / 'arm27.bin'
-          subprocess.run(['avr-objcopy', '-I', 'ihex', '-O', 'binary', str(hex_files[0]), str(binary)], check=True)
-          payload = binary.read_bytes()
+          flash = bytearray(b'\xff' * 0x8000)
+          upper = 0
+          for raw in hex_files[0].read_text().splitlines():
+              if not raw.startswith(':'):
+                  continue
+              rec = bytes.fromhex(raw[1:])
+              count = rec[0]
+              address = (rec[1] << 8) | rec[2]
+              kind = rec[3]
+              if kind == 0:
+                  start = upper + address
+                  flash[start:start + count] = rec[4:4 + count]
+              elif kind == 4:
+                  upper = ((rec[4] << 8) | rec[5]) << 16
+              elif kind == 1:
+                  break
+          payload = bytes(flash)
           for expected in (b'Classroom Custom Human Input', b'Classroom Studio'):
               if expected not in payload:
                   raise SystemExit(f'custom USB string missing from firmware: {expected!r}')

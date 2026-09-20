@@ -3089,8 +3089,9 @@ class TestRunner
             foreach (var key in schools) if (hx52.Contains('"' + key + '"')) found52++;
             Assert(found52 == schools.Length,
                 "v0.9.52: the identity list carries the six classroom devices schools hand to students");
-            Assert(hx52.Contains("0x0694, 0x0009") && hx52.Contains("0x303A, 0x1001") && hx52.Contains("0x04D8, 0x000A"),
-                "v0.9.52: Pico, LEGO SPIKE and Circuit Playground use their real USB identities");
+            Assert(hx52.Contains("IdeSafeVid") && hx52.Contains("IdeSafeBootPid")
+                   && hx52.Contains("legospike") && hx52.Contains("microchip"),
+                "v0.9.69: classroom profiles use the shared Windows-safe AMS CDC identity");
             Assert(ck52.Contains("(0x0694, 0x0009)") && ck52.Contains("(0x0694, 0x000A)")
                    && ck52.Contains("(0x303A, 0x1001)") && ck52.Contains("(0x303A, 0x1002)"),
                 "v0.9.52: checkup recognises the new devices in both bootloader and application mode");

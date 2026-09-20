@@ -58,6 +58,18 @@ public partial class BoardPrepWindow : Window
 
         _settingsPath = Path.Combine(AppContext.BaseDirectory, "board-prep-settings.json");
         _s = LoadSettings();
+        // v0.9.68 - never reopen a third-party/lab identity as the production default.
+        // The entries remain selectable for diagnostics, but a saved lab profile is reset
+        // to the neutral AMS CDC profile so a stale Logitech/Razer choice cannot be flashed.
+        if (BoardHexService.ModeFor(_s.IdentityKey).LabOnly)
+        {
+            _s.IdentityKey = "none";
+            _s.UseCustomVp = false;
+            _s.CustomVid = "0x1D50";
+            _s.CustomPid = "0x615E";
+            _s.CustomProduct = "AMS USB Serial Device";
+            _s.CustomManuf = "AMS";
+        }
 
         CmbIdentity.ItemsSource = BoardHexService.DeviceModes;
 

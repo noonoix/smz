@@ -1,59 +1,16 @@
 name: ARM 2.7 firmware
-
 on:
   push:
     branches: [fix/v32-profile-and-bundle]
-    paths:
-      - 'firmware/arm26/**'
-      - 'firmware/arm27/**'
-      - '.github/workflows/arm27.yml'
-
+    paths: ['firmware/arm26/**','firmware/arm27/**','.github/workflows/arm27.yml']
 permissions:
   contents: read
-
 jobs:
-  arduino-cli:
+  compile:
     runs-on: ubuntu-latest
-    steps:
-      - name: Install CLI
-        run: |
-          mkdir -p "$RUNNER_TEMP/bin"
-          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR="$RUNNER_TEMP/bin" sh
-          "$RUNNER_TEMP/bin/arduino-cli" version
-
-  sparkfun-core:
-    runs-on: ubuntu-latest
-    needs: arduino-cli
-    steps:
-      - name: Install CLI and SparkFun AVR core
-        run: |
-          mkdir -p "$RUNNER_TEMP/bin"
-          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR="$RUNNER_TEMP/bin" sh
-          CLI="$RUNNER_TEMP/bin/arduino-cli"
-          "$CLI" config add board_manager.additional_urls https://raw.githubusercontent.com/sparkfun/Arduino_Boards/main/IDE_Board_Manager/package_sparkfun_index.json
-          "$CLI" core update-index
-          "$CLI" core install SparkFun:avr
-          "$CLI" core list | grep 'SparkFun:avr'
-
-  hid-project:
-    runs-on: ubuntu-latest
-    needs: arduino-cli
-    steps:
-      - name: Install CLI and HID-Project
-        run: |
-          mkdir -p "$RUNNER_TEMP/bin"
-          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR="$RUNNER_TEMP/bin" sh
-          CLI="$RUNNER_TEMP/bin/arduino-cli"
-          "$CLI" core update-index
-          "$CLI" lib install HID-Project
-          "$CLI" lib list | grep -i 'HID-Project'
-
-  arm26-usb-compatibility-probe:
-    runs-on: ubuntu-latest
-    needs: [sparkfun-core, hid-project]
     steps:
       - uses: actions/checkout@v4
-      - name: Install toolchain
+      - name: Install complete Pro Micro toolchain
         run: |
           mkdir -p "$RUNNER_TEMP/bin"
           curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR="$RUNNER_TEMP/bin" sh
@@ -61,37 +18,15 @@ jobs:
           CLI="$RUNNER_TEMP/bin/arduino-cli"
           "$CLI" config add board_manager.additional_urls https://raw.githubusercontent.com/sparkfun/Arduino_Boards/main/IDE_Board_Manager/package_sparkfun_index.json
           "$CLI" core update-index
+          "$CLI" core install arduino:avr
           "$CLI" core install SparkFun:avr
           "$CLI" lib install HID-Project
-      - name: Prepare ARM 2.6 compatibility probe
-        run: |
-          mkdir -p /tmp/arm26base
-          sed -e 's/USBDevice\.configured()/true/' -e 's/USBDevice\.isSuspended()/false/' firmware/arm26/ams_board26.ino > /tmp/arm26base/arm26base.ino
-          printf '#pragma once\n#include <Arduino.h>\nstatic const uint8_t AMS_PSK[16]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};\n' > /tmp/arm26base/ams_key.h
-      - name: Compile ARM 2.6 compatibility probe
-        run: arduino-cli compile --fqbn 'SparkFun:avr:promicro:cpu=16MHzatmega32U4' --warnings all /tmp/arm26base
-
-  arm27-compile:
-    runs-on: ubuntu-latest
-    needs: [sparkfun-core, hid-project]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install toolchain
-        run: |
-          mkdir -p "$RUNNER_TEMP/bin"
-          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR="$RUNNER_TEMP/bin" sh
-          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
-          CLI="$RUNNER_TEMP/bin/arduino-cli"
-          "$CLI" config add board_manager.additional_urls https://raw.githubusercontent.com/sparkfun/Arduino_Boards/main/IDE_Board_Manager/package_sparkfun_index.json
-          "$CLI" core update-index
-          "$CLI" core install SparkFun:avr
-          "$CLI" lib install HID-Project
-      - name: Prepare ARM 2.7 sketch
+      - name: Prepare non-secret CI sketch
         run: |
           mkdir -p /tmp/arm27 /tmp/arm26
           cp firmware/arm27/ams_board27.ino /tmp/arm27/arm27.ino
           cp firmware/arm27/human_mouse_v3.h /tmp/arm27/
-          sed -e 's/USBDevice\.configured()/true/' -e 's/USBDevice\.isSuspended()/false/' firmware/arm26/ams_board26.ino > /tmp/arm26/ams_board26.ino
+          cp firmware/arm26/ams_board26.ino /tmp/arm26/
           printf '#pragma once\n#include <Arduino.h>\nstatic const uint8_t AMS_PSK[16]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};\n' > /tmp/arm26/ams_key.h
-      - name: Compile ARM 2.7
+      - name: Compile for Pro Micro ATmega32U4 5V/16MHz
         run: arduino-cli compile --fqbn 'SparkFun:avr:promicro:cpu=16MHzatmega32U4' --warnings all /tmp/arm27

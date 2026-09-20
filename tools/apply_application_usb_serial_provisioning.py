@@ -36,29 +36,39 @@ for old, new in replacements:
 boards.write_text(b, encoding="utf-8", newline="\n")
 
 p = prep.read_text(encoding="utf-8")
-replacements = [
-    (
-        'manufacturer: s.Manuf, crossCore: RadioSketchbook.IsChecked == true);',
-        'manufacturer: s.Manuf, serial: BoardHexService.ValidateSerial(TxtSerial.Text), crossCore: false);',
-    ),
-    (
-        'manufacturer: s.Manuf, crossCore: sketchbook);',
-        'manufacturer: s.Manuf, serial: BoardHexService.ValidateSerial(TxtSerial.Text), crossCore: false);',
-    ),
-    (
-        '            bool sketchbook = RadioSketchbook.IsChecked == true;\n            var block = BoardsTxtService.BuildBoardBlock',
-        '            bool sketchbook = RadioSketchbook.IsChecked == true;\n            if (!sketchbook)\n                throw new InvalidOperationException("برای حفظ Serial اختصاصی اپلیکیشن، نصب فقط به‌صورت پکیج خصوصی Sketchbook مجاز است.");\n            var block = BoardsTxtService.BuildBoardBlock',
-    ),
-    (
-        'var pkg = BoardsTxtService.InstallSketchbookPackage(path, block);',
-        'var pkg = BoardsTxtService.InstallSketchbookPackage(path, block, BoardHexService.ValidateSerial(TxtSerial.Text));',
-    ),
-]
-for old, new in replacements:
-    if new in p:
-        continue
+# Preview must show the exact serial and local core.
+old = 'manufacturer: s.Manuf, crossCore: RadioSketchbook.IsChecked == true);'
+new = 'manufacturer: s.Manuf, serial: BoardHexService.ValidateSerial(TxtSerial.Text), crossCore: false);'
+if new not in p:
     if p.count(old) != 1:
-        raise SystemExit(f"BoardPrepWindow patch anchor count {p.count(old)}: {old[:80]}")
+        raise SystemExit(f"preview patch anchor count {p.count(old)}")
+    p = p.replace(old, new, 1)
+
+# Install path: one selected device, serial captured on UI thread, same value in board block and private core.
+old = '''            bool sketchbook = RadioSketchbook.IsChecked == true;
+            if (!sketchbook)
+                throw new InvalidOperationException("برای حفظ Serial اختصاصی اپلیکیشن، نصب فقط به‌صورت پکیج خصوصی Sketchbook مجاز است.");
+            var block = BoardsTxtService.BuildBoardBlock(boardId: s.BoardId, name: s.BoardName,
+                bootVid: s.BootVid, bootPid: s.BootPid, appPid: s.AppPid, product: s.Product,
+                manufacturer: s.Manuf, crossCore: sketchbook);'''
+new = '''            bool sketchbook = RadioSketchbook.IsChecked == true;
+            if (!sketchbook)
+                throw new InvalidOperationException("برای حفظ Serial اختصاصی اپلیکیشن، نصب فقط به‌صورت پکیج خصوصی Sketchbook مجاز است.");
+            if (!int.TryParse(TxtCount.Text, out var identityCount) || identityCount != 1)
+                throw new InvalidOperationException("هر پکیج اپلیکیشن فقط برای یک Serial ساخته می‌شود؛ تعداد را روی ۱ بگذار و برای هر برد جداگانه نصب کن.");
+            var serial = BoardHexService.ValidateSerial(TxtSerial.Text);
+            var block = BoardsTxtService.BuildBoardBlock(boardId: s.BoardId, name: s.BoardName,
+                bootVid: s.BootVid, bootPid: s.BootPid, appPid: s.AppPid, product: s.Product,
+                manufacturer: s.Manuf, serial: serial, crossCore: false);'''
+if new not in p:
+    if p.count(old) != 1:
+        raise SystemExit(f"install block patch anchor count {p.count(old)}")
+    p = p.replace(old, new, 1)
+old = 'var pkg = BoardsTxtService.InstallSketchbookPackage(path, block, BoardHexService.ValidateSerial(TxtSerial.Text));'
+new = 'var pkg = BoardsTxtService.InstallSketchbookPackage(path, block, serial);'
+if new not in p:
+    if p.count(old) != 1:
+        raise SystemExit(f"install call patch anchor count {p.count(old)}")
     p = p.replace(old, new, 1)
 prep.write_text(p, encoding="utf-8", newline="\n")
 print("application USB serial provisioning applied")

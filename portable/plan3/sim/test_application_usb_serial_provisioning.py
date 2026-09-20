@@ -12,11 +12,16 @@ for marker in (
 ):
     assert marker in boards, marker
 for marker in (
-    "serial: BoardHexService.ValidateSerial(TxtSerial.Text)",
-    "crossCore: false",
+    "var serial = BoardHexService.ValidateSerial(TxtSerial.Text);",
+    "serial: serial, crossCore: false",
+    "InstallSketchbookPackage(path, block, serial)",
+    "هر پکیج اپلیکیشن فقط برای یک Serial ساخته می‌شود",
     "نصب فقط به‌صورت پکیج خصوصی Sketchbook مجاز است",
 ):
     assert marker in prep, marker
+assert prep.count("crossCore: false") >= 2
+assert "crossCore: sketchbook" not in prep
+assert "InstallSketchbookPackage(path, block, BoardHexService.ValidateSerial(TxtSerial.Text))" not in prep
 for marker in (
     "AMS_USB_SERIAL_PATCH_V1",
     "STRING_SERIAL[] PROGMEM",

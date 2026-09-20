@@ -1,3 +1,4 @@
+# Application VID/PID/product/manufacturer gate; per-device application serial remains a separate provisioning step.
 name: ARM 2.7 firmware
 on:
   push:

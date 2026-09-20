@@ -27,11 +27,12 @@ public static class BoardsTxtService
     public static string BuildBoardBlock(string boardId = "ams", string name = "Classroom Studio Board",
                                          string bootVid = "0x1D50", string bootPid = "0x615E",
                                          string appPid = "0x615F", string product = "AMS Macro Studio",
-                                         string manufacturer = "AMS", string serial = "AMS-00000000", bool crossCore = false)
+                                         string manufacturer = "AMS", string? serial = null, bool crossCore = false)
     {
         boardId = Regex.Replace(boardId.ToLowerInvariant(), "[^a-z0-9_]", "");
         if (boardId.Length == 0) boardId = "ams";
-        serial = BoardHexService.ValidateSerial(serial);
+        serial = serial is null ? null : BoardHexService.ValidateSerial(serial);
+        var usbSerialLine = serial is null ? "" : boardId + ".build.usb_serial=\"" + serial + "\"\n";
         string core = crossCore ? "arduino:arduino" : "arduino";
         string variant = crossCore ? "arduino:leonardo" : "leonardo";
         return
@@ -62,7 +63,7 @@ public static class BoardsTxtService
             boardId + ".build.pid=" + appPid + "\n" +
             boardId + ".build.usb_product=\"" + product + "\"\n" +
             boardId + ".build.usb_manufacturer=\"" + manufacturer + "\"\n" +
-            boardId + ".build.usb_serial=\"" + serial + "\"\n" +
+            usbSerialLine +
             boardId + ".build.board=AVR_LEONARDO\n" +
             boardId + ".build.core=" + core + "\n" +
             boardId + ".build.variant=" + variant + "\n" +
@@ -223,7 +224,7 @@ public static class BoardsTxtService
     }
 
     /// <summary>Finds the sketchbook folder from the IDE's preferences.txt, else the
-    /// default Documents\Arduino.</summary>
+    /// default Documents\\Arduino.</summary>
     public static string DetectSketchbook()
     {
         var local = Environment.GetEnvironmentVariable("LOCALAPPDATA");

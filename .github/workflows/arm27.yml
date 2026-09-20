@@ -21,7 +21,7 @@ jobs:
           "$CLI" core install arduino:avr
           "$CLI" core install SparkFun:avr
           "$CLI" lib install HID-Project
-          USB_CORE=$(find "$HOME/.arduino15/packages/SparkFun/hardware/avr" -path '*/cores/arduino/USBCore.cpp' -print -quit)
+          USB_CORE=$(find "$HOME/.arduino15/packages/arduino/hardware/avr" -path '*/cores/arduino/USBCore.cpp' -print -quit)
           test -n "$USB_CORE"
           python3 tools/patch_avr_usb_serial.py "$USB_CORE"
       - name: Prepare non-secret CI sketch

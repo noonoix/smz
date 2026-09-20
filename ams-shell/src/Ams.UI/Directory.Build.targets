@@ -7,13 +7,14 @@
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_keyboard_release_safety.py&quot; &quot;$(TargetDir)portable-runtime\combined_guard_runtime.py&quot;" />
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_guard_key_diagnostics.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_restart_route_output.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />
-    <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_restart_route_output.py&quot; &quot;$(TargetDir)portable-runtime\live_light_guard.py" />
+    <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_restart_route_output.py&quot; &quot;$(TargetDir)portable-runtime\live_light_guard.py&quot;" />
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_restart_sequence_output.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_stream_type_output.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_type_typo_character_count.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_stream_human_mouse_output.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />
-    <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_mouse_cooperative_output.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />
+    <!-- Capability must be added before the cooperative wrapper replaces HVER/HCFG/HPAUSE calls. -->
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_stream_human_mouse_capability_output.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />
+    <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_mouse_cooperative_output.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_engine_free_combined_runtime.py&quot; &quot;$(TargetDir)combined-runtime\combined_guard_runtime.py&quot;" />
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_engine_free_combined_runtime.py&quot; &quot;$(TargetDir)portable-runtime\combined_guard_runtime.py&quot;" />
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_engine_free_combined_runtime.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />

@@ -23,45 +23,22 @@ public partial class MainViewModel
         try
         {
             var workspace = CapturePipelineWorkspaceForExport();
-            var written = PortableGuardBundle.Export(
-                dlg.FileName,
-                workspace,
-                LightStateProfiles.ToArray(),
-                _settings,
+            var written = RestartGuardBundle.Export(
+                dlg.FileName, workspace, LightStateProfiles.ToArray(), _settings,
                 (int)SystemParameters.PrimaryScreenWidth,
                 (int)SystemParameters.PrimaryScreenHeight,
-                _currentFile ?? "untitled",
-                Environment.MachineName).ToList();
+                _currentFile ?? "untitled", Environment.MachineName).ToList();
 
-            // v32 has one board source of truth: the root plan in the Guard bundle.
-            // AutoCycle directives are added to that plan, never exported separately.
             var directory = Path.GetDirectoryName(Path.GetFullPath(dlg.FileName))
                 ?? throw new IOException("مسیر خروجی bundle نامعتبر است.");
             var planPath = Path.Combine(directory, "plan.txt");
-            var decoratedPlan = AutoCyclePlanBundle.DecorateRoot(
-                File.ReadAllText(planPath), _settings);
+            var decoratedPlan = AutoCyclePlanBundle.DecorateRoot(File.ReadAllText(planPath), _settings);
             WriteAtomic(planPath, new UTF8Encoding(false).GetBytes(decoratedPlan));
-
-            // plan.txt changed after bundle generation; rebuild the manifest hashes.
-            var hashPath = Path.Combine(directory, "SHA256SUMS.txt");
-            var hashFiles = written
-                .Where(path => !string.Equals(Path.GetFileName(path), "SHA256SUMS.txt", StringComparison.OrdinalIgnoreCase))
-                .Where(File.Exists)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-            var hashes = string.Join(Environment.NewLine, hashFiles.Select(path =>
-                Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))).ToLowerInvariant()
-                + "  " + Path.GetFileName(path))) + Environment.NewLine;
-            WriteAtomic(hashPath, new UTF8Encoding(false).GetBytes(hashes));
+            RestartGuardBundle.RebuildHashes(directory, written);
 
             foreach (var file in written) Log("complete Guard bundle: " + Path.GetFileName(file));
-            Log("complete Guard bundle: AutoCycle embedded in plan.txt; manifest rebuilt");
+            Log("complete Guard bundle: AutoCycle + Restart embedded; manifest rebuilt");
 
-            // The one-click flow owns the complete hand-off. Give CircuitPython
-            // time to reload after a CIRCUITPY write, then reuse the normal
-            // identity/status/sync path. If the board is not connected, the
-            // bundle remains a valid offline export and no false sync is shown.
             var syncMessage = "برد متصل نبود؛ پس از اتصال، فقط Sync کالیبراسیون را اجرا کن.";
             if (_bridge is not null && Connection == ConnectionState.Connected)
             {
@@ -74,14 +51,11 @@ public partial class MainViewModel
                         ? "کالیبراسیون Pico نیز بررسی و Sync شد."
                         : "Bundle ساخته شد؛ Sync کالیبراسیون ناموفق بود و باید جداگانه بررسی شود.";
                 }
-                else
-                {
-                    syncMessage = "Bundle ساخته شد؛ Pico هنوز پس از انتقال آمادهٔ Sync نبود.";
-                }
+                else syncMessage = "Bundle ساخته شد؛ Pico هنوز پس از انتقال آمادهٔ Sync نبود.";
             }
             MessageBox.Show(
                 $"بستهٔ کامل ساخته شد ({written.Count} فایل).\n\n"
-                + "تنظیمات AutoCycle، تمام Macro routeها، Recovery، Resumable، Guard، کالیبراسیون و manifest در همین بسته قرار دارند.\n\n"
+                + "تنظیمات AutoCycle، Restart، تمام Macro routeها، Recovery، Resumable، Guard، کالیبراسیون و manifest در همین بسته قرار دارند.\n\n"
                 + syncMessage,
                 "Complete Pico Guard bundle", MessageBoxButton.OK, MessageBoxImage.Information);
         }
@@ -103,17 +77,7 @@ public partial class MainViewModel
     private static void WriteAtomic(string path, byte[] bytes)
     {
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try
-        {
-            File.WriteAllBytes(temporary, bytes);
-            File.Move(temporary, path, overwrite: true);
-        }
-        finally
-        {
-            if (File.Exists(temporary)) File.Delete(temporary);
-        }
+        try { File.WriteAllBytes(temporary, bytes); File.Move(temporary, path, overwrite: true); }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
-
-    // Legacy export commands remain in their original partial files for serialized-plan
-    // compatibility, but their UI hooks are intentionally disabled in v32.
 }

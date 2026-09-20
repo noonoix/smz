@@ -39,6 +39,8 @@ public static class BoardHexService
     // v0.9.54 - list trimmed at the user's request (BBC micro:bit, Calliope mini, Adafruit,
     // ESP32-S2 and Raspberry Pi removed) and every remaining identity carries its real,
     // researched USB strings so selecting a device fills the board-spec form with defaults.
+    // v0.9.55 - twenty researched macro-less keyboards remain selectable as aliases;
+    // v0.9.69 changes only their emitted USB identity to the shared IDE-safe AMS CDC pair.
     public static readonly DeviceMode[] DeviceModes =
     {
         new("none",      "AMS CDC Serial (پیش‌فرض)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "AMS USB Serial Device", "AMS", false),

@@ -2,7 +2,7 @@ name: ARM 2.7 firmware
 on:
   push:
     branches: [fix/v32-profile-and-bundle]
-    paths: ['firmware/arm26/**','firmware/arm27/**','tools/patch_avr_usb_serial.py','.github/workflows/arm27.yml']
+    paths: ['firmware/arm26/**','firmware/arm27/**','.github/workflows/arm27.yml']
 permissions:
   contents: read
 jobs:
@@ -21,9 +21,6 @@ jobs:
           "$CLI" core install arduino:avr
           "$CLI" core install SparkFun:avr
           "$CLI" lib install HID-Project
-          USB_CORE=$(find "$HOME/.arduino15/packages/arduino/hardware/avr" -path '*/cores/arduino/USBCore.cpp' -print -quit)
-          test -n "$USB_CORE"
-          python3 tools/patch_avr_usb_serial.py "$USB_CORE" AMS-CI-00000001
       - name: Prepare non-secret CI sketch
         shell: bash
         run: |
@@ -53,6 +50,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import os
+
           root = Path(os.environ['RUNNER_TEMP'])
           text = (root / 'arm27-build.log').read_text(errors='replace')
           for marker in ('USB_VID=0x1D50', 'USB_PID=0x615F'):
@@ -71,10 +69,10 @@ jobs:
               elif kind == 4: upper = ((rec[4] << 8) | rec[5]) << 16
               elif kind == 1: break
           payload = bytes(flash)
-          for expected in (b'Classroom Custom Human Input', b'Classroom Studio', b'AMS-CI-00000001'):
-              if expected not in payload: raise SystemExit(f'custom USB value missing: {expected!r}')
+          for expected in (b'Classroom Custom Human Input', b'Classroom Studio'):
+              if expected not in payload: raise SystemExit(f'custom USB string missing: {expected!r}')
           lowered = payload.lower()
           for forbidden in (b'arduino leonardo', b'sparkfun pro micro', b'pro micro', b'leonardo'):
               if forbidden in lowered: raise SystemExit(f'generic board identity leaked: {forbidden!r}')
-          print('ARM 2.7 application VID/PID/strings/serial contract OK')
+          print('ARM 2.7 application USB identity contract OK')
           PY

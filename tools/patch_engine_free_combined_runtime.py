@@ -6,6 +6,22 @@ p = Path(sys.argv[1])
 s = p.read_text(encoding="utf-8")
 
 if p.name == "combined_guard_runtime.py":
+    # A route may end while MDOWN/MCLICK is active.  flush() only drains UART;
+    # it does not release the HID buttons held by the Pro Micro.
+    old_route = "        plan_engine.run_plan(self.routes[name], PlanContext(self)); self.arm.flush()\n"
+    new_route = '''        try:
+            plan_engine.run_plan(self.routes[name], PlanContext(self))
+        finally:
+            # Fail-safe route cleanup: never leave a physical mouse button held
+            # when a route completes, aborts, or raises.
+            self.arm.release(True)
+            self.arm.flush()
+'''
+    if old_route in s:
+        s = s.replace(old_route, new_route, 1)
+    elif new_route not in s:
+        raise SystemExit("missing route cleanup anchor")
+
     old = "import plan_engine\n"
     new = "# Combined Guard routes are executed only by the bounded streaming runner.\n"
     if old in s:

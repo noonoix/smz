@@ -1,14 +1,15 @@
 <Project>
+  <!-- The Combined Guard runtime must stay engine-free at Pico boot; importing plan_engine causes MemoryError. -->
   <Target Name="PatchPackagedKeyboardAndRestartRuntime" AfterTargets="PatchPackagedCombinedGuardRuntime">
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_keyboard_report_id.py&quot; &quot;$(TargetDir)combined-runtime\combined_guard_runtime.py&quot;" />
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_keyboard_report_id.py&quot; &quot;$(TargetDir)portable-runtime\combined_guard_runtime.py&quot;" />
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_guard_key_diagnostics.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_restart_route_output.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_restart_route_output.py&quot; &quot;$(TargetDir)portable-runtime\live_light_guard.py&quot;" />
-    <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_restart_sequence_output.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />
-    <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_stream_type_output.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />
-    <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_stream_human_mouse_output.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />
-    <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_stream_human_mouse_capability_output.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />
+    <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_restart_sequence_output.py&quot; &quot;$(TargetDir)combined-runtime\code.py" />
+    <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_stream_type_output.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot; />
+    <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_stream_human_mouse_output.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot; />
+    <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_stream_human_mouse_capability_output.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot; />
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_engine_free_combined_runtime.py&quot; &quot;$(TargetDir)combined-runtime\combined_guard_runtime.py&quot;" />
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_engine_free_combined_runtime.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />
   </Target>

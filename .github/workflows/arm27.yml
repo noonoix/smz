@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   compile:
@@ -37,4 +38,29 @@ jobs:
           cp firmware/arm26/ams_board26.ino /tmp/arm26/
           cp firmware/arm26/ams_key.h /tmp/arm26/
       - name: Compile for Pro Micro ATmega32U4 5V/16MHz
-        run: arduino-cli compile --fqbn 'SparkFun:avr:promicro:cpu=16MHzatmega32U4' --warnings all /tmp/arm27
+        id: avr
+        shell: bash
+        continue-on-error: true
+        run: |
+          set +e
+          arduino-cli compile --fqbn 'SparkFun:avr:promicro:cpu=16MHzatmega32U4' --warnings all /tmp/arm27 2>&1 | tee arm27-compile.log
+          code=${PIPESTATUS[0]}
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Publish failed compiler output
+        if: steps.avr.outputs.code != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let log = fs.readFileSync('arm27-compile.log', 'utf8');
+            if (log.length > 12000) log = log.slice(-12000);
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `ARM 2.7 compile diagnostic — ${context.sha.slice(0, 12)}`,
+              body: `Automated diagnostic for ${context.sha}.\n\n\`\`\`text\n${log}\n\`\`\``
+            });
+      - name: Enforce compiler result
+        if: steps.avr.outputs.code != '0'
+        run: exit 1

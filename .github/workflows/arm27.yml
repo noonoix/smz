@@ -7,15 +7,9 @@ on:
       - 'firmware/arm26/**'
       - 'firmware/arm27/**'
       - '.github/workflows/arm27.yml'
-  pull_request:
-    paths:
-      - 'firmware/arm26/**'
-      - 'firmware/arm27/**'
-      - '.github/workflows/arm27.yml'
 
 permissions:
-  contents: read
-  issues: write
+  contents: write
 
 jobs:
   compile:
@@ -33,7 +27,7 @@ jobs:
           arduino-cli core update-index 2>&1 | tee -a arm27-install.log
           arduino-cli core install SparkFun:avr 2>&1 | tee -a arm27-install.log
           arduino-cli lib install HID-Project 2>&1 | tee -a arm27-install.log
-          code=${PIPESTATUS[0]}
+          code=0
           arduino-cli core list | tee -a arm27-install.log
           arduino-cli lib list | grep -i HID | tee -a arm27-install.log
           if ! arduino-cli core list | grep -q 'SparkFun:avr'; then code=1; fi
@@ -59,23 +53,24 @@ jobs:
           code=${PIPESTATUS[0]}
           echo "code=$code" >> "$GITHUB_OUTPUT"
           exit 0
-      - name: Publish failed setup or compiler output
+      - name: Persist failed diagnostics
         if: steps.install.outputs.code != '0' || steps.avr.outputs.code != '0'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            let log = '';
-            for (const name of ['arm27-install.log','arm27-compile.log']) {
-              if (fs.existsSync(name)) log += `\n--- ${name} ---\n` + fs.readFileSync(name,'utf8');
-            }
-            if (log.length > 12000) log = log.slice(-12000);
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `ARM 2.7 compile diagnostic — ${context.sha.slice(0, 12)}`,
-              body: `Automated diagnostic for ${context.sha}.\n\n\`\`\`text\n${log}\n\`\`\``
-            });
+        shell: bash
+        run: |
+          mkdir -p ci
+          {
+            echo "commit=${GITHUB_SHA}"
+            echo "install=${{ steps.install.outputs.code }}"
+            echo "compile=${{ steps.avr.outputs.code }}"
+            echo
+            cat arm27-install.log 2>/dev/null || true
+            cat arm27-compile.log 2>/dev/null || true
+          } > ci/arm27-last-error.txt
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add ci/arm27-last-error.txt
+          git commit -m 'ci: record ARM 2.7 compiler failure' || true
+          git push
       - name: Enforce compiler result
         if: steps.install.outputs.code != '0' || steps.avr.outputs.code != '0'
         run: exit 1

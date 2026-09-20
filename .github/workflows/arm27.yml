@@ -9,7 +9,8 @@ on:
       - '.github/workflows/arm27.yml'
 
 permissions:
-  contents: write
+  contents: read
+  statuses: write
 
 jobs:
   compile:
@@ -57,24 +58,32 @@ jobs:
           code=${PIPESTATUS[0]}
           echo "code=$code" >> "$GITHUB_OUTPUT"
           exit 0
-      - name: Publish failed diagnostics branch
+      - name: Publish concise diagnostic status
         if: steps.install.outputs.code != '0' || steps.avr.outputs.code != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INSTALL_CODE: ${{ steps.install.outputs.code }}
+          COMPILE_CODE: ${{ steps.avr.outputs.code }}
         shell: bash
         run: |
-          mkdir -p ci
-          {
-            echo "commit=${GITHUB_SHA}"
-            echo "install=${{ steps.install.outputs.code }}"
-            echo "compile=${{ steps.avr.outputs.code }}"
-            echo
-            cat arm27-install.log 2>/dev/null || true
-            cat arm27-compile.log 2>/dev/null || true
-          } > ci/arm27-last-error.txt
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          git add ci/arm27-last-error.txt
-          git commit -m 'ci: record ARM 2.7 compiler failure' || true
-          git push --force origin HEAD:refs/heads/ci/arm27-diagnostics
+          line=$(grep -m1 -E '(^|: )(fatal error|error:|Error:)' arm27-compile.log arm27-install.log 2>/dev/null | tail -c 105 || true)
+          desc="i=${INSTALL_CODE:-na} c=${COMPILE_CODE:-na} ${line:-see-actions-log}"
+          desc=${desc:0:135}
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -d "$(jq -nc --arg d "$desc" --arg u "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:"failure",context:"arm27-diagnostic",description:$d,target_url:$u}')" || true
+      - name: Publish success status
+        if: steps.install.outputs.code == '0' && steps.avr.outputs.code == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -d "$(jq -nc '{state:"success",context:"arm27-diagnostic",description:"ARM 2.7 compiled for Pro Micro 5V/16MHz"}')"
       - name: Enforce compiler result
         if: steps.install.outputs.code != '0' || steps.avr.outputs.code != '0'
         run: exit 1

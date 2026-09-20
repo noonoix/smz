@@ -33,7 +33,6 @@ public static class BoardHexService
     public static readonly DeviceMode[] DeviceModes =
     {
         new("none",      "AMS CDC Serial (پیش‌فرض)", 0x1D50, 0x615E, 0x02, 0x00, 0x00, "AMS USB Serial Device", "AMS", false),
-        new("generic_cdc", "Generic CDC Serial", 0x1D50, 0x615E, 0x02, 0x00, 0x00, "USB Serial Device", "AMS", false),
         new("stm32",     "STM32 Virtual COM (CDC آزمایشگاهی)",    0x0483, 0x5740, 0x02, 0x00, 0x00, "STM32 Virtual COM Port",    "STMicroelectronics", true),
         new("xiao",      "Seeed XIAO (CDC آزمایشگاهی)",           0x2886, 0x802F, 0x02, 0x00, 0x00, "Seeed XIAO (CDC آزمایشگاهی)",                "Seeed", true),
         new("microchip", "Microchip CDC Demo (CDC آزمایشگاهی)",   0x04D8, 0x000A, 0x02, 0x00, 0x00, "CDC RS-232 Emulation Demo", "Microchip", true),

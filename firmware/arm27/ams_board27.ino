@@ -14,8 +14,12 @@ static void do_halt();
 #undef loop
 #include "human_mouse_v3.h"
 
+static bool arm27_human_command(const char* line){
+  return !strcmp(line,"HVER")||!strncmp(line,"HCFG|",5)||!strncmp(line,"HPAUSE|",7)||!strncmp(line,"HMOVE|",6)||!strncmp(line,"HRANDOM|",8);
+}
 static bool arm27_handle(char* line){
   if(!strcmp(line,"HVER")){send_line("OK|HVER|2.7.0|HMOUSE=1");return true;}
+  if(!arm27_human_command(line))return false;
   return human_mouse_v3_handle(line);
 }
 

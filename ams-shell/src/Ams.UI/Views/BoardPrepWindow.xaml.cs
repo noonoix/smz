@@ -524,9 +524,12 @@ public partial class BoardPrepWindow : Window
             bool sketchbook = RadioSketchbook.IsChecked == true;
             if (!sketchbook)
                 throw new InvalidOperationException("برای حفظ Serial اختصاصی اپلیکیشن، نصب فقط به‌صورت پکیج خصوصی Sketchbook مجاز است.");
+            if (!int.TryParse(TxtCount.Text, out var identityCount) || identityCount != 1)
+                throw new InvalidOperationException("هر پکیج اپلیکیشن فقط برای یک Serial ساخته می‌شود؛ تعداد را روی ۱ بگذار و برای هر برد جداگانه نصب کن.");
+            var serial = BoardHexService.ValidateSerial(TxtSerial.Text);
             var block = BoardsTxtService.BuildBoardBlock(boardId: s.BoardId, name: s.BoardName,
                 bootVid: s.BootVid, bootPid: s.BootPid, appPid: s.AppPid, product: s.Product,
-                manufacturer: s.Manuf, crossCore: sketchbook);
+                manufacturer: s.Manuf, serial: serial, crossCore: false);
             var path = TxtIdePath.Text.Trim();
             if (path.Length == 0) throw new ArgumentException("مسیر نصب خالی است — «🔍 تشخیص خودکار» را بزن یا دستی انتخاب کن.");
             CollectSettings();
@@ -538,7 +541,7 @@ public partial class BoardPrepWindow : Window
                 {
                     if (sketchbook)
                     {
-                        var pkg = BoardsTxtService.InstallSketchbookPackage(path, block, BoardHexService.ValidateSerial(TxtSerial.Text));
+                        var pkg = BoardsTxtService.InstallSketchbookPackage(path, block, serial);
                         return $"✓ پکیج برد در Sketchbook نصب شد:\r\n{pkg}";
                     }
                     var backup = BoardsTxtService.InstallBoardBlock(path, block, s.BoardId);

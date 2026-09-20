@@ -67,7 +67,7 @@ jobs:
         run: |
           mkdir -p /tmp/arm26base
           cp firmware/arm26/ams_board26.ino /tmp/arm26base/arm26base.ino
-          cp firmware/arm26/ams_key.h /tmp/arm26base/
+          printf '#pragma once\n#include <Arduino.h>\nstatic const uint8_t AMS_PSK[16]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};\n' > /tmp/arm26base/ams_key.h
       - name: Compile ARM 2.6 baseline
         run: arduino-cli compile --fqbn 'SparkFun:avr:promicro:cpu=16MHzatmega32U4' --warnings all /tmp/arm26base
 
@@ -92,6 +92,6 @@ jobs:
           cp firmware/arm27/ams_board27.ino /tmp/arm27/arm27.ino
           cp firmware/arm27/human_mouse_v3.h /tmp/arm27/
           cp firmware/arm26/ams_board26.ino /tmp/arm26/
-          cp firmware/arm26/ams_key.h /tmp/arm26/
+          printf '#pragma once\n#include <Arduino.h>\nstatic const uint8_t AMS_PSK[16]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};\n' > /tmp/arm26/ams_key.h
       - name: Compile ARM 2.7
         run: arduino-cli compile --fqbn 'SparkFun:avr:promicro:cpu=16MHzatmega32U4' --warnings all /tmp/arm27

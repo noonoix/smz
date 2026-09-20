@@ -37,12 +37,12 @@ if "chars_since_typo += 1" not in s:
     if end < 0:
         end = len(s)
     region = s[start:end]
-    matches = list(re.finditer(r"(?m)^(?P<indent>[ \t]*)j\s*\+=\s*1\s*\n(?P<next>[ \t]*)i\s*=\s*end\s*$", region))
+    matches = list(re.finditer(r"(?m)^(?P<indent>[ \t]*)j\s*\+=\s*1\s*$", region))
     if len(matches) != 1:
         raise SystemExit("missing TYPE typo increment anchor: found " + str(len(matches)))
     m = matches[0]
     indent = m.group("indent")
-    replacement = indent + "chars_since_typo += 1\n" + indent + "j += 1\n" + m.group("next") + "i = end"
+    replacement = indent + "chars_since_typo += 1\n" + indent + "j += 1"
     region = region[:m.start()] + replacement + region[m.end():]
     s = s[:start] + region + s[end:]
 

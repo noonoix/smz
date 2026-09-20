@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory() as td:
         subprocess.run([sys.executable, str(diag_patch), str(target)], check=True)
     text = target.read_text(encoding="utf-8")
     py_compile.compile(str(target), doraise=True)
-    for marker in ("press-start", "pressed", "release-start", "released", "cleanup-failed", "CLEANUP/keyboard", "CLEANUP/arm"):
+    for marker in ("press-start", "press-index=", "press-ok=", "pressed", "release-start", "release-index=", "released", "cleanup-failed", "CLEANUP/keyboard", "CLEANUP/arm"):
         assert marker in text
     assert "primary = None" in text and "if primary is None:" in text
-print("Guard keyboard diagnostics: HID stages visible and cleanup cannot mask a primary route exception")
+print("Guard keyboard diagnostics: per-key HID stages visible and cleanup cannot mask a primary route exception")

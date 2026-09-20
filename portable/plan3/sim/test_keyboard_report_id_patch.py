@@ -22,8 +22,10 @@ def main():
         assert text.count("self.device.send_report(self.report, 1)") == 1
         assert "except (TypeError, NotImplementedError):" in text
         assert text.count("self.device.send_report(self.report)") == 1
+        assert "duplicate = False" in text
+        assert "if code in self.report[2:]:" not in text
         assert text.count("def _send(self):") == 1
-    print("keyboard report-id compatibility fallback: PASS")
+    print("keyboard report-id and allocation-free membership patch: PASS")
 
 
 if __name__ == "__main__":

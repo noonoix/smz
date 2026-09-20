@@ -3200,14 +3200,26 @@ class TestRunner
             }
 
             var mc = BoardHexService.DefaultsFor("microchip");
-            Assert(mc.BoardId == "microchip" && mc.BootVid == "0x04D8" && mc.BootPid == "0x000A"
-                   && mc.AppPid == "0x000B" && mc.Product == "CDC RS-232 Emulation Demo"
+            Assert(mc.BoardId == "microchip" && mc.BootVid == "0x1D50" && mc.BootPid == "0x615E"
+                   && mc.AppPid == "0x615F" && mc.Product == "CDC RS-232 Emulation Demo"
                    && mc.Manufacturer == "Microchip",
-                "v0.9.55: the Microchip defaults match the reference tool's board-spec card");
+                "v0.9.69: the Microchip profile keeps its strings but uses the safe AMS CDC pair");
             var stm = BoardHexService.DefaultsFor("stm32");
-            Assert(stm.BootVid == "0x0483" && stm.BootPid == "0x5740" && stm.AppPid == "0x5741"
+            Assert(stm.BootVid == "0x1D50" && stm.BootPid == "0x615E" && stm.AppPid == "0x615F"
                    && stm.Product == "STM32 Virtual COM Port" && stm.Manufacturer == "STMicroelectronics",
-                "v0.9.55: the STM32 defaults are the real USB strings of that device");
+                "v0.9.69: the STM32 profile keeps its strings but uses the safe AMS CDC pair");
+            Assert(BoardHexService.DeviceModes.All(m => m.Vid == BoardHexService.IdeSafeVid
+                   && m.Pid == BoardHexService.IdeSafeBootPid && m.ClassType == BoardHexService.IdeSafeClass),
+                "v0.9.69: every selectable profile emits the same Windows-safe CDC identity");
+            try
+            {
+                BoardHexService.EnsureIdeSafeOverride(0x046D, 0xC33C);
+                Assert(false, "v0.9.69: third-party VID/PID override is rejected");
+            }
+            catch (ArgumentException)
+            {
+                Assert(true, "v0.9.69: third-party VID/PID override is rejected");
+            }
             var dflt = BoardHexService.DefaultsFor("none");
             Assert(dflt.BoardId == "ams" && dflt.BoardName == "Classroom Studio Board",
                 "v0.9.55: the AMS preset keeps the ams board id and Classroom Studio Board name");
@@ -3289,21 +3301,22 @@ class TestRunner
             Assert(kb55.All(k =>
                 {
                     var m = BoardHexService.ModeFor(k.Item1);
-                    return m.Key == k.Item1 && m.Vid == k.Item2 && m.Pid == k.Item3 && m.ClassType == 0x02;
+                    return m.Key == k.Item1 && m.Vid == BoardHexService.IdeSafeVid
+                           && m.Pid == BoardHexService.IdeSafeBootPid && m.ClassType == BoardHexService.IdeSafeClass;
                 }),
-                "v0.9.55: every keyboard preset keeps its researched VID/PID and stays CDC (class 0x02)");
+                "v0.9.69: every keyboard profile uses the Windows-safe AMS CDC pair");
 
             Assert(kb55.All(k =>
                 {
                     var d = BoardHexService.DefaultsFor(k.Item1);
-                    return d.BootVid == "0x" + k.Item2.ToString("X4") && d.BootPid == "0x" + k.Item3.ToString("X4") && d.AppPid == "0x" + (k.Item3 + 1).ToString("X4")
+                    return d.BootVid == "0x1D50" && d.BootPid == "0x615E" && d.AppPid == "0x615F"
                            && d.Product.Length > 0 && d.Manufacturer.Length > 0;
                 }),
-                "v0.9.55: selecting a keyboard prefills the board-spec defaults (product + manufacturer)");
+                "v0.9.69: selecting a keyboard profile keeps custom strings but uses safe board specs");
 
-            Assert(kb55.All(k => BoardCheckupService.ClassifyPort(k.Item2, k.Item3).Name is not null
-                                 && BoardCheckupService.ClassifyPort(k.Item2, k.Item3 + 1).Name is not null),
-                "v0.9.55: the checkup tab recognises both the bootloader and the application PID");
+            Assert(BoardCheckupService.ClassifyPort(BoardHexService.IdeSafeVid, BoardHexService.IdeSafeBootPid).Name is not null
+                   && BoardCheckupService.ClassifyPort(BoardHexService.IdeSafeVid, BoardHexService.IdeSafeApplicationPid).Name is not null,
+                "v0.9.69: the checkup tab recognises the shared safe bootloader and application pair");
 
             Assert(BoardHexService.DeviceModes.Select(m => m.Key).Distinct().Count() == BoardHexService.DeviceModes.Length,
                 "v0.9.55: no duplicate device-mode keys after the twenty additions");

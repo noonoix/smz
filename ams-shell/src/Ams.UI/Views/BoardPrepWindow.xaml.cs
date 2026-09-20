@@ -71,6 +71,18 @@ public partial class BoardPrepWindow : Window
             _s.CustomManuf = "AMS";
         }
 
+        // v0.9.69 — old settings may contain a third-party VID/PID from the
+        // previous lab-identity build. Clear only that unsafe override; keep the
+        // user's selected profile, product and unique serial.
+        if (_s.UseCustomVp &&
+            (!string.Equals(_s.CustomVid.Trim(), "0x1D50", StringComparison.OrdinalIgnoreCase) ||
+             !string.Equals(_s.CustomPid.Trim(), "0x615E", StringComparison.OrdinalIgnoreCase)))
+        {
+            _s.UseCustomVp = false;
+            _s.CustomVid = "0x1D50";
+            _s.CustomPid = "0x615E";
+        }
+
         CmbIdentity.ItemsSource = BoardHexService.DeviceModes;
 
         TxtSerial.Text = _s.Serial;
@@ -251,25 +263,24 @@ public partial class BoardPrepWindow : Window
     private (int? Vid, int? Pid, int Cls, int Sub, int Proto, string? Product, string? Manuf) ResolveIdentityConfig()
     {
         var preset = CurrentIdentity;
-        int? vid = null, pid = null;
-        string? product = null, manuf = null;
-        if (preset.Key != "none")
-        {
-            vid = preset.Vid;
-            pid = preset.Pid;
-            product = preset.Product;
-            manuf = preset.Manufacturer;
-        }
+        // Every selectable profile is forced through the same Windows-safe CDC identity.
+        // The selected profile still controls the visible product/manufacturer strings and
+        // the per-board serial, but never the VID/PID that Windows uses for driver binding.
+        int vid = BoardHexService.IdeSafeVid;
+        int pid = BoardHexService.IdeSafeBootPid;
         if (ChkCustom.IsChecked == true)
         {
-            vid = BoardHexService.ParseVidPid(TxtVid.Text, "VID");
-            pid = BoardHexService.ParseVidPid(TxtPid.Text, "PID");
+            var customVid = BoardHexService.ParseVidPid(TxtVid.Text, "VID");
+            var customPid = BoardHexService.ParseVidPid(TxtPid.Text, "PID");
+            BoardHexService.EnsureIdeSafeOverride(customVid, customPid);
         }
+        string? product = preset.Product;
+        string? manuf = preset.Manufacturer;
         var cp = BoardHexService.ValidateUsbString(TxtProduct.Text, "نام محصول");
         var cm = BoardHexService.ValidateUsbString(TxtManuf.Text, "سازنده");
         if (cp.Length > 0) product = cp;
         if (cm.Length > 0) manuf = cm;
-        return (vid, pid, preset.ClassType, preset.Subclass, preset.Protocol, product, manuf);
+        return (vid, pid, BoardHexService.IdeSafeClass, 0x00, 0x00, product, manuf);
     }
 
     private void BtnRandom_Click(object sender, RoutedEventArgs e)
@@ -424,16 +435,17 @@ public partial class BoardPrepWindow : Window
     private (string BootVid, string BootPid, string AppPid, string Product, string Manuf) ResolveBoardNumbers()
     {
         var preset = CurrentIdentity;
-        int vid = preset.Vid, pid = preset.Pid;
-        string product = preset.Product, manuf = preset.Manufacturer;
         if (ChkCustom.IsChecked == true)
         {
-            vid = BoardHexService.ParseVidPid(TxtVid.Text, "VID");
-            pid = BoardHexService.ParseVidPid(TxtPid.Text, "PID");
+            var customVid = BoardHexService.ParseVidPid(TxtVid.Text, "VID");
+            var customPid = BoardHexService.ParseVidPid(TxtPid.Text, "PID");
+            BoardHexService.EnsureIdeSafeOverride(customVid, customPid);
         }
+        string product = preset.Product, manuf = preset.Manufacturer;
         if (TxtProduct.Text.Trim().Length > 0) product = TxtProduct.Text.Trim();
         if (TxtManuf.Text.Trim().Length > 0) manuf = TxtManuf.Text.Trim();
-        return ($"0x{vid:X4}", $"0x{pid:X4}", $"0x{pid + 1:X4}", product, manuf);
+        return ($"0x{BoardHexService.IdeSafeVid:X4}", $"0x{BoardHexService.IdeSafeBootPid:X4}",
+                $"0x{BoardHexService.IdeSafeApplicationPid:X4}", product, manuf);
     }
 
     private void UpdatePreview()
@@ -514,11 +526,19 @@ public partial class BoardPrepWindow : Window
         var d = BoardHexService.DefaultsFor(CurrentIdentity.Key);
         static string Pick(System.Windows.Controls.TextBox? box, string fallback)
             => box is not null && box.Text.Trim().Length > 0 ? box.Text.Trim() : fallback;
+        var bootVid = Pick(TxtBootVid, n.BootVid);
+        var bootPid = Pick(TxtBootPid, n.BootPid);
+        var appPid = Pick(TxtAppPid, n.AppPid);
+        BoardHexService.EnsureIdeSafeOverride(
+            BoardHexService.ParseVidPid(bootVid, "بوت‌لودر VID"),
+            BoardHexService.ParseVidPid(bootPid, "بوت‌لودر PID"));
+        if (BoardHexService.ParseVidPid(appPid, "اپلیکیشن PID") != BoardHexService.IdeSafeApplicationPid)
+            throw new InvalidOperationException($"اپلیکیشن PID باید 0x{BoardHexService.IdeSafeApplicationPid:X4} باشد تا Arduino IDE پورت را شناسایی کند.");
         return (BoardHexService.SanitizeBoardId(Pick(TxtBoardId, d.BoardId)),
                 Pick(TxtBoardName, d.BoardName),
-                Pick(TxtBootVid, n.BootVid),
-                Pick(TxtBootPid, n.BootPid),
-                Pick(TxtAppPid, n.AppPid),
+                $"0x{BoardHexService.IdeSafeVid:X4}",
+                $"0x{BoardHexService.IdeSafeBootPid:X4}",
+                $"0x{BoardHexService.IdeSafeApplicationPid:X4}",
                 Pick(TxtBoardProduct, n.Product),
                 Pick(TxtBoardManuf, n.Manuf));
     }

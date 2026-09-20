@@ -57,9 +57,11 @@ jobs:
               if marker.lower() not in text.lower():
                   raise SystemExit(f'missing compiled USB identity marker: {marker}')
 
-          hex_files = list((root / 'arm27-build').glob('*.hex'))
+          hex_files = [p for p in (root / 'arm27-build').glob('*.hex')
+                       if not p.name.endswith('.with_bootloader.hex')]
           if len(hex_files) != 1:
-              raise SystemExit(f'expected one application HEX, found {len(hex_files)}')
+              names = ', '.join(p.name for p in (root / 'arm27-build').glob('*.hex'))
+              raise SystemExit(f'expected one application-only HEX; found: {names}')
           flash = bytearray(b'\xff' * 0x8000)
           upper = 0
           for raw in hex_files[0].read_text().splitlines():

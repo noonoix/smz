@@ -6,7 +6,35 @@ p = Path(sys.argv[1])
 s = p.read_text(encoding="utf-8")
 
 if p.name == "combined_guard_runtime.py":
-    # A route may end while MDOWN/MCLICK is active.  flush() only drains UART;
+    # Stop is an emergency path. Waiting for a HALT acknowledgement while the
+    # arm is in a human-mouse wait can delay or lose the button-up frames.
+    old_abort = '''    def abort(self):
+        try: self.send("HALT", 1.5)
+        except Exception: pass
+        self.release(True)
+'''
+    new_abort = '''    def abort(self):
+        # Nonblocking fail-safe stop: queue HALT and explicit MUP frames first,
+        # then drain replies. Do not wait for an acknowledgement before sending
+        # the button-up frames; an in-flight HMOVE/MCLICK may be aborting.
+        for line in ("HALT", "MUP|left", "MUP|right", "MUP|middle"):
+            try:
+                self.write(line)
+                time.sleep(.003)
+            except Exception:
+                pass
+        end = time.monotonic() + .35
+        while time.monotonic() < end:
+            self.pump()
+            time.sleep(.002)
+        self.held.clear(); self.pending = 0
+'''
+    if old_abort in s:
+        s = s.replace(old_abort, new_abort, 1)
+    elif new_abort not in s:
+        raise SystemExit("missing Arm.abort anchor")
+
+    # A route may end while MDOWN/MCLICK is active. flush() alone drains UART;
     # it does not release the HID buttons held by the Pro Micro.
     old_route = "        plan_engine.run_plan(self.routes[name], PlanContext(self)); self.arm.flush()\n"
     new_route = '''        try:

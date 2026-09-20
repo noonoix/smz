@@ -2,7 +2,7 @@ name: ARM 2.7 firmware
 on:
   push:
     branches: [fix/v32-profile-and-bundle]
-    paths: ['firmware/arm26/**','firmware/arm27/**','.github/workflows/arm27.yml']
+    paths: ['firmware/arm26/**','firmware/arm27/**','tools/patch_avr_usb_serial.py','.github/workflows/arm27.yml']
 permissions:
   contents: read
 jobs:
@@ -21,6 +21,9 @@ jobs:
           "$CLI" core install arduino:avr
           "$CLI" core install SparkFun:avr
           "$CLI" lib install HID-Project
+          USB_CORE=$(find "$HOME/.arduino15/packages/SparkFun/hardware/avr" -path '*/cores/arduino/USBCore.cpp' -print -quit)
+          test -n "$USB_CORE"
+          python3 tools/patch_avr_usb_serial.py "$USB_CORE"
       - name: Prepare non-secret CI sketch
         shell: bash
         run: |
@@ -42,6 +45,7 @@ jobs:
             --build-property 'build.pid=0x615F' \
             --build-property 'build.usb_product="Classroom Custom Human Input"' \
             --build-property 'build.usb_manufacturer="Classroom Studio"' \
+            --build-property 'compiler.cpp.extra_flags=-DUSB_SERIAL="AMS-CI-00000001"' \
             --output-dir "$RUNNER_TEMP/arm27-build" \
             --verbose --warnings all firmware/arm27 2>&1 | tee "$RUNNER_TEMP/arm27-build.log"
       - name: Verify final application identity
@@ -53,7 +57,7 @@ jobs:
 
           root = Path(os.environ['RUNNER_TEMP'])
           text = (root / 'arm27-build.log').read_text(errors='replace')
-          for marker in ('USB_VID=0x1D50', 'USB_PID=0x615F'):
+          for marker in ('USB_VID=0x1D50', 'USB_PID=0x615F', 'USB_SERIAL='):
               if marker.lower() not in text.lower():
                   raise SystemExit(f'missing compiled USB identity marker: {marker}')
 
@@ -79,12 +83,12 @@ jobs:
               elif kind == 1:
                   break
           payload = bytes(flash)
-          for expected in (b'Classroom Custom Human Input', b'Classroom Studio'):
+          for expected in (b'Classroom Custom Human Input', b'Classroom Studio', b'AMS-CI-00000001'):
               if expected not in payload:
-                  raise SystemExit(f'custom USB string missing from firmware: {expected!r}')
+                  raise SystemExit(f'custom USB value missing from firmware: {expected!r}')
           lowered = payload.lower()
           for forbidden in (b'arduino leonardo', b'sparkfun pro micro', b'pro micro', b'leonardo'):
               if forbidden in lowered:
                   raise SystemExit(f'generic board identity leaked into application firmware: {forbidden!r}')
-          print('ARM 2.7 application USB identity contract OK')
+          print('ARM 2.7 application VID/PID/strings/serial contract OK')
           PY

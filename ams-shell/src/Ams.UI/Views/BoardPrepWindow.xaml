@@ -145,7 +145,7 @@
                                 <TextBlock Text="تعداد فایل (۱–۵۰۰):" VerticalAlignment="Center" Margin="14,0,6,0" TextAlignment="Right" />
                                 <TextBox x:Name="TxtCount" FlowDirection="LeftToRight" Width="56" Text="1" FontFamily="Consolas" />
                             </StackPanel>
-                            <TextBlock Text="بیش از یک فایل = هر فایل یک سریال تصادفی تازه با همین پیشوند می‌گیرد."
+                            <TextBlock Text="تعداد بیشتر از ۱ = سریال‌های AMS-0001، AMS-0002… و نام محصول یکتا ساخته می‌شود؛ برای نام دلخواه از &#123;n&#125; یا &#123;id&#125; استفاده کن."
                                        Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap" TextAlignment="Right" />
                         </StackPanel>
                     </Border>

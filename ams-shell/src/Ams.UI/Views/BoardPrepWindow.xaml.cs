@@ -277,24 +277,49 @@ public partial class BoardPrepWindow : Window
         if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK) TxtOutputDir.Text = dlg.SelectedPath;
     }
 
+    // Fleet identity helpers: one deterministic profile per physical board.  VID/PID and
+    // manufacturer may be shared by a product family, but Product and Serial are never
+    // silently reused across the generated set.
+    private static string FleetProduct(string template, int number, int count)
+    {
+        var value = (template ?? "").Trim();
+        if (value.Length == 0) value = "AMS Macro Studio";
+        var token = number.ToString("D2");
+        bool templated = value.Contains("{n}", StringComparison.OrdinalIgnoreCase)
+                         || value.Contains("{id}", StringComparison.OrdinalIgnoreCase);
+        value = value.Replace("{n}", token, StringComparison.OrdinalIgnoreCase)
+                     .Replace("{id}", token, StringComparison.OrdinalIgnoreCase);
+        if (count > 1 && !templated) value += " " + token;
+        return BoardHexService.ValidateUsbString(value, "نام محصول");
+    }
+
+    private static string FleetSerial(string prefix, int number, int count, string single)
+    {
+        if (count == 1) return BoardHexService.ValidateSerial(single);
+        var p = (prefix ?? "").Trim();
+        if (p.Length == 0) p = "AMS";
+        return BoardHexService.ValidateSerial($"{p}-{number:D4}");
+    }
+
     private async void BtnGenerate_Click(object sender, RoutedEventArgs e)
     {
         try
         {
             if (!int.TryParse(TxtCount.Text, out int count) || count < 1 || count > 500)
                 throw new ArgumentException("تعداد باید یک عدد بین ۱ تا ۵۰۰ باشد");
-            var serials = new List<string>();
-            if (count == 1)
-            {
-                serials.Add(BoardHexService.ValidateSerial(TxtSerial.Text));
-            }
-            else
-            {
-                var prefix = TxtPrefix.Text.Trim();
-                if (prefix.Length == 0) prefix = "AMS";
-                for (int i = 0; i < count; i++) serials.Add(BoardHexService.GenerateRandomSerial(prefix));
-            }
             var cfg = ResolveIdentityConfig();
+            var productTemplate = TxtProduct.Text.Trim().Length > 0
+                ? TxtProduct.Text.Trim()
+                : (cfg.Product ?? CurrentIdentity.Product);
+            var fleet = Enumerable.Range(1, count)
+                .Select(number => (Number: number,
+                    Serial: FleetSerial(TxtPrefix.Text, number, count, TxtSerial.Text),
+                    Product: FleetProduct(productTemplate, number, count)))
+                .ToList();
+            if (fleet.Select(x => x.Serial).Distinct(StringComparer.OrdinalIgnoreCase).Count() != fleet.Count)
+                throw new ArgumentException("Serialهای تولیدشده تکراری هستند؛ پیشوند یا تعداد را تغییر بده.");
+            if (fleet.Select(x => x.Product).Distinct(StringComparer.OrdinalIgnoreCase).Count() != fleet.Count)
+                throw new ArgumentException("نام‌های محصول تولیدشده تکراری هستند؛ در نام محصول از {n} یا {id} استفاده کن.");
             var caterina = TxtCaterina.Text.Trim();
             if (!File.Exists(caterina))
                 throw new FileNotFoundException("Caterina.hex پیدا نشد — از کارت «مسیرها» مسیر درست را انتخاب کن.");
@@ -319,23 +344,51 @@ public partial class BoardPrepWindow : Window
                         ? $"هویت جدید: VID 0x{cfg.Vid:X4}  PID 0x{cfg.Pid:X4}  class 0x{cfg.Cls:X2}"
                         : "هویت دستگاه بدون تغییر می‌ماند (فقط سریال پچ می‌شود)");
                     int okCount = 0, errCount = 0;
-                    foreach (var serial in serials)
+                    var manifest = new List<object>();
+                    foreach (var board in fleet)
                     {
                         try
                         {
-                            var patched = BoardHexService.PatchHex(flash, serial, cfg.Vid, cfg.Pid,
-                                cfg.Cls, cfg.Sub, cfg.Proto, cfg.Product, cfg.Manuf);
-                            File.WriteAllText(Path.Combine(outDir, $"Caterina-{serial}.hex"),
+                            var patched = BoardHexService.PatchHex(flash, board.Serial, cfg.Vid, cfg.Pid,
+                                cfg.Cls, cfg.Sub, cfg.Proto, board.Product, cfg.Manuf);
+                            var fileName = $"Caterina-{board.Serial}.hex";
+                            File.WriteAllText(Path.Combine(outDir, fileName),
                                 BoardHexService.ToHex(patched), Encoding.ASCII);
-                            lines.Add($"  ✓ Caterina-{serial}.hex");
+                            var profileName = $"Board-{board.Number:D2}-{board.Serial}.json";
+                            var profile = new
+                            {
+                                schema = "ams-board-profile-v1",
+                                boardNumber = board.Number,
+                                serial = board.Serial,
+                                product = board.Product,
+                                manufacturer = cfg.Manuf,
+                                bootVid = cfg.Vid,
+                                bootPid = cfg.Pid,
+                                applicationPid = cfg.Pid is null ? null : cfg.Pid + 1,
+                                bootloaderHex = fileName,
+                                applicationBuildRequired = true,
+                                applicationBuildNote = "Arduino IDE را با همین Serial و Product کامپایل کن"
+                            };
+                            File.WriteAllText(Path.Combine(outDir, profileName),
+                                JsonSerializer.Serialize(profile, new JsonSerializerOptions { WriteIndented = true }), Encoding.UTF8);
+                            manifest.Add(profile);
+                            lines.Add($"  ✓ {fileName} · {board.Product} · {board.Serial}");
                             okCount++;
                         }
                         catch (Exception ex)
                         {
-                            lines.Add($"  ✗ {serial}: {ex.Message}");
+                            lines.Add($"  ✗ {board.Serial}: {ex.Message}");
                             errCount++;
                         }
                     }
+                    File.WriteAllText(Path.Combine(outDir, "fleet-manifest.json"),
+                        JsonSerializer.Serialize(new { schema = "ams-board-fleet-v1", count = manifest.Count, boards = manifest },
+                            new JsonSerializerOptions { WriteIndented = true }), Encoding.UTF8);
+                    File.WriteAllText(Path.Combine(outDir, "README-fleet-fa.txt"),
+                        "برای هر برد: ابتدا HEX بوت‌لودر متناظر با همان Serial را با ISP نصب کن؛ سپس Application را با همان Product و Serial در Arduino IDE کامپایل و Upload کن.
+" +
+                        "هرگز HEX بوت‌لودر یک برد را روی برد دیگر استفاده نکن.
+", Encoding.UTF8);
                     return (lines, okCount, errCount);
                 });
                 foreach (var l in result.lines) Log(l);

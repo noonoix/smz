@@ -23,6 +23,7 @@ public partial class MainViewModel
         try
         {
             var workspace = CapturePipelineWorkspaceForExport();
+            // RestartGuardBundle wraps PortableGuardBundle.Export, then adds the post-reboot route.
             var written = RestartGuardBundle.Export(
                 dlg.FileName, workspace, LightStateProfiles.ToArray(), _settings,
                 (int)SystemParameters.PrimaryScreenWidth,

@@ -27,10 +27,11 @@ public static class BoardsTxtService
     public static string BuildBoardBlock(string boardId = "ams", string name = "Classroom Studio Board",
                                          string bootVid = "0x1D50", string bootPid = "0x615E",
                                          string appPid = "0x615F", string product = "AMS Macro Studio",
-                                         string manufacturer = "AMS", bool crossCore = false)
+                                         string manufacturer = "AMS", string serial = "AMS-00000000", bool crossCore = false)
     {
         boardId = Regex.Replace(boardId.ToLowerInvariant(), "[^a-z0-9_]", "");
         if (boardId.Length == 0) boardId = "ams";
+        serial = BoardHexService.ValidateSerial(serial);
         string core = crossCore ? "arduino:arduino" : "arduino";
         string variant = crossCore ? "arduino:leonardo" : "leonardo";
         return
@@ -61,6 +62,7 @@ public static class BoardsTxtService
             boardId + ".build.pid=" + appPid + "\n" +
             boardId + ".build.usb_product=\"" + product + "\"\n" +
             boardId + ".build.usb_manufacturer=\"" + manufacturer + "\"\n" +
+            boardId + ".build.usb_serial=\"" + serial + "\"\n" +
             boardId + ".build.board=AVR_LEONARDO\n" +
             boardId + ".build.core=" + core + "\n" +
             boardId + ".build.variant=" + variant + "\n" +
@@ -158,7 +160,7 @@ public static class BoardsTxtService
     /// <summary>Installs the board as a standalone sketchbook hardware package (no admin,
     /// survives IDE updates). platform.txt is copied from the IDE when available so the
     /// avrdude upload recipes exist; otherwise the fallback template is written.</summary>
-    public static string InstallSketchbookPackage(string sketchbookPath, string block)
+    public static string InstallSketchbookPackage(string sketchbookPath, string block, string serial)
     {
         var pkg = Path.Combine(sketchbookPath, "hardware", "ams", "avr");
         Directory.CreateDirectory(pkg);
@@ -178,6 +180,7 @@ public static class BoardsTxtService
         {
             File.WriteAllText(Path.Combine(pkg, "platform.txt"), PlatformFallback);
         }
+        DeviceSpecificAvrCoreService.Install(pkg, serial);
         return pkg;
     }
 

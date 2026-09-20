@@ -380,7 +380,7 @@ public partial class BoardPrepWindow : Window
             if (TxtBoardSpecs1 is not null) TxtBoardSpecs1.Text = specs;
             TxtPreview.Text = BoardsTxtService.BuildBoardBlock(boardId: s.BoardId, name: s.BoardName,
                 bootVid: s.BootVid, bootPid: s.BootPid, appPid: s.AppPid, product: s.Product,
-                manufacturer: s.Manuf, crossCore: RadioSketchbook.IsChecked == true);
+                manufacturer: s.Manuf, serial: BoardHexService.ValidateSerial(TxtSerial.Text), crossCore: false);
         }
         catch (Exception ex) { TxtPreview.Text = ex.Message; }
     }
@@ -522,6 +522,8 @@ public partial class BoardPrepWindow : Window
         {
             var s = BoardSpecsFromUi();
             bool sketchbook = RadioSketchbook.IsChecked == true;
+            if (!sketchbook)
+                throw new InvalidOperationException("برای حفظ Serial اختصاصی اپلیکیشن، نصب فقط به‌صورت پکیج خصوصی Sketchbook مجاز است.");
             var block = BoardsTxtService.BuildBoardBlock(boardId: s.BoardId, name: s.BoardName,
                 bootVid: s.BootVid, bootPid: s.BootPid, appPid: s.AppPid, product: s.Product,
                 manufacturer: s.Manuf, crossCore: sketchbook);
@@ -536,7 +538,7 @@ public partial class BoardPrepWindow : Window
                 {
                     if (sketchbook)
                     {
-                        var pkg = BoardsTxtService.InstallSketchbookPackage(path, block);
+                        var pkg = BoardsTxtService.InstallSketchbookPackage(path, block, BoardHexService.ValidateSerial(TxtSerial.Text));
                         return $"✓ پکیج برد در Sketchbook نصب شد:\r\n{pkg}";
                     }
                     var backup = BoardsTxtService.InstallBoardBlock(path, block, s.BoardId);

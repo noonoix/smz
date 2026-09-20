@@ -44,6 +44,11 @@ public static class BoardsTxtService
             boardId + ".pid.0=" + appPid + "\n" +
             boardId + ".vid.1=" + bootVid + "\n" +
             boardId + ".pid.1=" + bootPid + "\n" +
+            // Arduino IDE 1.8.x also reads the scalar upload_port filter.
+            // Keep it on the temporary Caterina port; the indexed entries below
+            // retain the official Leonardo-style boot/app pair matching.
+            boardId + ".upload_port.vid=" + bootVid + "\n" +
+            boardId + ".upload_port.pid=" + bootPid + "\n" +
             boardId + ".upload_port.0.vid=" + bootVid + "\n" +
             boardId + ".upload_port.0.pid=" + bootPid + "\n" +
             boardId + ".upload_port.1.vid=" + bootVid + "\n" +

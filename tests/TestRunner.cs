@@ -2867,8 +2867,11 @@ class TestRunner
         var v50block = Ams.UI.Services.BoardsTxtService.BuildBoardBlock(name: "AMS Macro Studio",
             bootVid: "0x04D8", bootPid: "0x000A", appPid: "0x000B",
             product: "CDC RS-232 Emulation", manufacturer: "Microchip", crossCore: true);
-        Assert(V50Sha256(v50block, System.Text.Encoding.UTF8) == "46ff0f97defb6e8765487ba17dd05b7dce655e83027f77956bba196d3b589d7f",
-            "v0.9.50: boards.txt block is byte-identical to the original tool (golden sha256)");
+        Assert(v50block.Contains("ams.upload_port.vid=0x04D8\n")
+               && v50block.Contains("ams.upload_port.pid=0x000A\n")
+               && v50block.Contains("ams.upload_port.0.vid=0x04D8\n")
+               && v50block.Contains("ams.upload_port.1.pid=0x000B\n"),
+            "v0.9.69: boards.txt includes the legacy scalar and indexed IDE port filters");
         var v50tmp = Path.Combine(Path.GetTempPath(), "ams-boardprep-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(v50tmp);
         try

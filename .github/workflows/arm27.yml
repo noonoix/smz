@@ -16,22 +16,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: arduino/setup-arduino-cli@v2
-      - name: Install Pro Micro core and HID library
+      - name: Install Arduino CLI, Pro Micro core and HID library
         id: install
         shell: bash
         continue-on-error: true
         run: |
           set +e
-          arduino-cli config add board_manager.additional_urls https://raw.githubusercontent.com/sparkfun/Arduino_Boards/main/IDE_Board_Manager/package_sparkfun_index.json 2>&1 | tee arm27-install.log
-          arduino-cli core update-index 2>&1 | tee -a arm27-install.log
-          arduino-cli core install SparkFun:avr 2>&1 | tee -a arm27-install.log
-          arduino-cli lib install HID-Project 2>&1 | tee -a arm27-install.log
+          mkdir -p "$RUNNER_TEMP/arduino-cli-bin"
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR="$RUNNER_TEMP/arduino-cli-bin" sh 2>&1 | tee arm27-install.log
+          echo "$RUNNER_TEMP/arduino-cli-bin" >> "$GITHUB_PATH"
+          CLI="$RUNNER_TEMP/arduino-cli-bin/arduino-cli"
           code=0
-          arduino-cli core list | tee -a arm27-install.log
-          arduino-cli lib list | grep -i HID | tee -a arm27-install.log
-          if ! arduino-cli core list | grep -q 'SparkFun:avr'; then code=1; fi
-          if ! arduino-cli lib list | grep -qi 'HID-Project'; then code=1; fi
+          "$CLI" version 2>&1 | tee -a arm27-install.log || code=1
+          "$CLI" config add board_manager.additional_urls https://raw.githubusercontent.com/sparkfun/Arduino_Boards/main/IDE_Board_Manager/package_sparkfun_index.json 2>&1 | tee -a arm27-install.log || code=1
+          "$CLI" core update-index 2>&1 | tee -a arm27-install.log || code=1
+          "$CLI" core install SparkFun:avr 2>&1 | tee -a arm27-install.log || code=1
+          "$CLI" lib install HID-Project 2>&1 | tee -a arm27-install.log || code=1
+          "$CLI" core list | tee -a arm27-install.log
+          "$CLI" lib list | grep -i HID | tee -a arm27-install.log
+          if ! "$CLI" core list | grep -q 'SparkFun:avr'; then code=1; fi
+          if ! "$CLI" lib list | grep -qi 'HID-Project'; then code=1; fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
           exit 0
       - name: Prepare deterministic sketch layout

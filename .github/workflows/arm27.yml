@@ -45,7 +45,7 @@ jobs:
             --build-property 'build.pid=0x615F' \
             --build-property 'build.usb_product="Classroom Custom Human Input"' \
             --build-property 'build.usb_manufacturer="Classroom Studio"' \
-            --build-property 'compiler.cpp.extra_flags=-DUSB_SERIAL="AMS-CI-00000001"' \
+            --build-property "compiler.cpp.extra_flags='-DUSB_SERIAL=\"AMS-CI-00000001\"'" \
             --output-dir "$RUNNER_TEMP/arm27-build" \
             --verbose --warnings all firmware/arm27 2>&1 | tee "$RUNNER_TEMP/arm27-build.log"
       - name: Verify final application identity

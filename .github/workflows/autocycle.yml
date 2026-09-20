@@ -163,7 +163,7 @@ jobs:
 
   test-package:
     name: autocycle / downloadable test package
-    if: github.event_name == 'pull_request' && (github.head_ref == 'feature/light-state-profiles' || github.head_ref == 'phase6/non-executing-authorization-diagnostics')
+    if: github.event_name == 'pull_request' && (github.head_ref == 'feature/light-state-profiles' || github.head_ref == 'phase6/non-executing-authorization-diagnostics' || github.head_ref == 'fix/v32-profile-and-bundle')
     needs: [portable-contracts, windows-app]
     runs-on: ubuntu-latest
     timeout-minutes: 10

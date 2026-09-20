@@ -274,7 +274,7 @@
                                 <TextBox x:Name="TxtBoardManuf" FlowDirection="LeftToRight" Grid.Row="3" Grid.Column="1" Margin="0,8,10,0"
                                          TextChanged="BoardSpec_Changed" />
                             </Grid>
-                            <TextBlock Text="VID/PID امن و ثابت AMS برای همه‌ی انتخاب‌ها: 0x1D50:0x615E / 0x615F · نام و سریال از انتخاب شما می‌آید"
+                            <TextBlock Text="VID/PID امن و ثابت AMS برای همه‌ی انتخاب‌ها: 0x1D50:0x615E / 0x615F · PID اپلیکیشن = PID بوت‌لودر + ۱ · نام و سریال از انتخاب شما می‌آید"
                                        Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,8,0,0"
                                        TextWrapping="Wrap" TextAlignment="Right" />
                             <StackPanel Orientation="Horizontal" Margin="0,10,0,10">

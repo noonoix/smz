@@ -1,0 +1,6 @@
+<Project>
+  <Target Name="PatchPackagedKeyboardReportId" AfterTargets="Build">
+    <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_keyboard_report_id.py&quot; &quot;$(TargetDir)combined-runtime\combined_guard_runtime.py&quot;" />
+    <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_keyboard_report_id.py&quot; &quot;$(TargetDir)portable-runtime\combined_guard_runtime.py&quot;" />
+  </Target>
+</Project>

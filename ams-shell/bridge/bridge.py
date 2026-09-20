@@ -238,7 +238,7 @@ class PicoLink:
     def close(self):
         try:
             if self.ser is not None:
-                self._send("HALT|SILENT")
+                self._send("HALT")
                 self._send("BYE")
         except Exception:
             pass

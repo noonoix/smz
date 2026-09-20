@@ -1,0 +1,71 @@
+<Window x:Class="AMSBoardPrep.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="AMS Board Prep Debug — آماده‌سازی دستی یک برد" Width="1060" Height="820"
+        MinWidth="900" MinHeight="650" WindowStartupLocation="CenterScreen"
+        FlowDirection="RightToLeft" Background="{StaticResource PanelBrush}" Foreground="{StaticResource TextBrush}">
+  <Grid Margin="14">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="170"/></Grid.RowDefinitions>
+    <Border Grid.Row="0" Padding="12" Margin="0,0,0,10" Background="{StaticResource Panel2Brush}" CornerRadius="6">
+      <StackPanel>
+        <TextBlock Text="AMS Board Prep Debug" FontSize="20" FontWeight="Bold" />
+        <TextBlock Text="نسخهٔ مستقل برای آماده‌سازی دستی فقط یک برد — بدون تولید دسته‌ای و بدون وابستگی به محیط Classroom Studio" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0" />
+        <TextBlock x:Name="StatusText" Text="پروفایل فعال وجود ندارد" Foreground="#FBBF24" Margin="0,8,0,0" />
+      </StackPanel>
+    </Border>
+    <TabControl x:Name="Tabs" Grid.Row="1" SelectionChanged="Tabs_SelectionChanged">
+      <TabItem Header="۱ · هویت و HEX">
+        <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="12">
+          <TextBlock Text="در هر نوبت فقط یک برد را تعریف کن. پس از ساخت HEX، مقادیر پروفایل قفل منطقی می‌شوند و همهٔ مراحل بعد از همان پروفایل استفاده می‌کنند." TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,12" />
+          <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+            <TextBlock Text="شناسه برد:" Margin="0,5,8,5"/><TextBox x:Name="BoardId" Grid.Column="1" Margin="0,2,14,2" Text="ams" FlowDirection="LeftToRight" />
+            <TextBlock Text="Serial:" Grid.Row="1" Margin="0,5,8,5"/><TextBox x:Name="Serial" Grid.Row="1" Grid.Column="1" Margin="0,2,14,2" Text="AMS-0001" FlowDirection="LeftToRight" />
+            <TextBlock Text="Product:" Grid.Row="2" Margin="0,5,8,5"/><TextBox x:Name="Product" Grid.Row="2" Grid.Column="1" Margin="0,2,14,2" Text="AMS Pro Micro 01" FlowDirection="LeftToRight" />
+            <TextBlock Text="Manufacturer:" Grid.Row="3" Margin="0,5,8,5"/><TextBox x:Name="Manufacturer" Grid.Row="3" Grid.Column="1" Margin="0,2,14,2" Text="AMS" FlowDirection="LeftToRight" />
+            <TextBlock Text="VID:" Grid.Column="2" Margin="0,5,8,5"/><TextBox x:Name="Vid" Grid.Column="3" Margin="0,2,0,2" Text="0x1D50" FlowDirection="LeftToRight" />
+            <TextBlock Text="Boot PID:" Grid.Row="1" Grid.Column="2" Margin="0,5,8,5"/><TextBox x:Name="BootPid" Grid.Row="1" Grid.Column="3" Margin="0,2,0,2" Text="0x615E" FlowDirection="LeftToRight" />
+            <TextBlock Text="App PID:" Grid.Row="2" Grid.Column="2" Margin="0,5,8,5"/><TextBox x:Name="AppPid" Grid.Row="2" Grid.Column="3" Margin="0,2,0,2" Text="0x615F" FlowDirection="LeftToRight" />
+            <TextBlock Text="Caterina.hex:" Grid.Row="3" Grid.Column="2" Margin="0,5,8,5"/><DockPanel Grid.Row="3" Grid.Column="3"><TextBox x:Name="CaterinaPath" FlowDirection="LeftToRight"/><Button Content="انتخاب" Click="ChooseCaterina_Click" Margin="8,0,0,0" Padding="10,2"/></DockPanel>
+            <TextBlock Text="پوشه خروجی:" Grid.Row="4" Grid.Column="2" Margin="0,5,8,5"/><DockPanel Grid.Row="4" Grid.Column="3"><TextBox x:Name="OutputDir" FlowDirection="LeftToRight"/><Button Content="انتخاب" Click="ChooseOutput_Click" Margin="8,0,0,0" Padding="10,2"/></DockPanel>
+          </Grid>
+          <StackPanel Orientation="Horizontal" Margin="0,14,0,0"><Button Content="ساخت یک HEX و Profile" Click="Generate_Click" Padding="14,6" Background="{StaticResource AccentBrush}" Foreground="White"/><Button Content="پاک‌کردن پروفایل فعال" Click="ClearProfile_Click" Padding="12,6" Margin="10,0,0,0"/></StackPanel>
+          <TextBlock x:Name="ProfileSummary" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,14,0,0" />
+        </StackPanel></ScrollViewer>
+      </TabItem>
+      <TabItem Header="۲ · نصب در IDE">
+        <StackPanel Margin="12">
+          <TextBlock Text="این مرحله فقط Profile فعال را در Sketchbook نصب می‌کند. برای برد بعدی ابتدا به تب ۱ برگرد و Profile جدید بساز." TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,12" />
+          <DockPanel><TextBlock Text="Sketchbook:" VerticalAlignment="Center" Margin="0,0,8,0"/><TextBox x:Name="Sketchbook" FlowDirection="LeftToRight"/><Button Content="تشخیص" Click="DetectSketchbook_Click" Margin="8,0,0,0" Padding="10,2"/></DockPanel>
+          <StackPanel Orientation="Horizontal" Margin="0,14,0,0"><Button Content="نصب Profile در IDE" Click="InstallIde_Click" Padding="14,6" Background="{StaticResource AccentBrush}" Foreground="White"/><Button Content="حذف پکیج مستقل" Click="UninstallIde_Click" Padding="12,6" Margin="10,0,0,0"/></StackPanel>
+          <TextBlock Text="بعد از نصب، Arduino IDE را ببند و دوباره باز کن. برد Classroom Studio Board را انتخاب کن. این نسخه برای هر بار فقط یک Serial را در Core خصوصی نصب می‌کند." TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,14,0,0" />
+        </StackPanel>
+      </TabItem>
+      <TabItem Header="۳ · فلش بوت‌لودر ISP">
+        <StackPanel Margin="12">
+          <TextBlock Text="هشدار: این مرحله فقط برای بوت‌لودر است. پورت پروگرامر را انتخاب کن، نه پورت USB برد هدف." Foreground="#FBBF24" TextWrapping="Wrap" Margin="0,0,0,12" />
+          <DockPanel Margin="0,0,0,8"><TextBlock Text="فایل HEX:" VerticalAlignment="Center" Margin="0,0,8,0"/><TextBox x:Name="BootHex" FlowDirection="LeftToRight"/><Button Content="تازه‌سازی" Click="RefreshProfilePaths_Click" Margin="8,0,0,0" Padding="10,2"/></DockPanel>
+          <DockPanel><TextBlock Text="پورت ArduinoISP:" VerticalAlignment="Center" Margin="0,0,8,0"/><TextBox x:Name="ProgrammerPort" Text="COM33" FlowDirection="LeftToRight"/><Button Content="اسکن" Click="ScanPorts_Click" Margin="8,0,0,0" Padding="10,2"/></DockPanel>
+          <StackPanel Orientation="Horizontal" Margin="0,14,0,0"><CheckBox x:Name="CheckOnly" Content="فقط چک" IsChecked="False" VerticalAlignment="Center"/><CheckBox x:Name="Erase" Content="Erase فقط Recovery" Margin="16,0,0,0" VerticalAlignment="Center"/><CheckBox x:Name="FixFuses" Content="ترمیم فیوزها" Margin="16,0,0,0" VerticalAlignment="Center"/><Button Content="اجرای ISP" Click="FlashIsp_Click" Padding="14,6" Margin="18,0,0,0" Background="{StaticResource AccentBrush}" Foreground="White"/></StackPanel>
+        </StackPanel>
+      </TabItem>
+      <TabItem Header="۴ · Application با USB">
+        <StackPanel Margin="12">
+          <TextBlock Text="این مرحله ISP را استفاده نمی‌کند و Chip Erase انجام نمی‌دهد. ابتدا Application HEX را در Arduino IDE با همین Profile کامپایل کن." TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,12" />
+          <DockPanel Margin="0,0,0,8"><TextBlock Text="Application HEX:" VerticalAlignment="Center" Margin="0,0,8,0"/><TextBox x:Name="ApplicationHex" FlowDirection="LeftToRight"/><Button Content="انتخاب" Click="ChooseApplication_Click" Margin="8,0,0,0" Padding="10,2"/></DockPanel>
+          <DockPanel><TextBlock Text="Runtime COM:" VerticalAlignment="Center" Margin="0,0,8,0"/><TextBox x:Name="RuntimePort" Text="AUTO" FlowDirection="LeftToRight"/><Button Content="تشخیص" Click="DetectRuntime_Click" Margin="8,0,0,0" Padding="10,2"/></DockPanel>
+          <TextBlock x:Name="ApplicationValidation" Text="فایل App-only انتخاب نشده است." TextWrapping="Wrap" Foreground="#FBBF24" Margin="0,12,0,0" />
+          <StackPanel Orientation="Horizontal" Margin="0,14,0,0"><Button Content="اعتبارسنجی App-only" Click="ValidateApplication_Click" Padding="12,5"/><Button Content="آپلود USB با Retry" Click="UploadApplication_Click" Padding="14,6" Margin="10,0,0,0" Background="{StaticResource AccentBrush}" Foreground="White"/></StackPanel>
+        </StackPanel>
+      </TabItem>
+      <TabItem Header="۵ · چکاپ دقیق">
+        <StackPanel Margin="12">
+          <StackPanel Orientation="Horizontal"><Button Content="اسکن پورت‌ها" Click="ScanPorts_Click" Padding="12,5"/><Button Content="چکاپ Profile فعال" Click="Checkup_Click" Padding="14,5" Margin="10,0,0,0" Background="{StaticResource AccentBrush}" Foreground="White"/></StackPanel>
+          <ListBox x:Name="PortsList" Margin="0,12,0,0" Height="380" FontFamily="Consolas" FlowDirection="LeftToRight" />
+        </StackPanel>
+      </TabItem>
+    </TabControl>
+    <TextBox x:Name="LogBox" Grid.Row="2" Margin="0,10,0,0" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FlowDirection="LeftToRight" Background="#151922" Foreground="#E5E7EB" />
+  </Grid>
+</Window>

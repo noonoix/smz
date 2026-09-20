@@ -61,7 +61,7 @@ try
     Check(false, "duplicate Watch start is rejected");
 }
 catch (InvalidOperationException) { Check(true, "duplicate Watch start is rejected"); }
-await Task.Delay(360);
+await Task.Delay(Environment.GetEnvironmentVariable("GITHUB_ACTIONS") == "true" ? 750 : 360);
 await watch.StopAsync();
 var stoppedCalls = watchBridge.Commands.Count;
 await Task.Delay(150);

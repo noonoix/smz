@@ -26,9 +26,10 @@ jobs:
           cp firmware/arm26/ams_board26.ino /tmp/arm26base/arm26base.ino
           printf '#pragma once\n#include <Arduino.h>\nstatic const uint8_t AMS_PSK[16]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};\n' > /tmp/arm26base/ams_key.h
           set +e
-          out=$("$CLI" compile --fqbn 'SparkFun:avr:promicro:cpu=16MHzatmega32U4' /tmp/arm26base 2>&1)
+          out=$("$CLI" compile --fqbn 'SparkFun:avr:promicro:cpu=16MHzatmega32U4' --warnings all /tmp/arm26base 2>&1)
           code=$?
-          reason=$(printf '%s\n' "$out" | grep -m1 -E 'fatal error:|error:|region .* overflowed|Sketch too big' | sed 's/[^A-Za-z0-9_.: -]/ /g' | cut -c1-180)
+          reason=$(printf '%s\n' "$out" | grep -m1 -Ei 'fatal|error|overflow|too big|not found|invalid|undefined' | sed 's/[^A-Za-z0-9_.: -]/ /g' | cut -c1-180)
+          if [ -z "$reason" ]; then reason=$(printf '%s\n' "$out" | tail -n 4 | tr '\n' ' ' | sed 's/[^A-Za-z0-9_.: -]/ /g' | cut -c1-180); fi
           [ -n "$reason" ] || reason="compiler-exit-${code}"
           echo "code=$code" >> "$GITHUB_OUTPUT"
           echo "reason=$reason" >> "$GITHUB_OUTPUT"

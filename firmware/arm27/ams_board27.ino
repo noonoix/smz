@@ -6,12 +6,17 @@
 #undef loop
 #include "human_mouse_v3.h"
 
+static bool arm27_handle(char* line){
+  if(!strcmp(line,"HVER")){send_line("OK|HVER|2.7.0|HMOUSE=1");return true;}
+  return human_mouse_v3_handle(line);
+}
+
 void setup(){ arm26_setup(); }
 void loop(){
   poll_host_usb();
   if(serial1_line_ready()){
     g_out=&Serial1;
-    if(!human_mouse_v3_handle(g_line1)) legacy_handle_unused: handle(g_line1);
+    if(!arm27_handle(g_line1)) handle(g_line1);
     g_out=0;
   }
   if(!g_secure){if(Serial)do_handshake(40);else delay(1);return;}

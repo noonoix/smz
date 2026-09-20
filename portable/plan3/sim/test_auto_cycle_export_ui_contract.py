@@ -11,9 +11,9 @@ kit = (root / "ams-shell/src/Ams.UI/MainWindow.AutoCycleStyles.cs").read_text(en
 tabs_ui = (root / "ams-shell/src/Ams.UI/MainWindow.PipelineTabsUi.cs").read_text(encoding="utf-8")
 assert "[RelayCommand]" in vm
 assert "ExportCombinedPortableGuard" in vm
-assert "PortableGuardBundle.Export" in vm
+assert "RestartGuardBundle.Export" in vm
 assert "AutoCyclePlanBundle.DecorateRoot" in vm
-assert "SHA256.HashData" in vm
+assert "RestartGuardBundle.RebuildHashes" in vm
 assert "CapturePipelineWorkspaceForExport" in vm
 assert "PlanExporter.PlanBlockedException" in vm
 assert "ExportCombinedPortableGuardCommand" in combined_ui
@@ -28,4 +28,4 @@ assert "PostRestartTaskbarSlot" in schedule_ui and "BuildRangeRow" in schedule_u
 assert "MinHeight = 34" in kit and "MinWidth = 188" in kit
 assert "#5E9FE8" in kit and "ReorderExportSteps" in kit
 assert "PipelineTabs" in tabs_ui
-print("single combined AutoCycle + Macro + Guard export contract: 26 passed, 0 failed")
+print("single combined AutoCycle + Restart + Macro + Guard export contract: 26 passed, 0 failed")

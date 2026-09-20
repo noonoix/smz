@@ -1,4 +1,12 @@
 // ARM 2.7: arm26 transport/security/sound plus Phase-3 human mouse ownership.
+// Arduino only auto-generates prototypes for the primary sketch, not for a legacy
+// .ino included as a compatibility unit. Declare the forward references used by
+// arm26 before its definitions are included.
+#include <Arduino.h>
+static bool read_line_blocking(uint16_t timeoutMs);
+static bool decrypt_to(const char* line, char* out, uint8_t outMax);
+static void do_halt();
+
 #define setup arm26_setup
 #define loop arm26_loop
 #include "../arm26/ams_board26.ino"

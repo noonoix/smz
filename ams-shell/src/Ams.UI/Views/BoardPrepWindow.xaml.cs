@@ -385,11 +385,12 @@ public partial class BoardPrepWindow : Window
                     File.WriteAllText(Path.Combine(outDir, "fleet-manifest.json"),
                         JsonSerializer.Serialize(new { schema = "ams-board-fleet-v1", count = manifest.Count, boards = manifest },
                             new JsonSerializerOptions { WriteIndented = true }), Encoding.UTF8);
-                    File.WriteAllText(Path.Combine(outDir, "README-fleet-fa.txt"),
-                        "برای هر برد: ابتدا HEX بوت‌لودر متناظر با همان Serial را با ISP نصب کن؛ سپس Application را با همان Product و Serial در Arduino IDE کامپایل و Upload کن.
-" +
-                        "هرگز HEX بوت‌لودر یک برد را روی برد دیگر استفاده نکن.
-", Encoding.UTF8);
+                    var fleetReadme = string.Join(Environment.NewLine, new[]
+                    {
+                        "برای هر برد: ابتدا HEX بوت‌لودر متناظر با همان Serial را با ISP نصب کن؛ سپس Application را با همان Product و Serial در Arduino IDE کامپایل و Upload کن.",
+                        "هرگز HEX بوت‌لودر یک برد را روی برد دیگر استفاده نکن."
+                    }) + Environment.NewLine;
+                    File.WriteAllText(Path.Combine(outDir, "README-fleet-fa.txt"), fleetReadme, Encoding.UTF8);
                     return (lines, okCount, errCount);
                 });
                 foreach (var l in result.lines) Log(l);

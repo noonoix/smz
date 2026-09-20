@@ -7,7 +7,7 @@ on:
       - fix/v32-profile-and-bundle
     paths:
       - 'ams-shell/**'
-      - 'tools/AMSBoardPrep/**'
+      - 'tools/**'
       - '.github/workflows/autocycle.yml'
   pull_request:
     paths:

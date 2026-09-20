@@ -21,6 +21,7 @@ jobs:
           CLI="$RUNNER_TEMP/bin/arduino-cli"
           "$CLI" config add board_manager.additional_urls https://raw.githubusercontent.com/sparkfun/Arduino_Boards/main/IDE_Board_Manager/package_sparkfun_index.json >/dev/null
           "$CLI" core update-index >/dev/null
+          "$CLI" core install arduino:avr >/dev/null
           "$CLI" core install SparkFun:avr >/dev/null
           "$CLI" lib install HID-Project >/dev/null
           cp firmware/arm26/ams_board26.ino /tmp/arm26base/arm26base.ino

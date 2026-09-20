@@ -10,6 +10,8 @@ using System.Text.RegularExpressions;
 
 namespace Ams.UI.Services;
 
+// v0.9.69 — transfer verification: build from the moved repository.
+
 /// <summary>v0.9.50 — builds Caterina bootloader HEX files with a custom USB identity
 /// (VID/PID, unique serial number, product/manufacturer strings) for the Pro Micro arm
 /// board. Pure byte logic with no UI, so TestRunner covers it end to end.</summary>

@@ -25,41 +25,42 @@ public static class BoardHexService
     /// serial port and USB upload never drop — they ride the in-box Windows usbser driver.</summary>
     public sealed record DeviceMode(string Key, string Name, int Vid, int Pid,
                                     int ClassType, int Subclass, int Protocol,
-                                    string Product, string Manufacturer);
+                                    string Product, string Manufacturer, bool LabOnly = false);
 
     // v0.9.54 - list trimmed at the user's request (BBC micro:bit, Calliope mini, Adafruit,
     // ESP32-S2 and Raspberry Pi removed) and every remaining identity carries its real,
     // researched USB strings so selecting a device fills the board-spec form with defaults.
     public static readonly DeviceMode[] DeviceModes =
     {
-        new("none",      "پیش‌فرض AMS",     0x1D50, 0x615E, 0x02, 0x00, 0x00, "AMS Macro Studio",          "AMS"),
-        new("stm32",     "STM32 Virtual COM",    0x0483, 0x5740, 0x02, 0x00, 0x00, "STM32 Virtual COM Port",    "STMicroelectronics"),
-        new("xiao",      "Seeed XIAO",           0x2886, 0x802F, 0x02, 0x00, 0x00, "Seeed XIAO",                "Seeed"),
-        new("microchip", "Microchip CDC Demo",   0x04D8, 0x000A, 0x02, 0x00, 0x00, "CDC RS-232 Emulation Demo", "Microchip"),
-        new("legospike", "LEGO Education SPIKE", 0x0694, 0x0009, 0x02, 0x00, 0x00, "LEGO Technic Large Hub",    "LEGO Education"),
-        new("m5stack",   "M5Stack Core",         0x303A, 0x1001, 0x02, 0x00, 0x00, "M5Stack Core",              "M5Stack"),
+        new("none",      "AMS CDC Serial (پیش‌فرض)", 0x1D50, 0x615E, 0x02, 0x00, 0x00, "AMS USB Serial Device", "AMS", false),
+        new("generic_cdc", "Generic CDC Serial", 0x1D50, 0x615E, 0x02, 0x00, 0x00, "USB Serial Device", "AMS", false),
+        new("stm32",     "STM32 Virtual COM (CDC آزمایشگاهی)",    0x0483, 0x5740, 0x02, 0x00, 0x00, "STM32 Virtual COM Port",    "STMicroelectronics", true),
+        new("xiao",      "Seeed XIAO (CDC آزمایشگاهی)",           0x2886, 0x802F, 0x02, 0x00, 0x00, "Seeed XIAO (CDC آزمایشگاهی)",                "Seeed", true),
+        new("microchip", "Microchip CDC Demo (CDC آزمایشگاهی)",   0x04D8, 0x000A, 0x02, 0x00, 0x00, "CDC RS-232 Emulation Demo", "Microchip", true),
+        new("legospike", "LEGO Education SPIKE (CDC آزمایشگاهی)", 0x0694, 0x0009, 0x02, 0x00, 0x00, "LEGO Technic Large Hub",    "LEGO Education", true),
+        new("m5stack",   "M5Stack Core (CDC آزمایشگاهی)",         0x303A, 0x1001, 0x02, 0x00, 0x00, "M5Stack Core (CDC آزمایشگاهی)",              "M5Stack", true),
         // v0.9.55 - twenty researched macro-less keyboards (user list). VIDs are the real
         // vendor ids; every preset stays class 0x02 (CDC) so the serial port and upload survive.
-        new("g413tklse", "Logitech G413 TKL SE", 0x046D, 0xC33A, 0x02, 0x00, 0x00, "G413 TKL SE Gaming Keyboard", "Logitech"),
-        new("g413se", "Logitech G413 SE", 0x046D, 0xC33C, 0x02, 0x00, 0x00, "G413 SE Gaming Keyboard", "Logitech"),
-        new("gproxtklrapid", "Logitech G PRO X TKL Rapid", 0x046D, 0xC35E, 0x02, 0x00, 0x00, "PRO X TKL RAPID", "Logitech"),
-        new("blackwidowte", "Razer BlackWidow TE", 0x1532, 0x011C, 0x02, 0x00, 0x00, "BlackWidow Tournament Ed.", "Razer"),
-        new("blackwidowxte", "Razer BlackWidow X TE", 0x1532, 0x021B, 0x02, 0x00, 0x00, "BlackWidow X Tournament Ed", "Razer"),
-        new("celeritas2", "ZOWIE Celeritas II", 0x1AF3, 0x0025, 0x02, 0x00, 0x00, "CELERITAS II", "ZOWIE"),
-        new("mx83tkl", "CHERRY XTRFY MX 8.3 TKL", 0x046A, 0x00B1, 0x02, 0x00, 0x00, "XTRFY MX 8.3 TKL", "CHERRY"),
-        new("alloyorigins", "HyperX Alloy Origins", 0x0951, 0x16E5, 0x02, 0x00, 0x00, "HyperX Alloy Origins", "HyperX"),
-        new("alloyorigins60", "HyperX Alloy Origins 60", 0x0951, 0x16E9, 0x02, 0x00, 0x00, "HyperX Alloy Origins 60", "HyperX"),
-        new("alloyorigins65", "HyperX Alloy Origins 65", 0x0951, 0x16EB, 0x02, 0x00, 0x00, "HyperX Alloy Origins 65", "HyperX"),
-        new("duckyone2mini", "Ducky One 2 Mini", 0x04D9, 0x0348, 0x02, 0x00, 0x00, "Ducky One 2 Mini", "DuckyChannel"),
-        new("duckyone2promini", "Ducky One 2 Pro Mini", 0x04D9, 0x0356, 0x02, 0x00, 0x00, "Ducky One 2 Pro Mini", "DuckyChannel"),
-        new("apexprotkl", "SteelSeries Apex Pro TKL", 0x1038, 0x1614, 0x02, 0x00, 0x00, "Apex Pro TKL", "SteelSeries"),
-        new("apexpromini", "SteelSeries Apex Pro Mini", 0x1038, 0x1646, 0x02, 0x00, 0x00, "Apex Pro Mini", "SteelSeries"),
-        new("keychronk8", "Keychron K8", 0x3434, 0x0180, 0x02, 0x00, 0x00, "Keychron K8", "Keychron"),
-        new("das5qs2", "Das Keyboard 5QS Mark II", 0x24F0, 0x2038, 0x02, 0x00, 0x00, "Das Keyboard 5QS Mark II", "Metadot"),
-        new("zmk650wp", "Zalman ZM-K650-WP", 0x258A, 0x0006, 0x02, 0x00, 0x00, "ZM-K650-WP", "Zalman"),
-        new("vanguardpro96", "Corsair Vanguard Pro 96", 0x1B1C, 0x1BC4, 0x02, 0x00, 0x00, "VANGUARD PRO 96", "Corsair"),
-        new("shikarik515", "Fantech Shikari K515", 0x0C45, 0x7A0C, 0x02, 0x00, 0x00, "Shikari K515", "Fantech"),
-        new("gomk87rs", "GAMEON KENORA GOMK87-RS", 0x258A, 0x010C, 0x02, 0x00, 0x00, "KENORA GOMK87-RS", "GAMEON"),
+        new("g413tklse", "Logitech G413 TKL SE (CDC آزمایشگاهی)", 0x046D, 0xC33A, 0x02, 0x00, 0x00, "G413 TKL SE Gaming Keyboard", "Logitech", true),
+        new("g413se", "Logitech G413 SE (CDC آزمایشگاهی)", 0x046D, 0xC33C, 0x02, 0x00, 0x00, "G413 SE Gaming Keyboard", "Logitech", true),
+        new("gproxtklrapid", "Logitech G PRO X TKL Rapid (CDC آزمایشگاهی)", 0x046D, 0xC35E, 0x02, 0x00, 0x00, "PRO X TKL RAPID", "Logitech", true),
+        new("blackwidowte", "Razer BlackWidow TE (CDC آزمایشگاهی)", 0x1532, 0x011C, 0x02, 0x00, 0x00, "BlackWidow Tournament Ed.", "Razer", true),
+        new("blackwidowxte", "Razer BlackWidow X TE (CDC آزمایشگاهی)", 0x1532, 0x021B, 0x02, 0x00, 0x00, "BlackWidow X Tournament Ed", "Razer", true),
+        new("celeritas2", "ZOWIE Celeritas II (CDC آزمایشگاهی)", 0x1AF3, 0x0025, 0x02, 0x00, 0x00, "CELERITAS II", "ZOWIE", true),
+        new("mx83tkl", "CHERRY XTRFY MX 8.3 TKL (CDC آزمایشگاهی)", 0x046A, 0x00B1, 0x02, 0x00, 0x00, "XTRFY MX 8.3 TKL", "CHERRY", true),
+        new("alloyorigins", "HyperX Alloy Origins (CDC آزمایشگاهی)", 0x0951, 0x16E5, 0x02, 0x00, 0x00, "HyperX Alloy Origins (CDC آزمایشگاهی)", "HyperX", true),
+        new("alloyorigins60", "HyperX Alloy Origins 60", 0x0951, 0x16E9, 0x02, 0x00, 0x00, "HyperX Alloy Origins 60", "HyperX", true),
+        new("alloyorigins65", "HyperX Alloy Origins 65", 0x0951, 0x16EB, 0x02, 0x00, 0x00, "HyperX Alloy Origins 65", "HyperX", true),
+        new("duckyone2mini", "Ducky One 2 Mini (CDC آزمایشگاهی)", 0x04D9, 0x0348, 0x02, 0x00, 0x00, "Ducky One 2 Mini (CDC آزمایشگاهی)", "DuckyChannel", true),
+        new("duckyone2promini", "Ducky One 2 Pro Mini (CDC آزمایشگاهی)", 0x04D9, 0x0356, 0x02, 0x00, 0x00, "Ducky One 2 Pro Mini (CDC آزمایشگاهی)", "DuckyChannel", true),
+        new("apexprotkl", "SteelSeries Apex Pro TKL (CDC آزمایشگاهی)", 0x1038, 0x1614, 0x02, 0x00, 0x00, "Apex Pro TKL", "SteelSeries", true),
+        new("apexpromini", "SteelSeries Apex Pro Mini (CDC آزمایشگاهی)", 0x1038, 0x1646, 0x02, 0x00, 0x00, "Apex Pro Mini", "SteelSeries", true),
+        new("keychronk8", "Keychron K8 (CDC آزمایشگاهی)", 0x3434, 0x0180, 0x02, 0x00, 0x00, "Keychron K8 (CDC آزمایشگاهی)", "Keychron", true),
+        new("das5qs2", "Das Keyboard 5QS Mark II (CDC آزمایشگاهی)", 0x24F0, 0x2038, 0x02, 0x00, 0x00, "Das Keyboard 5QS Mark II (CDC آزمایشگاهی)", "Metadot", true),
+        new("zmk650wp", "Zalman ZM-K650-WP (CDC آزمایشگاهی)", 0x258A, 0x0006, 0x02, 0x00, 0x00, "ZM-K650-WP", "Zalman", true),
+        new("vanguardpro96", "Corsair Vanguard Pro 96 (CDC آزمایشگاهی)", 0x1B1C, 0x1BC4, 0x02, 0x00, 0x00, "VANGUARD PRO 96", "Corsair", true),
+        new("shikarik515", "Fantech Shikari K515 (CDC آزمایشگاهی)", 0x0C45, 0x7A0C, 0x02, 0x00, 0x00, "Shikari K515", "Fantech", true),
+        new("gomk87rs", "GAMEON KENORA GOMK87-RS (CDC آزمایشگاهی)", 0x258A, 0x010C, 0x02, 0x00, 0x00, "KENORA GOMK87-RS", "GAMEON", true),
     };
 
     public static DeviceMode ModeFor(string? key)
@@ -75,7 +76,7 @@ public static class BoardHexService
     public static BoardDefaults DefaultsFor(string? key)
     {
         var m = ModeFor(key);
-        var id = SanitizeBoardId(m.Key == "none" ? "ams" : m.Key);
+        var id = m.Key is "none" or "generic_cdc" ? "ams" : SanitizeBoardId(m.Key);
         var name = m.Key == "none" ? "Classroom Studio Board" : m.Product;
         return new BoardDefaults(id, name, $"0x{m.Vid:X4}", $"0x{m.Pid:X4}",
                                  $"0x{m.Pid + 1:X4}", m.Product, m.Manufacturer);

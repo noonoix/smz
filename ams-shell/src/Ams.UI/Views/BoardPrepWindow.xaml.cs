@@ -21,7 +21,7 @@ public partial class BoardPrepWindow : Window
     /// as ams-settings.json).</summary>
     private sealed class Settings
     {
-        public string IdentityKey { get; set; } = "microchip";
+        public string IdentityKey { get; set; } = "none";
         public string Serial { get; set; } = "AMS-00000000";
         public string Prefix { get; set; } = "AMS";
         public string Count { get; set; } = "1";

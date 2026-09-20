@@ -20,9 +20,10 @@ def main():
         text = target.read_text(encoding="utf-8")
         py_compile.compile(str(target), doraise=True)
         assert text.count("self.device.send_report(self.report, 1)") == 1
-        assert "except TypeError:" in text
+        assert "except (TypeError, NotImplementedError):" in text
+        assert text.count("self.device.send_report(self.report)") == 1
         assert text.count("def _send(self):") == 1
-    print("keyboard report-id patch: PASS")
+    print("keyboard report-id compatibility fallback: PASS")
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ s = p.read_text(encoding="utf-8")
 old = '''    def _send(self):
         self.device.send_report(self.report)
 '''
-new = '''    def _send(self):
+previous = '''    def _send(self):
         try:
             # CircuitPython's standard keyboard descriptor uses report ID 1.
             self.device.send_report(self.report, 1)
@@ -15,7 +15,18 @@ new = '''    def _send(self):
             # Compatibility with older one-argument Device.send_report builds.
             self.device.send_report(self.report)
 '''
-if old in s:
+new = '''    def _send(self):
+        try:
+            # Standard descriptors use report ID 1, but some board builds expose
+            # the optional argument while raising NotImplementedError at runtime.
+            self.device.send_report(self.report, 1)
+        except (TypeError, NotImplementedError):
+            # A single-report keyboard can infer its only report ID.
+            self.device.send_report(self.report)
+'''
+if previous in s:
+    s = s.replace(previous, new, 1)
+elif old in s:
     s = s.replace(old, new, 1)
 elif new not in s:
     raise SystemExit("missing keyboard send-report anchor")

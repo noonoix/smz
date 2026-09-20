@@ -11,12 +11,15 @@ helper = '''def _arm_send_cooperative(owner, line, timeout=5):
     owner.arm.pump()
     owner.arm.write(line)
     head = line.split("|", 1)[0]
+    # The ARM 2.7 firmware executes HRANDOM through hm3_move() and
+    # acknowledges it as OK|HMOVE. Accept that canonical semantic reply.
+    ack_head = "HMOVE" if head == "HRANDOM" else head
     end = runtime.time.monotonic() + timeout
     while runtime.time.monotonic() < end:
         owner.host_poll()
         owner.buttons()
         for reply in owner.arm.pump():
-            if reply.startswith("OK|" + head) or reply.startswith("ERR|"):
+            if reply.startswith("OK|" + ack_head) or reply.startswith("ERR|"):
                 return reply
         if not owner.controls.running and not owner.calibrating:
             return "ERR|STOPPED"
@@ -41,6 +44,11 @@ repls = {
 for old, new in repls.items():
     if old in s: s = s.replace(old, new, 1)
     elif new not in s: raise SystemExit("missing mouse call anchor: " + old)
+
+old_error = 'if not reply.startswith("OK|"): raise RuntimeError("ARM human mouse rejected")'
+new_error = 'if not reply.startswith("OK|"):\n        owner.emit("EVT|DEBUG|ARM/%s reply=%s"%(op,reply))\n        raise RuntimeError("ARM human mouse rejected: " + reply)'
+if old_error in s: s = s.replace(old_error, new_error, 1)
+elif new_error not in s: raise SystemExit("missing mouse rejection diagnostic anchor")
 
 if '_arm_send_cooperative(owner' not in s:
     raise SystemExit("cooperative mouse postcondition failed")

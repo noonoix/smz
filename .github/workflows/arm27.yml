@@ -5,6 +5,7 @@ on:
     paths: ['firmware/arm26/**','firmware/arm27/**','tools/patch_avr_usb_serial.py','.github/workflows/arm27.yml']
 permissions:
   contents: read
+  issues: write
 jobs:
   compile:
     runs-on: ubuntu-latest
@@ -92,3 +93,18 @@ jobs:
                   raise SystemExit(f'generic board identity leaked into application firmware: {forbidden!r}')
           print('ARM 2.7 application VID/PID/strings/serial contract OK')
           PY
+      - name: Report identity failure tail
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const p = process.env.RUNNER_TEMP + '/arm27-build.log';
+            const text = fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : '(compile log not created; failure occurred during toolchain/core patch setup)';
+            const tail = text.split('\n').slice(-100).join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 1,
+              body: '<!-- arm27-usb-identity-failure -->\n**ARM 2.7 USB identity failure tail**\n```\n' + tail + '\n```'
+            });

@@ -46,7 +46,7 @@ for old, new in repls.items():
     elif new not in s: raise SystemExit("missing mouse call anchor: " + old)
 
 old_error = 'if not reply.startswith("OK|"): raise RuntimeError("ARM human mouse rejected")'
-new_error = 'if not reply.startswith("OK|"):\n        owner.emit("EVT|DEBUG|ARM/%s reply=%s"%(op,reply))\n        raise RuntimeError("ARM human mouse rejected: " + reply)'
+new_error = 'if reply == "ERR|STOPPED": return False\n    if not reply.startswith("OK|"):\n        owner.emit("EVT|DEBUG|ARM/%s reply=%s"%(op,reply))\n        raise RuntimeError("ARM human mouse rejected: " + reply)'
 if old_error in s: s = s.replace(old_error, new_error, 1)
 elif new_error not in s: raise SystemExit("missing mouse rejection diagnostic anchor")
 

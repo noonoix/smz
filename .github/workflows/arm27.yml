@@ -22,10 +22,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: arduino/setup-arduino-cli@v2
-      - name: Install AVR core and HID library
+      - name: Install Pro Micro core and HID library
         run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://raw.githubusercontent.com/sparkfun/Arduino_Boards/main/IDE_Board_Manager/package_sparkfun_index.json
           arduino-cli core update-index
-          arduino-cli core install arduino:avr
+          arduino-cli core install SparkFun:avr
           arduino-cli lib install HID-Project
       - name: Prepare deterministic sketch layout
         run: |
@@ -34,5 +36,5 @@ jobs:
           cp firmware/arm27/human_mouse_v3.h /tmp/arm27/
           cp firmware/arm26/ams_board26.ino /tmp/arm26/
           cp firmware/arm26/ams_key.h /tmp/arm26/
-      - name: Compile for ATmega32U4
-        run: arduino-cli compile --fqbn arduino:avr:leonardo --warnings all /tmp/arm27
+      - name: Compile for Pro Micro ATmega32U4 5V/16MHz
+        run: arduino-cli compile --fqbn 'SparkFun:avr:promicro:cpu=16MHzatmega32U4' --warnings all /tmp/arm27

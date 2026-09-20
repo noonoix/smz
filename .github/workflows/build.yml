@@ -8,7 +8,7 @@ name: build-test-package
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, fix/v32-profile-and-bundle]
     # doc-only pushes (project state, patch notes) do not need a build+test cycle
     paths-ignore:
       - 'project-state/**'

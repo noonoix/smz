@@ -24,7 +24,7 @@ jobs:
       - name: Prepare non-secret CI sketch
         shell: bash
         run: |
-          cp firmware/arm27/ams_board27.ino firmware/arm27/arm27.ino
+          mv firmware/arm27/ams_board27.ino firmware/arm27/arm27.ino
           python3 - <<'PY'
           from pathlib import Path
           p=Path('firmware/arm27/arm27.ino')

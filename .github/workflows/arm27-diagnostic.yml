@@ -1,4 +1,4 @@
-name: ARM compiler diagnostic
+name: ARM 2.7 compiler diagnostic
 on:
   push:
     branches: [fix/v32-profile-and-bundle]
@@ -16,7 +16,7 @@ jobs:
       - id: build
         shell: bash
         run: |
-          mkdir -p "$RUNNER_TEMP/bin" /tmp/arm26base
+          mkdir -p "$RUNNER_TEMP/bin" /tmp/arm27 /tmp/arm26
           curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR="$RUNNER_TEMP/bin" sh >/dev/null
           CLI="$RUNNER_TEMP/bin/arduino-cli"
           "$CLI" config add board_manager.additional_urls https://raw.githubusercontent.com/sparkfun/Arduino_Boards/main/IDE_Board_Manager/package_sparkfun_index.json >/dev/null
@@ -24,20 +24,21 @@ jobs:
           "$CLI" core install arduino:avr >/dev/null
           "$CLI" core install SparkFun:avr >/dev/null
           "$CLI" lib install HID-Project >/dev/null
-          cp firmware/arm26/ams_board26.ino /tmp/arm26base/arm26base.ino
-          printf '#pragma once\n#include <Arduino.h>\nstatic const uint8_t AMS_PSK[16]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};\n' > /tmp/arm26base/ams_key.h
+          cp firmware/arm27/ams_board27.ino /tmp/arm27/arm27.ino
+          cp firmware/arm27/human_mouse_v3.h /tmp/arm27/
+          cp firmware/arm26/ams_board26.ino /tmp/arm26/
+          printf '#pragma once\n#include <Arduino.h>\nstatic const uint8_t AMS_PSK[16]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};\n' > /tmp/arm26/ams_key.h
           set +e
-          out=$("$CLI" compile --fqbn 'SparkFun:avr:promicro:cpu=16MHzatmega32U4' --warnings all /tmp/arm26base 2>&1)
+          out=$("$CLI" compile --fqbn 'SparkFun:avr:promicro:cpu=16MHzatmega32U4' --warnings all /tmp/arm27 2>&1)
           code=$?
           reason=$(printf '%s\n' "$out" | grep -m1 -Ei 'fatal|error|overflow|too big|not found|invalid|undefined' | sed 's/[^A-Za-z0-9_.: -]/ /g' | cut -c1-180)
           if [ -z "$reason" ]; then reason=$(printf '%s\n' "$out" | tail -n 4 | tr '\n' ' ' | sed 's/[^A-Za-z0-9_.: -]/ /g' | cut -c1-180); fi
           [ -n "$reason" ] || reason="compiler-exit-${code}"
           echo "code=$code" >> "$GITHUB_OUTPUT"
           echo "reason=$reason" >> "$GITHUB_OUTPUT"
-          exit 0
   report:
     needs: diagnose
-    name: ARM compiler - ${{ needs.diagnose.outputs.reason }}
+    name: ARM27 - ${{ needs.diagnose.outputs.reason }}
     runs-on: ubuntu-latest
     steps:
       - run: test '${{ needs.diagnose.outputs.code }}' = '0'

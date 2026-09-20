@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install complete Pro Micro toolchain
+      - name: Install complete ATmega32U4 toolchain
         run: |
           mkdir -p "$RUNNER_TEMP/bin"
           curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR="$RUNNER_TEMP/bin" sh
@@ -32,5 +32,12 @@ jobs:
           p.write_text(p.read_text().replace('../arm26/ams_board26.ino', legacy))
           PY
           printf '#pragma once\n#include <Arduino.h>\nstatic const uint8_t AMS_PSK[16]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};\n' > firmware/arm26/ams_key.h
-      - name: Compile for Pro Micro ATmega32U4 5V/16MHz
-        run: arduino-cli compile --fqbn 'SparkFun:avr:promicro:cpu=16MHzatmega32U4' --warnings all firmware/arm27
+      - name: Compile with Classroom Studio custom identity
+        run: |
+          arduino-cli compile \
+            --fqbn 'SparkFun:avr:promicro:cpu=16MHzatmega32U4' \
+            --build-property 'build.vid=0x1D50' \
+            --build-property 'build.pid=0x615F' \
+            --build-property 'build.usb_product="Classroom Custom Human Input"' \
+            --build-property 'build.usb_manufacturer="Classroom Studio"' \
+            --warnings all firmware/arm27

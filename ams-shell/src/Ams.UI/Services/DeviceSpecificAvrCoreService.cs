@@ -48,10 +48,10 @@ public static class DeviceSpecificAvrCoreService
 
         const string oldDecl = "extern const u8 STRING_MANUFACTURER[] PROGMEM;\nextern const DeviceDescriptor USB_DeviceDescriptorIAD PROGMEM;";
         const string newDecl = "extern const u8 STRING_MANUFACTURER[] PROGMEM;\nextern const u8 STRING_SERIAL[] PROGMEM; // AMS_USB_SERIAL_PATCH_V1\nextern const DeviceDescriptor USB_DeviceDescriptorIAD PROGMEM;";
-        const string oldValue = "const u8 STRING_MANUFACTURER[] PROGMEM = USB_MANUFACTURER;\n\n#define DEVICE_CLASS";
+        const string oldValue = "const u8 STRING_MANUFACTURER[] PROGMEM = USB_MANUFACTURER;\n\n\n#define DEVICE_CLASS";
         var newValue = $"const u8 STRING_MANUFACTURER[] PROGMEM = USB_MANUFACTURER;\nconst u8 STRING_SERIAL[] PROGMEM = \"{serial}\";\n\n#define DEVICE_CLASS";
-        const string oldBranch = "else if (setup.wValueL == ISERIAL) {\n#ifdef PLUGGABLE_USB_ENABLED\n char name[ISERIAL_MAX_LEN];\n PluggableUSB().getShortName(name);\n return USB_SendStringDescriptor((uint8_t*)name, strlen(name), 0);\n#endif\n }";
-        var newBranch = $"else if (setup.wValueL == ISERIAL) {{\n return USB_SendStringDescriptor(STRING_SERIAL, {serial.Length}, TRANSFER_PGM);\n }}";
+        const string oldBranch = "else if (setup.wValueL == ISERIAL) {\n#ifdef PLUGGABLE_USB_ENABLED\n\t\t\tchar name[ISERIAL_MAX_LEN];\n\t\t\tPluggableUSB().getShortName(name);\n\t\t\treturn USB_SendStringDescriptor((uint8_t*)name, strlen(name), 0);\n#endif\n\t\t}";
+        var newBranch = $"else if (setup.wValueL == ISERIAL) {{\n\t\t\treturn USB_SendStringDescriptor(STRING_SERIAL, {serial.Length}, TRANSFER_PGM);\n\t\t}}";
 
         text = ReplaceExactlyOnce(text, oldDecl, newDecl, "USB declaration");
         text = ReplaceExactlyOnce(text, oldValue, newValue, "USB serial value");

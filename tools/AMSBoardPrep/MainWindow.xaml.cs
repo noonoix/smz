@@ -235,6 +235,52 @@ public partial class MainWindow : Window
         finally { _busy = false; }
     }
 
+    private void ChooseAppIsp_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "Application HEX|*.hex|HEX|*.hex" };
+        if (dlg.ShowDialog(this) == true) { AppIspHex.Text = dlg.FileName; ValidateAppIsp(); }
+    }
+
+    private void ValidateAppIsp_Click(object sender, RoutedEventArgs e) => ValidateAppIsp();
+
+    private bool ValidateAppIsp()
+    {
+        try
+        {
+            RequireProfile();
+            var info = HexInspector.RequireApplicationOnly(AppIspHex.Text.Trim());
+            AppIspValidation.Text = $"✓ App-only معتبر: {info.Range} · {info.DataBytes:N0} bytes · Bootloader حفظ می‌شود\nProfile مورد انتظار: {_profile!.Product} / {_profile.Serial}";
+            AppIspValidation.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.LightGreen);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            AppIspValidation.Text = "✗ " + ex.Message;
+            AppIspValidation.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Orange);
+            return false;
+        }
+    }
+
+    private async void FlashApplicationIsp_Click(object sender, RoutedEventArgs e)
+    {
+        if (_busy || !ValidateAppIsp()) return;
+        try
+        {
+            RequireProfile();
+            var port = AppIspPort.Text.Trim();
+            if (!port.StartsWith("COM", StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("پورت ArduinoISP را مثل COM33 وارد کن.");
+            var script = Path.Combine(_baseDir, "tools", "isp_flash_app_only.py");
+            if (!File.Exists(script)) throw new FileNotFoundException("isp_flash_app_only.py کنار برنامه پیدا نشد.", script);
+            _busy = true;
+            Log("── فلش اضطراری Application با ISP؛ Bootloader حفظ می‌شود ──");
+            var code = await Task.Run(() => RunProcess("python", new List<string> { script, "--app-only", "--port", port, "--hex", AppIspHex.Text.Trim() }));
+            if (code == 0) { SetStatus("Application با ISP نصب شد — چکاپ را اجرا کن"); Log("✓ Application ISP موفق شد؛ Bootloader دست‌نخورده ماند."); }
+            else { SetStatus("فلش Application با ISP ناموفق", true); Log("✗ Application ISP با کد " + code + " تمام شد."); }
+        }
+        catch (Exception ex) { ShowError("فلش Application با ISP", ex); }
+        finally { _busy = false; }
+    }
+
     private void ChooseApplication_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "Application HEX|*.hex|HEX|*.hex" };

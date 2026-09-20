@@ -20,5 +20,6 @@
   <ItemGroup>
     <None Include="..\..\ams-shell\caterina\Caterina.hex" Link="caterina\Caterina.hex" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\ams-shell\tools\isp_flash.py" Link="tools\isp_flash.py" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="isp_flash_app_only.py" Link="tools\isp_flash_app_only.py" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

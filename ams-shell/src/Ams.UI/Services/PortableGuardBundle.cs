@@ -114,12 +114,52 @@ public static class PortableGuardBundle
     private static string CompileRoute(IEnumerable<StepNode> steps, AppSettings settings,
         int screenW, int screenH, string sourceName, string machine)
     {
-        var normalized = NormalizePortableSteps(steps);
+        var source = steps.ToList();
+        var normalized = NormalizePortableSteps(source);
         var text = PlanExporter.CompileOnce(normalized, settings, screenW, screenH, sourceName, machine).Text;
-        return string.Join("\n", text.Split('\n').Select(line =>
+        var route = string.Join("\n", text.Split('\n').Select(line =>
             line.StartsWith("# " + PortableOpSentinel, StringComparison.Ordinal)
                 ? line[(2 + PortableOpSentinel.Length)..]
                 : line));
+
+        // Never silently ship a route that dropped a requested mouse action. This was the
+        // failure mode seen in the 46 bundle: the .amsj contained randomMousePosition but
+        // desktop_steps.txt did not contain RMOUSE. Fail during export with the route and
+        // expected/actual counts instead of producing a broken Pico bundle.
+        ValidateMouseExport(source, route, sourceName);
+        return route;
+    }
+
+    private static void ValidateMouseExport(IEnumerable<StepNode> nodes, string route, string sourceName)
+    {
+        var expected = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["randomMousePosition"] = "RMOUSE|",
+            ["mouseMove"] = "MOVETO|",
+            ["mouseClick"] = "CLICK|",
+        };
+        foreach (var pair in expected)
+        {
+            var requested = CountEnabled(nodes, pair.Key);
+            if (requested == 0) continue;
+            var emitted = route.Split('\n').Count(line => line.StartsWith(pair.Value, StringComparison.Ordinal));
+            if (requested != emitted)
+                throw new InvalidDataException($"Mouse export mismatch in {Path.GetFileName(sourceName)}: " +
+                    $"{pair.Key} requested={requested}, emitted={emitted} ({pair.Value.TrimEnd('|')}). " +
+                    "Export stopped; no incomplete bundle was published.");
+        }
+    }
+
+    private static int CountEnabled(IEnumerable<StepNode> nodes, string type)
+    {
+        var total = 0;
+        foreach (var node in nodes)
+        {
+            if (node.IsDisabled) continue;
+            if (string.Equals(node.Type, type, StringComparison.Ordinal)) total++;
+            total += CountEnabled(node.Children, type);
+        }
+        return total;
     }
 
     private static List<StepNode> NormalizePortableSteps(IEnumerable<StepNode> nodes)

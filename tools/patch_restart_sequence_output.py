@@ -103,8 +103,15 @@ s=s.replace('''            if not _light_gate(owner, expected): return
                 return True''',1)
 route_old='''    primary = None
     try:
-        return _run_light_route(self, name)
+        _run_light_route(self, name)
     except Exception as exc:'''
+route_old_simple='''    try:
+        return _run_light_route(self, name)
+    finally:
+        # A state transition, Stop or parser failure must never leave a held key.
+        self.keyboard.release_all()
+        self.arm.flush()
+'''
 route_new='''    primary = None
     try:
         if name == "desktop_steps.txt" and self.restart_route_pending:
@@ -116,10 +123,60 @@ route_new='''    primary = None
             lo, hi = _restart_range()
             self.restart_deadline = self.restart_cycle_started + (lo if hi <= lo else _light_random.randint(lo, hi))
             _debug_event(self, "ROUTE", "restart-complete desktop-next", persist=True)
-        _run_light_route(self, name)
+        return _run_light_route(self, name)
     except Exception as exc:'''
-if route_old in s: s=s.replace(route_old,route_new,1)
-elif route_new not in s: raise SystemExit('missing restart route anchor')
+if route_old in s:
+    s=s.replace(route_old,route_new,1)
+elif route_old_simple in s:
+    s=s.replace(route_old_simple,route_new,1)
+elif route_new not in s:
+    # Accept the current streaming wrapper even when an earlier output patch
+    # changed only its comments/cleanup text.
+    marker = 'def _diagnostic_route(self, decision):\n'
+    if marker in s and 'return _run_light_route(self, name)' in s:
+        start = s.index(marker)
+        end = s.index('runtime.Combined.route = _diagnostic_route', start)
+        route_full = '''def _diagnostic_route(self, decision):
+    if not decision.get("execute"):
+        return False
+    name = decision.get("route")
+    if name not in _VALID_ROUTE_NAMES:
+        raise runtime.GuardBundleError("unvalidated route")
+    primary = None
+    try:
+        if name == "desktop_steps.txt" and self.restart_route_pending:
+            _debug_event(self, "ROUTE", "restart-before-desktop", persist=True)
+            if not _run_light_route(self, "restart_steps.txt"): return False
+            self.restart_route_pending = False
+            _restart_marker_clear()
+            self.restart_cycle_started = runtime.time.monotonic()
+            lo, hi = _restart_range()
+            self.restart_deadline = self.restart_cycle_started + (lo if hi <= lo else _light_random.randint(lo, hi))
+            _debug_event(self, "ROUTE", "restart-complete desktop-next", persist=True)
+        return _run_light_route(self, name)
+    except Exception as exc:
+        primary = exc
+        raise
+    finally:
+        try:
+            self.keyboard.release_all()
+        except Exception as cleanup:
+            self.emit("EVT|DEBUG|CLEANUP/keyboard " + type(cleanup).__name__)
+            if primary is None: raise
+        try:
+            self.arm.release(False)
+        except Exception as cleanup:
+            self.emit("EVT|DEBUG|CLEANUP/mouse " + type(cleanup).__name__)
+        try:
+            self.arm.flush()
+        except Exception as cleanup:
+            self.emit("EVT|DEBUG|CLEANUP/arm " + type(cleanup).__name__)
+            if primary is None: raise
+
+'''
+        s = s[:start] + route_full + s[end:]
+    else:
+        raise SystemExit('missing restart route anchor')
 loop_old='''        self.arm.pump()
         if (self.controls.running and not self.calibrating and'''
 loop_new='''        self.arm.pump()

@@ -96,7 +96,9 @@ new_route = '''    primary = None
 '''
 if old_route in s:
     s = s.replace(old_route, new_route, 1)
-elif new_route not in s and not ("self.arm.release(False)" in s and "CLEANUP/keyboard" in s):
+elif new_route not in s and not ("def _diagnostic_route" in s and
+                                    "self.keyboard.release_all()" in s and
+                                    "self.arm.flush()" in s):
     raise SystemExit("missing route cleanup anchor")
 p.write_text(s, encoding="utf-8", newline="\n")
 print("patched", p)

@@ -148,5 +148,7 @@ new='''            elif op == "KEY":
                 if not _light_type(owner, args, expected): return
             elif op in ("KDOWN", "KUP"):'''
 if old in s: s=s.replace(old,new,1)
+elif old.replace('return\n', 'return False\n') in s:
+    s=s.replace(old.replace('return\n', 'return False\n'), new, 1)
 elif new not in s and 'elif op == "TYPE":' not in s: raise SystemExit('missing TYPE dispatch anchor')
 p.write_text(s,encoding='utf-8',newline='\n'); print('patched streaming TYPE:',p)

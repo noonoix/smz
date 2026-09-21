@@ -8,6 +8,7 @@ on:
     paths:
       - 'ams-shell/**'
       - 'tools/**'
+      - 'firmware/pico-light-guard-1.0.0/**'
       - '.github/workflows/autocycle.yml'
   pull_request:
     paths:

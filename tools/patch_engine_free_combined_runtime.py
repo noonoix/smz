@@ -47,8 +47,17 @@ if p.name == "combined_guard_runtime.py":
 '''
     if old_route in s:
         s = s.replace(old_route, new_route, 1)
-    elif new_route not in s:
-        raise SystemExit("missing route cleanup anchor")
+    else:
+        current_route = '''        self.arm.prepare_route()
+        try:
+            plan_engine.run_plan(self.routes[name], PlanContext(self))
+            self.arm.flush()
+        finally:
+            # Always leave the Pro Micro neutral even when a plan step fails.
+            self.arm.release(True)
+'''
+        if current_route not in s:
+            raise SystemExit("missing route cleanup anchor")
 
     old = "import plan_engine\n"
     new = "# Combined Guard routes are executed only by the bounded streaming runner.\n"

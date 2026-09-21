@@ -90,10 +90,22 @@ elif p.name == "code.py":
     try:
         self.arm.prepare_route()
 """
+    simple_route_start = """    try:
+        _run_light_route(self, name)
+"""
+    simple_route_start_fixed = """    try:
+        self.arm.prepare_route()
+        _run_light_route(self, name)
+"""
     if route_start in s and route_start_fixed not in s:
         s = s.replace(route_start, route_start_fixed, 1)
     elif route_start_fixed not in s:
-        raise SystemExit("missing streaming route start anchor")
+        # The checked-in firmware fixture uses the smaller route wrapper;
+        # generated output uses the primary/except wrapper. Support both.
+        if simple_route_start in s and simple_route_start_fixed not in s:
+            s = s.replace(simple_route_start, simple_route_start_fixed, 1)
+        elif simple_route_start_fixed not in s:
+            raise SystemExit("missing streaming route start anchor")
 
     # The streaming runner is the active route path for the combined firmware.
     # It already releases the keyboard in its finally block, but previously
@@ -126,7 +138,28 @@ elif p.name == "code.py":
         self.keyboard.release_all()
         self.arm.flush()
 '''
+        old_simple_prepared = '''    try:
+        self.arm.prepare_route()
+        _run_light_route(self, name)
+    finally:
+        # A state transition, Stop or parser failure must never leave a held key.
+        self.keyboard.release_all()
+        self.arm.flush()
+'''
         new_simple = '''    try:
+        self.arm.prepare_route()
+        _run_light_route(self, name)
+    finally:
+        # A state transition, Stop or parser failure must never leave a held key
+        # or mouse button.
+        self.keyboard.release_all()
+        try:
+            self.arm.release(True)
+        except Exception:
+            pass
+        self.arm.flush()
+'''
+        new_simple_prepared = '''    try:
         _run_light_route(self, name)
     finally:
         # A state transition, Stop or parser failure must never leave a held key
@@ -140,7 +173,9 @@ elif p.name == "code.py":
 '''
         if old_simple in s:
             s = s.replace(old_simple, new_simple, 1)
-        elif new_simple not in s:
+        elif old_simple_prepared in s:
+            s = s.replace(old_simple_prepared, new_simple, 1)
+        elif new_simple not in s and new_simple_prepared not in s:
             raise SystemExit("missing streaming route cleanup anchor")
 else:
     raise SystemExit("expected code.py or combined_guard_runtime.py")

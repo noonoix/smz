@@ -30,16 +30,15 @@ if p.name == "combined_guard_runtime.py":
         self.held.clear(); self.pending = 0
 '''
     new_abort = '''    def abort(self):
-        # Stop the active human-mouse operation before sending MUP frames.
-        # Sending HALT and MUP back-to-back can make MUP arrive while the ARM
-        # is still inside hm3_wait(); that leaves a physical left button held.
+        # Stop first; release only buttons known to be held. Never synthesize
+        # a left/right/middle MUP on a mouse-only route.
         try:
             self.write("HALT")
         except Exception:
             pass
         deadline = time.monotonic() + .35
-        halted = False
         while time.monotonic() < deadline:
+            halted = False
             for reply in self.pump():
                 if reply.startswith("OK|HALT") or reply.startswith("ERR|ABORTED"):
                     halted = True
@@ -47,12 +46,9 @@ if p.name == "combined_guard_runtime.py":
             if halted:
                 break
             time.sleep(.002)
-        # Only release buttons after HALT has been observed (or its bounded
-        # wait expires). Keep this path nonblocking and independent of send(),
-        # because stop must work even with a stale reply in the UART buffer.
-        for line in ("MUP|left", "MUP|right", "MUP|middle"):
+        for button in tuple(self.held):
             try:
-                self.write(line)
+                self.write("MUP|" + button)
                 time.sleep(.008)
             except Exception:
                 pass
@@ -62,11 +58,12 @@ if p.name == "combined_guard_runtime.py":
             time.sleep(.002)
         self.held.clear(); self.pending = 0
 '''
+
     if old_abort in s:
         s = s.replace(old_abort, new_abort, 1)
     elif previous_abort in s:
         s = s.replace(previous_abort, new_abort, 1)
-    elif new_abort not in s:
+    elif "for button in tuple(self.held):" not in s and new_abort not in s:
         raise SystemExit("missing Arm.abort anchor")
 
     # A route may end while MDOWN/MCLICK is active. flush() alone drains UART;
@@ -77,7 +74,7 @@ if p.name == "combined_guard_runtime.py":
         finally:
             # Fail-safe route cleanup: never leave a physical mouse button held
             # when a route completes, aborts, or raises.
-            self.arm.release(True)
+            self.arm.release(False)
             self.arm.flush()
 '''
     if old_route in s:
@@ -85,7 +82,7 @@ if p.name == "combined_guard_runtime.py":
     else:
         if not ("self.arm.prepare_route()" in s and
                 "plan_engine.run_plan(" in s and
-                "self.arm.release(True)" in s):
+                ("self.arm.release(False)" in s or "self.arm.release(True)" in s)):
             raise SystemExit("missing route cleanup anchor")
 
     old = "import plan_engine\n"
@@ -134,7 +131,7 @@ elif p.name == "code.py":
             self.emit("EVT|DEBUG|CLEANUP/arm " + type(cleanup).__name__)
 '''
     new_cleanup = '''        try:
-            self.arm.release(True)
+            self.arm.release(False)
         except Exception as cleanup:
             self.emit("EVT|DEBUG|CLEANUP/mouse " + type(cleanup).__name__)
         try:
@@ -144,7 +141,7 @@ elif p.name == "code.py":
 '''
     if old_cleanup in s:
         s = s.replace(old_cleanup, new_cleanup, 1)
-    elif new_cleanup not in s:
+    elif new_cleanup not in s and "self.arm.release(False)" not in s:
         # The checked-in firmware fixture has a smaller diagnostic route block
         # than the packaged/generated code. Keep both source and build layouts
         # covered; this also makes the patch testable without a full .NET build.
@@ -171,7 +168,7 @@ elif p.name == "code.py":
         # or mouse button.
         self.keyboard.release_all()
         try:
-            self.arm.release(True)
+            self.arm.release(False)
         except Exception:
             pass
         self.arm.flush()
@@ -183,7 +180,7 @@ elif p.name == "code.py":
         # or mouse button.
         self.keyboard.release_all()
         try:
-            self.arm.release(True)
+            self.arm.release(False)
         except Exception:
             pass
         self.arm.flush()

@@ -118,6 +118,14 @@ class Arm:
             if time.monotonic() > end: raise RuntimeError("arm back-pressure timeout")
             time.sleep(.001)
         self.write("MMOVE|%d,%d,abs,2" % (x, y)); self.pending += 1
+    def _track_button_command(self, line):
+        head, sep, payload = line.partition("|")
+        button = payload.split(",", 1)[0].strip().lower() if sep else ""
+        if head == "MDOWN" and button in ("left", "right", "middle"):
+            self.held.add(button)
+        elif head == "MUP" and button in ("left", "right", "middle"):
+            self.held.discard(button)
+
     def send(self, line, timeout=5):
         head = line.split("|", 1)[0]
         # SETRES is idempotent. A stale ERR/partial UART line must not make a
@@ -130,7 +138,9 @@ class Arm:
             end = time.monotonic() + timeout
             while time.monotonic() < end:
                 for reply in self.pump():
-                    if reply.startswith("OK|" + head): return reply
+                    if reply.startswith("OK|" + head):
+                        self._track_button_command(line)
+                        return reply
                     if reply.startswith("ERR|"):
                         last_error = reply
                         break
@@ -149,14 +159,41 @@ class Arm:
         while self.pending and time.monotonic() < end: self.pump(); time.sleep(.002)
         if self.pending: raise RuntimeError("arm move acknowledgement timeout")
     def release(self, force=True):
-        for button in (("left", "right", "middle") if force else tuple(self.held)):
+        # Never emit MUP for a button that this runtime did not observe going
+        # down. Unconditional MUP frames were interpreted by the Pro Micro as
+        # a stray click/hold on otherwise mouse-only routes.
+        for button in tuple(self.held):
             try: self.send("MUP|" + button, 1)
             except Exception: pass
         self.held.clear(); self.pending = 0
     def abort(self):
-        try: self.send("HALT", 1.5)
-        except Exception: pass
-        self.release(True)
+        # Stop the active human-mouse operation first. Do not send synthetic
+        # MUP frames for left/right/middle when no MDOWN was acknowledged.
+        try:
+            self.write("HALT")
+        except Exception:
+            pass
+        deadline = time.monotonic() + .35
+        while time.monotonic() < deadline:
+            halted = False
+            for reply in self.pump():
+                if reply.startswith("OK|HALT") or reply.startswith("ERR|ABORTED"):
+                    halted = True
+                    break
+            if halted:
+                break
+            time.sleep(.002)
+        for button in tuple(self.held):
+            try:
+                self.write("MUP|" + button)
+                time.sleep(.008)
+            except Exception:
+                pass
+        deadline = time.monotonic() + .35
+        while time.monotonic() < deadline:
+            self.pump()
+            time.sleep(.002)
+        self.held.clear(); self.pending = 0
     def prepare_route(self):
         # Software equivalent of the power-cycle workaround: cancel a stale
         # route, neutralize all buttons, and discard completed move debt before
@@ -435,7 +472,7 @@ class Combined:
             self.arm.flush()
         finally:
             # Always leave the Pro Micro neutral even when a plan step fails.
-            self.arm.release(True)
+            self.arm.release(False)
             del route_plan
             gc.collect()
     def host_poll(self):

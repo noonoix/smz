@@ -561,25 +561,40 @@ def _run_light_route(ctx, commands):
 
 def _diagnostic_route(self, decision):
     if not decision.get("execute"):
-        return
+        return False
     name = decision.get("route")
     if name not in self.bundle["manifest"]["routes"].values():
         raise GuardBundleError("unvalidated route")
-    if name not in self.routes:
-        with open("/" + name, "r") as fh:
-            text = fh.read()
-        commands = _light_route_lines(text)
+    # A parsed plan is consumable: loop/random bookkeeping and the step cursor
+    # must never be reused by the next invocation of the same Route. Re-read
+    # and parse the plan for every transition so repeated desktop runs really
+    # emit their RMOUSE steps again.
+    with open("/" + name, "r") as fh:
+        text = fh.read()
+    commands = _light_route_lines(text)
+    try:
         if commands is not None:
             # Keep simple Pico-only routes off the large plan_engine import.
-            self.routes[name] = ("light", commands)
+            _run_light_route(PlanContext(self), commands)
         else:
-            self.routes[name] = ("plan", runtime.plan_engine.parse_plan(text))
-    kind, route = self.routes[name]
-    if kind == "light":
-        _run_light_route(PlanContext(self), route)
-    else:
-        runtime.plan_engine.run_plan(route, PlanContext(self))
-    self.arm.flush()
+            route_plan = runtime.plan_engine.parse_plan(text)
+            try:
+                runtime.plan_engine.run_plan(route_plan, PlanContext(self))
+            finally:
+                del route_plan
+        self.arm.flush()
+        return True
+    finally:
+        # Cleanup must be idempotent and must not manufacture a click. Arm
+        # releases only buttons explicitly tracked as held by MDOWN.
+        try:
+            self.arm.release(False)
+        except Exception as cleanup:
+            _debug_event(self, "CLEANUP", "mouse " + type(cleanup).__name__)
+        try:
+            self.arm.flush()
+        except Exception as cleanup:
+            _debug_event(self, "CLEANUP", "arm " + type(cleanup).__name__)
 
 runtime.Combined.route = _diagnostic_route
 
@@ -609,8 +624,11 @@ def _audible_loop(self):
                         route_name = decision.get("route")
                         _debug_event(self, "ROUTE", "start %s lux=%.1f" % (route_name, lux), persist=True)
                         _apply_pending_cursor(self, force=True)
-                        self.route(decision)
-                        _debug_event(self, "ROUTE", "complete %s" % route_name, persist=True)
+                        completed = self.route(decision)
+                        if completed is False:
+                            _debug_event(self, "ROUTE", "aborted %s" % route_name, persist=True)
+                        else:
+                            _debug_event(self, "ROUTE", "complete %s" % route_name, persist=True)
                     else:
                         _debug_event(self, "STATE", "denied reason=%s lux=%.1f" % (decision.get("reason"), lux), persist=True)
             except Exception as exc:

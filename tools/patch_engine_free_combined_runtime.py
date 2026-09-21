@@ -13,7 +13,7 @@ if p.name == "combined_guard_runtime.py":
         except Exception: pass
         self.release(True)
 '''
-    new_abort = '''    def abort(self):
+    previous_abort = '''    def abort(self):
         # Nonblocking fail-safe stop: queue HALT and explicit MUP frames first,
         # then drain replies. Do not wait for an acknowledgement before sending
         # the button-up frames; an in-flight HMOVE/MCLICK may be aborting.
@@ -29,8 +29,43 @@ if p.name == "combined_guard_runtime.py":
             time.sleep(.002)
         self.held.clear(); self.pending = 0
 '''
+    new_abort = '''    def abort(self):
+        # Stop the active human-mouse operation before sending MUP frames.
+        # Sending HALT and MUP back-to-back can make MUP arrive while the ARM
+        # is still inside hm3_wait(); that leaves a physical left button held.
+        try:
+            self.write("HALT")
+        except Exception:
+            pass
+        deadline = time.monotonic() + .35
+        halted = False
+        while time.monotonic() < deadline:
+            for reply in self.pump():
+                if reply.startswith("OK|HALT") or reply.startswith("ERR|ABORTED"):
+                    halted = True
+                    break
+            if halted:
+                break
+            time.sleep(.002)
+        # Only release buttons after HALT has been observed (or its bounded
+        # wait expires). Keep this path nonblocking and independent of send(),
+        # because stop must work even with a stale reply in the UART buffer.
+        for line in ("MUP|left", "MUP|right", "MUP|middle"):
+            try:
+                self.write(line)
+                time.sleep(.008)
+            except Exception:
+                pass
+        deadline = time.monotonic() + .35
+        while time.monotonic() < deadline:
+            self.pump()
+            time.sleep(.002)
+        self.held.clear(); self.pending = 0
+'''
     if old_abort in s:
         s = s.replace(old_abort, new_abort, 1)
+    elif previous_abort in s:
+        s = s.replace(previous_abort, new_abort, 1)
     elif new_abort not in s:
         raise SystemExit("missing Arm.abort anchor")
 

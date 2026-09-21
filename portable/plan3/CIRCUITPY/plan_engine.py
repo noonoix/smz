@@ -201,7 +201,7 @@ def _extract_containers(text):
         kind = head.split("|", 1)[0].upper()
         if kind not in heads:
             if kind in ("PKGITEM", "ENDPKG", "PARITEM", "ENDPAR", "ENDRETRY"):
-                raise ValueError("line %d: %s outside a container" % (i + 1, kind))
+                raise ValueError("line %d: %s outside a package/parallel block" % (i + 1, kind))
             out.append(lines[i]); i += 1; continue
         if kind == "RETRY":
             end, items, depth, closed, j = "ENDRETRY", [[]], 0, False, i + 1

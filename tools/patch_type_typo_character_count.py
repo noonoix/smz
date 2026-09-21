@@ -84,7 +84,7 @@ new_neighbor = '''def _type_neighbor(ch):
 
 
 def _light_type('''
-s = s[:neighbor.start()] + new_neighbor + s[neighbor.end()-len("def _light_type("):]
+s = s[:neighbor.start()] + new_neighbor + s[neighbor.end():]
 
 if "chars_since_typo>=next_typo" not in s or "typo-correction" not in s:
     raise SystemExit("TYPE character-based correction postcondition failed")

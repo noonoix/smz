@@ -676,7 +676,11 @@ def _apply_pending_cursor(self, force=False):
     if self.controls.running and not force:
         return True
     if _CURSOR_PENDING is None:
-        return _CURSOR_SYNC_READY
+        # A host cursor sample is optional. Pico-only exports and Collector
+        # sessions may start before the bridge sends CURSOR; preserve the
+        # Build52 behaviour and let the ARM keep its existing origin. A pending
+        # sample is still acknowledged transactionally below.
+        return True
     if getattr(self.arm, "pending", 0):
         return False
     x, y = _CURSOR_PENDING

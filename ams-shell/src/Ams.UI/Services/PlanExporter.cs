@@ -255,10 +255,53 @@ public static class PlanExporter
                 case "waitForSound":EmitWaitForSound(n);return; case "waitForLight":EmitWaitForLight(n);return;
                 case "label":EmitLabel(n);return; case "gotoLabel":EmitGoto(n);return; case "rawCommand":EmitRaw(n);return;
                 case "randomPackage":EmitRandomPackage(n);return; case "parallelGroup":EmitParallelGroup(n);return;
+                case "buzzer":EmitBuzzer(n);return;
                 case "runExe":EmitLaunch(n,false);return; case "openFile":EmitLaunch(n,true);return; case "playAudio":EmitAudio(n);return; case "playScript":EmitInclude(n);return;
                 case "findImage":Error(n,"findImage needs machine vision - it cannot run on the Pico");CollectBlockers(n);return;
                 default:Error(n,"unknown step type '"+n.Type+"' - this exporter does not know it (supported: the 23 app actions)");return;
             }
+        }
+
+        private void EmitBuzzer(StepNode n)
+        {
+            // Portable Guard routes use the same BEEP|frequency,duration and
+            // DELAY|milliseconds operations as the Pico plan engine. The AMSJ
+            // buzzer pattern is: frequency:duration[,pause];...
+            var p = n.Props;
+            var pattern = PropEx.GetString(p, "pattern").Trim();
+            if (pattern.Length == 0)
+            {
+                pattern = PropEx.GetString(p, "preset", "short").ToLowerInvariant() switch
+                {
+                    "warning" => "700:180,80;700:300",
+                    "success" => "880:100,60;1320:180",
+                    "double" => "900:150,80;1200:250",
+                    _ => "900:150",
+                };
+            }
+
+            var output = new List<string>();
+            foreach (var raw in pattern.Split(';', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var toneAndPause = raw.Trim().Split(',', StringSplitOptions.TrimEntries);
+                var tone = toneAndPause[0].Split(':', StringSplitOptions.TrimEntries);
+                if (tone.Length != 2
+                    || !int.TryParse(tone[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var frequency)
+                    || !int.TryParse(tone[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var duration)
+                    || frequency < 30 || frequency > 20000 || duration < 0
+                    || (toneAndPause.Length > 1 && (!int.TryParse(toneAndPause[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var pause) || pause < 0)))
+                {
+                    Error(n, "invalid buzzer pattern '" + raw + "' (expected frequency:duration[,pause])");
+                    return;
+                }
+                output.Add("BEEP|" + frequency.ToString(CultureInfo.InvariantCulture) + "," + duration.ToString(CultureInfo.InvariantCulture));
+                if (toneAndPause.Length > 1 && int.Parse(toneAndPause[1], CultureInfo.InvariantCulture) > 0)
+                    output.Add("DELAY|" + int.Parse(toneAndPause[1], CultureInfo.InvariantCulture));
+            }
+            if (output.Count == 0) { Error(n, "empty buzzer pattern"); return; }
+            Lines.AddRange(output);
+            Count("buzzer");
+            EmitDelay(n);
         }
 
         private void EmitComment(StepNode n)

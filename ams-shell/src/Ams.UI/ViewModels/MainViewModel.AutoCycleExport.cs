@@ -1,4 +1,6 @@
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using System.Windows;
 using Ams.UI.Services;
 using CommunityToolkit.Mvvm.Input;
@@ -8,90 +10,75 @@ namespace Ams.UI.ViewModels;
 public partial class MainViewModel
 {
     [RelayCommand]
-    private void ExportCombinedPortableGuard()
+    private async Task ExportCombinedPortableGuard()
     {
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
-            Filter = "Combined Pico + Arduino Guard bundle (plan.txt)|plan.txt",
+            Filter = "Complete Pico Guard bundle (plan.txt)|plan.txt",
             FileName = "plan.txt",
-            Title = "خروجی Combined Portable Guard — پوشه‌ی CIRCUITPY را انتخاب کن",
+            Title = "ساخت بسته کامل چرخه + Macro + Guard — پوشه CIRCUITPY را انتخاب کن",
         };
         if (dlg.ShowDialog() != true) return;
 
         try
         {
             var workspace = CapturePipelineWorkspaceForExport();
-            var written = PortableGuardBundle.Export(
-                dlg.FileName,
-                workspace,
-                LightStateProfiles.ToArray(),
-                _settings,
+            // RestartGuardBundle wraps PortableGuardBundle.Export, then adds the post-reboot route.
+            var written = RestartGuardBundle.Export(
+                dlg.FileName, workspace, LightStateProfiles.ToArray(), _settings,
                 (int)SystemParameters.PrimaryScreenWidth,
                 (int)SystemParameters.PrimaryScreenHeight,
-                _currentFile ?? "untitled",
-                Environment.MachineName);
+                _currentFile ?? "untitled", Environment.MachineName).ToList();
 
-            foreach (var file in written) Log("combined Guard export: " + Path.GetFileName(file));
-            Log($"combined Pico + Arduino arm bundle: {written.Count} file(s) written; CIRCUITPY is the runtime source of truth");
+            var directory = Path.GetDirectoryName(Path.GetFullPath(dlg.FileName))
+                ?? throw new IOException("مسیر خروجی bundle نامعتبر است.");
+            var planPath = Path.Combine(directory, "plan.txt");
+            var decoratedPlan = AutoCyclePlanBundle.DecorateRoot(File.ReadAllText(planPath), _settings);
+            WriteAtomic(planPath, new UTF8Encoding(false).GetBytes(decoratedPlan));
+            RestartGuardBundle.RebuildHashes(directory, written);
+
+            foreach (var file in written) Log("complete Guard bundle: " + Path.GetFileName(file));
+            Log("complete Guard bundle: AutoCycle + Restart embedded; manifest rebuilt");
+
+            var syncMessage = "برد متصل نبود؛ پس از اتصال، فقط Sync کالیبراسیون را اجرا کن.";
+            if (_bridge is not null && Connection == ConnectionState.Connected)
+            {
+                await Task.Delay(1500);
+                await RefreshLightGuardIdentityAsync();
+                if (LightGuardIdentityValid)
+                {
+                    await SyncLightGuardCalibrationAsync();
+                    syncMessage = LightGuardCalibrationSynchronized
+                        ? "کالیبراسیون Pico نیز بررسی و Sync شد."
+                        : "Bundle ساخته شد؛ Sync کالیبراسیون ناموفق بود و باید جداگانه بررسی شود.";
+                }
+                else syncMessage = "Bundle ساخته شد؛ Pico هنوز پس از انتقال آمادهٔ Sync نبود.";
+            }
             MessageBox.Show(
-                $"بسته‌ی Combined Pico + Arduino arm ساخته شد ({written.Count} فایل).\n"
-                + "plan.txt ورودی STATELOOP است؛ هفت فایل route، manifest، calibration و runtimeها هم کنار آن نوشته شدند.\n"
-                + "این خروجی فقط برای بررسی و کپی دستی روی CIRCUITPY است؛ هنوز نصب سخت‌افزار، merge یا پذیرش تولید انجام نشده است.",
-                "Export Combined Portable Guard", MessageBoxButton.OK, MessageBoxImage.Information);
+                $"بستهٔ کامل ساخته شد ({written.Count} فایل).\n\n"
+                + "تنظیمات AutoCycle، Restart، تمام Macro routeها، Recovery، Resumable، Guard، کالیبراسیون و manifest در همین بسته قرار دارند.\n\n"
+                + syncMessage,
+                "Complete Pico Guard bundle", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (PlanExporter.PlanBlockedException bx)
         {
-            Log($"combined Guard export blocked ({bx.Errors.Count} problem(s)) — nothing written:");
+            Log($"complete Guard export blocked ({bx.Errors.Count} problem(s)) — nothing written:");
             foreach (var error in bx.Errors) Log("  x " + error);
-            MessageBox.Show(
-                $"اکسپورت Combined Guard متوقف شد — {bx.Errors.Count} خطای Step. جزئیات در لاگ است.",
-                "Export Combined Portable Guard", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show($"اکسپورت بستهٔ کامل متوقف شد — {bx.Errors.Count} خطای Step. جزئیات در لاگ است.",
+                "Complete Pico Guard bundle", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         catch (Exception ex)
         {
-            Log("combined Guard export failed: " + ex.Message);
-            MessageBox.Show("خروجی Combined Guard ناموفق بود: " + ex.Message,
-                "Export Combined Portable Guard", MessageBoxButton.OK, MessageBoxImage.Error);
+            Log("complete Guard export failed: " + ex.Message);
+            MessageBox.Show("ساخت بستهٔ کامل ناموفق بود: " + ex.Message,
+                "Complete Pico Guard bundle", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
-    [RelayCommand]
-    private void ExportAutoCyclePicoPlan()
+    private static void WriteAtomic(string path, byte[] bytes)
     {
-        var dlg = new Microsoft.Win32.SaveFileDialog
-        {
-            Filter = "Pico automatic-cycle plan (plan.txt)|plan.txt",
-            FileName = "plan.txt",
-            Title = "خروجی چرخه‌ی خودکار پیکو — پوشه‌ی CIRCUITPY را انتخاب کن",
-        };
-        if (dlg.ShowDialog() != true) return;
-        try
-        {
-            var workspace = CapturePipelineWorkspaceForExport();
-            var written = PipelinePlanBundle.Export(dlg.FileName, workspace, _settings,
-                (int)SystemParameters.PrimaryScreenWidth, (int)SystemParameters.PrimaryScreenHeight,
-                _currentFile ?? "untitled", Environment.MachineName);
-            foreach (var file in written) Log("auto-cycle plan: " + Path.GetFileName(file));
-            Log($"auto-cycle pipeline: {written.Count} file(s) written; Main owns cycle directives");
-            MessageBox.Show(
-                $"بسته‌ی Pipeline ساخته شد ({written.Count} فایل).\n"
-                + "Launch، Main، دو Recovery و Resume Essentials به فایل‌های مستقل PLAN|2 تبدیل شدند.\n"
-                + "RUNFOR و AUTORESUME فقط در plan.txt اصلی نوشته شدند.\n"
-                + "همه‌ی فایل‌ها را در ریشه‌ی CIRCUITPY نگه دار.",
-                "Export AutoCycle Pipeline", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-        catch (PlanExporter.PlanBlockedException bx)
-        {
-            Log($"auto-cycle export blocked ({bx.Errors.Count} problem(s)):");
-            foreach (var error in bx.Errors) Log("  x " + error);
-            MessageBox.Show($"اکسپورت Pipeline متوقف شد — {bx.Errors.Count} خطا. جزئیات در لاگ است.",
-                "Export AutoCycle Pipeline", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
-        catch (Exception ex)
-        {
-            Log("auto-cycle export failed: " + ex.Message);
-            MessageBox.Show("خروجی Pipeline ناموفق بود: " + ex.Message,
-                "Export AutoCycle Pipeline", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
+        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try { File.WriteAllBytes(temporary, bytes); File.Move(temporary, path, overwrite: true); }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 }

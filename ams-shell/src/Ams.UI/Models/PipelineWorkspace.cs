@@ -3,16 +3,17 @@ using Ams.UI.Services;
 
 namespace Ams.UI.Models;
 
-/// <summary>Seven visible browser-style workspaces: six optical positions plus Resumable.</summary>
+/// <summary>Six optical positions, one post-reboot route, and Resumable.</summary>
 public enum PipelineKind
 {
     Desktop = 0,
-    LoginOrDc = 1,
-    CharacterDashboard = 2,
-    EnteringGameLoading = 3,
-    Game = 4,
-    Targeted = 5,
-    Resumable = 6,
+    Restart = 1,
+    LoginOrDc = 2,
+    CharacterDashboard = 3,
+    EnteringGameLoading = 4,
+    Game = 5,
+    Targeted = 6,
+    Resumable = 7,
 
     // Compatibility aliases for existing commands/export code. These aliases are
     // intentionally not visible tabs; legacy content is preserved separately on migration.
@@ -34,17 +35,17 @@ public sealed class PipelineTabDocument
 }
 
 /// <summary>
-/// Owns six optical-position step trees and one Resumable tree. Legacy five-tab
-/// documents are retained in LegacyPipelines during migration and are never silently
-/// mapped into a new optical position.
+/// Owns six optical-position step trees, one post-reboot tree, and one Resumable tree.
+/// Legacy documents are retained during migration and are never silently reassigned.
 /// </summary>
 public sealed class PipelineWorkspace
 {
-    public const int FormatVersion = 2;
+    public const int FormatVersion = 3;
 
     public ObservableCollection<PipelineTabDocument> Tabs { get; } = new()
     {
         new() { Kind = PipelineKind.Desktop, Title = "Desktop", FileName = "desktop_steps.txt" },
+        new() { Kind = PipelineKind.Restart, Title = "Restart", FileName = "restart_steps.txt" },
         new() { Kind = PipelineKind.LoginOrDc, Title = "Login / DC", FileName = "login_or_dc_steps.txt" },
         new() { Kind = PipelineKind.CharacterDashboard, Title = "Character Dashboard", FileName = "character_dashboard_steps.txt" },
         new() { Kind = PipelineKind.EnteringGameLoading, Title = "Entering Game / Loading", FileName = "entering_game_loading_steps.txt" },
@@ -53,14 +54,10 @@ public sealed class PipelineWorkspace
         new() { Kind = PipelineKind.Resumable, Title = "Resumable", FileName = "resumable_steps.txt" },
     };
 
-    /// <summary>Old Launch/Main/Recovery/Resume Essentials trees awaiting explicit review.</summary>
     public Dictionary<string, List<StepNode>> LegacyPipelines { get; } = new(StringComparer.Ordinal);
-
     public bool HasLegacyPipelines => LegacyPipelines.Count > 0;
-
     public PipelineTabDocument this[PipelineKind kind] => Tabs.Single(x => x.Kind == kind);
 
-    /// <summary>Legacy .amsj files migrate losslessly into the requested active tab.</summary>
     public static PipelineWorkspace FromLegacy(IEnumerable<StepNode> roots, PipelineKind target = PipelineKind.Game)
     {
         var workspace = new PipelineWorkspace();

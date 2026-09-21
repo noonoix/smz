@@ -1,5 +1,6 @@
 // v0.9.50 — Board preparation window (the AMS USB Studio tool ported into Classroom
-// Studio). Four tabs: build a Caterina HEX with a custom USB identity, install the board
+// Studio). Fleet v0.9.60: count>1 creates deterministic Product/Serial profiles and a manifest.
+// Four tabs: build a Caterina HEX with a custom USB identity, install the board
 // definition into the Arduino IDE, flash via ISP with the bundled tools\isp_flash.py,
 // and the read-only board checkup. All pure logic lives in Services\Board*.cs so
 // TestRunner step 50 covers it; this file is only wiring and dialogs.
@@ -20,7 +21,7 @@ public partial class BoardPrepWindow : Window
     /// as ams-settings.json).</summary>
     private sealed class Settings
     {
-        public string IdentityKey { get; set; } = "microchip";
+        public string IdentityKey { get; set; } = "none";
         public string Serial { get; set; } = "AMS-00000000";
         public string Prefix { get; set; } = "AMS";
         public string Count { get; set; } = "1";
@@ -57,6 +58,30 @@ public partial class BoardPrepWindow : Window
 
         _settingsPath = Path.Combine(AppContext.BaseDirectory, "board-prep-settings.json");
         _s = LoadSettings();
+        // v0.9.68 - never reopen a third-party/lab identity as the production default.
+        // The entries remain selectable for diagnostics, but a saved lab profile is reset
+        // to the neutral AMS CDC profile so a stale Logitech/Razer choice cannot be flashed.
+        if (BoardHexService.ModeFor(_s.IdentityKey).LabOnly)
+        {
+            _s.IdentityKey = "none";
+            _s.UseCustomVp = false;
+            _s.CustomVid = "0x1D50";
+            _s.CustomPid = "0x615E";
+            _s.CustomProduct = "AMS USB Serial Device";
+            _s.CustomManuf = "AMS";
+        }
+
+        // v0.9.69 — old settings may contain a third-party VID/PID from the
+        // previous lab-identity build. Clear only that unsafe override; keep the
+        // user's selected profile, product and unique serial.
+        if (_s.UseCustomVp &&
+            (!string.Equals(_s.CustomVid.Trim(), "0x1D50", StringComparison.OrdinalIgnoreCase) ||
+             !string.Equals(_s.CustomPid.Trim(), "0x615E", StringComparison.OrdinalIgnoreCase)))
+        {
+            _s.UseCustomVp = false;
+            _s.CustomVid = "0x1D50";
+            _s.CustomPid = "0x615E";
+        }
 
         CmbIdentity.ItemsSource = BoardHexService.DeviceModes;
 
@@ -238,25 +263,24 @@ public partial class BoardPrepWindow : Window
     private (int? Vid, int? Pid, int Cls, int Sub, int Proto, string? Product, string? Manuf) ResolveIdentityConfig()
     {
         var preset = CurrentIdentity;
-        int? vid = null, pid = null;
-        string? product = null, manuf = null;
-        if (preset.Key != "none")
-        {
-            vid = preset.Vid;
-            pid = preset.Pid;
-            product = preset.Product;
-            manuf = preset.Manufacturer;
-        }
+        // Every selectable profile is forced through the same Windows-safe CDC identity.
+        // The selected profile still controls the visible product/manufacturer strings and
+        // the per-board serial, but never the VID/PID that Windows uses for driver binding.
+        int vid = BoardHexService.IdeSafeVid;
+        int pid = BoardHexService.IdeSafeBootPid;
         if (ChkCustom.IsChecked == true)
         {
-            vid = BoardHexService.ParseVidPid(TxtVid.Text, "VID");
-            pid = BoardHexService.ParseVidPid(TxtPid.Text, "PID");
+            var customVid = BoardHexService.ParseVidPid(TxtVid.Text, "VID");
+            var customPid = BoardHexService.ParseVidPid(TxtPid.Text, "PID");
+            BoardHexService.EnsureIdeSafeOverride(customVid, customPid);
         }
+        string? product = preset.Product;
+        string? manuf = preset.Manufacturer;
         var cp = BoardHexService.ValidateUsbString(TxtProduct.Text, "نام محصول");
         var cm = BoardHexService.ValidateUsbString(TxtManuf.Text, "سازنده");
         if (cp.Length > 0) product = cp;
         if (cm.Length > 0) manuf = cm;
-        return (vid, pid, preset.ClassType, preset.Subclass, preset.Protocol, product, manuf);
+        return (vid, pid, BoardHexService.IdeSafeClass, 0x00, 0x00, product, manuf);
     }
 
     private void BtnRandom_Click(object sender, RoutedEventArgs e)
@@ -277,24 +301,49 @@ public partial class BoardPrepWindow : Window
         if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK) TxtOutputDir.Text = dlg.SelectedPath;
     }
 
+    // Fleet identity helpers: one deterministic profile per physical board.  VID/PID and
+    // manufacturer may be shared by a product family, but Product and Serial are never
+    // silently reused across the generated set.
+    private static string FleetProduct(string template, int number, int count)
+    {
+        var value = (template ?? "").Trim();
+        if (value.Length == 0) value = "AMS Macro Studio";
+        var token = number.ToString("D2");
+        bool templated = value.Contains("{n}", StringComparison.OrdinalIgnoreCase)
+                         || value.Contains("{id}", StringComparison.OrdinalIgnoreCase);
+        value = value.Replace("{n}", token, StringComparison.OrdinalIgnoreCase)
+                     .Replace("{id}", token, StringComparison.OrdinalIgnoreCase);
+        if (count > 1 && !templated) value += " " + token;
+        return BoardHexService.ValidateUsbString(value, "نام محصول");
+    }
+
+    private static string FleetSerial(string prefix, int number, int count, string single)
+    {
+        if (count == 1) return BoardHexService.ValidateSerial(single);
+        var p = (prefix ?? "").Trim();
+        if (p.Length == 0) p = "AMS";
+        return BoardHexService.ValidateSerial($"{p}-{number:D4}");
+    }
+
     private async void BtnGenerate_Click(object sender, RoutedEventArgs e)
     {
         try
         {
             if (!int.TryParse(TxtCount.Text, out int count) || count < 1 || count > 500)
                 throw new ArgumentException("تعداد باید یک عدد بین ۱ تا ۵۰۰ باشد");
-            var serials = new List<string>();
-            if (count == 1)
-            {
-                serials.Add(BoardHexService.ValidateSerial(TxtSerial.Text));
-            }
-            else
-            {
-                var prefix = TxtPrefix.Text.Trim();
-                if (prefix.Length == 0) prefix = "AMS";
-                for (int i = 0; i < count; i++) serials.Add(BoardHexService.GenerateRandomSerial(prefix));
-            }
             var cfg = ResolveIdentityConfig();
+            var productTemplate = TxtProduct.Text.Trim().Length > 0
+                ? TxtProduct.Text.Trim()
+                : (cfg.Product ?? CurrentIdentity.Product);
+            var fleet = Enumerable.Range(1, count)
+                .Select(number => (Number: number,
+                    Serial: FleetSerial(TxtPrefix.Text, number, count, TxtSerial.Text),
+                    Product: FleetProduct(productTemplate, number, count)))
+                .ToList();
+            if (fleet.Select(x => x.Serial).Distinct(StringComparer.OrdinalIgnoreCase).Count() != fleet.Count)
+                throw new ArgumentException("Serialهای تولیدشده تکراری هستند؛ پیشوند یا تعداد را تغییر بده.");
+            if (fleet.Select(x => x.Product).Distinct(StringComparer.OrdinalIgnoreCase).Count() != fleet.Count)
+                throw new ArgumentException("نام‌های محصول تولیدشده تکراری هستند؛ در نام محصول از {n} یا {id} استفاده کن.");
             var caterina = TxtCaterina.Text.Trim();
             if (!File.Exists(caterina))
                 throw new FileNotFoundException("Caterina.hex پیدا نشد — از کارت «مسیرها» مسیر درست را انتخاب کن.");
@@ -319,23 +368,52 @@ public partial class BoardPrepWindow : Window
                         ? $"هویت جدید: VID 0x{cfg.Vid:X4}  PID 0x{cfg.Pid:X4}  class 0x{cfg.Cls:X2}"
                         : "هویت دستگاه بدون تغییر می‌ماند (فقط سریال پچ می‌شود)");
                     int okCount = 0, errCount = 0;
-                    foreach (var serial in serials)
+                    var manifest = new List<object>();
+                    foreach (var board in fleet)
                     {
                         try
                         {
-                            var patched = BoardHexService.PatchHex(flash, serial, cfg.Vid, cfg.Pid,
-                                cfg.Cls, cfg.Sub, cfg.Proto, cfg.Product, cfg.Manuf);
-                            File.WriteAllText(Path.Combine(outDir, $"Caterina-{serial}.hex"),
+                            var patched = BoardHexService.PatchHex(flash, board.Serial, cfg.Vid, cfg.Pid,
+                                cfg.Cls, cfg.Sub, cfg.Proto, board.Product, cfg.Manuf);
+                            var fileName = $"Caterina-{board.Serial}.hex";
+                            File.WriteAllText(Path.Combine(outDir, fileName),
                                 BoardHexService.ToHex(patched), Encoding.ASCII);
-                            lines.Add($"  ✓ Caterina-{serial}.hex");
+                            var profileName = $"Board-{board.Number:D2}-{board.Serial}.json";
+                            var profile = new
+                            {
+                                schema = "ams-board-profile-v1",
+                                boardNumber = board.Number,
+                                serial = board.Serial,
+                                product = board.Product,
+                                manufacturer = cfg.Manuf,
+                                bootVid = cfg.Vid,
+                                bootPid = cfg.Pid,
+                                applicationPid = cfg.Pid is null ? null : cfg.Pid + 1,
+                                bootloaderHex = fileName,
+                                applicationBuildRequired = true,
+                                applicationBuildNote = "Arduino IDE را با همین Serial و Product کامپایل کن"
+                            };
+                            File.WriteAllText(Path.Combine(outDir, profileName),
+                                JsonSerializer.Serialize(profile, new JsonSerializerOptions { WriteIndented = true }), Encoding.UTF8);
+                            manifest.Add(profile);
+                            lines.Add($"  ✓ {fileName} · {board.Product} · {board.Serial}");
                             okCount++;
                         }
                         catch (Exception ex)
                         {
-                            lines.Add($"  ✗ {serial}: {ex.Message}");
+                            lines.Add($"  ✗ {board.Serial}: {ex.Message}");
                             errCount++;
                         }
                     }
+                    File.WriteAllText(Path.Combine(outDir, "fleet-manifest.json"),
+                        JsonSerializer.Serialize(new { schema = "ams-board-fleet-v1", count = manifest.Count, boards = manifest },
+                            new JsonSerializerOptions { WriteIndented = true }), Encoding.UTF8);
+                    var fleetReadme = string.Join(Environment.NewLine, new[]
+                    {
+                        "برای هر برد: ابتدا HEX بوت‌لودر متناظر با همان Serial را با ISP نصب کن؛ سپس Application را با همان Product و Serial در Arduino IDE کامپایل و Upload کن.",
+                        "هرگز HEX بوت‌لودر یک برد را روی برد دیگر استفاده نکن."
+                    }) + Environment.NewLine;
+                    File.WriteAllText(Path.Combine(outDir, "README-fleet-fa.txt"), fleetReadme, Encoding.UTF8);
                     return (lines, okCount, errCount);
                 });
                 foreach (var l in result.lines) Log(l);
@@ -357,16 +435,17 @@ public partial class BoardPrepWindow : Window
     private (string BootVid, string BootPid, string AppPid, string Product, string Manuf) ResolveBoardNumbers()
     {
         var preset = CurrentIdentity;
-        int vid = preset.Vid, pid = preset.Pid;
-        string product = preset.Product, manuf = preset.Manufacturer;
         if (ChkCustom.IsChecked == true)
         {
-            vid = BoardHexService.ParseVidPid(TxtVid.Text, "VID");
-            pid = BoardHexService.ParseVidPid(TxtPid.Text, "PID");
+            var customVid = BoardHexService.ParseVidPid(TxtVid.Text, "VID");
+            var customPid = BoardHexService.ParseVidPid(TxtPid.Text, "PID");
+            BoardHexService.EnsureIdeSafeOverride(customVid, customPid);
         }
+        string product = preset.Product, manuf = preset.Manufacturer;
         if (TxtProduct.Text.Trim().Length > 0) product = TxtProduct.Text.Trim();
         if (TxtManuf.Text.Trim().Length > 0) manuf = TxtManuf.Text.Trim();
-        return ($"0x{vid:X4}", $"0x{pid:X4}", $"0x{pid + 1:X4}", product, manuf);
+        return ($"0x{BoardHexService.IdeSafeVid:X4}", $"0x{BoardHexService.IdeSafeBootPid:X4}",
+                $"0x{BoardHexService.IdeSafeApplicationPid:X4}", product, manuf);
     }
 
     private void UpdatePreview()
@@ -380,7 +459,7 @@ public partial class BoardPrepWindow : Window
             if (TxtBoardSpecs1 is not null) TxtBoardSpecs1.Text = specs;
             TxtPreview.Text = BoardsTxtService.BuildBoardBlock(boardId: s.BoardId, name: s.BoardName,
                 bootVid: s.BootVid, bootPid: s.BootPid, appPid: s.AppPid, product: s.Product,
-                manufacturer: s.Manuf, crossCore: RadioSketchbook.IsChecked == true);
+                manufacturer: s.Manuf, serial: BoardHexService.ValidateSerial(TxtSerial.Text), crossCore: false);
         }
         catch (Exception ex) { TxtPreview.Text = ex.Message; }
     }
@@ -447,11 +526,19 @@ public partial class BoardPrepWindow : Window
         var d = BoardHexService.DefaultsFor(CurrentIdentity.Key);
         static string Pick(System.Windows.Controls.TextBox? box, string fallback)
             => box is not null && box.Text.Trim().Length > 0 ? box.Text.Trim() : fallback;
+        var bootVid = Pick(TxtBootVid, n.BootVid);
+        var bootPid = Pick(TxtBootPid, n.BootPid);
+        var appPid = Pick(TxtAppPid, n.AppPid);
+        BoardHexService.EnsureIdeSafeOverride(
+            BoardHexService.ParseVidPid(bootVid, "بوت‌لودر VID"),
+            BoardHexService.ParseVidPid(bootPid, "بوت‌لودر PID"));
+        if (BoardHexService.ParseVidPid(appPid, "اپلیکیشن PID") != BoardHexService.IdeSafeApplicationPid)
+            throw new InvalidOperationException($"اپلیکیشن PID باید 0x{BoardHexService.IdeSafeApplicationPid:X4} باشد تا Arduino IDE پورت را شناسایی کند.");
         return (BoardHexService.SanitizeBoardId(Pick(TxtBoardId, d.BoardId)),
                 Pick(TxtBoardName, d.BoardName),
-                Pick(TxtBootVid, n.BootVid),
-                Pick(TxtBootPid, n.BootPid),
-                Pick(TxtAppPid, n.AppPid),
+                $"0x{BoardHexService.IdeSafeVid:X4}",
+                $"0x{BoardHexService.IdeSafeBootPid:X4}",
+                $"0x{BoardHexService.IdeSafeApplicationPid:X4}",
                 Pick(TxtBoardProduct, n.Product),
                 Pick(TxtBoardManuf, n.Manuf));
     }
@@ -522,9 +609,14 @@ public partial class BoardPrepWindow : Window
         {
             var s = BoardSpecsFromUi();
             bool sketchbook = RadioSketchbook.IsChecked == true;
+            if (!sketchbook)
+                throw new InvalidOperationException("برای حفظ Serial اختصاصی اپلیکیشن، نصب فقط به‌صورت پکیج خصوصی Sketchbook مجاز است.");
+            if (!int.TryParse(TxtCount.Text, out var identityCount) || identityCount != 1)
+                throw new InvalidOperationException("هر پکیج اپلیکیشن فقط برای یک Serial ساخته می‌شود؛ تعداد را روی ۱ بگذار و برای هر برد جداگانه نصب کن.");
+            var serial = BoardHexService.ValidateSerial(TxtSerial.Text);
             var block = BoardsTxtService.BuildBoardBlock(boardId: s.BoardId, name: s.BoardName,
                 bootVid: s.BootVid, bootPid: s.BootPid, appPid: s.AppPid, product: s.Product,
-                manufacturer: s.Manuf, crossCore: sketchbook);
+                manufacturer: s.Manuf, serial: serial, crossCore: false);
             var path = TxtIdePath.Text.Trim();
             if (path.Length == 0) throw new ArgumentException("مسیر نصب خالی است — «🔍 تشخیص خودکار» را بزن یا دستی انتخاب کن.");
             CollectSettings();
@@ -536,7 +628,7 @@ public partial class BoardPrepWindow : Window
                 {
                     if (sketchbook)
                     {
-                        var pkg = BoardsTxtService.InstallSketchbookPackage(path, block);
+                        var pkg = BoardsTxtService.InstallSketchbookPackage(path, block, serial);
                         return $"✓ پکیج برد در Sketchbook نصب شد:\r\n{pkg}";
                     }
                     var backup = BoardsTxtService.InstallBoardBlock(path, block, s.BoardId);

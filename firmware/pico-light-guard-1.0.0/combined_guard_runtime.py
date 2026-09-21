@@ -1,4 +1,5 @@
 # Combined Phase 7 board-owned runtime. It validates the exported bundle before routing.
+import gc
 import json
 import math
 import os
@@ -117,26 +118,88 @@ class Arm:
             if time.monotonic() > end: raise RuntimeError("arm back-pressure timeout")
             time.sleep(.001)
         self.write("MMOVE|%d,%d,abs,2" % (x, y)); self.pending += 1
+    def _track_button_command(self, line):
+        head, sep, payload = line.partition("|")
+        button = payload.split(",", 1)[0].strip().lower() if sep else ""
+        if head == "MDOWN" and button in ("left", "right", "middle"):
+            self.held.add(button)
+        elif head == "MUP" and button in ("left", "right", "middle"):
+            self.held.discard(button)
+
     def send(self, line, timeout=5):
-        self.pump(); self.write(line); head = line.split("|", 1)[0]; end = time.monotonic() + timeout
-        while time.monotonic() < end:
-            for reply in self.pump():
-                if reply.startswith("OK|" + head) or reply.startswith("ERR|"): return reply
-            time.sleep(.002)
-        raise RuntimeError("arm acknowledgement timeout: " + head)
+        head = line.split("|", 1)[0]
+        # SETRES is idempotent. A stale ERR/partial UART line must not make a
+        # whole Route fail; retry it once after the receive queue is pumped.
+        attempts = 2 if head == "SETRES" else 1
+        last_error = None
+        for attempt in range(attempts):
+            self.pump()
+            self.write(line)
+            end = time.monotonic() + timeout
+            while time.monotonic() < end:
+                for reply in self.pump():
+                    if reply.startswith("OK|" + head):
+                        self._track_button_command(line)
+                        return reply
+                    if reply.startswith("ERR|"):
+                        last_error = reply
+                        break
+                if last_error is not None: break
+                time.sleep(.002)
+            if attempt + 1 < attempts:
+                self.pump()
+                time.sleep(.03)
+                last_error = None
+                continue
+            if last_error is not None:
+                raise RuntimeError("ARM %s rejected: %s" % (head, last_error))
+            raise RuntimeError("ARM %s acknowledgement timeout" % head)
     def flush(self):
         end = time.monotonic() + 3
         while self.pending and time.monotonic() < end: self.pump(); time.sleep(.002)
         if self.pending: raise RuntimeError("arm move acknowledgement timeout")
     def release(self, force=True):
-        for button in (("left", "right", "middle") if force else tuple(self.held)):
+        # Never emit MUP for a button that this runtime did not observe going
+        # down. Unconditional MUP frames were interpreted by the Pro Micro as
+        # a stray click/hold on otherwise mouse-only routes.
+        for button in tuple(self.held):
             try: self.send("MUP|" + button, 1)
             except Exception: pass
         self.held.clear(); self.pending = 0
     def abort(self):
-        try: self.send("HALT", 1.5)
-        except Exception: pass
-        self.release(True)
+        # Stop the active human-mouse operation first. Do not send synthetic
+        # MUP frames for left/right/middle when no MDOWN was acknowledged.
+        try:
+            self.write("HALT")
+        except Exception:
+            pass
+        deadline = time.monotonic() + .35
+        while time.monotonic() < deadline:
+            halted = False
+            for reply in self.pump():
+                if reply.startswith("OK|HALT") or reply.startswith("ERR|ABORTED"):
+                    halted = True
+                    break
+            if halted:
+                break
+            time.sleep(.002)
+        for button in tuple(self.held):
+            try:
+                self.write("MUP|" + button)
+                time.sleep(.008)
+            except Exception:
+                pass
+        deadline = time.monotonic() + .35
+        while time.monotonic() < deadline:
+            self.pump()
+            time.sleep(.002)
+        self.held.clear(); self.pending = 0
+    def prepare_route(self):
+        # Software equivalent of the power-cycle workaround: cancel a stale
+        # route, neutralize all buttons, and discard completed move debt before
+        # SETRES or the first RMOUSE command of the next route.
+        self.abort()
+        self.pending = 0
 
 class Button:
     def __init__(self, pin):
@@ -258,7 +321,7 @@ class Combined:
             remount = getattr(storage, "remount", None)
             if remount is None:
                 raise RuntimeError("storage.remount unavailable")
-            remount("/", readonly=False)
+            remount("/", readonly=False, disable_concurrent_write_protection=True)
         except Exception as exc:
             raise RuntimeError("calibration filesystem is not writable: " + str(exc)[:80])
 
@@ -399,9 +462,19 @@ class Combined:
         if not decision.get("execute"): return
         name = decision.get("route")
         if name not in self.bundle["manifest"]["routes"].values(): raise GuardBundleError("unvalidated route")
-        if name not in self.routes:
-            with open("/" + name, "r") as fh: self.routes[name] = plan_engine.parse_plan(fh.read())
-        plan_engine.run_plan(self.routes[name], PlanContext(self)); self.arm.flush()
+        # A parsed plan is consumable: loop/random bookkeeping must not be
+        # reused by a later invocation of the same Route.
+        with open("/" + name, "r") as fh:
+            route_plan = plan_engine.parse_plan(fh.read())
+        self.arm.prepare_route()
+        try:
+            plan_engine.run_plan(route_plan, PlanContext(self))
+            self.arm.flush()
+        finally:
+            # Always leave the Pro Micro neutral even when a plan step fails.
+            self.arm.release(False)
+            del route_plan
+            gc.collect()
     def host_poll(self):
         if self.usb.in_waiting: self.host.extend(self.usb.read(self.usb.in_waiting))
         while b"\n" in self.host:

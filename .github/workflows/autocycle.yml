@@ -2,6 +2,14 @@ name: AutoCycle integration validation
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - fix/v32-profile-and-bundle
+    paths:
+      - 'ams-shell/**'
+      - 'tools/**'
+      - 'firmware/pico-light-guard-1.0.0/**'
+      - '.github/workflows/autocycle.yml'
   pull_request:
     paths:
       - 'ams-shell/**'
@@ -163,7 +171,7 @@ jobs:
 
   test-package:
     name: autocycle / downloadable test package
-    if: github.event_name == 'pull_request' && (github.head_ref == 'feature/light-state-profiles' || github.head_ref == 'phase6/non-executing-authorization-diagnostics')
+    if: (github.event_name == 'push' && github.ref_name == 'fix/v32-profile-and-bundle') || (github.event_name == 'pull_request' && (github.head_ref == 'feature/light-state-profiles' || github.head_ref == 'phase6/non-executing-authorization-diagnostics' || github.head_ref == 'fix/v32-profile-and-bundle'))
     needs: [portable-contracts, windows-app]
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -206,6 +214,10 @@ jobs:
             echo 'This is a prerelease diagnostic package; no actuator or execution path is enabled.'
           } > release-body.md
       - name: Publish prerelease test build
+        # Pull-request tokens cannot create releases in this repository. The
+        # Windows ZIP remains available as a workflow artifact for PR runs;
+        # publish a GitHub Release only for trusted branch pushes.
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: phase6-diagnostics-test-${{ github.run_number }}

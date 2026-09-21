@@ -1,0 +1,48 @@
+name: ARM 2.7 compiler diagnostic
+on:
+  push:
+    branches: [fix/v32-profile-and-bundle]
+    paths: ['firmware/arm26/**','firmware/arm27/**','.github/workflows/arm27-diagnostic.yml']
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    outputs:
+      reason: ${{ steps.build.outputs.reason }}
+      code: ${{ steps.build.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: build
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR="$RUNNER_TEMP/bin" sh >/dev/null
+          CLI="$RUNNER_TEMP/bin/arduino-cli"
+          "$CLI" config add board_manager.additional_urls https://raw.githubusercontent.com/sparkfun/Arduino_Boards/main/IDE_Board_Manager/package_sparkfun_index.json >/dev/null
+          "$CLI" core update-index >/dev/null
+          "$CLI" core install arduino:avr >/dev/null
+          "$CLI" core install SparkFun:avr >/dev/null
+          "$CLI" lib install HID-Project >/dev/null
+          mv firmware/arm27/ams_board27.ino firmware/arm27/arm27.ino
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('firmware/arm27/arm27.ino')
+          legacy=Path('firmware/arm26/ams_board26.ino').resolve().as_posix()
+          p.write_text(p.read_text().replace('../arm26/ams_board26.ino', legacy))
+          PY
+          printf '#pragma once\n#include <Arduino.h>\nstatic const uint8_t AMS_PSK[16]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};\n' > firmware/arm26/ams_key.h
+          set +e
+          out=$("$CLI" compile --fqbn 'SparkFun:avr:promicro:cpu=16MHzatmega32U4' --warnings all firmware/arm27 2>&1)
+          code=$?
+          reason=$(printf '%s\n' "$out" | grep -m1 -Ei 'fatal|error|overflow|too big|not found|invalid|undefined' | sed 's/[^A-Za-z0-9_.: -]/ /g' | cut -c1-180)
+          if [ -z "$reason" ]; then reason=$(printf '%s\n' "$out" | tail -n 4 | tr '\n' ' ' | sed 's/[^A-Za-z0-9_.: -]/ /g' | cut -c1-180); fi
+          [ -n "$reason" ] || reason="compiler-exit-${code}"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "reason=$reason" >> "$GITHUB_OUTPUT"
+  report:
+    needs: diagnose
+    name: ARM27 - ${{ needs.diagnose.outputs.reason }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: test '${{ needs.diagnose.outputs.code }}' = '0'

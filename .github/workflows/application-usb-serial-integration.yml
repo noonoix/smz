@@ -1,0 +1,32 @@
+name: Application USB serial integration
+on:
+  push:
+    branches: [fix/v32-profile-and-bundle]
+    paths:
+      - 'tools/apply_application_usb_serial_provisioning.py'
+      - 'ams-shell/src/Ams.UI/Services/DeviceSpecificAvrCoreService.cs'
+      - '.github/workflows/application-usb-serial-integration.yml'
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply Classroom Studio application serial integration
+        run: python3 tools/apply_application_usb_serial_provisioning.py
+      - name: Verify source contract
+        run: |
+          python3 portable/plan3/sim/test_application_usb_serial_provisioning.py
+          git diff --check
+      - name: Commit generated integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ams-shell/src/Ams.UI/Services/BoardsTxtService.cs ams-shell/src/Ams.UI/Views/BoardPrepWindow.xaml.cs
+          if git diff --cached --quiet; then
+            echo "Application serial integration already applied"
+          else
+            git commit -m "feat: bind Classroom Studio serial to application USB descriptor"
+            git push
+          fi

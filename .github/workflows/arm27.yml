@@ -1,0 +1,79 @@
+# Application VID/PID/product/manufacturer gate; per-device application serial remains a separate provisioning step.
+name: ARM 2.7 firmware
+on:
+  push:
+    branches: [fix/v32-profile-and-bundle]
+    paths: ['firmware/arm26/**','firmware/arm27/**','.github/workflows/arm27.yml']
+permissions:
+  contents: read
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install complete ATmega32U4 toolchain
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR="$RUNNER_TEMP/bin" sh
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          CLI="$RUNNER_TEMP/bin/arduino-cli"
+          "$CLI" config add board_manager.additional_urls https://raw.githubusercontent.com/sparkfun/Arduino_Boards/main/IDE_Board_Manager/package_sparkfun_index.json
+          "$CLI" core update-index
+          "$CLI" core install arduino:avr
+          "$CLI" core install SparkFun:avr
+          "$CLI" lib install HID-Project
+      - name: Prepare non-secret CI sketch
+        shell: bash
+        run: |
+          mv firmware/arm27/ams_board27.ino firmware/arm27/arm27.ino
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('firmware/arm27/arm27.ino')
+          legacy=Path('firmware/arm26/ams_board26.ino').resolve().as_posix()
+          p.write_text(p.read_text().replace('../arm26/ams_board26.ino', legacy))
+          PY
+          printf '#pragma once\n#include <Arduino.h>\nstatic const uint8_t AMS_PSK[16]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};\n' > firmware/arm26/ams_key.h
+      - name: Compile with Classroom Studio custom identity
+        shell: bash
+        run: |
+          set -o pipefail
+          arduino-cli compile \
+            --fqbn 'SparkFun:avr:promicro:cpu=16MHzatmega32U4' \
+            --build-property 'build.vid=0x1D50' \
+            --build-property 'build.pid=0x615F' \
+            --build-property 'build.usb_product="Classroom Custom Human Input"' \
+            --build-property 'build.usb_manufacturer="Classroom Studio"' \
+            --output-dir "$RUNNER_TEMP/arm27-build" \
+            --verbose --warnings all firmware/arm27 2>&1 | tee "$RUNNER_TEMP/arm27-build.log"
+      - name: Verify final application identity
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+
+          root = Path(os.environ['RUNNER_TEMP'])
+          text = (root / 'arm27-build.log').read_text(errors='replace')
+          for marker in ('USB_VID=0x1D50', 'USB_PID=0x615F'):
+              if marker.lower() not in text.lower():
+                  raise SystemExit(f'missing compiled USB identity marker: {marker}')
+          hex_files = [p for p in (root / 'arm27-build').glob('*.hex') if not p.name.endswith('.with_bootloader.hex')]
+          if len(hex_files) != 1:
+              raise SystemExit('expected exactly one application-only HEX')
+          flash = bytearray(b'\xff' * 0x8000)
+          upper = 0
+          for raw in hex_files[0].read_text().splitlines():
+              if not raw.startswith(':'): continue
+              rec = bytes.fromhex(raw[1:]); count = rec[0]; address = (rec[1] << 8) | rec[2]; kind = rec[3]
+              if kind == 0:
+                  start = upper + address; flash[start:start + count] = rec[4:4 + count]
+              elif kind == 4: upper = ((rec[4] << 8) | rec[5]) << 16
+              elif kind == 1: break
+          payload = bytes(flash)
+          for expected in (b'Classroom Custom Human Input', b'Classroom Studio'):
+              if expected not in payload: raise SystemExit(f'custom USB string missing: {expected!r}')
+          lowered = payload.lower()
+          for forbidden in (b'arduino leonardo', b'sparkfun pro micro', b'pro micro', b'leonardo'):
+              if forbidden in lowered: raise SystemExit(f'generic board identity leaked: {forbidden!r}')
+          print('ARM 2.7 application USB identity contract OK')
+          PY

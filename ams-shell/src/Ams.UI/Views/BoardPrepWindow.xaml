@@ -8,7 +8,7 @@
         FontFamily="Segoe UI" FontSize="13">
 
     <!-- v0.9.50 — board preparation window (port of AMS USB Studio):
-         tab 1 builds Caterina HEX files with a custom USB identity,
+         tab 1 builds Caterina HEX files with a Windows-safe CDC identity and custom strings,
          tab 2 installs the board definition into the Arduino IDE,
          tab 3 flashes via ISP (bundled tools\isp_flash.py),
          tab 4 is the read-only board checkup. -->
@@ -104,9 +104,9 @@
                         <StackPanel>
                             <TextBlock Text="هویت دستگاه (VID/PID)" FontWeight="SemiBold" Margin="0,0,0,6" TextAlignment="Right" />
                             <ComboBox x:Name="CmbIdentity" DisplayMemberPath="Name" SelectionChanged="AnyField_Changed" />
-                            <TextBlock Text="همه‌ی هویت‌ها CDC هستند — پورت سریال و آپلود USB هرگز قطع نمی‌شود."
+                            <TextBlock Text="همه‌ی انتخاب‌ها به CDC امن AMS تبدیل می‌شوند؛ نام و سریال می‌تواند متفاوت باشد، اما پورت Windows و Arduino IDE همیشه سازگار می‌ماند."
                                        Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap" TextAlignment="Right" />
-                            <CheckBox x:Name="ChkCustom" Content="VID/PID و نام‌های سفارشی (پیشرفته)" Margin="0,10,0,0"
+                            <CheckBox x:Name="ChkCustom" Content="نام‌های سفارشی (پیشرفته) — VID/PID امن AMS ثابت است" Margin="0,10,0,0"
                                       Checked="ChkCustom_Checked" Unchecked="ChkCustom_Checked" />
                             <Grid x:Name="GridAdvanced" Visibility="Collapsed" Margin="0,8,0,0">
                                 <Grid.ColumnDefinitions>
@@ -145,7 +145,7 @@
                                 <TextBlock Text="تعداد فایل (۱–۵۰۰):" VerticalAlignment="Center" Margin="14,0,6,0" TextAlignment="Right" />
                                 <TextBox x:Name="TxtCount" FlowDirection="LeftToRight" Width="56" Text="1" FontFamily="Consolas" />
                             </StackPanel>
-                            <TextBlock Text="بیش از یک فایل = هر فایل یک سریال تصادفی تازه با همین پیشوند می‌گیرد."
+                            <TextBlock Text="تعداد بیشتر از ۱ = سریال‌های AMS-0001، AMS-0002… و نام محصول یکتا ساخته می‌شود؛ برای نام دلخواه از &#123;n&#125; یا &#123;id&#125; استفاده کن."
                                        Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap" TextAlignment="Right" />
                         </StackPanel>
                     </Border>
@@ -274,7 +274,7 @@
                                 <TextBox x:Name="TxtBoardManuf" FlowDirection="LeftToRight" Grid.Row="3" Grid.Column="1" Margin="0,8,10,0"
                                          TextChanged="BoardSpec_Changed" />
                             </Grid>
-                            <TextBlock Text="PID اپلیکیشن = PID بوت‌لودر + ۱ (باید متفاوت باشند) · فیلد خالی = مقدار هویت انتخاب‌شده"
+                            <TextBlock Text="VID/PID امن و ثابت AMS برای همه‌ی انتخاب‌ها: 0x1D50:0x615E / 0x615F · PID اپلیکیشن = PID بوت‌لودر + ۱ · نام و سریال از انتخاب شما می‌آید"
                                        Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,8,0,0"
                                        TextWrapping="Wrap" TextAlignment="Right" />
                             <StackPanel Orientation="Horizontal" Margin="0,10,0,10">

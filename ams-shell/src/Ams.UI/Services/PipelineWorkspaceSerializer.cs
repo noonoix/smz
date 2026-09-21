@@ -3,7 +3,7 @@ using Ams.UI.Models;
 
 namespace Ams.UI.Services;
 
-/// <summary>Versioned persistence envelope for six optical-position tabs plus Resumable.</summary>
+/// <summary>Versioned persistence envelope for optical, Restart, and Resumable tabs.</summary>
 public static class PipelineWorkspaceSerializer
 {
     private sealed class Envelope
@@ -28,27 +28,37 @@ public static class PipelineWorkspaceSerializer
 
     public static PipelineWorkspace Deserialize(string json)
     {
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object
+                || root.TryGetProperty("steps", out _)
+                || !root.TryGetProperty("pipelines", out _))
+                throw new InvalidDataException("Legacy AMS script document.");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidDataException("Not an AMS pipeline document.", ex);
+        }
+
         var envelope = JsonSerializer.Deserialize<Envelope>(json, Options)
             ?? throw new InvalidDataException("Not an AMS pipeline document.");
         if (envelope.app != "AMS")
             throw new InvalidDataException("Unsupported AMS pipeline document.");
+        if (envelope.pipelineVersion is not (1 or 2 or PipelineWorkspace.FormatVersion))
+            throw new InvalidDataException("Unsupported AMS pipeline document.");
 
         var workspace = new PipelineWorkspace();
-        if (envelope.pipelineVersion == PipelineWorkspace.FormatVersion)
+        if (envelope.pipelineVersion >= 2)
         {
             foreach (var pair in envelope.legacyPipelines)
                 workspace.LegacyPipelines[pair.Key] = pair.Value;
-        }
-        else if (envelope.pipelineVersion != 1)
-        {
-            throw new InvalidDataException("Unsupported AMS pipeline document.");
         }
 
         var currentNames = workspace.Tabs.Select(tab => tab.Kind.ToString()).ToHashSet(StringComparer.Ordinal);
         foreach (var pair in envelope.pipelines)
         {
-            // Version-1 Launch/Main/Recovery/Resume Essentials trees are retained as
-            // migration data instead of being guessed into a new optical position.
             if (!currentNames.Contains(pair.Key))
                 workspace.LegacyPipelines[pair.Key] = pair.Value;
         }
@@ -63,6 +73,7 @@ public static class PipelineWorkspaceSerializer
                 tab.Steps.Add(root);
             }
         }
+        // Version 1/2 files did not have Restart; the new tab intentionally stays empty.
         return workspace;
     }
 }

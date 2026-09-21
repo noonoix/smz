@@ -321,7 +321,13 @@ public partial class MainViewModel : ObservableObject
 
         bool pico = s.Contains("pico", StringComparison.OrdinalIgnoreCase) || s.Contains("role=brain", StringComparison.OrdinalIgnoreCase);
 
-        bool arm = s.Contains("arm=promicro", StringComparison.OrdinalIgnoreCase) || s.Contains("arm=ok", StringComparison.OrdinalIgnoreCase) || !pico;
+        // Combined Guard advertises the Pico brain and its live UART arm channel
+        // separately. Older parsing only recognized the legacy arm=promicro token,
+        // so a valid combined PING incorrectly lit Pro Micro as disconnected.
+        bool arm = s.Contains("arm=promicro", StringComparison.OrdinalIgnoreCase)
+            || s.Contains("arm=ok", StringComparison.OrdinalIgnoreCase)
+            || (pico && s.Contains("uart=on", StringComparison.OrdinalIgnoreCase))
+            || !pico;
 
         return (pico, arm);
 

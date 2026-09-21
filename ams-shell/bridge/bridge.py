@@ -112,7 +112,13 @@ def detect_board_port():
                 ser.close()
         except Exception:
             continue
-    return cands[0].device if cands and score(cands[0]) >= 50 else None
+    # Never guess from USB metadata alone. A serial-looking device can be the
+    # Pro Micro console, a stale COM port, or another adapter. Guessing here
+    # caused AUTO to select COM30, then open_link fell back to encrypted
+    # BoardLink and failed on the missing private ams_key.json. AUTO must only
+    # return a port that answered the Pico/brain probe; direct Pro Micro
+    # connection remains an explicit manual-port operation.
+    return None
 
 
 class PicoError(Exception):
@@ -141,6 +147,7 @@ class PicoLink:
         self.tx = 0
         self.rx = 0
         self._rxbuf = bytearray()
+        self._write_lock = threading.Lock()
 
     def connect(self):
         import serial
@@ -201,9 +208,10 @@ class PicoLink:
     def _send(self, text):
         if self.ser is None:
             raise PicoError("not connected")
-        self.ser.write(text.encode("ascii") + b"\n")
-        self.ser.flush()
-        self.tx += 1
+        with self._write_lock:
+            self.ser.write(text.encode("ascii") + b"\n")
+            self.ser.flush()
+            self.tx += 1
 
     def _read_line(self, timeout=0.5):
         """یک خط کامل؛ بایت‌های نیمه‌تمام در بافر می‌مانند (همان قاعدهٔ ams_serial)."""
@@ -232,7 +240,7 @@ class PicoLink:
     def close(self):
         try:
             if self.ser is not None:
-                self._send("HALT|SILENT")
+                self._send("HALT")
                 self._send("BYE")
         except Exception:
             pass
@@ -302,6 +310,22 @@ def open_link(port):
     return link, dev
 
 
+def _windows_cursor_position():
+    """Return the real Windows cursor position, or None outside Windows."""
+    if os.name != "nt":
+        return None
+    try:
+        import ctypes
+        class POINT(ctypes.Structure):
+            _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+        point = POINT()
+        if ctypes.windll.user32.GetCursorPos(ctypes.byref(point)):
+            return int(point.x), int(point.y)
+    except Exception:
+        pass
+    return None
+
+
 def main():
     emit({"event": "stage", "stage": "bridge_started"})
     ap = argparse.ArgumentParser()
@@ -323,6 +347,8 @@ def main():
     # ── نخ رویدادهای EVT برد ────────────────────────────────────────
     def event_pump():
         seen = 0
+        last_cursor = 0.0
+        last_cursor_pos = None
         while not stop_evt.is_set():
             link = state["link"]
             if link is not None:
@@ -330,6 +356,23 @@ def main():
                 while seen < len(evs):
                     emit({"event": "evt", "line": evs[seen]})
                     seen += 1
+                # Keep the Pico/Pro Micro origin aligned with the actual OS
+                # cursor. The update is one-way and silent; it never pairs with
+                # a command reply and is ignored for direct BoardLink sessions.
+                now = time.monotonic()
+                if isinstance(link, PicoLink) and now - last_cursor >= 0.10:
+                    pos = _windows_cursor_position()
+                    if pos is not None:
+                        # Send only changes. Repeating the same CURSOR packet every
+                        # 100 ms was unnecessary USB/UART traffic and, while a route
+                        # was active, could compete with the mouse command stream.
+                        last_cursor = now
+                        if pos != last_cursor_pos:
+                            try:
+                                link._send("CURSOR|%d,%d" % pos)
+                                last_cursor_pos = pos
+                            except Exception:
+                                pass
             time.sleep(0.05)
 
     threading.Thread(target=event_pump, daemon=True).start()
@@ -345,7 +388,9 @@ def main():
                 if op == "connect":
                     port = req.get("port") or "AUTO"
                     if port.strip().upper() in ("AUTO", ""):
-                        port = detect_board_port() or "AUTO"   # v0.9.5 — اسکن خودکار
+                        port = detect_board_port()   # v0.9.5 — probe, never guess
+                        if not port:
+                            raise PicoError("No compatible Pico brain answered PING; select the Pico data port manually or connect the board.")
                     emit({"event": "stage", "stage": "port_open", "port": port})
                     # v0.9.59 — مغز پیکو اول: لینک متن‌باز pico-light اگر PING با
                     # role=brain جواب داد؛ وگرنه همان BoardLink رمزشده برای پرو میکرو.

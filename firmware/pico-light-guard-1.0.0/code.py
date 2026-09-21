@@ -5,6 +5,10 @@ import gc
 import sys
 import os as _real_os
 import hashlib as _real_hashlib
+try:
+    import microcontroller as _microcontroller
+except Exception:
+    _microcontroller = None
 
 class _PathCompat:
     @staticmethod
@@ -62,9 +66,19 @@ class _DeferredPlanEngine:
 
     def __getattr__(self, name):
         if self.module is None:
-            del sys.modules["plan_engine"]
+            # The deferred loader installs a proxy under this name during boot.
+            # Removing it with del is not idempotent: a previous failed import
+            # or CircuitPython module cleanup can leave the key absent, turning
+            # the first route execution into KeyError('plan_engine').
+            sys.modules.pop("plan_engine", None)
             gc.collect()
-            self.module = __import__("plan_engine")
+            try:
+                self.module = __import__("plan_engine")
+            except Exception:
+                # Keep the proxy available for a controlled retry/diagnostic
+                # instead of leaving a missing sys.modules entry.
+                sys.modules["plan_engine"] = self
+                raise
             sys.modules["plan_engine"] = self.module
         return getattr(self.module, name)
 
@@ -83,8 +97,144 @@ gc.collect()
 import combined_guard_runtime as runtime
 from combined_guard_runtime import main
 
+_DEBUG_FILE = "/guard-debug.log"
+_DEBUG_MAX_BYTES = 8192
+_DEBUG_MAX_LINES = 96
+_DEBUG_NVM_BYTES = 1536
+_DEBUG_PERSIST_EVENTS = ("BOOT", "GP4", "ROUTE", "FAIL", "STOP", "CAL")
+
+
+def _debug_trim(text):
+    lines = text.splitlines()[-_DEBUG_MAX_LINES:]
+    text = "\n".join(lines) + ("\n" if lines else "")
+    if len(text) > _DEBUG_MAX_BYTES:
+        text = text[-_DEBUG_MAX_BYTES:]
+        if "\n" in text:
+            text = text[text.index("\n") + 1:]
+    return text
+
+
+def _debug_nvm_read():
+    try:
+        nvm = getattr(_microcontroller, "nvm", None)
+        if nvm is None:
+            return ""
+        raw = bytes(nvm[:_DEBUG_NVM_BYTES]).rstrip(b"\x00")
+        if not raw.startswith(b"CGD1\n"):
+            return ""
+        return raw[5:].decode("utf-8", "replace")
+    except Exception:
+        return ""
+
+
+def _debug_nvm_write(text):
+    try:
+        nvm = getattr(_microcontroller, "nvm", None)
+        if nvm is None:
+            return False
+        payload = (b"CGD1\n" + _debug_trim(text).encode("utf-8", "replace"))[:_DEBUG_NVM_BYTES]
+        padded = payload + (b"\x00" * (_DEBUG_NVM_BYTES - len(payload)))
+        nvm[:_DEBUG_NVM_BYTES] = padded
+        return bytes(nvm[:len(payload)]) == payload
+    except Exception:
+        return False
+
+
+def _debug_file_read():
+    try:
+        with open(_DEBUG_FILE, "r") as fh:
+            return fh.read()
+    except Exception:
+        return ""
+
+
+def _debug_persist(self):
+    try:
+        # Re-open the filesystem for every persistence attempt. A host-side
+        # delete/remount can leave CircuitPython with a stale read-only view;
+        # doing this only after the NVM write was too late to recreate the file.
+        try:
+            remount = getattr(runtime.storage, "remount", None)
+            if remount is not None:
+                remount("/", readonly=False, disable_concurrent_write_protection=True)
+        except Exception:
+            pass
+        # Merge the file and NVM journals. NVM survives reset; the file is the
+        # user-visible copy and must be restored whenever it was deleted.
+        file_text = _debug_file_read()
+        nvm_text = _debug_nvm_read()
+        previous = file_text or nvm_text
+        payload = _debug_trim(previous + "".join(self.debug_events))
+        file_ok = False
+        try:
+            with open(_DEBUG_FILE, "w") as fh:
+                fh.write(payload)
+                try: fh.flush()
+                except Exception: pass
+            file_ok = _debug_file_read() == payload
+        except Exception:
+            pass
+        nvm_ok = _debug_nvm_write(payload)
+        # Do not discard pending events merely because NVM succeeded: if the
+        # visible file failed, the next boot/event must retry its reconstruction.
+        if file_ok:
+            self.debug_events = []
+        return file_ok or nvm_ok
+    except Exception:
+        pass
+    # Keep pending records for the next event/retry; never lose GP4/FAIL data.
+    return False
+
+
+def _debug_event(self, kind, detail="", persist=False):
+    stamp = int(runtime.time.monotonic())
+    clean = str(detail).replace("|", "/").replace("\n", " ")[:180]
+    line = "%d|%s|%s\n" % (stamp, kind, clean)
+    self.debug_events.append(line)
+    if len(self.debug_events) > _DEBUG_MAX_LINES:
+        self.debug_events = self.debug_events[-_DEBUG_MAX_LINES:]
+    # Live evidence is available even when both persistent stores are busy.
+    try:
+        self.emit("EVT|DEBUG|" + line.rstrip("\n").replace("|", "/"))
+    except Exception:
+        pass
+    if persist or any(kind.startswith(prefix) for prefix in _DEBUG_PERSIST_EVENTS):
+        _debug_persist(self)
+
+
+def _debug_get(self):
+    _debug_persist(self)
+    return _debug_file_read() or _debug_nvm_read()
+
+
+def _debug_exception(exc):
+    # Some CircuitPython exceptions have an empty str(); preserve the type and
+    # repr so a route failure is actionable instead of appearing as FAIL|guard=.
+    kind = type(exc).__name__
+    detail = repr(exc)
+    if not detail or detail == "''":
+        detail = "<empty>"
+    return (kind + ":" + detail).replace("\n", " ")[:180]
+
+
+def _debug_clear(self):
+    self.debug_events = []
+    _debug_nvm_write("")
+    try:
+        with open(_DEBUG_FILE, "w") as fh:
+            fh.write("")
+    except Exception:
+        pass
+
+
+def _debug_emit(self):
+    text = _debug_get(self)
+    for raw in text.splitlines():
+        self.emit("EVT|DEBUG|" + raw.replace("|", "/"))
+
 def _memory_safe_init(self):
     global _BOOT_BUNDLE
+    self.debug_events = []
     bundle = _BOOT_BUNDLE
     _BOOT_BUNDLE = None
     self.bundle = bundle
@@ -114,6 +264,8 @@ def _memory_safe_init(self):
     self.blue_start_consumed = False
     self.blue_start_pending = False
     self.last_cal_error = None
+    self.debug_last_state = None
+    _debug_event(self, "BOOT", "bundle=valid profiles=%d" % len(runtime.PROFILES), persist=True)
 
 # The six calibration positions use distinct ascending notes: C4 through A4.
 _CAL_NOTES = (262, 294, 330, 349, 392, 440)
@@ -212,11 +364,10 @@ def _immediate_audible_start(self):
     # Acknowledge Start on the physical press, not on release. Route execution
     # remains gated until the press resolves, so a held blue button can still
     # become the long-hold calibration gesture without executing a route.
+    # Defer Start until release so a held press can become calibration.
     self.guard.reset()
-    self.controls.start()
     self.blue_start_pending = True
     self.blue_start_consumed = True
-    self.guard_start_tone()
 
 def _enter_calibration_from_pending_start(self):
     # The user held the same blue press that initially cued Start. Cancel the
@@ -273,6 +424,8 @@ def _audible_cal_tick(self):
     _original_cal_tick(self)
     if was_sampling and isinstance(self.result, dict):
         self.cal_stage_complete_tone()
+        # Sampling completion is an implicit confirmation; save once.
+        self.save_cal()
 
 def _audible_save_cal(self):
     profile_was_saved = runtime.PROFILES[self.stage] in self.saved_ids
@@ -312,6 +465,12 @@ def _audible_buttons(self):
     now = runtime.time.monotonic()
     blue = self.blue.poll(now)
     yellow = self.yellow.poll(now)
+    if blue == "down":
+        _debug_event(self, "GP4", "down running=%s calibrating=%s" % (self.controls.running, self.calibrating), persist=True)
+    elif blue == "long":
+        _debug_event(self, "GP4", "long calibrating=%s" % self.calibrating, persist=True)
+    elif blue == "up":
+        _debug_event(self, "GP4", "up", persist=True)
     if blue == "down" and not self.calibrating and self.controls.running:
         # Stop is fail-safe and should acknowledge immediately on press. This
         # consumes the blue press so the later release/long-hold path cannot
@@ -338,13 +497,106 @@ def _audible_buttons(self):
         self.blue_start_consumed = False
         if getattr(self, "blue_start_pending", False):
             self.blue_start_pending = False
-        if not stop_consumed and not start_consumed and not self.blue.long:
+            # Short GP4 press: start and play the Start cue on release only.
+            # Long GP4 press was consumed by the calibration branch above.
+            if not stop_consumed and not self.blue.long:
+                self.guard.reset()
+                self.controls.start()
+                self.guard_start_tone()
+                _debug_event(self, "GP4", "short-start running=1", persist=True)
+        elif not stop_consumed and not start_consumed and not self.blue.long:
             if self.calibrating:
                 self.next_cal()
     if yellow == "up" and not self.yellow.long:
         self.yellow_action()
     self.cal_tick()
 
+
+_original_plan_setres = runtime.PlanContext.setres
+_original_plan_beep = runtime.PlanContext.beep
+
+def _diagnostic_setres(ctx, w, h):
+    _debug_event(ctx.r, "STEP", "SCREEN %dx%d -> SETRES" % (w, h), persist=True)
+    return _original_plan_setres(ctx, w, h)
+
+def _diagnostic_beep(ctx, frequency, duration):
+    _debug_event(ctx.r, "STEP", "BEEP %d,%d" % (frequency, duration), persist=True)
+    return _original_plan_beep(ctx, frequency, duration)
+
+runtime.PlanContext.setres = _diagnostic_setres
+runtime.PlanContext.beep = _diagnostic_beep
+
+_LIGHT_ROUTE_COMMANDS = {"SCREEN", "SPEED", "BEEP", "DELAY"}
+
+def _light_route_lines(text):
+    commands = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split("|", 1)
+        if len(parts) != 2 or parts[0].upper() not in _LIGHT_ROUTE_COMMANDS:
+            return None
+        commands.append((parts[0].upper(), parts[1].strip()))
+    return commands
+
+def _run_light_route(ctx, commands):
+    for command, args in commands:
+        if command == "SCREEN":
+            fields = args.replace(",", " ").split()
+            if len(fields) != 2:
+                raise ValueError("SCREEN needs width,height")
+            ctx.screen_w, ctx.screen_h = int(fields[0]), int(fields[1])
+            _debug_event(ctx.r, "STEP", "SCREEN metadata %dx%d" % (ctx.screen_w, ctx.screen_h), persist=True)
+        elif command == "SPEED":
+            # Speed is route metadata; BEEP/DELAY do not need the Arm.
+            continue
+        elif command == "DELAY":
+            ctx.sleep_ms(int(float(args)))
+        elif command == "BEEP":
+            fields = args.replace(",", " ").split()
+            if len(fields) != 2:
+                raise ValueError("BEEP needs frequency,duration")
+            ctx.beep(int(fields[0]), int(float(fields[1])))
+
+def _diagnostic_route(self, decision):
+    if not decision.get("execute"):
+        return False
+    name = decision.get("route")
+    if name not in self.bundle["manifest"]["routes"].values():
+        raise GuardBundleError("unvalidated route")
+    # A parsed plan is consumable: loop/random bookkeeping and the step cursor
+    # must never be reused by the next invocation of the same Route. Re-read
+    # and parse the plan for every transition so repeated desktop runs really
+    # emit their RMOUSE steps again.
+    with open("/" + name, "r") as fh:
+        text = fh.read()
+    commands = _light_route_lines(text)
+    try:
+        if commands is not None:
+            # Keep simple Pico-only routes off the large plan_engine import.
+            _run_light_route(PlanContext(self), commands)
+        else:
+            route_plan = runtime.plan_engine.parse_plan(text)
+            try:
+                runtime.plan_engine.run_plan(route_plan, PlanContext(self))
+            finally:
+                del route_plan
+        self.arm.flush()
+        return True
+    finally:
+        # Cleanup must be idempotent and must not manufacture a click. Arm
+        # releases only buttons explicitly tracked as held by MDOWN.
+        try:
+            self.arm.release(False)
+        except Exception as cleanup:
+            _debug_event(self, "CLEANUP", "mouse " + type(cleanup).__name__)
+        try:
+            self.arm.flush()
+        except Exception as cleanup:
+            _debug_event(self, "CLEANUP", "arm " + type(cleanup).__name__)
+
+runtime.Combined.route = _diagnostic_route
 
 def _audible_loop(self):
     self.emit("combined-pico-guard-executor|GP4 start/stop hold3s=calibration|GP3 pause/resume|GP6 piezo")
@@ -358,12 +610,35 @@ def _audible_loop(self):
                 runtime.time.monotonic() - last >= .25):
             last = runtime.time.monotonic()
             try:
-                self.guard.update(self.sensor.lux(), int(last * 1000))
-                if self.guard.last_decision is not None:
-                    self.route(self.guard.last_decision)
+                lux = self.sensor.lux()
+                active = self.guard.update(lux, int(last * 1000))
+                if active != self.debug_last_state:
+                    _debug_event(self, "STATE", "%s lux=%.1f" % (active or "unknown", lux), persist=active is None)
+                    self.debug_last_state = active
+                decision = self.guard.last_decision
+                # A decision is a one-shot transition. Clear it before running
+                # the route so the same Desktop macro is not replayed every poll.
+                self.guard.last_decision = None
+                if decision is not None:
+                    if decision.get("execute"):
+                        route_name = decision.get("route")
+                        _debug_event(self, "ROUTE", "start %s lux=%.1f" % (route_name, lux), persist=True)
+                        if not _apply_pending_cursor(self, force=True):
+                            _debug_event(self, "CURSOR", "sync-failed-before-route", persist=True)
+                            raise RuntimeError("ARM cursor origin not acknowledged")
+                        _debug_event(self, "CURSOR", "sync-ok-before-route", persist=True)
+                        completed = self.route(decision)
+                        if completed is False:
+                            _debug_event(self, "ROUTE", "aborted %s" % route_name, persist=True)
+                        else:
+                            _debug_event(self, "ROUTE", "complete %s" % route_name, persist=True)
+                    else:
+                        _debug_event(self, "STATE", "denied reason=%s lux=%.1f" % (decision.get("reason"), lux), persist=True)
             except Exception as exc:
+                failure = _debug_exception(exc)
+                _debug_event(self, "FAIL", "guard=" + failure, persist=True)
                 self.immediate_audible_stop()
-                self.emit("ERR|GUARD|FAIL|" + str(exc)[:60])
+                self.emit("ERR|GUARD|FAIL|" + failure[:100])
         runtime.time.sleep(.01)
 
 
@@ -380,6 +655,44 @@ def _live_host_beep(self, frequency, duration_ms):
         if tone is not None:
             try: tone.duty_cycle = 0; tone.deinit()
             except Exception: pass
+
+_CURSOR_PENDING = None
+_CURSOR_LAST_APPLIED = None
+_CURSOR_SYNC_READY = False
+
+
+def _apply_pending_cursor(self, force=False):
+    """Synchronize the Pro Micro origin with an acknowledged Windows position.
+
+    The Pro Micro owns the HID cursor state. A fire-and-forget HSETCUR can be
+    lost or answered BUSY, after which the next HMOVE starts from stale/centre
+    coordinates. Cursor sync is therefore a transaction: keep the pending
+    value until OK|HSETCUR is received, and fail closed before a Route if no
+    acknowledged origin exists.
+    """
+    global _CURSOR_PENDING, _CURSOR_LAST_APPLIED, _CURSOR_SYNC_READY
+    if self.calibrating:
+        return False
+    if self.controls.running and not force:
+        return True
+    if _CURSOR_PENDING is None:
+        return _CURSOR_SYNC_READY
+    if getattr(self.arm, "pending", 0):
+        return False
+    x, y = _CURSOR_PENDING
+    try:
+        reply = self.arm.send("HSETCUR|%d,%d" % (x, y), 2)
+        if not reply.startswith("OK|HSETCUR"):
+            return False
+        _CURSOR_LAST_APPLIED = (x, y)
+        _CURSOR_PENDING = None
+        _CURSOR_SYNC_READY = True
+        return True
+    except Exception:
+        # Keep the value pending. The next idle boundary retries it instead of
+        # silently allowing a movement from a stale Arduino origin.
+        return False
+
 
 def _live_host_poll(self):
     if self.usb.in_waiting:
@@ -399,7 +712,28 @@ def _live_host_poll(self):
                 reply = self.calstatus()
             elif line.startswith("CALSET|"):
                 reply = self.calset(line)
+            elif line.startswith("CURSOR|"):
+                # Coalesce cursor packets. The ARM must not receive HSETCUR while
+                # a human mouse path is executing; the newest value is applied at
+                # idle or immediately before the next route.
+                global _CURSOR_PENDING
+                fields = line.split("|", 1)[1].split(",")
+                if len(fields) != 2:
+                    raise ValueError("CURSOR needs x,y")
+                x, y = int(fields[0]), int(fields[1])
+                if x < 0 or y < 0:
+                    raise ValueError("CURSOR range")
+                _CURSOR_PENDING = (x, y)
+                _apply_pending_cursor(self)
+                reply = None
             elif line == "GUARD|ON":
+                # A host Start is a new run request. Reset the one-shot light
+                # transition gate so the same stable desktop state can execute
+                # again without power-cycling the Pico.
+                self.guard.reset()
+                self.guard.last_decision = None
+                self.debug_last_state = None
+                _apply_pending_cursor(self, force=True)
                 self.controls.start()
                 self.guard_start_tone()
                 reply = "OK|GUARD|ON"
@@ -410,7 +744,14 @@ def _live_host_poll(self):
                 self.immediate_audible_stop()
                 reply = "OK|GUARD|OFF"
             elif line == "LUX?":
-                reply = "OK|LUX|lux=%.1f|sensor=ok" % self.sensor.lux()
+                lux = self.sensor.lux()
+                reply = "OK|LUX|lux=%.1f|sensor=ok" % lux
+            elif line == "DEBUGGET":
+                _debug_emit(self)
+                reply = "OK|DEBUG|read"
+            elif line == "DEBUGCLEAR":
+                _debug_clear(self)
+                reply = "OK|DEBUG|cleared"
             elif line.startswith("SETRES|"):
                 fields = line.split("|", 1)[1].split(",")
                 if len(fields) != 2:
@@ -433,9 +774,14 @@ def _live_host_poll(self):
                 reply = "ERR|UNKNOWN|" + head
         except Exception:
             reply = "ERR|EXEC|" + head
-        self.emit(reply)
+        if reply is not None:
+            self.emit(reply)
 
 runtime.Combined.__init__ = _memory_safe_init
+runtime.Combined.debug_event = _debug_event
+runtime.Combined.debug_get = _debug_get
+runtime.Combined.debug_clear = _debug_clear
+runtime.Combined.debug_emit = _debug_emit
 runtime.Combined._live_host_beep = _live_host_beep
 runtime.Combined.host_poll = _live_host_poll
 runtime.Combined._cal_beep = _cal_beep

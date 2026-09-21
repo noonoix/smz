@@ -7,7 +7,7 @@ using Ams.UI.ViewModels;
 
 namespace Ams.UI;
 
-/// <summary>Dedicated Classroom Studio action for the combined Pico + Arduino portable bundle.</summary>
+/// <summary>Single v32 board export: AutoCycle + macro routes + Guard bundle.</summary>
 internal static class CombinedGuardExportUiBootstrap
 {
     private static readonly DependencyProperty InstalledProperty = DependencyProperty.RegisterAttached(
@@ -46,8 +46,8 @@ internal static class CombinedGuardExportUiBootstrap
         window.SetValue(InstalledProperty, true);
 
         var panel = AutoCycleUiKit.EnsureExportCard(body);
-        var button = AutoCycleUiKit.Action("۰  ·  ساخت Combined Guard Bundle", true);
-        button.ToolTip = "بسته‌ی کامل Pico + Arduino arm: plan.txt با STATELOOP، هفت route، manifest، calibration و runtimeهای CIRCUITPY.";
+        var button = AutoCycleUiKit.Action("ساخت بسته کامل چرخه + Macro + Guard", true);
+        button.ToolTip = "تنظیمات AutoCycle، plan.txt، همه routeهای ماکرو، Recovery، Resumable، Guard، کالیبراسیون و manifest را یکجا می‌سازد.";
         button.SetBinding(Button.CommandProperty,
             new Binding(nameof(MainViewModel.ExportCombinedPortableGuardCommand)));
         panel.Children.Insert(0, button);

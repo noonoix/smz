@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <AssemblyName>AMSBoardPrep</AssemblyName>
+    <AssemblyTitle>AMS Board Prep Debug</AssemblyTitle>
+    <Product>AMS Board Prep Debug</Product>
+    <Version>0.1.0</Version>
+    <RootNamespace>AMSBoardPrep</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\ams-shell\src\Ams.UI\Ams.UI.csproj" />
+    <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\ams-shell\caterina\Caterina.hex" Link="caterina\Caterina.hex" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\ams-shell\tools\isp_flash.py" Link="tools\isp_flash.py" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="isp_flash_app_only.py" Link="tools\isp_flash_app_only.py" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

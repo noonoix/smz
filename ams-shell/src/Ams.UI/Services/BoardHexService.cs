@@ -10,6 +10,8 @@ using System.Text.RegularExpressions;
 
 namespace Ams.UI.Services;
 
+// v0.9.69 — transfer verification: build from the moved repository.
+
 /// <summary>v0.9.50 — builds Caterina bootloader HEX files with a custom USB identity
 /// (VID/PID, unique serial number, product/manufacturer strings) for the Pro Micro arm
 /// board. Pure byte logic with no UI, so TestRunner covers it end to end.</summary>
@@ -21,46 +23,61 @@ public static class BoardHexService
     public const int StringDescBase = 0x7F00;
     public const int StringDescMax = 0x8000;
 
-    /// <summary>Ready-made device identities. Every preset is class 0x02 (CDC) so the
-    /// serial port and USB upload never drop — they ride the in-box Windows usbser driver.</summary>
+    // Windows/Arduino IDE safety contract: every selectable profile uses one neutral
+    // CDC identity. Product/manufacturer/serial remain selectable, but third-party
+    // VID/PID pairs are never emitted because Windows may bind them to the wrong driver.
+    public const int IdeSafeVid = 0x1D50;
+    public const int IdeSafeBootPid = 0x615E;
+    public const int IdeSafeApplicationPid = 0x615F;
+    public const int IdeSafeClass = 0x02;
+
+    /// <summary>Ready-made device profiles. The visible profile names are aliases for
+    /// product/manufacturer strings; all emitted USB descriptors use the neutral AMS CDC
+    /// identity above so every selection remains a normal Windows serial port.</summary>
     public sealed record DeviceMode(string Key, string Name, int Vid, int Pid,
                                     int ClassType, int Subclass, int Protocol,
-                                    string Product, string Manufacturer);
+                                    string Product, string Manufacturer, bool LabOnly = false);
 
     // v0.9.54 - list trimmed at the user's request (BBC micro:bit, Calliope mini, Adafruit,
     // ESP32-S2 and Raspberry Pi removed) and every remaining identity carries its real,
     // researched USB strings so selecting a device fills the board-spec form with defaults.
+    // v0.9.55 - twenty researched macro-less keyboards remain selectable as aliases;
+    // v0.9.69 changes only their emitted USB identity to the shared IDE-safe AMS CDC pair.
     public static readonly DeviceMode[] DeviceModes =
     {
-        new("none",      "پیش‌فرض AMS",     0x1D50, 0x615E, 0x02, 0x00, 0x00, "AMS Macro Studio",          "AMS"),
-        new("stm32",     "STM32 Virtual COM",    0x0483, 0x5740, 0x02, 0x00, 0x00, "STM32 Virtual COM Port",    "STMicroelectronics"),
-        new("xiao",      "Seeed XIAO",           0x2886, 0x802F, 0x02, 0x00, 0x00, "Seeed XIAO",                "Seeed"),
-        new("microchip", "Microchip CDC Demo",   0x04D8, 0x000A, 0x02, 0x00, 0x00, "CDC RS-232 Emulation Demo", "Microchip"),
-        new("legospike", "LEGO Education SPIKE", 0x0694, 0x0009, 0x02, 0x00, 0x00, "LEGO Technic Large Hub",    "LEGO Education"),
-        new("m5stack",   "M5Stack Core",         0x303A, 0x1001, 0x02, 0x00, 0x00, "M5Stack Core",              "M5Stack"),
-        // v0.9.55 - twenty researched macro-less keyboards (user list). VIDs are the real
-        // vendor ids; every preset stays class 0x02 (CDC) so the serial port and upload survive.
-        new("g413tklse", "Logitech G413 TKL SE", 0x046D, 0xC33A, 0x02, 0x00, 0x00, "G413 TKL SE Gaming Keyboard", "Logitech"),
-        new("g413se", "Logitech G413 SE", 0x046D, 0xC33C, 0x02, 0x00, 0x00, "G413 SE Gaming Keyboard", "Logitech"),
-        new("gproxtklrapid", "Logitech G PRO X TKL Rapid", 0x046D, 0xC35E, 0x02, 0x00, 0x00, "PRO X TKL RAPID", "Logitech"),
-        new("blackwidowte", "Razer BlackWidow TE", 0x1532, 0x011C, 0x02, 0x00, 0x00, "BlackWidow Tournament Ed.", "Razer"),
-        new("blackwidowxte", "Razer BlackWidow X TE", 0x1532, 0x021B, 0x02, 0x00, 0x00, "BlackWidow X Tournament Ed", "Razer"),
-        new("celeritas2", "ZOWIE Celeritas II", 0x1AF3, 0x0025, 0x02, 0x00, 0x00, "CELERITAS II", "ZOWIE"),
-        new("mx83tkl", "CHERRY XTRFY MX 8.3 TKL", 0x046A, 0x00B1, 0x02, 0x00, 0x00, "XTRFY MX 8.3 TKL", "CHERRY"),
-        new("alloyorigins", "HyperX Alloy Origins", 0x0951, 0x16E5, 0x02, 0x00, 0x00, "HyperX Alloy Origins", "HyperX"),
-        new("alloyorigins60", "HyperX Alloy Origins 60", 0x0951, 0x16E9, 0x02, 0x00, 0x00, "HyperX Alloy Origins 60", "HyperX"),
-        new("alloyorigins65", "HyperX Alloy Origins 65", 0x0951, 0x16EB, 0x02, 0x00, 0x00, "HyperX Alloy Origins 65", "HyperX"),
-        new("duckyone2mini", "Ducky One 2 Mini", 0x04D9, 0x0348, 0x02, 0x00, 0x00, "Ducky One 2 Mini", "DuckyChannel"),
-        new("duckyone2promini", "Ducky One 2 Pro Mini", 0x04D9, 0x0356, 0x02, 0x00, 0x00, "Ducky One 2 Pro Mini", "DuckyChannel"),
-        new("apexprotkl", "SteelSeries Apex Pro TKL", 0x1038, 0x1614, 0x02, 0x00, 0x00, "Apex Pro TKL", "SteelSeries"),
-        new("apexpromini", "SteelSeries Apex Pro Mini", 0x1038, 0x1646, 0x02, 0x00, 0x00, "Apex Pro Mini", "SteelSeries"),
-        new("keychronk8", "Keychron K8", 0x3434, 0x0180, 0x02, 0x00, 0x00, "Keychron K8", "Keychron"),
-        new("das5qs2", "Das Keyboard 5QS Mark II", 0x24F0, 0x2038, 0x02, 0x00, 0x00, "Das Keyboard 5QS Mark II", "Metadot"),
-        new("zmk650wp", "Zalman ZM-K650-WP", 0x258A, 0x0006, 0x02, 0x00, 0x00, "ZM-K650-WP", "Zalman"),
-        new("vanguardpro96", "Corsair Vanguard Pro 96", 0x1B1C, 0x1BC4, 0x02, 0x00, 0x00, "VANGUARD PRO 96", "Corsair"),
-        new("shikarik515", "Fantech Shikari K515", 0x0C45, 0x7A0C, 0x02, 0x00, 0x00, "Shikari K515", "Fantech"),
-        new("gomk87rs", "GAMEON KENORA GOMK87-RS", 0x258A, 0x010C, 0x02, 0x00, 0x00, "KENORA GOMK87-RS", "GAMEON"),
+        new("none",      "AMS CDC Serial (پیش‌فرض)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "AMS USB Serial Device", "AMS", false),
+        new("stm32",     "STM32 Virtual COM (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "STM32 Virtual COM Port", "STMicroelectronics", false),
+        new("xiao",      "Seeed XIAO (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "Seeed XIAO (CDC)", "Seeed", false),
+        new("microchip", "Microchip CDC Demo (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "CDC RS-232 Emulation Demo", "Microchip", false),
+        new("legospike", "LEGO Education SPIKE (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "LEGO Technic Large Hub", "LEGO Education", false),
+        new("m5stack",   "M5Stack Core (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "M5Stack Core (CDC)", "M5Stack", false),
+        new("g413tklse", "Logitech G413 TKL SE (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "G413 TKL SE Gaming Keyboard", "Logitech", false),
+        new("g413se", "Logitech G413 SE (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "G413 SE Gaming Keyboard", "Logitech", false),
+        new("gproxtklrapid", "Logitech G PRO X TKL Rapid (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "PRO X TKL RAPID", "Logitech", false),
+        new("blackwidowte", "Razer BlackWidow TE (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "BlackWidow Tournament Ed.", "Razer", false),
+        new("blackwidowxte", "Razer BlackWidow X TE (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "BlackWidow X Tournament Ed", "Razer", false),
+        new("celeritas2", "ZOWIE Celeritas II (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "CELERITAS II", "ZOWIE", false),
+        new("mx83tkl", "CHERRY XTRFY MX 8.3 TKL (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "XTRFY MX 8.3 TKL", "CHERRY", false),
+        new("alloyorigins", "HyperX Alloy Origins (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "HyperX Alloy Origins", "HyperX", false),
+        new("alloyorigins60", "HyperX Alloy Origins 60 (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "HyperX Alloy Origins 60", "HyperX", false),
+        new("alloyorigins65", "HyperX Alloy Origins 65 (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "HyperX Alloy Origins 65", "HyperX", false),
+        new("duckyone2mini", "Ducky One 2 Mini (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "Ducky One 2 Mini", "DuckyChannel", false),
+        new("duckyone2promini", "Ducky One 2 Pro Mini (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "Ducky One 2 Pro Mini", "DuckyChannel", false),
+        new("apexprotkl", "SteelSeries Apex Pro TKL (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "Apex Pro TKL", "SteelSeries", false),
+        new("apexpromini", "SteelSeries Apex Pro Mini (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "Apex Pro Mini", "SteelSeries", false),
+        new("keychronk8", "Keychron K8 (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "Keychron K8", "Keychron", false),
+        new("das5qs2", "Das Keyboard 5QS Mark II (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "Das Keyboard 5QS Mark II", "Metadot", false),
+        new("zmk650wp", "Zalman ZM-K650-WP (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "ZM-K650-WP", "Zalman", false),
+        new("vanguardpro96", "Corsair Vanguard Pro 96 (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "VANGUARD PRO 96", "Corsair", false),
+        new("shikarik515", "Fantech Shikari K515 (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "Shikari K515", "Fantech", false),
+        new("gomk87rs", "GAMEON KENORA GOMK87-RS (CDC امن)", IdeSafeVid, IdeSafeBootPid, IdeSafeClass, 0x00, 0x00, "KENORA GOMK87-RS", "GAMEON", false),
     };
+
+    public static void EnsureIdeSafeOverride(int vid, int pid)
+    {
+        if (vid != IdeSafeVid || pid != IdeSafeBootPid)
+            throw new ArgumentException($"برای شناسایی قطعی در Windows/Arduino IDE، VID/PID باید {IdeSafeVid:X4}:{IdeSafeBootPid:X4} باشد؛ VID/PID سازنده‌های دیگر قابل استفاده نیست.");
+    }
 
     public static DeviceMode ModeFor(string? key)
         => DeviceModes.FirstOrDefault(m => m.Key == key) ?? DeviceModes[0];
@@ -75,10 +92,10 @@ public static class BoardHexService
     public static BoardDefaults DefaultsFor(string? key)
     {
         var m = ModeFor(key);
-        var id = SanitizeBoardId(m.Key == "none" ? "ams" : m.Key);
+        var id = m.Key is "none" or "generic_cdc" ? "ams" : SanitizeBoardId(m.Key);
         var name = m.Key == "none" ? "Classroom Studio Board" : m.Product;
-        return new BoardDefaults(id, name, $"0x{m.Vid:X4}", $"0x{m.Pid:X4}",
-                                 $"0x{m.Pid + 1:X4}", m.Product, m.Manufacturer);
+        return new BoardDefaults(id, name, $"0x{IdeSafeVid:X4}", $"0x{IdeSafeBootPid:X4}",
+                                 $"0x{IdeSafeApplicationPid:X4}", m.Product, m.Manufacturer);
     }
 
     /// <summary>Arduino board ids are lowercase [a-z0-9_]; anything else is dropped.</summary>

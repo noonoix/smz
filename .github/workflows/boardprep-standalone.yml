@@ -1,0 +1,73 @@
+name: AMS Board Prep Debug
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/v32-profile-and-bundle
+    paths:
+      - 'tools/AMSBoardPrep/**'
+      - 'ams-shell/src/Ams.UI/Services/Board*.cs'
+      - 'ams-shell/src/Ams.UI/Services/BoardsTxtService.cs'
+      - 'ams-shell/src/Ams.UI/Services/DeviceSpecificAvrCoreService.cs'
+      - 'ams-shell/src/Ams.UI/Services/HexInspector.cs'
+      - 'ams-shell/caterina/Caterina.hex'
+      - 'ams-shell/tools/isp_flash.py'
+      - '.github/workflows/boardprep-standalone.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: standalone Board Prep / Windows publish
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore
+        shell: pwsh
+        run: dotnet restore tools/AMSBoardPrep/AMSBoardPrep.csproj
+      - name: Publish standalone app
+        shell: pwsh
+        run: dotnet publish tools/AMSBoardPrep/AMSBoardPrep.csproj -c Release -r win-x64 --self-contained true -o boardprep-out
+      - name: Stage documentation and verify files
+        shell: pwsh
+        run: |
+          Copy-Item tools/AMSBoardPrep/README-FA.md boardprep-out/README-FA.md -Force
+          if (-not (Test-Path boardprep-out/AMSBoardPrep.exe)) { throw 'AMSBoardPrep.exe was not produced' }
+          if (-not (Test-Path boardprep-out/caterina/Caterina.hex)) { throw 'Caterina.hex missing' }
+          if (-not (Test-Path boardprep-out/tools/isp_flash.py)) { throw 'isp_flash.py missing' }
+      - name: Package
+        shell: pwsh
+        run: |
+          Compress-Archive -Path boardprep-out/* -DestinationPath AMSBoardPrep-debug-win-x64.zip -Force
+          (Get-FileHash AMSBoardPrep-debug-win-x64.zip -Algorithm SHA256).Hash | Set-Content AMSBoardPrep-debug-win-x64.sha256
+      - name: Upload standalone artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AMSBoardPrep-debug-win-x64
+          path: |
+            AMSBoardPrep-debug-win-x64.zip
+            AMSBoardPrep-debug-win-x64.sha256
+            boardprep-out/README-FA.md
+          retention-days: 14
+      - name: Publish prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ams-board-prep-debug-${{ github.run_number }}
+          name: "AMS Board Prep Debug #${{ github.run_number }}"
+          prerelease: true
+          generate_release_notes: false
+          body: |
+            نسخهٔ مستقل دیباگ آماده‌سازی دستی یک برد.
+
+            روند: هویت → نصب IDE → ISP → Application USB → چکاپ.
+            این نسخه تولید دسته‌ای ندارد و برای تست سخت‌افزاری آماده شده است.
+          files: |
+            AMSBoardPrep-debug-win-x64.zip
+            AMSBoardPrep-debug-win-x64.sha256
+            tools/AMSBoardPrep/README-FA.md

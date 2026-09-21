@@ -1,0 +1,26 @@
+PLAN|2
+# hardware reference route derived from random pkg.amsj; no sensitive text
+SCREEN|1920,1080
+SPEED|300,2000
+
+LOOP|2
+RPKG|all,1,6
+KEY|combo=49
+DELAY|88,188
+PKGITEM
+KEY|combo=50
+DELAY|122,222
+PKGITEM
+KEY|combo=51
+DELAY|111,444
+PKGITEM
+KEY|combo=52
+DELAY|44,222
+PKGITEM
+KEY|combo=53
+DELAY|555,888
+PKGITEM
+KEY|combo=54
+DELAY|124,190
+ENDPKG
+ENDLOOP

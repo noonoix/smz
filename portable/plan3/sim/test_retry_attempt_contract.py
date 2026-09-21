@@ -4,7 +4,8 @@ import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-for candidate in (os.path.join(HERE, "CIRCUITPY"), HERE):
+ROOT = os.path.dirname(HERE)
+for candidate in (os.path.join(ROOT, "CIRCUITPY"), ROOT, HERE):
     if os.path.exists(os.path.join(candidate, "plan_engine.py")):
         sys.path.insert(0, candidate)
         break

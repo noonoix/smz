@@ -78,6 +78,23 @@ elif p.name == "code.py":
     if "_DeferredPlanEngine" in s or 'sys.modules["plan_engine"]' in s:
         raise SystemExit("Deferred plan_engine proxy remains")
 
+    # Every generated route uses the bounded streaming executor.  Before a
+    # new route, cancel any in-flight ARM human-mouse operation and send MUP
+    # frames.  Without this boundary the Pro Micro can retain stale move debt;
+    # repeated routes then stop after fewer and fewer RMOUSE commands until a
+    # power cycle resets the ARM.
+    route_start = """    primary = None
+    try:
+"""
+    route_start_fixed = """    primary = None
+    try:
+        self.arm.prepare_route()
+"""
+    if route_start in s and route_start_fixed not in s:
+        s = s.replace(route_start, route_start_fixed, 1)
+    elif route_start_fixed not in s:
+        raise SystemExit("missing streaming route start anchor")
+
     # The streaming runner is the active route path for the combined firmware.
     # It already releases the keyboard in its finally block, but previously
     # only flushed the UART. A route ending after MDOWN/MCLICK could therefore

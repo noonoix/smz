@@ -2053,6 +2053,23 @@ public partial class MainViewModel : ObservableObject
 
             });
 
+            engine.SetReviewPause(async ct =>
+            {
+                // Alarm first, then expose the same yellow Resume control used by manual pause.
+                try
+                {
+                    await _bridge.SendAsync("BEEP|880,180", 5);
+                    await Task.Delay(120, ct);
+                    await _bridge.SendAsync("BEEP|660,240", 5);
+                }
+                catch { /* review pause must remain available even if the buzzer is absent */ }
+                IsPaused = true;
+                Log("⚠ retryAttempt exhausted — human review required; fix the screen and press Resume");
+                while (IsPaused) await Task.Delay(100, ct);
+                Log("retryAttempt: Resume received — rechecking success light state");
+                return true;
+            });
+
             engine.SetMouseSpeedRange(_settings.MouseMoveSpeedMin, _settings.MouseMoveSpeedMax);
 
             var sw = System.Diagnostics.Stopwatch.StartNew();

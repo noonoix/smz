@@ -130,6 +130,14 @@ public static class StepTextsFa
         ["typeText:mode"] = "حالت (keystrokes = کلیدبه‌کلید · clipboard = الصاق)",
         ["forLoop:mode"] = "حالت تکرار (count/time/infinite)",
         ["randomPackage:mode"] = "حالت — shuffleAll: هر فرزند یک بار با ترتیب تصادفی تازه · randomSubset: تعداد تصادفی از فرزندان",
+        ["retryAttempt:title"] = "عنوان بلوک تلاش",
+        ["retryAttempt:maxAttempts"] = "حداکثر تعداد تلاش",
+        ["retryAttempt:timeoutMs"] = "مهلت انتظار موفقیت (ms)",
+        ["retryAttempt:successLuxCenter"] = "مرکز نور موفقیت (لوکس)",
+        ["retryAttempt:successLuxTolerance"] = "تلورانس نور موفقیت ± (لوکس)",
+        ["retryAttempt:stableSec"] = "مدت تثبیت وضعیت موفقیت (ثانیه)",
+        ["retryAttempt:timeoutAction"] = "عملکرد هنگام Timeout تلاش",
+        ["retryAttempt:exhaustedAction"] = "پس از پایان تلاش‌ها (آلارم و توقف برای بازبینی انسانی)",
 
         // x/y/w/h — mouseMove vs randomMousePosition vs findImage
         ["mouseMove:x"] = "مختصات X",

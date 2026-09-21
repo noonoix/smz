@@ -653,6 +653,12 @@ def _live_host_poll(self):
             elif line.startswith("CALSET|"):
                 reply = self.calset(line)
             elif line == "GUARD|ON":
+                # A host Start is a new run request. Reset the one-shot light
+                # transition gate so the same stable desktop state can execute
+                # again without power-cycling the Pico.
+                self.guard.reset()
+                self.guard.last_decision = None
+                self.debug_last_state = None
                 self.controls.start()
                 self.guard_start_tone()
                 reply = "OK|GUARD|ON"

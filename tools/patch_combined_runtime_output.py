@@ -155,11 +155,11 @@ def _run_light_route(owner, name):
     with open("/" + name, "r") as fh:
         owner.emit("EVT|DEBUG|MEM/route-open free=%d" % gc.mem_free())
         while True:
-            if not _light_gate(owner, expected): return
+            if not _light_gate(owner, expected): return False
             raw = fh.readline()
             if not raw:
                 if frames: raise ValueError("LOOP without ENDLOOP")
-                return
+                return True
             line = raw.strip()
             if not line or line.startswith("#"): continue
             split = line.find("|")
@@ -179,14 +179,14 @@ def _run_light_route(owner, name):
                 if len(a) != 2: raise ValueError("bad SPEED")
             elif op == "DELAY":
                 a = args.split(",")
-                if not _light_sleep(owner, int(a[0]), expected): return
+                if not _light_sleep(owner, int(a[0]), expected): return False
             elif op == "BEEP":
                 a = args.split(",")
                 if len(a) != 2: raise ValueError("bad BEEP")
                 owner.emit("EVT|DEBUG|STEP/BEEP %s,%s" % (a[0], a[1]))
-                if not _light_beep(owner, int(a[0]), int(float(a[1])), expected): return
+                if not _light_beep(owner, int(a[0]), int(float(a[1])), expected): return False
             elif op == "KEY":
-                if not _light_key(owner, args, expected): return
+                if not _light_key(owner, args, expected): return False
             elif op in ("KDOWN", "KUP"):
                 code = _light_keycode(int(args))
                 if op == "KDOWN": owner.keyboard.press(code)
@@ -225,7 +225,9 @@ def _diagnostic_route(self, decision):
     if name not in _VALID_ROUTE_NAMES:
         raise runtime.GuardBundleError("unvalidated route")
     try:
-        _run_light_route(self, name)
+        # Propagate Stop/light-gate cancellation so the caller does not log
+        # an aborted Route as successfully completed.
+        return _run_light_route(self, name)
     finally:
         # A state transition, Stop or parser failure must never leave a held key.
         self.keyboard.release_all()

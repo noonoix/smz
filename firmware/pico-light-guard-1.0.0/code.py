@@ -608,6 +608,7 @@ def _audible_loop(self):
                     if decision.get("execute"):
                         route_name = decision.get("route")
                         _debug_event(self, "ROUTE", "start %s lux=%.1f" % (route_name, lux), persist=True)
+                        _apply_pending_cursor(self, force=True)
                         self.route(decision)
                         _debug_event(self, "ROUTE", "complete %s" % route_name, persist=True)
                     else:
@@ -634,6 +635,36 @@ def _live_host_beep(self, frequency, duration_ms):
             try: tone.duty_cycle = 0; tone.deinit()
             except Exception: pass
 
+_CURSOR_PENDING = None
+_CURSOR_LAST_APPLIED = None
+
+
+def _apply_pending_cursor(self, force=False):
+    """Apply the newest Windows cursor only while the ARM is idle.
+
+    CURSOR is a position hint, not a movement command. Never inject HSETCUR
+    while HMOVE/HRANDOM is running; doing that interleaves origin updates with
+    the human path and can make later routes appear to reset or finish early.
+    At a route boundary ``force=True`` applies the latest idle position once.
+    """
+    global _CURSOR_PENDING, _CURSOR_LAST_APPLIED
+    if _CURSOR_PENDING is None or self.calibrating:
+        return
+    if self.controls.running and not force:
+        return
+    if getattr(self.arm, "pending", 0):
+        return
+    x, y = _CURSOR_PENDING
+    try:
+        self.arm.write("HSETCUR|%d,%d" % (x, y))
+        _CURSOR_LAST_APPLIED = (x, y)
+        _CURSOR_PENDING = None
+    except Exception:
+        # Keep it pending for the next idle poll; never fail a Guard route
+        # because the optional origin-sync packet could not be written.
+        pass
+
+
 def _live_host_poll(self):
     if self.usb.in_waiting:
         self.host.extend(self.usb.read(self.usb.in_waiting))
@@ -653,16 +684,18 @@ def _live_host_poll(self):
             elif line.startswith("CALSET|"):
                 reply = self.calset(line)
             elif line.startswith("CURSOR|"):
-                # Windows bridge periodically supplies the real OS cursor. Do not
-                # echo a reply on USB: this is a one-way position update and the
-                # ARM reply is drained by arm.pump().
+                # Coalesce cursor packets. The ARM must not receive HSETCUR while
+                # a human mouse path is executing; the newest value is applied at
+                # idle or immediately before the next route.
+                global _CURSOR_PENDING
                 fields = line.split("|", 1)[1].split(",")
                 if len(fields) != 2:
                     raise ValueError("CURSOR needs x,y")
                 x, y = int(fields[0]), int(fields[1])
                 if x < 0 or y < 0:
                     raise ValueError("CURSOR range")
-                self.arm.write("HSETCUR|%d,%d" % (x, y))
+                _CURSOR_PENDING = (x, y)
+                _apply_pending_cursor(self)
                 reply = None
             elif line == "GUARD|ON":
                 # A host Start is a new run request. Reset the one-shot light
@@ -671,6 +704,7 @@ def _live_host_poll(self):
                 self.guard.reset()
                 self.guard.last_decision = None
                 self.debug_last_state = None
+                _apply_pending_cursor(self, force=True)
                 self.controls.start()
                 self.guard_start_tone()
                 reply = "OK|GUARD|ON"

@@ -348,6 +348,7 @@ def main():
     def event_pump():
         seen = 0
         last_cursor = 0.0
+        last_cursor_pos = None
         while not stop_evt.is_set():
             link = state["link"]
             if link is not None:
@@ -362,11 +363,16 @@ def main():
                 if isinstance(link, PicoLink) and now - last_cursor >= 0.10:
                     pos = _windows_cursor_position()
                     if pos is not None:
-                        try:
-                            link._send("CURSOR|%d,%d" % pos)
-                            last_cursor = now
-                        except Exception:
-                            pass
+                        # Send only changes. Repeating the same CURSOR packet every
+                        # 100 ms was unnecessary USB/UART traffic and, while a route
+                        # was active, could compete with the mouse command stream.
+                        last_cursor = now
+                        if pos != last_cursor_pos:
+                            try:
+                                link._send("CURSOR|%d,%d" % pos)
+                                last_cursor_pos = pos
+                            except Exception:
+                                pass
             time.sleep(0.05)
 
     threading.Thread(target=event_pump, daemon=True).start()

@@ -1,4 +1,5 @@
 # Combined Phase 7 board-owned runtime. It validates the exported bundle before routing.
+import gc
 import json
 import math
 import os
@@ -424,15 +425,19 @@ class Combined:
         if not decision.get("execute"): return
         name = decision.get("route")
         if name not in self.bundle["manifest"]["routes"].values(): raise GuardBundleError("unvalidated route")
-        if name not in self.routes:
-            with open("/" + name, "r") as fh: self.routes[name] = plan_engine.parse_plan(fh.read())
+        # A parsed plan is consumable: loop/random bookkeeping must not be
+        # reused by a later invocation of the same Route.
+        with open("/" + name, "r") as fh:
+            route_plan = plan_engine.parse_plan(fh.read())
         self.arm.prepare_route()
         try:
-            plan_engine.run_plan(self.routes[name], PlanContext(self))
+            plan_engine.run_plan(route_plan, PlanContext(self))
             self.arm.flush()
         finally:
             # Always leave the Pro Micro neutral even when a plan step fails.
             self.arm.release(True)
+            del route_plan
+            gc.collect()
     def host_poll(self):
         if self.usb.in_waiting: self.host.extend(self.usb.read(self.usb.in_waiting))
         while b"\n" in self.host:

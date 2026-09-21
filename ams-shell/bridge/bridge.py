@@ -147,6 +147,7 @@ class PicoLink:
         self.tx = 0
         self.rx = 0
         self._rxbuf = bytearray()
+        self._write_lock = threading.Lock()
 
     def connect(self):
         import serial
@@ -207,9 +208,10 @@ class PicoLink:
     def _send(self, text):
         if self.ser is None:
             raise PicoError("not connected")
-        self.ser.write(text.encode("ascii") + b"\n")
-        self.ser.flush()
-        self.tx += 1
+        with self._write_lock:
+            self.ser.write(text.encode("ascii") + b"\n")
+            self.ser.flush()
+            self.tx += 1
 
     def _read_line(self, timeout=0.5):
         """یک خط کامل؛ بایت‌های نیمه‌تمام در بافر می‌مانند (همان قاعدهٔ ams_serial)."""
@@ -308,6 +310,22 @@ def open_link(port):
     return link, dev
 
 
+def _windows_cursor_position():
+    """Return the real Windows cursor position, or None outside Windows."""
+    if os.name != "nt":
+        return None
+    try:
+        import ctypes
+        class POINT(ctypes.Structure):
+            _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+        point = POINT()
+        if ctypes.windll.user32.GetCursorPos(ctypes.byref(point)):
+            return int(point.x), int(point.y)
+    except Exception:
+        pass
+    return None
+
+
 def main():
     emit({"event": "stage", "stage": "bridge_started"})
     ap = argparse.ArgumentParser()
@@ -329,6 +347,7 @@ def main():
     # ── نخ رویدادهای EVT برد ────────────────────────────────────────
     def event_pump():
         seen = 0
+        last_cursor = 0.0
         while not stop_evt.is_set():
             link = state["link"]
             if link is not None:
@@ -336,6 +355,18 @@ def main():
                 while seen < len(evs):
                     emit({"event": "evt", "line": evs[seen]})
                     seen += 1
+                # Keep the Pico/Pro Micro origin aligned with the actual OS
+                # cursor. The update is one-way and silent; it never pairs with
+                # a command reply and is ignored for direct BoardLink sessions.
+                now = time.monotonic()
+                if isinstance(link, PicoLink) and now - last_cursor >= 0.10:
+                    pos = _windows_cursor_position()
+                    if pos is not None:
+                        try:
+                            link._send("CURSOR|%d,%d" % pos)
+                            last_cursor = now
+                        except Exception:
+                            pass
             time.sleep(0.05)
 
     threading.Thread(target=event_pump, daemon=True).start()

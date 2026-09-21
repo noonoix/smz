@@ -652,6 +652,18 @@ def _live_host_poll(self):
                 reply = self.calstatus()
             elif line.startswith("CALSET|"):
                 reply = self.calset(line)
+            elif line.startswith("CURSOR|"):
+                # Windows bridge periodically supplies the real OS cursor. Do not
+                # echo a reply on USB: this is a one-way position update and the
+                # ARM reply is drained by arm.pump().
+                fields = line.split("|", 1)[1].split(",")
+                if len(fields) != 2:
+                    raise ValueError("CURSOR needs x,y")
+                x, y = int(fields[0]), int(fields[1])
+                if x < 0 or y < 0:
+                    raise ValueError("CURSOR range")
+                self.arm.write("HSETCUR|%d,%d" % (x, y))
+                reply = None
             elif line == "GUARD|ON":
                 # A host Start is a new run request. Reset the one-shot light
                 # transition gate so the same stable desktop state can execute
@@ -699,7 +711,8 @@ def _live_host_poll(self):
                 reply = "ERR|UNKNOWN|" + head
         except Exception:
             reply = "ERR|EXEC|" + head
-        self.emit(reply)
+        if reply is not None:
+            self.emit(reply)
 
 runtime.Combined.__init__ = _memory_safe_init
 runtime.Combined.debug_event = _debug_event

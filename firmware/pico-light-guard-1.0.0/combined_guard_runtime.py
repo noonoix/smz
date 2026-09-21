@@ -118,12 +118,31 @@ class Arm:
             time.sleep(.001)
         self.write("MMOVE|%d,%d,abs,2" % (x, y)); self.pending += 1
     def send(self, line, timeout=5):
-        self.pump(); self.write(line); head = line.split("|", 1)[0]; end = time.monotonic() + timeout
-        while time.monotonic() < end:
-            for reply in self.pump():
-                if reply.startswith("OK|" + head) or reply.startswith("ERR|"): return reply
-            time.sleep(.002)
-        raise RuntimeError("arm acknowledgement timeout: " + head)
+        head = line.split("|", 1)[0]
+        # SETRES is idempotent. A stale ERR/partial UART line must not make a
+        # whole Route fail; retry it once after the receive queue is pumped.
+        attempts = 2 if head == "SETRES" else 1
+        last_error = None
+        for attempt in range(attempts):
+            self.pump()
+            self.write(line)
+            end = time.monotonic() + timeout
+            while time.monotonic() < end:
+                for reply in self.pump():
+                    if reply.startswith("OK|" + head): return reply
+                    if reply.startswith("ERR|"):
+                        last_error = reply
+                        break
+                if last_error is not None: break
+                time.sleep(.002)
+            if attempt + 1 < attempts:
+                self.pump()
+                time.sleep(.03)
+                last_error = None
+                continue
+            if last_error is not None:
+                raise RuntimeError("ARM %s rejected: %s" % (head, last_error))
+            raise RuntimeError("ARM %s acknowledgement timeout" % head)
     def flush(self):
         end = time.monotonic() + 3
         while self.pending and time.monotonic() < end: self.pump(); time.sleep(.002)
@@ -137,6 +156,12 @@ class Arm:
         try: self.send("HALT", 1.5)
         except Exception: pass
         self.release(True)
+    def prepare_route(self):
+        # Software equivalent of the power-cycle workaround: cancel a stale
+        # route, neutralize all buttons, and discard completed move debt before
+        # SETRES or the first RMOUSE command of the next route.
+        self.abort()
+        self.pending = 0
 
 class Button:
     def __init__(self, pin):
@@ -401,7 +426,13 @@ class Combined:
         if name not in self.bundle["manifest"]["routes"].values(): raise GuardBundleError("unvalidated route")
         if name not in self.routes:
             with open("/" + name, "r") as fh: self.routes[name] = plan_engine.parse_plan(fh.read())
-        plan_engine.run_plan(self.routes[name], PlanContext(self)); self.arm.flush()
+        self.arm.prepare_route()
+        try:
+            plan_engine.run_plan(self.routes[name], PlanContext(self))
+            self.arm.flush()
+        finally:
+            # Always leave the Pro Micro neutral even when a plan step fails.
+            self.arm.release(True)
     def host_poll(self):
         if self.usb.in_waiting: self.host.extend(self.usb.read(self.usb.in_waiting))
         while b"\n" in self.host:

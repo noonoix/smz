@@ -74,6 +74,29 @@ elif p.name == "code.py":
                   "# shims, and keep all Guard routes on the bounded streaming executor.")
     if "_DeferredPlanEngine" in s or 'sys.modules["plan_engine"]' in s:
         raise SystemExit("Deferred plan_engine proxy remains")
+
+    # The streaming runner is the active route path for the combined firmware.
+    # It already releases the keyboard in this finally block, but previously
+    # only flushed the UART. A route ending after MDOWN/MCLICK could therefore
+    # leave the Pro Micro's left button physically held until Ctrl+Alt+Del.
+    old_cleanup = '''        try:
+            self.arm.flush()
+        except Exception as cleanup:
+            self.emit("EVT|DEBUG|CLEANUP/arm " + type(cleanup).__name__)
+'''
+    new_cleanup = '''        try:
+            self.arm.release(True)
+        except Exception as cleanup:
+            self.emit("EVT|DEBUG|CLEANUP/mouse " + type(cleanup).__name__)
+        try:
+            self.arm.flush()
+        except Exception as cleanup:
+            self.emit("EVT|DEBUG|CLEANUP/arm " + type(cleanup).__name__)
+'''
+    if old_cleanup in s:
+        s = s.replace(old_cleanup, new_cleanup, 1)
+    elif new_cleanup not in s:
+        raise SystemExit("missing streaming route cleanup anchor")
 else:
     raise SystemExit("expected code.py or combined_guard_runtime.py")
 

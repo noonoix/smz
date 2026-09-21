@@ -623,7 +623,10 @@ def _audible_loop(self):
                     if decision.get("execute"):
                         route_name = decision.get("route")
                         _debug_event(self, "ROUTE", "start %s lux=%.1f" % (route_name, lux), persist=True)
-                        _apply_pending_cursor(self, force=True)
+                        if not _apply_pending_cursor(self, force=True):
+                            _debug_event(self, "CURSOR", "sync-failed-before-route", persist=True)
+                            raise RuntimeError("ARM cursor origin not acknowledged")
+                        _debug_event(self, "CURSOR", "sync-ok-before-route", persist=True)
                         completed = self.route(decision)
                         if completed is False:
                             _debug_event(self, "ROUTE", "aborted %s" % route_name, persist=True)
@@ -655,32 +658,40 @@ def _live_host_beep(self, frequency, duration_ms):
 
 _CURSOR_PENDING = None
 _CURSOR_LAST_APPLIED = None
+_CURSOR_SYNC_READY = False
 
 
 def _apply_pending_cursor(self, force=False):
-    """Apply the newest Windows cursor only while the ARM is idle.
+    """Synchronize the Pro Micro origin with an acknowledged Windows position.
 
-    CURSOR is a position hint, not a movement command. Never inject HSETCUR
-    while HMOVE/HRANDOM is running; doing that interleaves origin updates with
-    the human path and can make later routes appear to reset or finish early.
-    At a route boundary ``force=True`` applies the latest idle position once.
+    The Pro Micro owns the HID cursor state. A fire-and-forget HSETCUR can be
+    lost or answered BUSY, after which the next HMOVE starts from stale/centre
+    coordinates. Cursor sync is therefore a transaction: keep the pending
+    value until OK|HSETCUR is received, and fail closed before a Route if no
+    acknowledged origin exists.
     """
-    global _CURSOR_PENDING, _CURSOR_LAST_APPLIED
-    if _CURSOR_PENDING is None or self.calibrating:
-        return
+    global _CURSOR_PENDING, _CURSOR_LAST_APPLIED, _CURSOR_SYNC_READY
+    if self.calibrating:
+        return False
     if self.controls.running and not force:
-        return
+        return True
+    if _CURSOR_PENDING is None:
+        return _CURSOR_SYNC_READY
     if getattr(self.arm, "pending", 0):
-        return
+        return False
     x, y = _CURSOR_PENDING
     try:
-        self.arm.write("HSETCUR|%d,%d" % (x, y))
+        reply = self.arm.send("HSETCUR|%d,%d" % (x, y), 2)
+        if not reply.startswith("OK|HSETCUR"):
+            return False
         _CURSOR_LAST_APPLIED = (x, y)
         _CURSOR_PENDING = None
+        _CURSOR_SYNC_READY = True
+        return True
     except Exception:
-        # Keep it pending for the next idle poll; never fail a Guard route
-        # because the optional origin-sync packet could not be written.
-        pass
+        # Keep the value pending. The next idle boundary retries it instead of
+        # silently allowing a movement from a stale Arduino origin.
+        return False
 
 
 def _live_host_poll(self):

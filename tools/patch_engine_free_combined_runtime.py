@@ -76,7 +76,7 @@ elif p.name == "code.py":
         raise SystemExit("Deferred plan_engine proxy remains")
 
     # The streaming runner is the active route path for the combined firmware.
-    # It already releases the keyboard in this finally block, but previously
+    # It already releases the keyboard in its finally block, but previously
     # only flushed the UART. A route ending after MDOWN/MCLICK could therefore
     # leave the Pro Micro's left button physically held until Ctrl+Alt+Del.
     old_cleanup = '''        try:
@@ -96,7 +96,32 @@ elif p.name == "code.py":
     if old_cleanup in s:
         s = s.replace(old_cleanup, new_cleanup, 1)
     elif new_cleanup not in s:
-        raise SystemExit("missing streaming route cleanup anchor")
+        # The checked-in firmware fixture has a smaller diagnostic route block
+        # than the packaged/generated code. Keep both source and build layouts
+        # covered; this also makes the patch testable without a full .NET build.
+        old_simple = '''    try:
+        _run_light_route(self, name)
+    finally:
+        # A state transition, Stop or parser failure must never leave a held key.
+        self.keyboard.release_all()
+        self.arm.flush()
+'''
+        new_simple = '''    try:
+        _run_light_route(self, name)
+    finally:
+        # A state transition, Stop or parser failure must never leave a held key
+        # or mouse button.
+        self.keyboard.release_all()
+        try:
+            self.arm.release(True)
+        except Exception:
+            pass
+        self.arm.flush()
+'''
+        if old_simple in s:
+            s = s.replace(old_simple, new_simple, 1)
+        elif new_simple not in s:
+            raise SystemExit("missing streaming route cleanup anchor")
 else:
     raise SystemExit("expected code.py or combined_guard_runtime.py")
 

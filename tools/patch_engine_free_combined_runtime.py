@@ -189,6 +189,22 @@ elif p.name == "code.py":
             s = s.replace(old_simple, new_simple, 1)
         elif old_simple_prepared in s:
             s = s.replace(old_simple_prepared, new_simple, 1)
+        elif "def _diagnostic_route" in s and "self.keyboard.release_all()" in s and "self.arm.flush()" in s:
+            # The output combiner may already have normalized the route wrapper
+            # comments and return value. Patch its cleanup structurally instead
+            # of depending on the older exact text block.
+            start = s.index("def _diagnostic_route")
+            end = s.index("runtime.Combined.route = _diagnostic_route", start)
+            section = s[start:end]
+            release_block = """        try:
+            self.arm.release(False)
+        except Exception:
+            pass
+        self.arm.flush()
+"""
+            if "self.arm.release(False)" not in section:
+                section = section.replace("        self.arm.flush()\n", release_block, 1)
+                s = s[:start] + section + s[end:]
         elif new_simple not in s and new_simple_prepared not in s:
             raise SystemExit("missing streaming route cleanup anchor")
 else:

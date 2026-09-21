@@ -135,7 +135,7 @@ def _light_type(owner,args,expected):
 # Backspace is control char and needs an explicit mapping.
 helper=helper.replace('    if ch=="\\t": return 43,False\n', '    if ch=="\\t": return 43,False\n    if ord(ch)==8: return 42,False\n')
 anchor='def _run_light_route(owner, name):\n'
-if helper not in s:
+if helper not in s and "def _light_type(" not in s:
     if anchor not in s: raise SystemExit('missing TYPE helper anchor')
     s=s.replace(anchor,helper+anchor,1)
 s=s.replace('{"PLAN", "SCREEN", "SPEED", "BEEP", "DELAY", "LOOP", "LOOPTIME", "ENDLOOP", "KEY", "KDOWN", "KUP"}', '{"PLAN", "SCREEN", "SPEED", "BEEP", "DELAY", "LOOP", "LOOPTIME", "ENDLOOP", "KEY", "KDOWN", "KUP", "TYPE"}',1)
@@ -148,5 +148,5 @@ new='''            elif op == "KEY":
                 if not _light_type(owner, args, expected): return
             elif op in ("KDOWN", "KUP"):'''
 if old in s: s=s.replace(old,new,1)
-elif new not in s: raise SystemExit('missing TYPE dispatch anchor')
+elif new not in s and 'elif op == "TYPE":' not in s: raise SystemExit('missing TYPE dispatch anchor')
 p.write_text(s,encoding='utf-8',newline='\n'); print('patched streaming TYPE:',p)

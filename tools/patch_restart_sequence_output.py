@@ -103,13 +103,13 @@ s=s.replace('''            if not _light_gate(owner, expected): return
                 return True''',1)
 route_old='''    primary = None
     try:
-        _run_light_route(self, name)
+        return _run_light_route(self, name)
     except Exception as exc:'''
 route_new='''    primary = None
     try:
         if name == "desktop_steps.txt" and self.restart_route_pending:
             _debug_event(self, "ROUTE", "restart-before-desktop", persist=True)
-            if not _run_light_route(self, "restart_steps.txt"): return
+            if not _run_light_route(self, "restart_steps.txt"): return False
             self.restart_route_pending = False
             _restart_marker_clear()
             self.restart_cycle_started = runtime.time.monotonic()

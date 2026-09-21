@@ -113,34 +113,16 @@ elif p.name == "code.py":
     if "_DeferredPlanEngine" in s or 'sys.modules["plan_engine"]' in s:
         raise SystemExit("Deferred plan_engine proxy remains")
 
-    # Every generated route uses the bounded streaming executor.  Before a
-    # new route, cancel any in-flight ARM human-mouse operation and send MUP
-    # frames.  Without this boundary the Pro Micro can retain stale move debt;
-    # repeated routes then stop after fewer and fewer RMOUSE commands until a
-    # power cycle resets the ARM.
-    route_start = """    primary = None
-    try:
-"""
-    route_start_fixed = """    primary = None
-    try:
-        self.arm.prepare_route()
-"""
-    simple_route_start = """    try:
-        _run_light_route(self, name)
-"""
-    simple_route_start_fixed = """    try:
-        self.arm.prepare_route()
-        _run_light_route(self, name)
-"""
-    if route_start in s and route_start_fixed not in s:
-        s = s.replace(route_start, route_start_fixed, 1)
-    elif route_start_fixed not in s:
-        # The checked-in firmware fixture uses the smaller route wrapper;
-        # generated output uses the primary/except wrapper. Support both.
-        if simple_route_start in s and simple_route_start_fixed not in s:
-            s = s.replace(simple_route_start, simple_route_start_fixed, 1)
-        elif simple_route_start_fixed not in s:
-            raise SystemExit("missing streaming route start anchor")
+    # Revert the field regression introduced by the first route-reset patch:
+    # remove that call from already-generated code as well as from future builds.
+    # The active 2.7 streaming path must start with HVER/HCFG/HPAUSE.
+    s = s.replace("        self.arm.prepare_route()\n", "", 1)
+
+    # Do not call Arm.prepare_route() at the start of a streaming Route.
+    # The 2.7 Pro Micro must receive its first HVER/HCFG/HPAUSE sequence
+    # directly; a leading HALT/MUP made the first HRANDOM acknowledge without
+    # producing visible HID motion in the field. Route-start recovery is kept
+    # out of this active path until it has a dedicated ARM handshake contract.
 
     # The streaming runner is the active route path for the combined firmware.
     # It already releases the keyboard in its finally block, but previously

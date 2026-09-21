@@ -128,7 +128,7 @@ for index, (vk, value) in enumerate(key_delay_pairs(ctx)):
     check("random delay stays inside the child's range %d" % index, lo <= value <= hi)
 
 # some-random maps to portable pick mode: inclusive count, no replacement.
-PICK = ROUTE.replace("RPKG|all,1,6", "RPKG|pick,2,4")
+PICK = ROUTE.replace("LOOP|2\n", "LOOP|1\n", 1).replace("RPKG|all,1,6", "RPKG|pick,2,4")
 subsets = set()
 for seed in range(12):
     c = Ctx()

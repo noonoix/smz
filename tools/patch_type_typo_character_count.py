@@ -13,7 +13,10 @@ s = p.read_text(encoding="utf-8")
 start = re.search(r"(?m)^def _light_type\(owner,\s*args,\s*expected\):\s*$", s)
 if not start:
     raise SystemExit("missing TYPE function anchor")
-end = re.search(r"(?m)^def _mouse_pair\(", s[start.end():])
+# patch_stream_type_output.py emits _run_light_route directly after _light_type;
+# older runtime templates used _mouse_pair. Accept both layouts so the build
+# remains compatible with either generated runtime without silently truncating it.
+end = re.search(r"(?m)^def (?:_mouse_pair|_run_light_route)\(", s[start.end():])
 if not end:
     raise SystemExit("missing TYPE function end anchor")
 end_pos = start.end() + end.start()

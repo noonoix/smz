@@ -93,6 +93,8 @@ new_route = '''    primary = None
             self.emit("EVT|DEBUG|CLEANUP/arm " + type(cleanup).__name__)
             if primary is None:
                 raise
+        # Reclaim route-local parser/serial allocations before the next run.
+        gc.collect()
 '''
 if old_route in s:
     s = s.replace(old_route, new_route, 1)
@@ -127,6 +129,8 @@ elif new_route not in s:
             self.emit("EVT|DEBUG|CLEANUP/arm " + type(cleanup).__name__)
             if primary is None:
                 raise
+        # Reclaim route-local parser/serial allocations before the next run.
+        gc.collect()
 
 '''
         s = s[:start] + wrapper + s[end:]

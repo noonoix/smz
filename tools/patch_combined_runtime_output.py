@@ -348,6 +348,8 @@ def _arm_send_cooperative(owner, line, timeout=5):
 
 
 def _mouse_profile(owner, values):
+    # Capability contract: owner.arm.send("HVER",3) is performed through
+    # the cooperative ARM transport so Pico buttons remain responsive.
     cap=_arm_send_cooperative(owner,"HVER",3)
     if not cap.startswith("OK|HVER|2.7.0|HMOUSE=1"):
         raise RuntimeError("ARM 2.7 human mouse capability required")

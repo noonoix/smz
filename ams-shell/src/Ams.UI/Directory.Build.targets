@@ -1,4 +1,8 @@
 <Project>
+  <Target Name="PreparePortableGuardRandomPackageRuntime" BeforeTargets="CoreCompile">
+    <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_portable_guard_random_runtime.py&quot; &quot;$(MSBuildProjectDirectory)\Services\PortableGuardBundle.cs&quot;" />
+  </Target>
+
   <!-- The Combined Guard runtime must stay engine-free at Pico boot; importing plan_engine causes MemoryError. -->
   <Target Name="PatchPackagedKeyboardAndRestartRuntime" AfterTargets="PatchPackagedCombinedGuardRuntime">
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_keyboard_report_id.py&quot; &quot;$(TargetDir)combined-runtime\combined_guard_runtime.py&quot;" />
@@ -18,5 +22,9 @@
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_engine_free_combined_runtime.py&quot; &quot;$(TargetDir)combined-runtime\combined_guard_runtime.py&quot;" />
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_engine_free_combined_runtime.py&quot; &quot;$(TargetDir)portable-runtime\combined_guard_runtime.py&quot;" />
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_engine_free_combined_runtime.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />
+  </Target>
+
+  <Target Name="PatchPackagedRandomPackageRuntime" AfterTargets="PatchPackagedKeyboardAndRestartRuntime">
+    <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_random_package_output.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />
   </Target>
 </Project>

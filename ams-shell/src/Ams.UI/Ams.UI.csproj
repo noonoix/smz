@@ -34,6 +34,8 @@
     <None Include="..\..\light-state-profiles.json"><Link>light-state-profiles.json</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY\plan_cycle.py"><Link>portable-runtime\plan_cycle.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY\plan_engine.py"><Link>portable-runtime\plan_engine.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="..\..\..\portable\plan3\CIRCUITPY\random_package_runtime.py"><Link>portable-runtime\random_package_runtime.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="..\..\..\portable\plan3\CIRCUITPY\random_package_runtime.py"><Link>combined-runtime\random_package_runtime.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY\cycle_runtime.py"><Link>portable-runtime\cycle_runtime.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY\restart_windows.py"><Link>portable-runtime\restart_windows.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY\auto_resume_boot.py"><Link>portable-runtime\auto_resume_boot.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>

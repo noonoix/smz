@@ -679,7 +679,7 @@ s=s.replace('def _audible_start_cal(self):\n    _original_start_cal(self)', 'def
 # ARM abort/cleanup command.  This also prevents a route exception from turning
 # into a Pro Micro HALT when the route never used the ARM.
 _old_stop = '    self.guard_stop_tone()\n    self.arm.abort()\n\ndef _silent_shutdown(self):'
-_new_stop = '    if getattr(self, "route_uses_mouse", False):\n        self.arm.abort()\n\ndef _silent_shutdown(self):'
+_new_stop = '    self.guard_stop_tone()\n    if getattr(self, "route_uses_mouse", False):\n        self.arm.abort()\n\ndef _silent_shutdown(self):'
 if _old_stop in s:
     s = s.replace(_old_stop, _new_stop, 1)
 _old_silent = 'def _silent_shutdown(self):\n    # Disconnect/shutdown must leave the board fail-safe without replaying the\n    # user-facing Stop cue. Physical blue Stop and GUARD|OFF remain audible.\n    self.controls.running = False\n    self.controls.paused = False\n    self.controls.aborted = True\n    try:\n        self.keyboard.release_all()\n    except Exception:\n        pass\n    try:\n        self.arm.abort()\n    except Exception:\n        pass\n\ndef _immediate_audible_start'

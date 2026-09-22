@@ -387,6 +387,17 @@ def _mouse_values(args):
 
 def _light_mouse(owner,op,args,expected):
     values=_mouse_values(args)
+    # Cursor origin and screen resolution belong to the Pro Micro only when
+    # this route actually contains a mouse operation. Keyboard/light-only
+    # routes must never wake or command the ARM.
+    if not _apply_pending_cursor(owner, force=True):
+        raise RuntimeError("ARM cursor origin not acknowledged")
+    if not getattr(owner, "route_screen_applied", False):
+        screen = getattr(owner, "route_screen", None)
+        if screen is not None:
+            if not owner.arm.send("SETRES|%d,%d" % (screen[0], screen[1]), 3).startswith("OK|"):
+                raise RuntimeError("ARM SETRES rejected")
+        owner.route_screen_applied = True
     if not _light_gate(owner,expected): return False
     if op=="MOVETO":
         if "x" not in values or "y" not in values: raise ValueError("MOVETO needs x/y")
@@ -414,6 +425,8 @@ def _run_light_route(owner, name):
     owner.emit("EVT|DEBUG|MEM/route-enter free=%d" % gc.mem_free())
     expected = getattr(owner, "debug_last_state", None)
     owner.light_poll_due = 0
+    owner.route_screen = None
+    owner.route_screen_applied = False
     frames = []
     with open("/" + name, "r") as fh:
         owner.emit("EVT|DEBUG|MEM/route-open free=%d" % gc.mem_free())
@@ -440,7 +453,6 @@ def _run_light_route(owner, name):
                 w=int(a[0]); h=int(a[1])
                 if w<1 or h<1: raise ValueError("bad SCREEN")
                 owner.route_screen=(w,h)
-                if not owner.arm.send("SETRES|%d,%d"%(w,h),3).startswith("OK|"): raise RuntimeError("ARM SETRES rejected")
             elif op == "SPEED":
                 a = args.split(",")
                 if len(a) != 2: raise ValueError("bad SPEED")
@@ -610,15 +622,24 @@ def _diagnostic_route(self, decision):
 
 runtime.Combined.route = _diagnostic_route
 '''
-start=s.find('_LIGHT_ROUTE_COMMANDS =')
+start=s.find('import random as _light_random')
 marker='runtime.Combined.route = _diagnostic_route'
 end=s.find(marker,start)
 if start<0 or end<0: raise SystemExit('missing light region')
-# Include our import on repeat runs so applying this patch stays idempotent.
-import_start=s.rfind('import random as _light_random',0,start)
-if import_start>=0 and start-import_start<80: start=import_start
-end=s.find('\n',end); end=len(s) if end<0 else end+1
-s=s[:start]+block+s[end:]
+end += len(marker)
+if end < len(s) and s[end] == '\n': end += 1
+s=s[:start]+block+'\n'+s[end:]
+_cursor_old = '''                        if not _apply_pending_cursor(self, force=True):
+                            _debug_event(self, "CURSOR", "sync-failed-before-route", persist=True)
+                            raise RuntimeError("ARM cursor origin not acknowledged")
+                        _debug_event(self, "CURSOR", "sync-ok-before-route", persist=True)
+                        completed = self.route(decision)'''
+_cursor_new = '''                        # Cursor synchronization is lazy: keyboard/light-only routes
+                        # must not command the Pro Micro. Mouse routes call it before
+                        # their first mouse operation.
+                        completed = self.route(decision)'''
+if _cursor_old in s: s = s.replace(_cursor_old, _cursor_new, 1)
+elif _cursor_new not in s: raise SystemExit('cursor target anchor missing')
 release='''                self.guard_start_tone()
                 self.bundle = None
                 self.guard.bundle = None
@@ -655,6 +676,8 @@ required = (
     'elif op in (\"RMOUSE\", \"MOVETO\"):',
     'elif op in (\"LOOP\", \"LOOPTIME\"):',
     'elif op == \"ENDLOOP\":',
+    'owner.route_screen_applied = False',
+    'Cursor synchronization is lazy: keyboard/light-only routes',
 )
 missing = [token for token in required if token not in s]
 if missing:

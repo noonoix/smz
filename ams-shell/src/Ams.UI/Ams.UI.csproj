@@ -43,6 +43,9 @@
     <None Include="..\..\..\portable\plan3\CIRCUITPY\live_light_guard.py"><Link>portable-runtime\live_light_guard.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY\guard_transition.py"><Link>portable-runtime\guard_transition.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY\guard_calibration_protocol.py"><Link>portable-runtime\guard_calibration_protocol.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="..\..\..\portable\plan3\CIRCUITPY\random_package_runtime.py"><Link>portable-runtime\random_package_runtime.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="..\..\..\portable\plan3\CIRCUITPY\settings.toml"><Link>portable-runtime\settings.toml</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="..\..\..\portable\plan3\CIRCUITPY\README-HID-TEST.txt"><Link>portable-runtime\README-HID-TEST.txt</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\firmware\pico-light-guard-1.0.0\code.py"><Link>combined-runtime\code.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\firmware\pico-light-guard-1.0.0\boot.py"><Link>combined-runtime\boot.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\firmware\pico-light-guard-1.0.0\combined_guard_runtime.py"><Link>portable-runtime\combined_guard_runtime.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>

@@ -2,6 +2,10 @@
 from pathlib import Path
 import sys
 p=Path(sys.argv[1]); s=p.read_text(encoding='utf-8')
+if "# GOLDEN_PICO_RUNTIME_52_RPKG" in s:
+    p.write_text(s, encoding="utf-8", newline="\n")
+    print("Golden Pico runtime preserved", p)
+    raise SystemExit(0)
 for old,new in {
 'raise GuardBundleError("unvalidated route")':'raise runtime.GuardBundleError("unvalidated route")',
 '    if persist or any(kind.startswith(prefix) for prefix in _DEBUG_PERSIST_EVENTS):\n        _debug_persist(self)':'    if kind in ("BOOT", "FAIL"):\n        _debug_persist(self)',

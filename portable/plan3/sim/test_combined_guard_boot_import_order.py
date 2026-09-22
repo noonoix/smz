@@ -30,6 +30,9 @@ assert entry_text.count('.load_guard_bundle("/")') == 2
 assert 'class _DeferredPlanEngine:' not in entry_text
 assert 'sys.modules["plan_engine"] = _DeferredPlanEngine()' not in entry_text
 assert 'from random_package_runtime import run_file_package' in entry_text
+assert 'def _light_goto_label(fh, args):' in entry_text
+assert 'elif op == "LABEL":' in entry_text
+assert 'elif op == "GOTO":' in entry_text
 runtime_pos = entry_text.index('import combined_guard_runtime as runtime')
 assert load_pos < runtime_pos
 assert 'gc.collect()' in entry_text[load_pos:runtime_pos]

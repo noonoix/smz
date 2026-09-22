@@ -524,7 +524,7 @@ runtime.PlanContext.beep = _diagnostic_beep
 
 import random as _light_random
 
-_LIGHT_ROUTE_COMMANDS = {"PLAN", "SCREEN", "SPEED", "BEEP", "DELAY", "LOOP", "LOOPTIME", "ENDLOOP", "KEY", "KDOWN", "KUP", "TYPE", "RMOUSE", "MOVETO"}
+_LIGHT_ROUTE_COMMANDS = {"PLAN", "SCREEN", "SPEED", "BEEP", "DELAY", "LOOP", "LOOPTIME", "ENDLOOP", "KEY", "KDOWN", "KUP", "TYPE", "RMOUSE", "MOVETO", "LABEL", "GOTO"}
 _VALID_ROUTE_NAMES = ("desktop_steps.txt", "restart_steps.txt", "login_or_dc_steps.txt", "character_dashboard_steps.txt", "entering_game_loading_steps.txt", "game_steps.txt", "targeted_steps.txt", "resumable_steps.txt")
 
 
@@ -919,6 +919,27 @@ def _light_package_action(owner, op, args, expected):
     raise ValueError("unsupported package command: " + op)
 
 
+def _light_label_name(args, op):
+    name = args.strip()
+    if not name or "|" in name or "=" in name or any(ch.isspace() for ch in name):
+        raise ValueError("bad %s label" % op)
+    return name
+
+
+def _light_goto_label(fh, args):
+    name = _light_label_name(args, "GOTO")
+    current = fh.tell()
+    fh.seek(0)
+    while True:
+        raw = fh.readline()
+        if not raw:
+            fh.seek(current)
+            raise ValueError("GOTO label not found: " + name)
+        line = raw.strip()
+        if line.upper().startswith("LABEL|") and line[6:].strip() == name:
+            return fh.tell()
+
+
 def _run_light_route(owner, name):
     gc.collect()
     owner.emit("EVT|DEBUG|MEM/route-enter free=%d" % gc.mem_free())
@@ -1000,6 +1021,13 @@ def _run_light_route(owner, name):
                     frame[1] -= 1
                     if frame[1] > 0: fh.seek(frame[0])
                     else: frames.pop()
+            elif op == "LABEL":
+                _light_label_name(args, "LABEL")
+                owner.emit("EVT|DEBUG|STEP/LABEL %s" % args.strip())
+            elif op == "GOTO":
+                target = _light_goto_label(fh, args)
+                owner.emit("EVT|DEBUG|STEP/GOTO %s" % args.strip())
+                fh.seek(target)
             else:
                 raise ValueError("unsupported light command")
 

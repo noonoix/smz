@@ -28,15 +28,16 @@ assert loader_pos < extras_pos < load_pos
 assert entry_text.count('.load_guard_bundle("/")') == 2
 assert 'class _DeferredPlanEngine:' not in entry_text
 assert 'sys.modules["plan_engine"] = _DeferredPlanEngine()' not in entry_text
-assert 'from random_package_runtime import run_file_package' in entry_text
-assert 'from random_package_runtime import run_file_package, run_parallel_group' in entry_text
+assert 'from random_package_runtime import run_route_special' in entry_text
 assert 'def _light_parallel_group(' not in entry_text
 assert 'def run_parallel_group(' in sidecar_text
+assert 'def run_route_special(' in sidecar_text
+assert 'WSND|%d,%d,%d' in sidecar_text
 assert 'def _light_goto_label(fh, args):' in entry_text
 assert 'elif op == "LABEL":' in entry_text
 assert 'elif op == "GOTO":' in entry_text
 assert '"PGROUP"' in entry_text
-assert 'op in ("RPKG", "PGROUP")' in entry_text
+assert 'op in ("RPKG", "PGROUP", "WSND")' in entry_text
 assert 'op not in ("ENDLOOP", "PGROUP")' in entry_text
 runtime_pos = entry_text.index('import combined_guard_runtime as runtime')
 assert load_pos < runtime_pos

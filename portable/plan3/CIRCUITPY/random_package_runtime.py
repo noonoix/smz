@@ -173,3 +173,22 @@ def run_parallel_group(fh, args, owner, expected, action):
     if args:
         raise ValueError("PGROUP takes no arguments")
     return _parallel_group(owner, fh, expected, action)
+
+
+def run_route_special(op, fh, args, owner, expected, action, arm_send):
+    if op == "RPKG":
+        return run_file_package(fh, args, owner, expected, action)
+    if op == "PGROUP":
+        return run_parallel_group(fh, args, owner, expected, action)
+    fields = args.split(",")
+    if len(fields) != 3:
+        raise ValueError("WSND needs threshold,min_ms,timeout_ms")
+    threshold, minimum, timeout = (int(value) for value in fields)
+    if threshold < 0 or minimum < 0 or timeout < 0:
+        raise ValueError("WSND values must be non-negative")
+    owner.emit("EVT|DEBUG|STEP/WSND %d,%d,%d" % (threshold, minimum, timeout))
+    reply = arm_send(owner, "WSND|%d,%d,%d" % (threshold, minimum, timeout), timeout / 1000 + 3)
+    if reply.startswith("ERR|"):
+        raise RuntimeError("ARM WSND rejected: " + reply)
+    owner.emit("EVT|DEBUG|STEP/WSND reply=" + reply)
+    return True

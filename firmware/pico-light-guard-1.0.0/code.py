@@ -979,10 +979,9 @@ def _run_light_route(owner, name):
                 owner.route_speed=(lo,hi)
             elif op == "DELAY":
                 if not _light_package_delay(owner, args, expected): return False
-            elif op in ("RPKG", "PGROUP"):
-                from random_package_runtime import run_file_package, run_parallel_group
-                runner = run_file_package if op == "RPKG" else run_parallel_group
-                if not runner(fh, args, owner, expected, _light_package_action): return False
+            elif op in ("RPKG", "PGROUP", "WSND"):
+                from random_package_runtime import run_route_special
+                if not run_route_special(op, fh, args, owner, expected, _light_package_action, _arm_send_cooperative): return False
             elif op == "BEEP":
                 a = args.split(",")
                 if len(a) != 2: raise ValueError("bad BEEP")

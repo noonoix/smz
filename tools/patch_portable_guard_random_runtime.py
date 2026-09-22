@@ -8,16 +8,20 @@ s = p.read_text(encoding="utf-8")
 
 old_runtime = '''        "plan_engine.py", "live_light_guard.py", "guard_transition.py", "guard_calibration_protocol.py", "error_policy.py", "combined_guard_runtime.py",'''
 new_runtime = '''        "plan_engine.py", "live_light_guard.py", "guard_transition.py", "guard_calibration_protocol.py", "error_policy.py", "combined_guard_runtime.py", "random_package_runtime.py",'''
-if old_runtime in s:
+if new_runtime in s:
+    pass
+elif old_runtime in s:
     s = s.replace(old_runtime, new_runtime, 1)
-elif new_runtime not in s:
+else:
     raise SystemExit("PortableGuardBundle RuntimeFiles anchor missing")
 
 old_inventory = '''        "plan.txt", "plan_engine.py", "README-FLASH.md", "resumable_steps.txt", "SHA256SUMS.txt",'''
 new_inventory = '''        "plan.txt", "plan_engine.py", "random_package_runtime.py", "README-FLASH.md", "resumable_steps.txt", "SHA256SUMS.txt",'''
-if old_inventory in s:
+if new_inventory in s:
+    pass
+elif old_inventory in s:
     s = s.replace(old_inventory, new_inventory, 1)
-elif new_inventory not in s:
+else:
     raise SystemExit("PortableGuardBundle inventory anchor missing")
 
 s = s.replace("complete 21-file staging bundle", "complete 22-file staging bundle")

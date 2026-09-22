@@ -33,9 +33,9 @@ assert 'from random_package_runtime import run_file_package' in entry_text
 assert 'def _light_goto_label(fh, args):' in entry_text
 assert 'elif op == "LABEL":' in entry_text
 assert 'elif op == "GOTO":' in entry_text
-assert '_PLAN_ENGINE_ROUTE_COMMANDS = {"PGROUP", "WSND", "TRGSND", "IFSND", "IFLUX"}' in entry_text
-assert 'def _route_uses_plan_engine(name):' in entry_text
-assert 'def _run_plan_engine_route(owner, name):' in entry_text
+assert '"PGROUP"' in entry_text
+assert 'def _light_parallel_group(owner, fh, expected):' in entry_text
+assert 'elif op == "PGROUP":' in entry_text
 runtime_pos = entry_text.index('import combined_guard_runtime as runtime')
 assert load_pos < runtime_pos
 assert 'gc.collect()' in entry_text[load_pos:runtime_pos]

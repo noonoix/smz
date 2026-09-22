@@ -524,38 +524,8 @@ runtime.PlanContext.beep = _diagnostic_beep
 
 import random as _light_random
 
-_LIGHT_ROUTE_COMMANDS = {"PLAN", "SCREEN", "SPEED", "BEEP", "DELAY", "LOOP", "LOOPTIME", "ENDLOOP", "KEY", "KDOWN", "KUP", "TYPE", "RMOUSE", "MOVETO", "LABEL", "GOTO"}
+_LIGHT_ROUTE_COMMANDS = {"PLAN", "SCREEN", "SPEED", "BEEP", "DELAY", "LOOP", "LOOPTIME", "ENDLOOP", "KEY", "KDOWN", "KUP", "TYPE", "RMOUSE", "MOVETO", "LABEL", "GOTO", "PGROUP"}
 _VALID_ROUTE_NAMES = ("desktop_steps.txt", "restart_steps.txt", "login_or_dc_steps.txt", "character_dashboard_steps.txt", "entering_game_loading_steps.txt", "game_steps.txt", "targeted_steps.txt", "resumable_steps.txt")
-_PLAN_ENGINE_ROUTE_COMMANDS = {"PGROUP", "WSND", "TRGSND", "IFSND", "IFLUX"}
-
-
-def _route_uses_plan_engine(name):
-    try:
-        with open("/" + name, "r") as fh:
-            for raw in fh:
-                line = raw.strip()
-                if not line or line.startswith("#"):
-                    continue
-                if line.split("|", 1)[0].upper() in _PLAN_ENGINE_ROUTE_COMMANDS:
-                    return True
-    except Exception:
-        return False
-    return False
-
-
-def _run_plan_engine_route(owner, name):
-    # Load the full PLAN|2 engine only for commands that cannot be represented
-    # by the bounded streaming parser. This keeps the Golden boot path light.
-    import plan_engine as _plan_engine
-    with open("/" + name, "r") as fh:
-        text = fh.read()
-    plan = _plan_engine.parse_plan(text)
-    try:
-        _plan_engine.run_plan(plan, runtime.PlanContext(owner))
-        return True
-    finally:
-        del plan
-        gc.collect()
 
 
 def _light_gate(owner, expected_state):
@@ -970,11 +940,69 @@ def _light_goto_label(fh, args):
             return fh.tell()
 
 
+def _light_parallel_group(owner, fh, expected):
+    # Store only file offsets, not parsed branch bodies. This keeps PGROUP
+    # compatible with the low-memory streaming executor and avoids importing
+    # the large Plan2 engine during boot.
+    branches = []
+    branch_start = fh.tell()
+    while True:
+        boundary = fh.tell()
+        raw = fh.readline()
+        if not raw:
+            raise ValueError("PGROUP without ENDPAR")
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        split = line.find("|")
+        op = line.upper() if split < 0 else line[:split].upper()
+        if op == "PARITEM":
+            if fh.tell() <= branch_start:
+                raise ValueError("empty Parallel Group branch")
+            branches.append([branch_start, boundary, branch_start])
+            branch_start = fh.tell()
+        elif op == "ENDPAR":
+            if fh.tell() <= branch_start:
+                raise ValueError("empty Parallel Group branch")
+            branches.append([branch_start, boundary, branch_start])
+            after_group = fh.tell()
+            break
+
+    if len(branches) < 2:
+        raise ValueError("Parallel Group needs at least two branches")
+    owner.emit("EVT|DEBUG|STEP/PGROUP branches=%d" % len(branches))
+    live = len(branches)
+    while live:
+        for branch in branches:
+            cursor, end = branch[2], branch[1]
+            if cursor >= end:
+                continue
+            fh.seek(cursor)
+            raw = fh.readline()
+            branch[2] = fh.tell()
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            split = line.find("|")
+            if split < 1:
+                raise ValueError("invalid Parallel Group command")
+            op = line[:split].upper()
+            args = line[split + 1:]
+            if op == "PLAN":
+                if args != "2":
+                    raise ValueError("unsupported PLAN version in Parallel Group")
+                continue
+            if op not in ("DELAY", "KEY", "TYPE", "RMOUSE", "MOVETO", "KDOWN", "KUP", "BEEP"):
+                raise ValueError("unsupported Parallel Group command: " + op)
+            if not _light_package_action(owner, op, args, expected):
+                fh.seek(after_group)
+                return False
+        live = sum(1 for branch in branches if branch[2] < branch[1])
+    fh.seek(after_group)
+    return True
+
+
 def _run_light_route(owner, name):
-    if _route_uses_plan_engine(name):
-        gc.collect()
-        owner.emit("EVT|DEBUG|MEM/route-enter free=%d" % gc.mem_free())
-        return _run_plan_engine_route(owner, name)
     gc.collect()
     owner.emit("EVT|DEBUG|MEM/route-enter free=%d" % gc.mem_free())
     expected = getattr(owner, "debug_last_state", None)
@@ -1017,6 +1045,10 @@ def _run_light_route(owner, name):
             elif op == "RPKG":
                 from random_package_runtime import run_file_package
                 if not run_file_package(fh, args, owner, expected, _light_package_action): return False
+            elif op == "PGROUP":
+                if args:
+                    raise ValueError("PGROUP takes no arguments")
+                if not _light_parallel_group(owner, fh, expected): return False
             elif op == "BEEP":
                 a = args.split(",")
                 if len(a) != 2: raise ValueError("bad BEEP")

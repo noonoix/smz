@@ -169,5 +169,7 @@ def _parallel_group(owner, fh, expected, action):
     return True
 
 
-def run_parallel_group(owner, fh, expected, action):
+def run_parallel_group(fh, args, owner, expected, action):
+    if args:
+        raise ValueError("PGROUP takes no arguments")
     return _parallel_group(owner, fh, expected, action)

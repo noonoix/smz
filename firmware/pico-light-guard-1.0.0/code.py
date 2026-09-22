@@ -524,7 +524,6 @@ runtime.PlanContext.beep = _diagnostic_beep
 
 import random as _light_random
 
-_LIGHT_ROUTE_COMMANDS = {"PLAN", "SCREEN", "SPEED", "BEEP", "DELAY", "LOOP", "LOOPTIME", "ENDLOOP", "KEY", "KDOWN", "KUP", "TYPE", "RMOUSE", "MOVETO", "LABEL", "GOTO", "PGROUP"}
 _VALID_ROUTE_NAMES = ("desktop_steps.txt", "restart_steps.txt", "login_or_dc_steps.txt", "character_dashboard_steps.txt", "entering_game_loading_steps.txt", "game_steps.txt", "targeted_steps.txt", "resumable_steps.txt")
 
 
@@ -940,7 +939,6 @@ def _light_goto_label(fh, args):
             return fh.tell()
 
 
-
 def _run_light_route(owner, name):
     gc.collect()
     owner.emit("EVT|DEBUG|MEM/route-enter free=%d" % gc.mem_free())
@@ -981,14 +979,10 @@ def _run_light_route(owner, name):
                 owner.route_speed=(lo,hi)
             elif op == "DELAY":
                 if not _light_package_delay(owner, args, expected): return False
-            elif op == "RPKG":
-                from random_package_runtime import run_file_package
-                if not run_file_package(fh, args, owner, expected, _light_package_action): return False
-            elif op == "PGROUP":
-                if args:
-                    raise ValueError("PGROUP takes no arguments")
-                from random_package_runtime import run_parallel_group
-                if not run_parallel_group(owner, fh, expected, _light_package_action): return False
+            elif op in ("RPKG", "PGROUP"):
+                from random_package_runtime import run_file_package, run_parallel_group
+                runner = run_file_package if op == "RPKG" else run_parallel_group
+                if not runner(fh, args, owner, expected, _light_package_action): return False
             elif op == "BEEP":
                 a = args.split(",")
                 if len(a) != 2: raise ValueError("bad BEEP")

@@ -37,6 +37,7 @@ assert 'elif op == "LABEL":' in entry_text
 assert 'elif op == "GOTO":' in entry_text
 assert '"PGROUP"' in entry_text
 assert 'op in ("RPKG", "PGROUP")' in entry_text
+assert 'op not in ("ENDLOOP", "PGROUP")' in entry_text
 runtime_pos = entry_text.index('import combined_guard_runtime as runtime')
 assert load_pos < runtime_pos
 assert 'gc.collect()' in entry_text[load_pos:runtime_pos]

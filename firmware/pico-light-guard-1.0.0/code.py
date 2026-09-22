@@ -958,7 +958,7 @@ def _run_light_route(owner, name):
             split = line.find("|")
             if split < 0:
                 op = line.upper(); args = ""
-                if op != "ENDLOOP": raise ValueError("invalid route line")
+                if op not in ("ENDLOOP", "PGROUP"): raise ValueError("invalid route line")
             else:
                 if split < 1: raise ValueError("invalid route line")
                 op = line[:split].upper(); args = line[split + 1:]

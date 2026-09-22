@@ -526,6 +526,36 @@ import random as _light_random
 
 _LIGHT_ROUTE_COMMANDS = {"PLAN", "SCREEN", "SPEED", "BEEP", "DELAY", "LOOP", "LOOPTIME", "ENDLOOP", "KEY", "KDOWN", "KUP", "TYPE", "RMOUSE", "MOVETO", "LABEL", "GOTO"}
 _VALID_ROUTE_NAMES = ("desktop_steps.txt", "restart_steps.txt", "login_or_dc_steps.txt", "character_dashboard_steps.txt", "entering_game_loading_steps.txt", "game_steps.txt", "targeted_steps.txt", "resumable_steps.txt")
+_PLAN_ENGINE_ROUTE_COMMANDS = {"PGROUP", "WSND", "TRGSND", "IFSND", "IFLUX"}
+
+
+def _route_uses_plan_engine(name):
+    try:
+        with open("/" + name, "r") as fh:
+            for raw in fh:
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if line.split("|", 1)[0].upper() in _PLAN_ENGINE_ROUTE_COMMANDS:
+                    return True
+    except Exception:
+        return False
+    return False
+
+
+def _run_plan_engine_route(owner, name):
+    # Load the full PLAN|2 engine only for commands that cannot be represented
+    # by the bounded streaming parser. This keeps the Golden boot path light.
+    import plan_engine as _plan_engine
+    with open("/" + name, "r") as fh:
+        text = fh.read()
+    plan = _plan_engine.parse_plan(text)
+    try:
+        _plan_engine.run_plan(plan, runtime.PlanContext(owner))
+        return True
+    finally:
+        del plan
+        gc.collect()
 
 
 def _light_gate(owner, expected_state):
@@ -941,6 +971,10 @@ def _light_goto_label(fh, args):
 
 
 def _run_light_route(owner, name):
+    if _route_uses_plan_engine(name):
+        gc.collect()
+        owner.emit("EVT|DEBUG|MEM/route-enter free=%d" % gc.mem_free())
+        return _run_plan_engine_route(owner, name)
     gc.collect()
     owner.emit("EVT|DEBUG|MEM/route-enter free=%d" % gc.mem_free())
     expected = getattr(owner, "debug_last_state", None)

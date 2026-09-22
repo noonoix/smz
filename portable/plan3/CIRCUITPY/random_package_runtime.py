@@ -1,6 +1,6 @@
 # Low-memory Random Package executor.
-# Imported only when a route actually contains RPKG; normal boot and mouse routes
-# stay on the proven engine-free runner.
+# Imported only when a route actually contains RPKG or PGROUP; normal boot and
+# mouse routes stay on the proven engine-free runner.
 import random
 
 
@@ -109,3 +109,65 @@ def _lines(lines, owner, expected, action):
 
 def run_file_package(fh, args, owner, expected, action):
     return _package(args, _read_items(fh), owner, expected, action)
+
+
+def _parallel_group(owner, fh, expected, action):
+    branches = []
+    branch_start = fh.tell()
+    while True:
+        boundary = fh.tell()
+        raw = fh.readline()
+        if not raw:
+            raise ValueError("PGROUP without ENDPAR")
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        split = line.find("|")
+        op = line.upper() if split < 0 else line[:split].upper()
+        if op == "PARITEM":
+            if fh.tell() <= branch_start:
+                raise ValueError("empty Parallel Group branch")
+            branches.append([branch_start, boundary, branch_start])
+            branch_start = fh.tell()
+        elif op == "ENDPAR":
+            if fh.tell() <= branch_start:
+                raise ValueError("empty Parallel Group branch")
+            branches.append([branch_start, boundary, branch_start])
+            after_group = fh.tell()
+            break
+    if len(branches) < 2:
+        raise ValueError("Parallel Group needs at least two branches")
+    owner.emit("EVT|DEBUG|STEP/PGROUP branches=%d" % len(branches))
+    live = len(branches)
+    while live:
+        for branch in branches:
+            cursor, end = branch[2], branch[1]
+            if cursor >= end:
+                continue
+            fh.seek(cursor)
+            raw = fh.readline()
+            branch[2] = fh.tell()
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            split = line.find("|")
+            if split < 1:
+                raise ValueError("invalid Parallel Group command")
+            op = line[:split].upper()
+            args = line[split + 1:]
+            if op == "PLAN":
+                if args != "2":
+                    raise ValueError("unsupported PLAN version in Parallel Group")
+                continue
+            if op not in ("DELAY", "KEY", "TYPE", "RMOUSE", "MOVETO", "KDOWN", "KUP", "BEEP"):
+                raise ValueError("unsupported Parallel Group command: " + op)
+            if not action(owner, op, args, expected):
+                fh.seek(after_group)
+                return False
+        live = sum(1 for branch in branches if branch[2] < branch[1])
+    fh.seek(after_group)
+    return True
+
+
+def run_parallel_group(owner, fh, expected, action):
+    return _parallel_group(owner, fh, expected, action)

@@ -355,10 +355,10 @@ def _immediate_audible_start(self):
     self.blue_start_consumed = True
 
 def _ensure_runtime_bundle(self):
+    # Golden boot transfers the verified bundle exactly once. Calibration must
+    # use that object; never reparse the manifest on the hot path.
     if self.bundle is None:
-        self.bundle = runtime.load_guard_bundle(chr(47))
-        self.guard.bundle = self.bundle
-        gc.collect()
+        raise RuntimeError("verified Guard bundle unavailable")
 
 def _enter_calibration_from_pending_start(self):
     _ensure_runtime_bundle(self)

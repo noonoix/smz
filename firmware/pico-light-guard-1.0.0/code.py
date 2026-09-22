@@ -987,7 +987,7 @@ def _run_light_route(owner, name):
             elif op == "PGROUP":
                 if args:
                     raise ValueError("PGROUP takes no arguments")
-                from parallel_group_runtime import run_parallel_group
+                from random_package_runtime import run_parallel_group
                 if not run_parallel_group(owner, fh, expected, _light_package_action): return False
             elif op == "BEEP":
                 a = args.split(",")

@@ -675,6 +675,29 @@ if helper not in s:
     s=s.replace(anchor,helper+anchor,1)
 s=s.replace('def _enter_calibration_from_pending_start(self):\n    #', 'def _enter_calibration_from_pending_start(self):\n    _ensure_runtime_bundle(self)\n    #',1)
 s=s.replace('def _audible_start_cal(self):\n    _original_start_cal(self)', 'def _audible_start_cal(self):\n    _ensure_runtime_bundle(self)\n    _original_start_cal(self)',1)
+# Hard ownership boundary: a keyboard/light-only route must not send even the
+# ARM abort/cleanup command.  This also prevents a route exception from turning
+# into a Pro Micro HALT when the route never used the ARM.
+_old_stop = '    self.arm.abort()\n\ndef _silent_shutdown(self):'
+_new_stop = '    if getattr(self, "route_uses_mouse", False):\n        self.arm.abort()\n\ndef _silent_shutdown(self):'
+if _old_stop in s:
+    s = s.replace(_old_stop, _new_stop, 1)
+_old_silent = '    try:\n        self.arm.abort()\n    except Exception:\n        pass\n\ndef _immediate_audible_start'
+_new_silent = '    if getattr(self, "route_uses_mouse", False):\n        try:\n            self.arm.abort()\n        except Exception:\n            pass\n\ndef _immediate_audible_start'
+if _old_silent in s:
+    s = s.replace(_old_silent, _new_silent, 1)
+# GUARD|ON is a run request, not a cursor-sync request. Cursor origin is
+# synchronized lazily at the first actual mouse step only.
+_old_on = '                _apply_pending_cursor(self, force=True)\n                self.controls.start()\n                self.guard_start_tone()'
+_new_on = '                self.controls.start()\n                self.guard_start_tone()'
+if _old_on in s:
+    s = s.replace(_old_on, _new_on, 1)
+# Do not leave the ARM-owned route flag live after cleanup; otherwise a later
+# host CURSOR packet or GUARD|ON could wake the Pro Micro for a keyboard route.
+_old_final = '        try:\n            self.arm.release(False)\n        except Exception as cleanup:\n            self.emit("EVT|DEBUG|CLEANUP/mouse " + type(cleanup).__name__)\n        try:\n            self.arm.release(False)\n        except Exception as cleanup:\n            self.emit("EVT|DEBUG|CLEANUP/mouse " + type(cleanup).__name__)\n        try:\n            self.arm.flush()\n        except Exception as cleanup:\n            self.emit("EVT|DEBUG|CLEANUP/arm " + type(cleanup).__name__)\n            if primary is None: raise\n\nruntime.Combined.route = _diagnostic_route'
+_new_final = '        if getattr(self, "route_uses_mouse", False):\n            try:\n                self.arm.release(False)\n            except Exception as cleanup:\n                self.emit("EVT|DEBUG|CLEANUP/mouse " + type(cleanup).__name__)\n            try:\n                self.arm.release(False)\n            except Exception as cleanup:\n                self.emit("EVT|DEBUG|CLEANUP/mouse " + type(cleanup).__name__)\n            try:\n                self.arm.flush()\n            except Exception as cleanup:\n                self.emit("EVT|DEBUG|CLEANUP/arm " + type(cleanup).__name__)\n                if primary is None: raise\n        self.route_uses_mouse = False\n\nruntime.Combined.route = _diagnostic_route'
+if _old_final in s:
+    s = s.replace(_old_final, _new_final, 1)
 if s.count('def _run_light_route(owner, name):')!=1: raise SystemExit('bad runner count')
 required = (
     'def _cal_beep(self, frequency, duration_ms):',

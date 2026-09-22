@@ -6,6 +6,17 @@ import sys
 p = Path(sys.argv[1])
 s = p.read_text(encoding="utf-8")
 
+# Bundle verification runs before main(). The exported manifest includes the lazy
+# executor, so pre-boot validation must expect and hash that file as well.
+old_hashed = 'for _name in ("pico-calibration.json", "README-FLASH.md"):'
+new_hashed = 'for _name in ("pico-calibration.json", "README-FLASH.md", "random_package_runtime.py"):'
+if new_hashed in s:
+    pass
+elif old_hashed in s:
+    s = s.replace(old_hashed, new_hashed, 1)
+else:
+    raise SystemExit("missing pre-boot hashed-bundle anchor")
+
 helpers = '''def _light_package_delay(owner, args, expected):
     parts = args.split(",")
     if len(parts) not in (1, 2): raise ValueError("bad DELAY range")
@@ -63,6 +74,7 @@ required = (
     "def _light_package_action(owner, op, args, expected):",
     'elif op == "RPKG":',
     "from random_package_runtime import run_file_package",
+    new_hashed,
 )
 missing = [token for token in required if token not in s]
 if missing:

@@ -28,7 +28,7 @@ assert 'generator = "Classroom Studio v" + ExporterVersion' in exporter
 block = exporter.split('ExpectedBundleFiles = new[]', 1)[1].split('};', 1)[0]
 files = re.findall(r'"([^"\\]+\.(?:py|txt|json|md|toml))"', block)
 assert len(files) == 24, files
-assert len(set(files)) == 21, files
+assert len(set(files)) == 24, files
 for required in (
     "code.py", "boot.py", "combined_guard_runtime.py", "plan_engine.py",
     "live_light_guard.py", "guard_transition.py", "guard_calibration_protocol.py",

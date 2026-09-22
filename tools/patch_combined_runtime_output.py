@@ -8,6 +8,15 @@ for old,new in {
 }.items():
     if old in s: s=s.replace(old,new)
     elif new not in s: raise SystemExit('missing anchor: '+old)
+# The current combined runtime already contains the ownership-aware route
+# dispatcher. Do not apply the legacy light-route replacement below: that
+# replacement predates PLAN|2 containers and rejects RPKG as an unsupported
+# light command. Keep the small compatibility substitutions above, then leave
+# the current source intact and let it reach the bundle unchanged.
+if "def _light_route_lines(text):" in s and "runtime.plan_engine.parse_plan(text)" in s:
+    p.write_text(s, encoding="utf-8")
+    raise SystemExit(0)
+
 block='''import random as _light_random
 
 _LIGHT_ROUTE_COMMANDS = {"PLAN", "SCREEN", "SPEED", "BEEP", "DELAY", "LOOP", "LOOPTIME", "ENDLOOP", "KEY", "KDOWN", "KUP"}

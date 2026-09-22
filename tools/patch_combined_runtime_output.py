@@ -623,6 +623,8 @@ def _diagnostic_route(self, decision):
 runtime.Combined.route = _diagnostic_route
 '''
 start=s.find('import random as _light_random')
+if start < 0:
+    start=s.find('_LIGHT_ROUTE_COMMANDS =')
 marker='runtime.Combined.route = _diagnostic_route'
 end=s.find(marker,start)
 if start<0 or end<0: raise SystemExit('missing light region')

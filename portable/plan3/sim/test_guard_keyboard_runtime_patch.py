@@ -10,14 +10,17 @@ def main():
         shutil.copyfile(SOURCE, target)
         for _ in range(2): subprocess.run([sys.executable, str(PATCH), str(target)], check=True)
         text = target.read_text(encoding="utf-8")
+        package_text = SIDECAR.read_text(encoding="utf-8")
         py_compile.compile(str(target), doraise=True)
+        py_compile.compile(str(SIDECAR), doraise=True)
         assert text.count("def _run_light_route(owner, name):") == 1
         assert text.count("def _light_keycode(vk):") == 1
         # Golden Build 52 extends the bounded streaming command set with the
         # RPKG package container; verify the previously-passed keyboard subset
         # without requiring the obsolete exact set literal.
-        for op in ("PLAN", "SCREEN", "SPEED", "BEEP", "DELAY", "LOOP", "LOOPTIME", "ENDLOOP", "KEY", "KDOWN", "KUP", "RPKG", "PKGITEM", "ENDPKG"):
+        for op in ("PLAN", "SCREEN", "SPEED", "BEEP", "DELAY", "LOOP", "LOOPTIME", "ENDLOOP", "KEY", "KDOWN", "KUP", "RPKG"):
             assert op in text
+        assert "PKGITEM" in package_text and "ENDPKG" in package_text
         assert 'elif op == "KEY":' in text
         assert 'elif op in ("KDOWN", "KUP"):' in text
         assert 'self.keyboard.release_all()' in text

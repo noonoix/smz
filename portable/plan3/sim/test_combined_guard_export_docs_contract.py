@@ -26,7 +26,7 @@ assert 'generator = "Classroom Studio v" + ExporterVersion' in exporter
 
 # Keep the inventory exact: 24 package files; SHA256SUMS hashes the 20 core payloads.
 block = exporter.split('ExpectedBundleFiles = new[]', 1)[1].split('};', 1)[0]
-files = re.findall(r'"([^"\\]+\.(?:py|txt|json|md))"', block)
+files = re.findall(r'"([^"\\]+\.(?:py|txt|json|md|toml))"', block)
 assert len(files) == 24, files
 assert len(set(files)) == 21, files
 for required in (

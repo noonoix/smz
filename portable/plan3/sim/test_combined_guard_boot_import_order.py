@@ -28,6 +28,7 @@ assert loader_pos < extras_pos < load_pos
 assert entry_text.count('.load_guard_bundle("/")') == 2
 assert 'class _DeferredPlanEngine:' not in entry_text
 assert 'sys.modules["plan_engine"] = _DeferredPlanEngine()' not in entry_text
+assert 'from random_package_runtime import run_file_package' in entry_text
 assert 'from random_package_runtime import run_route_special' in entry_text
 assert 'def _light_parallel_group(' not in entry_text
 assert 'def run_parallel_group(' in sidecar_text

@@ -980,6 +980,7 @@ def _run_light_route(owner, name):
             elif op == "DELAY":
                 if not _light_package_delay(owner, args, expected): return False
             elif op in ("RPKG", "PGROUP", "WSND", "CLICK"):
+                from random_package_runtime import run_file_package
                 from random_package_runtime import run_route_special
                 if not run_route_special(op, fh, args, owner, expected, _light_package_action, _arm_send_cooperative): return False
             elif op == "BEEP":

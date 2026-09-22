@@ -356,7 +356,7 @@ def _immediate_audible_start(self):
 
 def _ensure_runtime_bundle(self):
     if self.bundle is None:
-        self.bundle = runtime.load_guard_bundle("/")
+        self.bundle = runtime.load_guard_bundle(chr(47))
         self.guard.bundle = self.bundle
         gc.collect()
 

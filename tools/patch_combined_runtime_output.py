@@ -14,6 +14,10 @@ if _audio_old in s: s = s.replace(_audio_old, _audio_new, 1)
 _audio_cue_old = 'def _guard_start_tone(self):\n    self._guard_pattern(_GUARD_START_PATTERN)'
 _audio_cue_new = 'def _guard_start_tone(self):\n    _debug_event(self, "CAL", "start-cue", persist=True)\n    self._guard_pattern(_GUARD_START_PATTERN)'
 if _audio_cue_old in s: s = s.replace(_audio_cue_old, _audio_cue_new, 1)
+_cursor_old_guard = '    if self.calibrating:\n        return False'
+_cursor_new_guard = '    if self.calibrating:\n        return False\n    if not getattr(self, "route_uses_mouse", False):\n        return True'
+if _cursor_old_guard in s: s = s.replace(_cursor_old_guard, _cursor_new_guard, 1)
+elif _cursor_new_guard not in s: raise SystemExit('missing lazy cursor guard anchor')
 block=r'''import random as _light_random
 
 _LIGHT_ROUTE_COMMANDS = {"PLAN", "SCREEN", "SPEED", "BEEP", "DELAY", "LOOP", "LOOPTIME", "ENDLOOP", "KEY", "KDOWN", "KUP"}
@@ -21,9 +25,12 @@ _VALID_ROUTE_NAMES = ("desktop_steps.txt", "restart_steps.txt", "login_or_dc_ste
 
 
 def _light_gate(owner, expected_state):
-    owner.host_poll(); owner.buttons(); owner.arm.pump()
+    owner.host_poll(); owner.buttons()
+    if getattr(owner, "route_uses_mouse", False): owner.arm.pump()
     while owner.controls.paused and owner.controls.running:
-        owner.host_poll(); owner.buttons(); owner.arm.pump(); runtime.time.sleep(.01)
+        owner.host_poll(); owner.buttons()
+        if getattr(owner, "route_uses_mouse", False): owner.arm.pump()
+        runtime.time.sleep(.01)
     if not owner.controls.running or owner.calibrating:
         return False
     now = runtime.time.monotonic()
@@ -389,6 +396,7 @@ def _mouse_values(args):
 
 def _light_mouse(owner,op,args,expected):
     values=_mouse_values(args)
+    owner.route_uses_mouse = True
     # Cursor origin and screen resolution belong to the Pro Micro only when
     # this route actually contains a mouse operation. Keyboard/light-only
     # routes must never wake or command the ARM.
@@ -429,6 +437,7 @@ def _run_light_route(owner, name):
     owner.light_poll_due = 0
     owner.route_screen = None
     owner.route_screen_applied = False
+    owner.route_uses_mouse = False
     frames = []
     with open("/" + name, "r") as fh:
         owner.emit("EVT|DEBUG|MEM/route-open free=%d" % gc.mem_free())
@@ -681,6 +690,7 @@ required = (
     'elif op in (\"LOOP\", \"LOOPTIME\"):',
     'elif op == \"ENDLOOP\":',
     'owner.route_screen_applied = False',
+    'owner.route_uses_mouse = False',
     'Cursor synchronization is lazy: keyboard/light-only routes',
 )
 missing = [token for token in required if token not in s]

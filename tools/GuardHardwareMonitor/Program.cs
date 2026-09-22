@@ -8,6 +8,7 @@ internal static class Program
     private const int Baud = 115200;
     private const int PollMs = 100;
     private const int ProbeMs = 1500;
+    private static readonly object LogLock = new();
 
     public static int Main(string[] args)
     {
@@ -51,7 +52,7 @@ internal static class Program
         {
             while (!token.IsCancellationRequested)
             {
-                var ports = string.Join(",", SerialPort.GetPortNames().OrderBy(x => x));
+                var ports = string.Join(",", SerialPort.GetPortNames().Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x));
                 if (ports != lastPorts)
                 {
                     lastPorts = ports;
@@ -73,7 +74,7 @@ internal static class Program
                         if (role == "PICO")
                         {
                             port.Write("PING\n");
-                            Write(log, "TX|PICO|PING");
+                            Record(log, "TX|PICO|PING");
                         }
                         else
                         {
@@ -105,11 +106,11 @@ internal static class Program
                             if (role == "PICO" && line.Contains("role=brain", StringComparison.OrdinalIgnoreCase))
                             {
                                 verified = true;
-                                Write(log, "PING|OK|brain");
+                                Record(log, "PING|OK|brain");
                                 if (history && port.IsOpen)
                                 {
                                     port.Write("DEBUGGET\n");
-                                    Write(log, "TX|PICO|DEBUGGET");
+                                    Record(log, "TX|PICO|DEBUGGET");
                                     history = false;
                                 }
                             }
@@ -119,7 +120,9 @@ internal static class Program
                     if ((DateTime.UtcNow - lastHeartbeat).TotalSeconds >= 5)
                     {
                         lastHeartbeat = DateTime.UtcNow;
-                        Write(log, $"HEARTBEAT|{role}|open={port.IsOpen}|verified={verified}");
+                        Record(log, $"HEARTBEAT|{role}|open={port.IsOpen}|verified={verified}");
+                        if (role == "PICO" && !verified)
+                            Record(log, "PING|TIMEOUT|no brain response yet");
                     }
                     Thread.Sleep(PollMs);
                 }
@@ -186,7 +189,10 @@ internal static class Program
         Console.WriteLine(text);
     }
 
-    private static void Write(StreamWriter log, string text) => log.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} | {text}");
+    private static void Write(StreamWriter log, string text)
+    {
+        lock (LogLock) log.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} | {text}");
+    }
     private static string Clean(Exception ex) => (ex.GetType().Name + ":" + ex.Message).Replace('|', '/').Replace('\r', ' ').Replace('\n', ' ');
     private static bool IsDisconnect(Exception ex) => ex is IOException or InvalidOperationException or UnauthorizedAccessException or OperationCanceledException;
     private static void Dispose(ref SerialPort? p) { try { p?.Close(); } catch { } try { p?.Dispose(); } catch { } p = null; }

@@ -4,6 +4,7 @@ import py_compile, shutil, subprocess, sys, tempfile
 ROOT = Path(__file__).resolve().parents[3]
 PATCH = ROOT / "tools" / "patch_combined_runtime_output.py"
 SOURCE = ROOT / "firmware" / "pico-light-guard-1.0.0" / "code.py"
+SIDECAR = ROOT / "portable" / "plan3" / "CIRCUITPY" / "random_package_runtime.py"
 def main():
     with tempfile.TemporaryDirectory() as td:
         target = Path(td) / "code.py"

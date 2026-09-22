@@ -1,0 +1,105 @@
+name: Classroom Studio Random Package build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/classroom-random-package-export]
+
+permissions:
+  contents: write
+
+jobs:
+  windows-build:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate low-memory Random Package runtime
+        shell: pwsh
+        run: |
+          python -m py_compile portable/plan3/CIRCUITPY/random_package_runtime.py tools/patch_random_package_output.py tools/patch_portable_guard_random_runtime.py tools/patch_keyboard_only_route_output.py
+          python portable/plan3/sim/test_combined_random_package_runtime.py
+          python portable/plan3/sim/test_random_package_delay_contract.py
+      - name: Restore and build Classroom Studio
+        shell: pwsh
+        run: |
+          dotnet restore ams-shell/AMS.sln
+          dotnet build ams-shell/AMS.sln -c Release --no-restore 2>&1 | Tee-Object windows-build.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify packaged exporter contract
+        shell: pwsh
+        run: |
+          $out = 'ams-shell/src/Ams.UI/bin/Release/net8.0-windows'
+          $required = @(
+            'combined-runtime/random_package_runtime.py',
+            'portable-runtime/random_package_runtime.py',
+            'combined-runtime/code.py'
+          )
+          foreach ($file in $required) {
+            if (-not (Test-Path (Join-Path $out $file))) { throw "Missing $file" }
+          }
+          $code = Get-Content (Join-Path $out 'combined-runtime/code.py') -Raw
+          foreach ($token in @(
+            'def _light_package_action',
+            'elif op == "RPKG":',
+            'from random_package_runtime import run_file_package',
+            'def _route_requires_cursor_sync(name):',
+            'if _route_requires_cursor_sync(route_name):',
+            'not-required-keyboard-route',
+            'route_uses_mouse = _route_requires_cursor_sync(name)'
+          )) {
+            if (-not $code.Contains($token)) { throw "Combined runtime missing: $token" }
+          }
+          python -m py_compile (Join-Path $out 'combined-runtime/code.py') (Join-Path $out 'combined-runtime/random_package_runtime.py')
+      - name: Run Classroom Studio tests
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force tests/bin, tests/obj -ErrorAction SilentlyContinue
+          dotnet build tests/TestRunner.csproj -c Release
+          dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object windows-tests.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (Select-String -Path windows-tests.log -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
+      - name: Package Windows build
+        shell: pwsh
+        run: |
+          $out = 'ams-shell/src/Ams.UI/bin/Release/net8.0-windows'
+          Remove-Item -Recurse -Force "$out/bridge/__pycache__" -ErrorAction SilentlyContinue
+          Compress-Archive -Path "$out/*" -DestinationPath 'Classroom-Studio-Random-Package.zip' -Force
+          (Get-FileHash 'Classroom-Studio-Random-Package.zip' -Algorithm SHA256).Hash | Set-Content 'sha256.txt' -Encoding ascii
+          $result = (Select-String -Path windows-tests.log -Pattern '=== Results' | Select-Object -Last 1).Line
+          @(
+            '# Classroom Studio — Random Package exporter build',
+            '',
+            "Source commit: ${{ github.sha }}",
+            "Tests: $result",
+            "SHA-256: $(Get-Content sha256.txt -Raw)",
+            '',
+            'Includes lazy low-memory RPKG execution. Keyboard-only Guard routes bypass ARM cursor/SETRES gates; mouse routes retain acknowledged cursor synchronization.'
+          ) | Set-Content release-body.md -Encoding utf8
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Classroom-Studio-Random-Package
+          path: |
+            Classroom-Studio-Random-Package.zip
+            sha256.txt
+            windows-build.log
+            windows-tests.log
+          retention-days: 14
+      - name: Publish prerelease build
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: random-package-export-${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          name: 'Classroom Studio Random Package #${{ github.run_number }}'
+          prerelease: true
+          body_path: release-body.md
+          files: |
+            Classroom-Studio-Random-Package.zip
+            sha256.txt
+            windows-tests.log

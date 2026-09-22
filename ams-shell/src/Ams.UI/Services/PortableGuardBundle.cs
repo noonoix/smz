@@ -81,7 +81,7 @@ public static class PortableGuardBundle
         foreach (var firmware in firmwareSources)
         {
             var destination = Path.Combine(directory, firmware.Name);
-            AtomicWrite(destination, File.ReadAllBytes(firmware.Path));
+            AtomicWrite(destination, ReadTextPayload(firmware.Path));
             written.Add(destination);
         }
         foreach (var tab in workspace.Tabs)
@@ -102,7 +102,7 @@ public static class PortableGuardBundle
         foreach (var runtime in runtimeSources)
         {
             var destination = Path.Combine(directory, runtime.Name);
-            AtomicWrite(destination, File.ReadAllBytes(runtime.Path));
+            AtomicWrite(destination, ReadTextPayload(runtime.Path));
             written.Add(destination);
         }
         // Sidecars must be present for the Golden Pico bundle, but must remain
@@ -111,7 +111,7 @@ public static class PortableGuardBundle
         foreach (var sidecar in sidecarSources)
         {
             var destination = Path.Combine(directory, sidecar.Name);
-            AtomicWrite(destination, File.ReadAllBytes(sidecar.Path));
+            AtomicWrite(destination, ReadTextPayload(sidecar.Path));
             sidecarWritten.Add(destination);
         }
         var hashesPath = Path.Combine(directory, "SHA256SUMS.txt");
@@ -361,6 +361,18 @@ All files must stay together at the root of the staging directory. `SHA256SUMS.t
         "entering-game-loading" => PipelineKind.EnteringGameLoading, "game" => PipelineKind.Game, "targeted" => PipelineKind.Targeted,
         _ => throw new InvalidDataException("Unknown Guard profile: " + id),
     };
+
+    private static byte[] ReadTextPayload(string path)
+    {
+        // Git/Windows may materialize newly added Python sidecars as CRLF.
+        // CircuitPython can be strict around the entry point; Golden Build 52
+        // is LF-normalized, so preserve that byte-level contract in every
+        // exported text runtime file.
+        var text = File.ReadAllText(path, Encoding.UTF8)
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n');
+        return Encoding.UTF8.GetBytes(text);
+    }
 
     private static void AtomicWrite(string path, byte[] bytes)
     {

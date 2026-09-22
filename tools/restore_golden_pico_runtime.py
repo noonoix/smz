@@ -18,7 +18,10 @@ out_text = out.read_text(encoding="utf-8")
 source_text = source.read_text(encoding="utf-8")
 marker = "# GOLDEN_PICO_RUNTIME_52_RPKG"
 if marker in out_text and marker in source_text:
-    shutil.copyfile(source, out)
-    print("Golden Pico runtime restored", out)
+    # Normalize explicitly; Windows checkout/build may have materialized the
+    # source as CRLF, while the reviewed Golden artifact is LF-only.
+    normalized = source_text.replace("\r\n", "\n").replace("\r", "\n")
+    out.write_text(normalized, encoding="utf-8", newline="\n")
+    print("Golden Pico runtime restored (LF)", out)
 else:
     print("legacy Pico runtime preserved", out)

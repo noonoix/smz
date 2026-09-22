@@ -24,6 +24,7 @@ PROFILE_IDS = (
 )
 ROUTE_FILES = {
     "Desktop": "desktop_steps.txt",
+    "Restart": "restart_steps.txt",
     "LoginOrDc": "login_or_dc_steps.txt",
     "CharacterDashboard": "character_dashboard_steps.txt",
     "EnteringGameLoading": "entering_game_loading_steps.txt",
@@ -46,6 +47,15 @@ REQUIRED_BUNDLE_FILES = (
 HASHED_BUNDLE_FILES = tuple(
     filename for filename in REQUIRED_BUNDLE_FILES if filename != "SHA256SUMS.txt"
 ) + tuple(ROUTE_FILES.values()) + ("guard-transition.json", "guard-calibration.json")
+# These files are shipped for Random Package compatibility but are not part of
+# the original Golden Build52 manifest. Accepting them as an all-or-nothing
+# optional set lets the board boot bundles produced by older Studio builds while
+# the exporter converges back to the Golden manifest contract.
+OPTIONAL_COMPATIBILITY_SIDECARS = (
+    "random_package_runtime.py",
+    "settings.toml",
+    "README-HID-TEST.txt",
+)
 
 
 class GuardBundleError(ValueError):
@@ -82,6 +92,8 @@ def _file_sha256(root, name):
 
 def _verify_hash_manifest(root):
     expected = set(HASHED_BUNDLE_FILES)
+    optional = set(OPTIONAL_COMPATIBILITY_SIDECARS)
+    allowed = expected | optional
     seen = {}
     try:
         with open(os.path.join(root, "SHA256SUMS.txt"), "r") as fh:
@@ -93,7 +105,7 @@ def _verify_hash_manifest(root):
                         or any(character not in "0123456789abcdefABCDEF" for character in fields[0]):
                     raise GuardBundleError("invalid SHA256SUMS entry")
                 digest, name = fields[0].lower(), fields[1]
-                if name not in expected or name in seen:
+                if name not in allowed or name in seen:
                     raise GuardBundleError("unexpected or duplicate SHA256SUMS file: " + name)
                 seen[name] = digest
     except GuardBundleError:
@@ -101,9 +113,10 @@ def _verify_hash_manifest(root):
     except Exception as exc:
         raise GuardBundleError("cannot read SHA256SUMS.txt") from exc
 
-    if set(seen) != expected:
+    present_optional = set(seen) - expected
+    if present_optional not in (set(), optional):
         missing = sorted(expected - set(seen))
-        extra = sorted(set(seen) - expected)
+        extra = sorted(present_optional)
         detail = "missing=" + ",".join(missing)
         if extra:
             detail += "; extra=" + ",".join(extra)

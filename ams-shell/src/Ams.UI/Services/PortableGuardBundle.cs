@@ -122,6 +122,14 @@ public static class PortableGuardBundle
                 ? line[(2 + PortableOpSentinel.Length)..]
                 : line));
 
+        // SCREEN and SPEED are route metadata, not keyboard commands. The shared
+        // PLAN|2 compiler emits them for every route, but the combined runtime
+        // forwards SCREEN as ARM SETRES. A Pico-only route must therefore not
+        // contain those metadata lines: otherwise a keyboard-only macro wakes
+        // the Pro Micro and fails when it is intentionally disconnected.
+        if (!RequiresArm(source))
+            route = StripArmMetadata(route);
+
         // Never silently ship a route that dropped a requested mouse action. This was the
         // failure mode seen in the 46 bundle: the .amsj contained randomMousePosition but
         // desktop_steps.txt did not contain RMOUSE. Fail during export with the route and
@@ -129,6 +137,26 @@ public static class PortableGuardBundle
         ValidateMouseExport(source, route, sourceName);
         return route;
     }
+
+    private static bool RequiresArm(IEnumerable<StepNode> nodes)
+    {
+        // Mouse and sound sensing are the only built-in portable operations that
+        // belong to the Pro Micro. rawCommand is intentionally conservative: it
+        // may carry a user-authored ARM command and must not be stripped of the
+        // route metadata contract.
+        var armOwned = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "randomMousePosition", "mouseMove", "mouseClick", "mouseScroll",
+            "waitForSound", "rawCommand",
+        };
+        return nodes.Any(node =>
+            !node.IsDisabled && (armOwned.Contains(node.Type) || RequiresArm(node.Children)));
+    }
+
+    private static string StripArmMetadata(string route)
+        => string.Join("\n", route.Split('\n').Where(line =>
+            !line.StartsWith("SCREEN|", StringComparison.Ordinal) &&
+            !line.StartsWith("SPEED|", StringComparison.Ordinal)));
 
     private static void ValidateMouseExport(IEnumerable<StepNode> nodes, string route, string sourceName)
     {

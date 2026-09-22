@@ -23,7 +23,7 @@ assert '_guard_bundle.HASHED_BUNDLE_FILES += (_name,)' in entry_text
 extras_pos = entry_text.index('for _name in ("pico-calibration.json", "README-FLASH.md"):')
 load_pos = entry_text.index('_BOOT_BUNDLE = _guard_bundle.load_guard_bundle("/")')
 assert loader_pos < extras_pos < load_pos
-assert entry_text.count('.load_guard_bundle("/")') == 1
+assert entry_text.count('.load_guard_bundle("/")') == 2
 # Golden Build 52 deliberately has no deferred plan-engine import in code.py.
 # RPKG is loaded by the bounded random_package_runtime sidecar only when the
 # streaming route reaches RPKG.
@@ -36,8 +36,8 @@ assert 'gc.collect()' in entry_text[load_pos:runtime_pos]
 init_start = entry_text.index("def _memory_safe_init(self):")
 init_end = entry_text.index("runtime.Combined.__init__ = _memory_safe_init")
 init_text = entry_text[init_start:init_end]
-assert "load_guard_bundle" not in init_text
 assert "bundle = _BOOT_BUNDLE" in init_text
+assert "_ensure_runtime_bundle" in init_text
 assert "_BOOT_BUNDLE = None" in init_text
 assert "self.guard.bundle = bundle" in init_text
 assert init_text.index("self.bundle = bundle") < init_text.index("runtime.Arm()")

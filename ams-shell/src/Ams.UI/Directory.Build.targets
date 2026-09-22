@@ -18,5 +18,7 @@
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_engine_free_combined_runtime.py&quot; &quot;$(TargetDir)combined-runtime\combined_guard_runtime.py&quot;" />
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_engine_free_combined_runtime.py&quot; &quot;$(TargetDir)portable-runtime\combined_guard_runtime.py&quot;" />
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_engine_free_combined_runtime.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />
+    <!-- Historical patchers above are retained for legacy fixtures. Never let them mutate the reviewed Golden Pico entry point. -->
+    <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\restore_golden_pico_runtime.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot; &quot;$(MSBuildProjectDirectory)\..\..\..\firmware\pico-light-guard-1.0.0\code.py&quot;" />
   </Target>
 </Project>

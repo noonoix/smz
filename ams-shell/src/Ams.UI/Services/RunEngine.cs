@@ -57,6 +57,7 @@ public sealed class RunEngine
     private long _lastParallelKeyTick;
     private int _mouseRestAtSeq = -1;
     private Func<CancellationToken, Task>? _pauseCheck;
+    private Func<CancellationToken, Task<bool>>? _reviewPause;
     /// <summary>v0.9.0 — run-scoped human pause manager (every-N-moves long breaks span steps and repeats).</summary>
     private HumanMouse.PausePlanner? _mousePauses;
     private HumanMouse.PausePlanner MousePauses => _mousePauses ??= new HumanMouse.PausePlanner(Rng);
@@ -92,6 +93,10 @@ public sealed class RunEngine
 
     /// <summary>Optional pause-check delegate injected by MainViewModel.</summary>
     public void SetPauseCheck(Func<CancellationToken, Task> pauseCheck) => _pauseCheck = pauseCheck;
+    /// <summary>Requests a human-review pause after a bounded retry block is exhausted.
+    /// The callback returns only after Resume; the caller then rechecks the success state.
+    /// </summary>
+    public void SetReviewPause(Func<CancellationToken, Task<bool>> reviewPause) => _reviewPause = reviewPause;
     /// <summary>Human-like mouse speed range (ms) injected by MainViewModel. 0 = disabled.</summary>
     public void SetMouseSpeedRange(int min, int max) { _mouseSpeedMin = min; _mouseSpeedMax = max; }
     private int _mouseSpeedMin, _mouseSpeedMax;
@@ -178,6 +183,10 @@ public sealed class RunEngine
 
                 case "randomPackage":
                     await RunRandomPackageAsync(s, ct);
+                    break;
+
+                case "retryAttempt":
+                    await RunRetryAttemptAsync(s, ct);
                     break;
 
                 case "parallelGroup":
@@ -803,6 +812,70 @@ public sealed class RunEngine
         _log("🎲 random package: " + string.Join(" → ",
             pool.Select(p => string.IsNullOrWhiteSpace(p.Name) ? p.Summary : p.Name)));
         await RunStepsAsync(pool, ct);
+    }
+
+    // ─────────────────────────── retry attempt ───────────────────────────
+
+    /// <summary>
+    /// Bounded login/recovery attempt. The body is replayed until the configured light state
+    /// becomes stable. Timeout Esc is optional. Exhaustion never returns to Desktop and never
+    /// continues silently: it alarms, pauses for human review, and rechecks after Resume.
+    /// </summary>
+    private async Task RunRetryAttemptAsync(StepNode s, CancellationToken ct)
+    {
+        int maxAttempts = Math.Max(1, Math.Min(20, PropEx.GetInt(s.Props, "maxAttempts", 3)));
+        int timeoutMs = Math.Max(100, PropEx.GetInt(s.Props, "timeoutMs", 30000));
+        int center = Math.Max(0, PropEx.GetInt(s.Props, "successLuxCenter", 50));
+        int tolerance = Math.Max(1, PropEx.GetInt(s.Props, "successLuxTolerance", 5));
+        int stableMs = Math.Max(0, (int)Math.Round(PropEx.GetDouble(s.Props, "stableSec", 1) * 1000));
+        int lo = Math.Max(0, center - tolerance);
+        int hi = Math.Max(lo, center + tolerance);
+        string timeoutAction = PropEx.GetString(s.Props, "timeoutAction", "esc");
+        string exhaustedAction = PropEx.GetString(s.Props, "exhaustedAction", "alarmAndPauseForReview");
+        if (exhaustedAction != "alarmAndPauseForReview")
+            throw new InvalidOperationException("retryAttempt only supports alarmAndPauseForReview");
+
+        async Task<bool> WaitSuccessAsync()
+        {
+            string cmd = $"WLUX|{lo},{hi},{stableMs},{timeoutMs},0";
+            string reply = await Send(cmd, ct, allowTimeout: true,
+                timeoutSeconds: timeoutMs / 1000.0 + 10, timeoutPolicy: "continue");
+            bool matched = !reply.StartsWith("ERR|TIMEOUT", StringComparison.Ordinal);
+            _log(matched ? $"retryAttempt success light={lo}-{hi}" : "retryAttempt light timeout");
+            return matched;
+        }
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            ct.ThrowIfCancellationRequested();
+            _log($"retryAttempt attempt {attempt}/{maxAttempts}");
+            await RunStepsAsync(s.Children, ct);
+            if (await WaitSuccessAsync()) return;
+            if (timeoutAction == "esc")
+                await Send("KCOMBO|27", ct, quiet: true);
+            if (attempt < maxAttempts)
+                await PausableDelay(1000, ct);
+        }
+
+        // The alarm/review callback is supplied by the UI so the yellow Resume control is
+        // authoritative. No route is selected or restarted here.
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+            _log("retryAttempt exhausted — human review required; waiting for Resume");
+            if (_reviewPause is null)
+            {
+                await Send("BEEP|880,180", ct, quiet: true);
+                throw new PolicyStop(alarmed: true);
+            }
+            if (!await _reviewPause(ct)) throw new PolicyStop(alarmed: true);
+            if (await WaitSuccessAsync())
+            {
+                _log("retryAttempt resumed after review");
+                return;
+            }
+            _log("retryAttempt Resume received but success state is not stable yet");
+        }
     }
 
     /// <summary>v0.9.15 — Parallel Group: the children run CONCURRENTLY on the same board and the

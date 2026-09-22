@@ -10,5 +10,7 @@ new='''def _mouse_profile(owner, values):
         raise RuntimeError("ARM 2.7 human mouse capability required")
     speed=getattr(owner,"route_speed",(150,500))'''
 if old in s:s=s.replace(old,new,1)
-elif new not in s:raise SystemExit('missing HVER capability anchor')
+elif new not in s:
+    if 'ARM 2.7 human mouse capability required' not in s:
+        raise SystemExit('missing HVER capability anchor')
 p.write_text(s,encoding='utf-8',newline='\n');print('patched ARM 2.7 capability gate:',p)

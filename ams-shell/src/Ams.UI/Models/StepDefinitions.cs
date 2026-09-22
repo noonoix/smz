@@ -280,6 +280,23 @@ public static class StepDefinitions
                 : $"Random Package · all {s.Children.Count} step(s), shuffled",
             // container — the runner shuffles/picks children per pass (v0.7.8)
         },
+        ["retryAttempt"] = new StepDefinition
+        {
+            Label = "Retry Attempt", ColorResourceKey = "StepFlowBrush", DefaultDelay = 0, IsContainer = true, IsScopeContainer = true,
+            Fields = new FieldDef[]
+            {
+                new("title", "Group title (blank = default name)", FieldKind.Text, ""),
+                new("maxAttempts", "Maximum attempts", FieldKind.Int, "3"),
+                new("timeoutMs", "Wait for success timeout (ms)", FieldKind.Int, "30000"),
+                new("successLuxCenter", "Success light centre (lux)", FieldKind.Int, "50"),
+                new("successLuxTolerance", "Success light tolerance +/- (lux)", FieldKind.Int, "5"),
+                new("stableSec", "Success must be stable for (s)", FieldKind.Float, "1"),
+                new("timeoutAction", "On attempt timeout", FieldKind.Combo, "esc", new[] { "esc", "none" }),
+                new("exhaustedAction", "When attempts are exhausted", FieldKind.Combo, "alarmAndPauseForReview", new[] { "alarmAndPauseForReview" }),
+            },
+            Summarize = s => $"Retry Attempt · {Math.Max(1, PropEx.GetInt(s.Props, "maxAttempts", 3))} attempts · success {PropEx.GetInt(s.Props, "successLuxCenter", 50)}±{PropEx.GetInt(s.Props, "successLuxTolerance", 5)} lux",
+            // Structural: the portable runtime owns bounded attempts, timeout Esc, alarm and review pause.
+        },
         ["waitForSound"] = new StepDefinition
         {
             Label = "Wait For Sound", ColorResourceKey = "StepFindImageBrush", DefaultDelay = 0, IsContainer = true, IsScopeContainer = true,   // v0.9.34 — the If-structure needs the accordion/scope visuals (findImage parity)
@@ -561,6 +578,7 @@ public static class StepDefinitions
         ["forLoop"] = "🔁",
         ["parallelGroup"] = "⚡",
         ["randomPackage"] = "🎲",
+        ["retryAttempt"] = "⟳",
         ["waitForSound"] = "🔊",
         ["waitForLight"] = "💡",
         ["findImage"] = "🔍",

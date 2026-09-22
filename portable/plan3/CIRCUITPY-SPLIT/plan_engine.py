@@ -55,7 +55,7 @@ def pct_dec(s):
         out.append(s[i])
         i += 1
     return ''.join(out)
-_OPS = ('PLAN', 'SCREEN', 'SPEED', 'RMOUSE', 'CLICK', 'TYPE', 'DELAY', 'LOOP', 'LOOPTIME', 'ENDLOOP', 'WLIGHT', 'STATELOOP', 'MOVETO', 'KEY', 'KDOWN', 'KUP', 'WHEEL', 'RAW', 'WSND', 'TRGSND', 'IFSND', 'IFLUX', 'ELSE', 'ENDIF', 'LABEL', 'GOTO', 'INCLUDE', 'RPKG', 'PKGITEM', 'ENDPKG', 'PGROUP', 'PARITEM', 'ENDPAR', 'BEEP')
+_OPS = ('PLAN', 'SCREEN', 'SPEED', 'RMOUSE', 'CLICK', 'TYPE', 'DELAY', 'LOOP', 'LOOPTIME', 'ENDLOOP', 'WLIGHT', 'STATELOOP', 'MOVETO', 'KEY', 'KDOWN', 'KUP', 'WHEEL', 'RAW', 'WSND', 'TRGSND', 'IFSND', 'IFLUX', 'ELSE', 'ENDIF', 'LABEL', 'GOTO', 'INCLUDE', 'RPKG', 'PKGITEM', 'ENDPKG', 'PGROUP', 'PARITEM', 'ENDPAR', 'RETRY', 'ENDRETRY', 'BEEP')
 _V2_OPS = frozenset(_OPS[11:])
 
 def _pair(s, what, line_no):
@@ -111,94 +111,125 @@ _PAR_OK = ('MOVETO', 'CLICK', 'KEY', 'KDOWN', 'KUP', 'WHEEL', 'TYPE', 'DELAY', '
 _PKG_MODES = ('pick', 'all', 'seq')
 
 def _extract_containers(text):
-    lines = text.split('\n')
-    out = []
-    table = []
+    """Lift v3 container bodies out of the flat plan text.
+
+    RPKG/PGROUP have item separators; RETRY has one ordered attempt body.
+    All three may contain nested containers and are parsed recursively.
+    """
+    lines = text.split("\n")
+    out, table = [], []
+    heads = ("RPKG", "PGROUP", "RETRY")
     i = 0
     while i < len(lines):
         head = lines[i].strip()
-        kind = head.split('|')[0].upper()
-        if kind not in ('RPKG', 'PGROUP'):
-            if kind in ('PKGITEM', 'ENDPKG', 'PARITEM', 'ENDPAR'):
-                raise ValueError('line %d: %s outside a package/parallel block' % (i + 1, kind))
-            out.append(lines[i])
-            i += 1
-            continue
-        sep = 'PKGITEM' if kind == 'RPKG' else 'PARITEM'
-        end = 'ENDPKG' if kind == 'RPKG' else 'ENDPAR'
-        items = [[]]
-        depth = 0
-        closed = False
-        j = i + 1
-        while j < len(lines):
-            k = lines[j].strip().split('|')[0].upper()
-            if k in ('RPKG', 'PGROUP'):
-                depth += 1
-            elif k in ('ENDPKG', 'ENDPAR'):
-                if depth == 0:
-                    if k != end:
-                        raise ValueError('line %d: %s closes a %s block' % (j + 1, k, kind))
-                    closed = True
-                    break
-                depth -= 1
-            elif k == sep and depth == 0:
-                items.append([])
-                j += 1
-                continue
-            items[-1].append(lines[j])
-            j += 1
-        if not closed:
-            raise ValueError('line %d: %s is never closed with %s' % (i + 1, kind, end))
-        table.append(['\n'.join(b) for b in items])
-        out.append(head + (',' if '|' in head else '|') + '#%d' % (len(table) - 1))
+        kind = head.split("|", 1)[0].upper()
+        if kind not in heads:
+            if kind in ("PKGITEM", "ENDPKG", "PARITEM", "ENDPAR", "ENDRETRY"):
+                raise ValueError("line %d: %s outside a package/parallel block" % (i + 1, kind))
+            out.append(lines[i]); i += 1; continue
+        if kind == "RETRY":
+            end, items, depth, closed, j = "ENDRETRY", [[]], 0, False, i + 1
+            while j < len(lines):
+                k = lines[j].strip().split("|", 1)[0].upper()
+                if k in heads:
+                    depth += 1
+                elif k in ("ENDRETRY", "ENDPKG", "ENDPAR"):
+                    if depth == 0:
+                        if k != end:
+                            raise ValueError("line %d: %s closes a RETRY block" % (j + 1, k))
+                        closed = True; break
+                    depth -= 1
+                items[0].append(lines[j]); j += 1
+            if not closed:
+                raise ValueError("line %d: RETRY is never closed with ENDRETRY" % (i + 1))
+        else:
+            sep = "PKGITEM" if kind == "RPKG" else "PARITEM"
+            end = "ENDPKG" if kind == "RPKG" else "ENDPAR"
+            items, depth, closed, j = [[]], 0, False, i + 1
+            while j < len(lines):
+                k = lines[j].strip().split("|", 1)[0].upper()
+                if k in heads:
+                    depth += 1
+                elif k in ("ENDPKG", "ENDPAR", "ENDRETRY"):
+                    if depth == 0:
+                        if k != end:
+                            raise ValueError("line %d: %s closes a %s block" % (j + 1, k, kind))
+                        closed = True; break
+                    depth -= 1
+                elif k == sep and depth == 0:
+                    items.append([]); j += 1; continue
+                items[-1].append(lines[j]); j += 1
+            if not closed:
+                raise ValueError("line %d: %s is never closed with %s" % (i + 1, kind, end))
+        table.append(["\n".join(b) for b in items])
+        out.append(head + ("," if "|" in head else "|") + "#%d" % (len(table) - 1))
         i = j + 1
-    return ('\n'.join(out), table)
+    return "\n".join(out), table
 
 def _parse_v3(op, fields, prm, line_no, ctab):
-    if op in ('PKGITEM', 'ENDPKG', 'PARITEM', 'ENDPAR'):
-        raise ValueError('line %d: stray %s' % (line_no, op))
-    body = fields[1] if len(fields) > 1 else ''
-    if op == 'BEEP':
-        parts = body.split(',')
+    """Parse the v3 ops. Container bodies were replaced by a #index reference."""
+    if op in ("PKGITEM", "ENDPKG", "PARITEM", "ENDPAR", "ENDRETRY"):
+        raise ValueError("line %d: stray %s" % (line_no, op))
+    body = fields[1] if len(fields) > 1 else ""
+    if op == "BEEP":
+        parts = body.split(",")
         if len(parts) != 2:
-            raise ValueError('line %d: BEEP needs freq,ms' % line_no)
+            raise ValueError("line %d: BEEP needs freq,ms" % line_no)
         try:
-            prm['v'] = (int(parts[0]), int(parts[1]))
+            prm["v"] = (int(parts[0]), int(parts[1]))
         except Exception:
             raise ValueError("line %d: bad BEEP '%s'" % (line_no, body))
-        if not 30 <= prm['v'][0] <= 20000 or prm['v'][1] < 0:
-            raise ValueError('line %d: BEEP out of range (30..20000 Hz)' % line_no)
+        if not 30 <= prm["v"][0] <= 20000 or prm["v"][1] < 0:
+            raise ValueError("line %d: BEEP out of range (30..20000 Hz)" % line_no)
         return
-    parts = body.split(',')
-    if not parts[-1].startswith('#'):
-        raise ValueError('line %d: %s must open a block body' % (line_no, op))
+    parts = body.split(",")
+    if not parts[-1].startswith("#"):
+        raise ValueError("line %d: %s must open a block body" % (line_no, op))
     bodies = ctab[int(parts[-1][1:])]
-    progs = [parse_plan('PLAN|2\n' + b) for b in bodies]
-    if op == 'RPKG':
+    progs = [parse_plan("PLAN|2\n" + b) for b in bodies]
+    if op == "RETRY":
+        if len(parts) != 8:
+            raise ValueError("line %d: RETRY needs max,timeout,lux,tolerance,stable,timeoutAction,exhaustedAction" % line_no)
+        try:
+            mx, timeout, center, tolerance, stable = (int(parts[i]) for i in range(5))
+        except Exception:
+            raise ValueError("line %d: bad RETRY numeric arguments" % line_no)
+        if mx < 1 or timeout < 100 or center < 0 or tolerance < 1 or stable < 0:
+            raise ValueError("line %d: RETRY arguments out of range" % line_no)
+        if parts[5] not in ("esc", "none") or parts[6] != "alarmAndPauseForReview":
+            raise ValueError("line %d: unsupported RETRY policy" % line_no)
+        if len(progs) != 1:
+            raise ValueError("line %d: RETRY must have one body" % line_no)
+        prm.update(max_attempts=mx, timeout=timeout, center=center,
+                   tolerance=tolerance, stable=stable, timeout_action=parts[5],
+                   exhausted_action=parts[6], prog=progs[0])
+        return
+    if op == "RPKG":
         if len(parts) != 4:
-            raise ValueError('line %d: RPKG needs mode,min,max' % line_no)
+            raise ValueError("line %d: RPKG needs mode,min,max" % line_no)
         mode = parts[0].strip().lower()
         if mode not in _PKG_MODES:
             raise ValueError("line %d: unknown RPKG mode '%s' (pick|all|seq)" % (line_no, parts[0]))
         try:
-            mn, mx = (int(parts[1]), int(parts[2]))
+            mn, mx = int(parts[1]), int(parts[2])
         except Exception:
             raise ValueError("line %d: bad RPKG counts '%s'" % (line_no, body))
         if not progs:
-            raise ValueError('line %d: RPKG has no items' % line_no)
+            raise ValueError("line %d: RPKG has no items" % line_no)
         if mn < 0 or mx < mn or mx > len(progs):
-            raise ValueError('line %d: RPKG counts out of range (%d items)' % (line_no, len(progs)))
-        prm['mode'], prm['mn'], prm['mx'], prm['progs'] = (mode, mn, mx, progs)
+            raise ValueError("line %d: RPKG counts out of range (%d items)" % (line_no, len(progs)))
+        prm["mode"], prm["mn"], prm["mx"], prm["progs"] = mode, mn, mx, progs
         return
     if len(parts) != 1:
-        raise ValueError('line %d: PGROUP takes no arguments' % line_no)
+        raise ValueError("line %d: PGROUP takes no arguments" % line_no)
     if len(progs) < 2:
-        raise ValueError('line %d: PGROUP needs at least two branches' % line_no)
+        raise ValueError("line %d: PGROUP needs at least two branches" % line_no)
     for b in progs:
         for o, _p in b:
-            if o != 'PLAN' and o not in _PAR_OK:
-                raise ValueError('line %d: %s is not allowed inside PGROUP' % (line_no, o))
-    prm['progs'] = progs
+            if o != "PLAN" and o not in _PAR_OK:
+                raise ValueError("line %d: %s is not allowed inside PGROUP" % (line_no, o))
+    prm["progs"] = progs
+
 
 def parse_plan(text):
     text, _ctab = _extract_containers(text)
@@ -215,7 +246,7 @@ def parse_plan(text):
             raise ValueError("line %d: unknown op '%s'" % (line_no, fields[0]))
         prm = {}
         prm['_chain'] = tuple((b[2] for b in loop_stack))
-        if op in ('RPKG', 'PGROUP', 'BEEP', 'PKGITEM', 'ENDPKG', 'PARITEM', 'ENDPAR'):
+        if op in ('RPKG', 'PGROUP', 'RETRY', 'BEEP', 'PKGITEM', 'ENDPKG', 'PARITEM', 'ENDPAR', 'ENDRETRY'):
             _parse_v3(op, fields, prm, line_no, _ctab)
             ops.append((op, prm))
             continue
@@ -663,6 +694,37 @@ def run_plan(ops, ctx, _pos=None, _pauses=None, _inc=()):
                 stack.pop()
             i = lip
             continue
+        elif op == 'RETRY':
+            success = False
+            for attempt in range(1, prm['max_attempts'] + 1):
+                ctx.log('retryAttempt attempt=%d/%d' % (attempt, prm['max_attempts']))
+                run_plan(prm['prog'], ctx, _pos=pos, _pauses=pauses, _inc=inc)
+                wait_state = getattr(ctx, 'retry_wait_state', None)
+                if wait_state is None:
+                    raise ValueError('RETRY needs ctx.retry_wait_state')
+                if wait_state(prm['center'], prm['tolerance'], prm['stable'], prm['timeout']):
+                    ctx.log('retryAttempt success')
+                    success = True
+                    break
+                ctx.log('retryAttempt timeout')
+                if prm['timeout_action'] == 'esc':
+                    ctx.key_combo([27], 0, 0)
+                if attempt < prm['max_attempts'] and not ctx.sleep_ms(1000):
+                    raise PlanAbort()
+            if not success:
+                alarm = getattr(ctx, 'retry_alarm', None)
+                if alarm is not None:
+                    alarm('retryAttempt exhausted')
+                review = getattr(ctx, 'pause_for_review', None)
+                if review is None:
+                    raise PlanAbort()
+                while True:
+                    if not review():
+                        raise PlanAbort()
+                    if wait_state(prm['center'], prm['tolerance'], prm['stable'], prm['timeout']):
+                        ctx.log('retryAttempt resumed after review')
+                        break
+                    ctx.log('retryAttempt Resume received but success state is not stable yet')
         elif op == 'RPKG':
             progs = prm['progs']
             order = list(range(len(progs)))

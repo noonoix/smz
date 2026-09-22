@@ -59,7 +59,7 @@ public static class PlanExporter
     { ["second"] = 1, ["minute"] = 60, ["hour"] = 3600 };
 
     private static readonly HashSet<string> Conditional = new() { "findImage", "waitForSound", "waitForLight" };
-    private static readonly HashSet<string> LoopOwners = new() { "forLoop", "randomPackage", "parallelGroup" };
+    private static readonly HashSet<string> LoopOwners = new() { "forLoop", "randomPackage", "parallelGroup", "retryAttempt" };
 
     // Bare-modifier aliases on top of KeyMap.VK (plan_gen parity: the armed-key field accepts them).
     private static readonly Dictionary<string, int> VkAliases = new()
@@ -254,7 +254,7 @@ public static class PlanExporter
                 case "typeText":EmitTypeText(n);return; case "forLoop":EmitForLoop(n);return;
                 case "waitForSound":EmitWaitForSound(n);return; case "waitForLight":EmitWaitForLight(n);return;
                 case "label":EmitLabel(n);return; case "gotoLabel":EmitGoto(n);return; case "rawCommand":EmitRaw(n);return;
-                case "randomPackage":EmitRandomPackage(n);return; case "parallelGroup":EmitParallelGroup(n);return;
+                case "randomPackage":EmitRandomPackage(n);return; case "retryAttempt":EmitRetryAttempt(n);return; case "parallelGroup":EmitParallelGroup(n);return;
                 case "buzzer":EmitBuzzer(n);return;
                 case "runExe":EmitLaunch(n,false);return; case "openFile":EmitLaunch(n,true);return; case "playAudio":EmitAudio(n);return; case "playScript":EmitInclude(n);return;
                 case "findImage":Error(n,"findImage needs machine vision - it cannot run on the Pico");CollectBlockers(n);return;
@@ -437,6 +437,24 @@ public static class PlanExporter
         private void EmitRaw(StepNode n){var cmd=PropEx.GetString(n.Props,"cmd","PING").Trim();if(cmd.Length==0||cmd.Contains('\n')||cmd.Contains('\r')){Error(n,"raw command must be one non-empty line");return;}Emit(n,new[]{"RAW|"+cmd},"RAW");}
         private void EmitRandomPackage(StepNode n){var kids=n.Children.Where(c=>!c.IsDisabled&&!IsMarker(c)).ToList();if(kids.Count==0){Error(n,"random package has no enabled children");return;}if(kids.Any(c=>Conditional.Contains(c.Type)&&PropEx.GetBool(c.Props,"insertIfElse"))){Error(n,"an If/Else structure cannot live inside a Random Package");return;}var mode=PropEx.GetString(n.Props,"mode","shuffleAll");int mn=1,mx=kids.Count;string em="all";if(mode=="randomSubset"){em="pick";mn=Math.Max(0,PropEx.GetInt(n.Props,"minCount",1));mx=Math.Min(kids.Count,PropEx.GetInt(n.Props,"maxCount",10));if(mn>mx)(mn,mx)=(mx,mn);}else if(mode!="shuffleAll"){Error(n,"unknown random package mode '"+mode+"'");return;}Lines.Add("RPKG|"+em+","+mn+","+mx);Count("RPKG");for(int i=0;i<kids.Count;i++){if(i>0)Lines.Add("PKGITEM");Walk(new List<StepNode>{kids[i]});}Lines.Add("ENDPKG");EmitDelay(n);}
         private static readonly HashSet<string> ParallelOk=new(){"mouseMove","mouseClick","mouseScroll","keystroke","keyDown","keyUp","typeText","delay","rawCommand","comment"};
+        private void EmitRetryAttempt(StepNode n)
+        {
+            var kids = n.Children.Where(c => !c.IsDisabled && !IsMarker(c)).ToList();
+            if (kids.Count == 0) { Error(n, "retry attempt has no enabled body steps"); return; }
+            int attempts = Math.Max(1, Math.Min(20, PropEx.GetInt(n.Props, "maxAttempts", 3)));
+            int timeout = Math.Max(100, PropEx.GetInt(n.Props, "timeoutMs", 30000));
+            int center = Math.Max(0, PropEx.GetInt(n.Props, "successLuxCenter", 50));
+            int tolerance = Math.Max(1, PropEx.GetInt(n.Props, "successLuxTolerance", 5));
+            int stable = Math.Max(0, (int)Math.Round(PropEx.GetDouble(n.Props, "stableSec", 1) * 1000));
+            string timeoutAction = PropEx.GetString(n.Props, "timeoutAction", "esc");
+            string exhausted = PropEx.GetString(n.Props, "exhaustedAction", "alarmAndPauseForReview");
+            Lines.Add($"RETRY|{attempts},{timeout},{center},{tolerance},{stable},{timeoutAction},{exhausted}");
+            Count("RETRY");
+            Walk(kids);
+            Lines.Add("ENDRETRY");
+            EmitDelay(n);
+        }
+
         private void EmitParallelGroup(StepNode n){var kids=n.Children.Where(c=>!c.IsDisabled&&!IsMarker(c)).ToList();if(kids.Count<2){Error(n,"a Parallel Group needs at least two enabled branches");return;}var before=Errors.Count;foreach(var c in kids)if(!ParallelOk.Contains(c.Type))Error(c,"'"+c.Type+"' cannot live inside a Parallel Group on the Pico");if(Errors.Count>before)return;Lines.Add("PGROUP");Count("PGROUP");for(int i=0;i<kids.Count;i++){if(i>0)Lines.Add("PARITEM");Walk(new List<StepNode>{kids[i]});}Lines.Add("ENDPAR");EmitDelay(n);}
         private static string QuoteRun(string value)=>value.Contains(' ')?"\""+value+"\"":value;
         private void EmitRunMacro(StepNode n,string command,string kind){string enc;try{enc=PctType(command);}catch(FormatException ex){Error(n,ex.Message);return;}Emit(n,new[]{"# "+kind,"KEY|combo=91+82|hold=40,90","DELAY|350,650","TYPE|text="+enc,"DELAY|140,260","KEY|combo=13|hold=40,90","DELAY|600,1200"},kind);}
@@ -739,7 +757,7 @@ public static class PlanExporter
         var stack = new List<(string Kind, bool ElseSeen, int Line)>();
         var labels = new HashSet<string>(StringComparer.Ordinal);
         var gotos = new List<string>();
-        var known = new HashSet<string>{"PLAN","SCREEN","SPEED","DELAY","LOOP","LOOPTIME","ENDLOOP","RMOUSE","MOVETO","CLICK","TYPE","WLIGHT","WSND","TRGSND","IFSND","IFLUX","ELSE","ENDIF","KEY","KDOWN","KUP","WHEEL","LABEL","GOTO","RAW","RPKG","PKGITEM","ENDPKG","PGROUP","PARITEM","ENDPAR","INCLUDE","BEEP"};
+        var known = new HashSet<string>{"PLAN","SCREEN","SPEED","DELAY","LOOP","LOOPTIME","ENDLOOP","RMOUSE","MOVETO","CLICK","TYPE","WLIGHT","WSND","TRGSND","IFSND","IFLUX","ELSE","ENDIF","KEY","KDOWN","KUP","WHEEL","LABEL","GOTO","RAW","RPKG","PKGITEM","ENDPKG","PGROUP","PARITEM","ENDPAR","RETRY","ENDRETRY","INCLUDE","BEEP"};
         bool first = true;
         string previousOp = "";
         var lines = text.Split('\n');
@@ -766,6 +784,7 @@ public static class PlanExporter
                 case "IFSND": case "IFLUX": stack.Add(("IF", false, li + 1)); break;
                 case "RPKG": stack.Add(("RPKG", false, li + 1)); break;
                 case "PGROUP": stack.Add(("PGROUP", false, li + 1)); break;
+                case "RETRY": stack.Add(("RETRY", false, li + 1)); break;
                 case "ENDLOOP": Need("LOOP", op); stack.RemoveAt(stack.Count - 1); break;
                 case "ELSE":
                     Need("IF", op);
@@ -791,6 +810,8 @@ public static class PlanExporter
                     if (previousOp is "PGROUP" or "PARITEM") Bad("empty Parallel Group branch");
                     stack.RemoveAt(stack.Count - 1);
                     break;
+                case "ENDRETRY":
+                    Need("RETRY", op); stack.RemoveAt(stack.Count - 1); break;
             }
 
             if (op == "LABEL")
@@ -889,7 +910,7 @@ def pct_dec(s):
         out.append(s[i])
         i += 1
     return ''.join(out)
-_OPS = ('PLAN', 'SCREEN', 'SPEED', 'RMOUSE', 'CLICK', 'TYPE', 'DELAY', 'LOOP', 'LOOPTIME', 'ENDLOOP', 'WLIGHT', 'STATELOOP', 'MOVETO', 'KEY', 'KDOWN', 'KUP', 'WHEEL', 'RAW', 'WSND', 'TRGSND', 'IFSND', 'IFLUX', 'ELSE', 'ENDIF', 'LABEL', 'GOTO', 'INCLUDE', 'RPKG', 'PKGITEM', 'ENDPKG', 'PGROUP', 'PARITEM', 'ENDPAR', 'BEEP')
+_OPS = ('PLAN', 'SCREEN', 'SPEED', 'RMOUSE', 'CLICK', 'TYPE', 'DELAY', 'LOOP', 'LOOPTIME', 'ENDLOOP', 'WLIGHT', 'STATELOOP', 'MOVETO', 'KEY', 'KDOWN', 'KUP', 'WHEEL', 'RAW', 'WSND', 'TRGSND', 'IFSND', 'IFLUX', 'ELSE', 'ENDIF', 'LABEL', 'GOTO', 'INCLUDE', 'RPKG', 'PKGITEM', 'ENDPKG', 'PGROUP', 'PARITEM', 'ENDPAR', 'RETRY', 'ENDRETRY', 'BEEP')
 _V2_OPS = frozenset(_OPS[11:])
 
 def _pair(s, what, line_no):
@@ -945,94 +966,125 @@ _PAR_OK = ('MOVETO', 'CLICK', 'KEY', 'KDOWN', 'KUP', 'WHEEL', 'TYPE', 'DELAY', '
 _PKG_MODES = ('pick', 'all', 'seq')
 
 def _extract_containers(text):
-    lines = text.split('\n')
-    out = []
-    table = []
+    """Lift v3 container bodies out of the flat plan text.
+
+    RPKG/PGROUP have item separators; RETRY has one ordered attempt body.
+    All three may contain nested containers and are parsed recursively.
+    """
+    lines = text.split("\n")
+    out, table = [], []
+    heads = ("RPKG", "PGROUP", "RETRY")
     i = 0
     while i < len(lines):
         head = lines[i].strip()
-        kind = head.split('|')[0].upper()
-        if kind not in ('RPKG', 'PGROUP'):
-            if kind in ('PKGITEM', 'ENDPKG', 'PARITEM', 'ENDPAR'):
-                raise ValueError('line %d: %s outside a package/parallel block' % (i + 1, kind))
-            out.append(lines[i])
-            i += 1
-            continue
-        sep = 'PKGITEM' if kind == 'RPKG' else 'PARITEM'
-        end = 'ENDPKG' if kind == 'RPKG' else 'ENDPAR'
-        items = [[]]
-        depth = 0
-        closed = False
-        j = i + 1
-        while j < len(lines):
-            k = lines[j].strip().split('|')[0].upper()
-            if k in ('RPKG', 'PGROUP'):
-                depth += 1
-            elif k in ('ENDPKG', 'ENDPAR'):
-                if depth == 0:
-                    if k != end:
-                        raise ValueError('line %d: %s closes a %s block' % (j + 1, k, kind))
-                    closed = True
-                    break
-                depth -= 1
-            elif k == sep and depth == 0:
-                items.append([])
-                j += 1
-                continue
-            items[-1].append(lines[j])
-            j += 1
-        if not closed:
-            raise ValueError('line %d: %s is never closed with %s' % (i + 1, kind, end))
-        table.append(['\n'.join(b) for b in items])
-        out.append(head + (',' if '|' in head else '|') + '#%d' % (len(table) - 1))
+        kind = head.split("|", 1)[0].upper()
+        if kind not in heads:
+            if kind in ("PKGITEM", "ENDPKG", "PARITEM", "ENDPAR", "ENDRETRY"):
+                raise ValueError("line %d: %s outside a package/parallel block" % (i + 1, kind))
+            out.append(lines[i]); i += 1; continue
+        if kind == "RETRY":
+            end, items, depth, closed, j = "ENDRETRY", [[]], 0, False, i + 1
+            while j < len(lines):
+                k = lines[j].strip().split("|", 1)[0].upper()
+                if k in heads:
+                    depth += 1
+                elif k in ("ENDRETRY", "ENDPKG", "ENDPAR"):
+                    if depth == 0:
+                        if k != end:
+                            raise ValueError("line %d: %s closes a RETRY block" % (j + 1, k))
+                        closed = True; break
+                    depth -= 1
+                items[0].append(lines[j]); j += 1
+            if not closed:
+                raise ValueError("line %d: RETRY is never closed with ENDRETRY" % (i + 1))
+        else:
+            sep = "PKGITEM" if kind == "RPKG" else "PARITEM"
+            end = "ENDPKG" if kind == "RPKG" else "ENDPAR"
+            items, depth, closed, j = [[]], 0, False, i + 1
+            while j < len(lines):
+                k = lines[j].strip().split("|", 1)[0].upper()
+                if k in heads:
+                    depth += 1
+                elif k in ("ENDPKG", "ENDPAR", "ENDRETRY"):
+                    if depth == 0:
+                        if k != end:
+                            raise ValueError("line %d: %s closes a %s block" % (j + 1, k, kind))
+                        closed = True; break
+                    depth -= 1
+                elif k == sep and depth == 0:
+                    items.append([]); j += 1; continue
+                items[-1].append(lines[j]); j += 1
+            if not closed:
+                raise ValueError("line %d: %s is never closed with %s" % (i + 1, kind, end))
+        table.append(["\n".join(b) for b in items])
+        out.append(head + ("," if "|" in head else "|") + "#%d" % (len(table) - 1))
         i = j + 1
-    return ('\n'.join(out), table)
+    return "\n".join(out), table
 
 def _parse_v3(op, fields, prm, line_no, ctab):
-    if op in ('PKGITEM', 'ENDPKG', 'PARITEM', 'ENDPAR'):
-        raise ValueError('line %d: stray %s' % (line_no, op))
-    body = fields[1] if len(fields) > 1 else ''
-    if op == 'BEEP':
-        parts = body.split(',')
+    """Parse the v3 ops. Container bodies were replaced by a #index reference."""
+    if op in ("PKGITEM", "ENDPKG", "PARITEM", "ENDPAR", "ENDRETRY"):
+        raise ValueError("line %d: stray %s" % (line_no, op))
+    body = fields[1] if len(fields) > 1 else ""
+    if op == "BEEP":
+        parts = body.split(",")
         if len(parts) != 2:
-            raise ValueError('line %d: BEEP needs freq,ms' % line_no)
+            raise ValueError("line %d: BEEP needs freq,ms" % line_no)
         try:
-            prm['v'] = (int(parts[0]), int(parts[1]))
+            prm["v"] = (int(parts[0]), int(parts[1]))
         except Exception:
             raise ValueError("line %d: bad BEEP '%s'" % (line_no, body))
-        if not 30 <= prm['v'][0] <= 20000 or prm['v'][1] < 0:
-            raise ValueError('line %d: BEEP out of range (30..20000 Hz)' % line_no)
+        if not 30 <= prm["v"][0] <= 20000 or prm["v"][1] < 0:
+            raise ValueError("line %d: BEEP out of range (30..20000 Hz)" % line_no)
         return
-    parts = body.split(',')
-    if not parts[-1].startswith('#'):
-        raise ValueError('line %d: %s must open a block body' % (line_no, op))
+    parts = body.split(",")
+    if not parts[-1].startswith("#"):
+        raise ValueError("line %d: %s must open a block body" % (line_no, op))
     bodies = ctab[int(parts[-1][1:])]
-    progs = [parse_plan('PLAN|2\n' + b) for b in bodies]
-    if op == 'RPKG':
+    progs = [parse_plan("PLAN|2\n" + b) for b in bodies]
+    if op == "RETRY":
+        if len(parts) != 8:
+            raise ValueError("line %d: RETRY needs max,timeout,lux,tolerance,stable,timeoutAction,exhaustedAction" % line_no)
+        try:
+            mx, timeout, center, tolerance, stable = (int(parts[i]) for i in range(5))
+        except Exception:
+            raise ValueError("line %d: bad RETRY numeric arguments" % line_no)
+        if mx < 1 or timeout < 100 or center < 0 or tolerance < 1 or stable < 0:
+            raise ValueError("line %d: RETRY arguments out of range" % line_no)
+        if parts[5] not in ("esc", "none") or parts[6] != "alarmAndPauseForReview":
+            raise ValueError("line %d: unsupported RETRY policy" % line_no)
+        if len(progs) != 1:
+            raise ValueError("line %d: RETRY must have one body" % line_no)
+        prm.update(max_attempts=mx, timeout=timeout, center=center,
+                   tolerance=tolerance, stable=stable, timeout_action=parts[5],
+                   exhausted_action=parts[6], prog=progs[0])
+        return
+    if op == "RPKG":
         if len(parts) != 4:
-            raise ValueError('line %d: RPKG needs mode,min,max' % line_no)
+            raise ValueError("line %d: RPKG needs mode,min,max" % line_no)
         mode = parts[0].strip().lower()
         if mode not in _PKG_MODES:
             raise ValueError("line %d: unknown RPKG mode '%s' (pick|all|seq)" % (line_no, parts[0]))
         try:
-            mn, mx = (int(parts[1]), int(parts[2]))
+            mn, mx = int(parts[1]), int(parts[2])
         except Exception:
             raise ValueError("line %d: bad RPKG counts '%s'" % (line_no, body))
         if not progs:
-            raise ValueError('line %d: RPKG has no items' % line_no)
+            raise ValueError("line %d: RPKG has no items" % line_no)
         if mn < 0 or mx < mn or mx > len(progs):
-            raise ValueError('line %d: RPKG counts out of range (%d items)' % (line_no, len(progs)))
-        prm['mode'], prm['mn'], prm['mx'], prm['progs'] = (mode, mn, mx, progs)
+            raise ValueError("line %d: RPKG counts out of range (%d items)" % (line_no, len(progs)))
+        prm["mode"], prm["mn"], prm["mx"], prm["progs"] = mode, mn, mx, progs
         return
     if len(parts) != 1:
-        raise ValueError('line %d: PGROUP takes no arguments' % line_no)
+        raise ValueError("line %d: PGROUP takes no arguments" % line_no)
     if len(progs) < 2:
-        raise ValueError('line %d: PGROUP needs at least two branches' % line_no)
+        raise ValueError("line %d: PGROUP needs at least two branches" % line_no)
     for b in progs:
         for o, _p in b:
-            if o != 'PLAN' and o not in _PAR_OK:
-                raise ValueError('line %d: %s is not allowed inside PGROUP' % (line_no, o))
-    prm['progs'] = progs
+            if o != "PLAN" and o not in _PAR_OK:
+                raise ValueError("line %d: %s is not allowed inside PGROUP" % (line_no, o))
+    prm["progs"] = progs
+
 
 def parse_plan(text):
     text, _ctab = _extract_containers(text)
@@ -1049,7 +1101,7 @@ def parse_plan(text):
             raise ValueError("line %d: unknown op '%s'" % (line_no, fields[0]))
         prm = {}
         prm['_chain'] = tuple((b[2] for b in loop_stack))
-        if op in ('RPKG', 'PGROUP', 'BEEP', 'PKGITEM', 'ENDPKG', 'PARITEM', 'ENDPAR'):
+        if op in ('RPKG', 'PGROUP', 'RETRY', 'BEEP', 'PKGITEM', 'ENDPKG', 'PARITEM', 'ENDPAR', 'ENDRETRY'):
             _parse_v3(op, fields, prm, line_no, _ctab)
             ops.append((op, prm))
             continue
@@ -1497,6 +1549,37 @@ def run_plan(ops, ctx, _pos=None, _pauses=None, _inc=()):
                 stack.pop()
             i = lip
             continue
+        elif op == 'RETRY':
+            success = False
+            for attempt in range(1, prm['max_attempts'] + 1):
+                ctx.log('retryAttempt attempt=%d/%d' % (attempt, prm['max_attempts']))
+                run_plan(prm['prog'], ctx, _pos=pos, _pauses=pauses, _inc=inc)
+                wait_state = getattr(ctx, 'retry_wait_state', None)
+                if wait_state is None:
+                    raise ValueError('RETRY needs ctx.retry_wait_state')
+                if wait_state(prm['center'], prm['tolerance'], prm['stable'], prm['timeout']):
+                    ctx.log('retryAttempt success')
+                    success = True
+                    break
+                ctx.log('retryAttempt timeout')
+                if prm['timeout_action'] == 'esc':
+                    ctx.key_combo([27], 0, 0)
+                if attempt < prm['max_attempts'] and not ctx.sleep_ms(1000):
+                    raise PlanAbort()
+            if not success:
+                alarm = getattr(ctx, 'retry_alarm', None)
+                if alarm is not None:
+                    alarm('retryAttempt exhausted')
+                review = getattr(ctx, 'pause_for_review', None)
+                if review is None:
+                    raise PlanAbort()
+                while True:
+                    if not review():
+                        raise PlanAbort()
+                    if wait_state(prm['center'], prm['tolerance'], prm['stable'], prm['timeout']):
+                        ctx.log('retryAttempt resumed after review')
+                        break
+                    ctx.log('retryAttempt Resume received but success state is not stable yet')
         elif op == 'RPKG':
             progs = prm['progs']
             order = list(range(len(progs)))

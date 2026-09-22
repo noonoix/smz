@@ -59,7 +59,7 @@ public static class PlanExporter
     { ["second"] = 1, ["minute"] = 60, ["hour"] = 3600 };
 
     private static readonly HashSet<string> Conditional = new() { "findImage", "waitForSound", "waitForLight" };
-    private static readonly HashSet<string> LoopOwners = new() { "forLoop", "randomPackage", "parallelGroup" };
+    private static readonly HashSet<string> LoopOwners = new() { "forLoop", "randomPackage", "parallelGroup", "retryAttempt" };
 
     // Bare-modifier aliases on top of KeyMap.VK (plan_gen parity: the armed-key field accepts them).
     private static readonly Dictionary<string, int> VkAliases = new()
@@ -254,7 +254,7 @@ public static class PlanExporter
                 case "typeText":EmitTypeText(n);return; case "forLoop":EmitForLoop(n);return;
                 case "waitForSound":EmitWaitForSound(n);return; case "waitForLight":EmitWaitForLight(n);return;
                 case "label":EmitLabel(n);return; case "gotoLabel":EmitGoto(n);return; case "rawCommand":EmitRaw(n);return;
-                case "randomPackage":EmitRandomPackage(n);return; case "parallelGroup":EmitParallelGroup(n);return;
+                case "randomPackage":EmitRandomPackage(n);return; case "retryAttempt":EmitRetryAttempt(n);return; case "parallelGroup":EmitParallelGroup(n);return;
                 case "runExe":EmitLaunch(n,false);return; case "openFile":EmitLaunch(n,true);return; case "playAudio":EmitAudio(n);return; case "playScript":EmitInclude(n);return;
                 case "findImage":Error(n,"findImage needs machine vision - it cannot run on the Pico");CollectBlockers(n);return;
                 default:Error(n,"unknown step type '"+n.Type+"' - this exporter does not know it (supported: the 23 app actions)");return;
@@ -394,6 +394,24 @@ public static class PlanExporter
         private void EmitRaw(StepNode n){var cmd=PropEx.GetString(n.Props,"cmd","PING").Trim();if(cmd.Length==0||cmd.Contains('\n')||cmd.Contains('\r')){Error(n,"raw command must be one non-empty line");return;}Emit(n,new[]{"RAW|"+cmd},"RAW");}
         private void EmitRandomPackage(StepNode n){var kids=n.Children.Where(c=>!c.IsDisabled&&!IsMarker(c)).ToList();if(kids.Count==0){Error(n,"random package has no enabled children");return;}if(kids.Any(c=>Conditional.Contains(c.Type)&&PropEx.GetBool(c.Props,"insertIfElse"))){Error(n,"an If/Else structure cannot live inside a Random Package");return;}var mode=PropEx.GetString(n.Props,"mode","shuffleAll");int mn=1,mx=kids.Count;string em="all";if(mode=="randomSubset"){em="pick";mn=Math.Max(0,PropEx.GetInt(n.Props,"minCount",1));mx=Math.Min(kids.Count,PropEx.GetInt(n.Props,"maxCount",10));if(mn>mx)(mn,mx)=(mx,mn);}else if(mode!="shuffleAll"){Error(n,"unknown random package mode '"+mode+"'");return;}Lines.Add("RPKG|"+em+","+mn+","+mx);Count("RPKG");for(int i=0;i<kids.Count;i++){if(i>0)Lines.Add("PKGITEM");Walk(new List<StepNode>{kids[i]});}Lines.Add("ENDPKG");EmitDelay(n);}
         private static readonly HashSet<string> ParallelOk=new(){"mouseMove","mouseClick","mouseScroll","keystroke","keyDown","keyUp","typeText","delay","rawCommand","comment"};
+        private void EmitRetryAttempt(StepNode n)
+        {
+            var kids = n.Children.Where(c => !c.IsDisabled && !IsMarker(c)).ToList();
+            if (kids.Count == 0) { Error(n, "retry attempt has no enabled body steps"); return; }
+            int attempts = Math.Max(1, Math.Min(20, PropEx.GetInt(n.Props, "maxAttempts", 3)));
+            int timeout = Math.Max(100, PropEx.GetInt(n.Props, "timeoutMs", 30000));
+            int center = Math.Max(0, PropEx.GetInt(n.Props, "successLuxCenter", 50));
+            int tolerance = Math.Max(1, PropEx.GetInt(n.Props, "successLuxTolerance", 5));
+            int stable = Math.Max(0, (int)Math.Round(PropEx.GetDouble(n.Props, "stableSec", 1) * 1000));
+            string timeoutAction = PropEx.GetString(n.Props, "timeoutAction", "esc");
+            string exhausted = PropEx.GetString(n.Props, "exhaustedAction", "alarmAndPauseForReview");
+            Lines.Add($"RETRY|{attempts},{timeout},{center},{tolerance},{stable},{timeoutAction},{exhausted}");
+            Count("RETRY");
+            Walk(kids);
+            Lines.Add("ENDRETRY");
+            EmitDelay(n);
+        }
+
         private void EmitParallelGroup(StepNode n){var kids=n.Children.Where(c=>!c.IsDisabled&&!IsMarker(c)).ToList();if(kids.Count<2){Error(n,"a Parallel Group needs at least two enabled branches");return;}var before=Errors.Count;foreach(var c in kids)if(!ParallelOk.Contains(c.Type))Error(c,"'"+c.Type+"' cannot live inside a Parallel Group on the Pico");if(Errors.Count>before)return;Lines.Add("PGROUP");Count("PGROUP");for(int i=0;i<kids.Count;i++){if(i>0)Lines.Add("PARITEM");Walk(new List<StepNode>{kids[i]});}Lines.Add("ENDPAR");EmitDelay(n);}
         private static string QuoteRun(string value)=>value.Contains(' ')?"\""+value+"\"":value;
         private void EmitRunMacro(StepNode n,string command,string kind){string enc;try{enc=PctType(command);}catch(FormatException ex){Error(n,ex.Message);return;}Emit(n,new[]{"# "+kind,"KEY|combo=91+82|hold=40,90","DELAY|350,650","TYPE|text="+enc,"DELAY|140,260","KEY|combo=13|hold=40,90","DELAY|600,1200"},kind);}
@@ -696,7 +714,7 @@ public static class PlanExporter
         var stack = new List<(string Kind, bool ElseSeen, int Line)>();
         var labels = new HashSet<string>(StringComparer.Ordinal);
         var gotos = new List<string>();
-        var known = new HashSet<string>{"PLAN","SCREEN","SPEED","DELAY","LOOP","LOOPTIME","ENDLOOP","RMOUSE","MOVETO","CLICK","TYPE","WLIGHT","WSND","TRGSND","IFSND","IFLUX","ELSE","ENDIF","KEY","KDOWN","KUP","WHEEL","LABEL","GOTO","RAW","RPKG","PKGITEM","ENDPKG","PGROUP","PARITEM","ENDPAR","INCLUDE","BEEP"};
+        var known = new HashSet<string>{"PLAN","SCREEN","SPEED","DELAY","LOOP","LOOPTIME","ENDLOOP","RMOUSE","MOVETO","CLICK","TYPE","WLIGHT","WSND","TRGSND","IFSND","IFLUX","ELSE","ENDIF","KEY","KDOWN","KUP","WHEEL","LABEL","GOTO","RAW","RPKG","PKGITEM","ENDPKG","PGROUP","PARITEM","ENDPAR","RETRY","ENDRETRY","INCLUDE","BEEP"};
         bool first = true;
         string previousOp = "";
         var lines = text.Split('\n');
@@ -723,6 +741,7 @@ public static class PlanExporter
                 case "IFSND": case "IFLUX": stack.Add(("IF", false, li + 1)); break;
                 case "RPKG": stack.Add(("RPKG", false, li + 1)); break;
                 case "PGROUP": stack.Add(("PGROUP", false, li + 1)); break;
+                case "RETRY": stack.Add(("RETRY", false, li + 1)); break;
                 case "ENDLOOP": Need("LOOP", op); stack.RemoveAt(stack.Count - 1); break;
                 case "ELSE":
                     Need("IF", op);
@@ -748,6 +767,8 @@ public static class PlanExporter
                     if (previousOp is "PGROUP" or "PARITEM") Bad("empty Parallel Group branch");
                     stack.RemoveAt(stack.Count - 1);
                     break;
+                case "ENDRETRY":
+                    Need("RETRY", op); stack.RemoveAt(stack.Count - 1); break;
             }
 
             if (op == "LABEL")

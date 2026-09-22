@@ -355,10 +355,10 @@ def _immediate_audible_start(self):
     self.blue_start_consumed = True
 
 def _ensure_runtime_bundle(self):
-    # Golden boot transfers the verified bundle exactly once. Calibration must
-    # use that object; never reparse the manifest on the hot path.
     if self.bundle is None:
-        raise RuntimeError("verified Guard bundle unavailable")
+        self.bundle = runtime.load_guard_bundle("/")
+        self.guard.bundle = self.bundle
+        gc.collect()
 
 def _enter_calibration_from_pending_start(self):
     _ensure_runtime_bundle(self)
@@ -1120,34 +1120,6 @@ def _diagnostic_route(self, decision):
 
 runtime.Combined.route = _diagnostic_route
 
-_ARM_ROUTE_COMMANDS = {"RMOUSE", "MOVETO", "CLICK", "WHEEL", "WSND", "TRGSND", "IFSND", "RAW"}
-
-
-def _route_requires_arm(self, name, seen=None):
-    """Only real mouse/sound routes may contact the Pro Micro."""
-    seen = set() if seen is None else seen
-    if name in seen:
-        return False
-    seen.add(name)
-    try:
-        with open("/" + name, "r") as fh:
-            lines = fh.read().splitlines()
-    except Exception:
-        return False
-    for raw in lines:
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        fields = line.split("|", 1)
-        op = fields[0].upper()
-        if op in _ARM_ROUTE_COMMANDS:
-            return True
-        if op == "INCLUDE" and len(fields) == 2 and fields[1].startswith("file="):
-            if _route_requires_arm(self, fields[1][5:].strip(), seen):
-                return True
-    return False
-
-
 def _audible_loop(self):
     self.emit("combined-pico-guard-executor|GP4 start/stop hold3s=calibration|GP3 pause/resume|GP6 piezo")
     last = 0
@@ -1174,10 +1146,7 @@ def _audible_loop(self):
                     if decision.get("execute"):
                         route_name = decision.get("route")
                         _debug_event(self, "ROUTE", "start %s lux=%.1f" % (route_name, lux), persist=True)
-                        # Pico-only keyboard/package routes must not wake the
-                        # Pro Micro merely because the host sent cursor telemetry.
-                        if _route_requires_arm(self, route_name):
-                            _apply_pending_cursor(self, force=True)
+                        _apply_pending_cursor(self, force=True)
                         completed = self.route(decision)
                         if completed is False:
                             _debug_event(self, "ROUTE", "aborted %s" % route_name, persist=True)
@@ -1267,7 +1236,7 @@ def _live_host_poll(self):
                 if x < 0 or y < 0:
                     raise ValueError("CURSOR range")
                 _CURSOR_PENDING = (x, y)
-                # Apply only at a real ARM-owned route boundary.
+                _apply_pending_cursor(self)
                 reply = None
             elif line == "GUARD|ON":
                 # A host Start is a new run request. Reset the one-shot light
@@ -1276,7 +1245,7 @@ def _live_host_poll(self):
                 self.guard.reset()
                 self.guard.last_decision = None
                 self.debug_last_state = None
-                # Route ownership decides whether ARM synchronization is needed.
+                _apply_pending_cursor(self, force=True)
                 self.controls.start()
                 self.guard_start_tone()
                 reply = "OK|GUARD|ON"

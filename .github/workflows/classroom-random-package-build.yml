@@ -23,7 +23,7 @@ jobs:
       - name: Validate low-memory Random Package runtime
         shell: pwsh
         run: |
-          python -m py_compile portable/plan3/CIRCUITPY/random_package_runtime.py tools/patch_random_package_output.py tools/patch_portable_guard_random_runtime.py
+          python -m py_compile portable/plan3/CIRCUITPY/random_package_runtime.py tools/patch_random_package_output.py tools/patch_portable_guard_random_runtime.py tools/patch_keyboard_only_route_output.py
           python portable/plan3/sim/test_combined_random_package_runtime.py
           python portable/plan3/sim/test_random_package_delay_contract.py
       - name: Restore and build Classroom Studio
@@ -45,7 +45,15 @@ jobs:
             if (-not (Test-Path (Join-Path $out $file))) { throw "Missing $file" }
           }
           $code = Get-Content (Join-Path $out 'combined-runtime/code.py') -Raw
-          foreach ($token in @('def _light_package_action', 'elif op == "RPKG":', 'from random_package_runtime import run_file_package')) {
+          foreach ($token in @(
+            'def _light_package_action',
+            'elif op == "RPKG":',
+            'from random_package_runtime import run_file_package',
+            'def _route_requires_cursor_sync(name):',
+            'if _route_requires_cursor_sync(route_name):',
+            'not-required-keyboard-route',
+            'route_uses_mouse = _route_requires_cursor_sync(name)'
+          )) {
             if (-not $code.Contains($token)) { throw "Combined runtime missing: $token" }
           }
           python -m py_compile (Join-Path $out 'combined-runtime/code.py') (Join-Path $out 'combined-runtime/random_package_runtime.py')
@@ -72,7 +80,7 @@ jobs:
             "Tests: $result",
             "SHA-256: $(Get-Content sha256.txt -Raw)",
             '',
-            'Includes lazy low-memory RPKG execution for Combined Guard exports and keeps Pico keyboard / Pro Micro mouse ownership.'
+            'Includes lazy low-memory RPKG execution. Keyboard-only Guard routes bypass ARM cursor/SETRES gates; mouse routes retain acknowledged cursor synchronization.'
           ) | Set-Content release-body.md -Encoding utf8
       - uses: actions/upload-artifact@v4
         with:

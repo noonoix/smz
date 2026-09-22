@@ -27,4 +27,8 @@
   <Target Name="PatchPackagedRandomPackageRuntime" AfterTargets="PatchPackagedKeyboardAndRestartRuntime">
     <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_random_package_output.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />
   </Target>
+
+  <Target Name="PatchPackagedKeyboardOnlyCursorGate" AfterTargets="PatchPackagedRandomPackageRuntime">
+    <Exec Command="python &quot;$(MSBuildProjectDirectory)\..\..\..\tools\patch_keyboard_only_route_output.py&quot; &quot;$(TargetDir)combined-runtime\code.py&quot;" />
+  </Target>
 </Project>

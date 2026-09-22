@@ -69,7 +69,7 @@ def _light_mouse(owner,op,args,expected):
 
 '''
 anchor='def _run_light_route(owner, name):\n'
-if helper not in s:
+if 'def _light_mouse(owner,op,args,expected):' not in s:
     if anchor not in s: raise SystemExit('missing human mouse helper anchor')
     s=s.replace(anchor,helper+anchor,1)
 s=s.replace('"KDOWN", "KUP", "TYPE"}', '"KDOWN", "KUP", "TYPE", "RMOUSE", "MOVETO"}',1)
@@ -93,7 +93,11 @@ new='''            elif op == "SCREEN":
                 if lo<0 or hi<lo: raise ValueError("bad SPEED")
                 owner.route_speed=(lo,hi)'''
 if old in s:s=s.replace(old,new,1)
-elif new not in s:raise SystemExit('missing mouse metadata anchor')
+elif new not in s:
+    # The combined-runtime exporter may already use lazy screen metadata:
+    # SCREEN is stored locally and SETRES is sent only before a mouse step.
+    if not ('owner.route_screen=(w,h)' in s and 'def _light_mouse(owner,op,args,expected):' in s):
+        raise SystemExit('missing mouse metadata anchor')
 old2='''            elif op == "TYPE":
                 if not _light_type(owner, args, expected): return
             elif op in ("KDOWN", "KUP"):'''
@@ -103,5 +107,7 @@ new2='''            elif op == "TYPE":
                 if not _light_mouse(owner, op, args, expected): return
             elif op in ("KDOWN", "KUP"):'''
 if old2 in s:s=s.replace(old2,new2,1)
-elif new2 not in s:raise SystemExit('missing mouse dispatch anchor')
+elif new2 not in s:
+    if 'elif op in ("RMOUSE", "MOVETO"):' not in s:
+        raise SystemExit('missing mouse dispatch anchor')
 p.write_text(s,encoding='utf-8',newline='\n');print('patched streaming human mouse:',p)

@@ -180,6 +180,33 @@ def run_route_special(op, fh, args, owner, expected, action, arm_send):
         return run_file_package(fh, args, owner, expected, action)
     if op == "PGROUP":
         return run_parallel_group(fh, args, owner, expected, action)
+    if op == "CLICK":
+        fields = {}
+        for field in args.split("|"):
+            if "=" not in field:
+                raise ValueError("bad CLICK field")
+            key, value = field.split("=", 1)
+            fields[key] = value
+        button = fields.get("btn", "left").lower()
+        if button not in ("left", "middle", "right"):
+            raise ValueError("bad CLICK button")
+        count = int(fields.get("n", "1"))
+        if count < 1 or count > 2:
+            raise ValueError("bad CLICK count")
+        hold = fields.get("hold", "0,0").split(",")
+        if len(hold) != 2:
+            raise ValueError("bad CLICK hold")
+        hmin, hmax = int(hold[0]), int(hold[1])
+        if hmin < 0 or hmax < 0:
+            raise ValueError("bad CLICK hold")
+        if hmax < hmin:
+            hmin, hmax = hmax, hmin
+        owner.emit("EVT|DEBUG|STEP/CLICK %s,%d,%d,%d" % (button, count, hmin, hmax))
+        reply = arm_send(owner, "MCLICK|%s,%d,%d,%d" % (button, count, hmin, hmax), 8)
+        if reply.startswith("ERR|"):
+            raise RuntimeError("ARM MCLICK rejected: " + reply)
+        owner.emit("EVT|DEBUG|STEP/CLICK reply=" + reply)
+        return True
     fields = args.split(",")
     if len(fields) != 3:
         raise ValueError("WSND needs threshold,min_ms,timeout_ms")

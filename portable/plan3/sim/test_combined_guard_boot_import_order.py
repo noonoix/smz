@@ -33,11 +33,12 @@ assert 'def _light_parallel_group(' not in entry_text
 assert 'def run_parallel_group(' in sidecar_text
 assert 'def run_route_special(' in sidecar_text
 assert 'WSND|%d,%d,%d' in sidecar_text
+assert 'MCLICK|%s,%d,%d,%d' in sidecar_text
 assert 'def _light_goto_label(fh, args):' in entry_text
 assert 'elif op == "LABEL":' in entry_text
 assert 'elif op == "GOTO":' in entry_text
 assert '"PGROUP"' in entry_text
-assert 'op in ("RPKG", "PGROUP", "WSND")' in entry_text
+assert 'op in ("RPKG", "PGROUP", "WSND", "CLICK")' in entry_text
 assert 'op not in ("ENDLOOP", "PGROUP")' in entry_text
 runtime_pos = entry_text.index('import combined_guard_runtime as runtime')
 assert load_pos < runtime_pos

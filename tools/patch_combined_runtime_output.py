@@ -164,11 +164,14 @@ def _route_uses_plan_engine(name):
 
 
 def _run_plan_engine_route(owner, name):
+    # Keep the large PLAN|2 engine out of boot. RPKG and other containers load
+    # it only when the selected Route actually needs it.
+    import plan_engine as _plan_engine
     with open("/" + name, "r") as fh:
         text = fh.read()
-    route_plan = runtime.plan_engine.parse_plan(text)
+    route_plan = _plan_engine.parse_plan(text)
     try:
-        runtime.plan_engine.run_plan(route_plan, runtime.PlanContext(owner))
+        _plan_engine.run_plan(route_plan, runtime.PlanContext(owner))
     finally:
         del route_plan
     return True

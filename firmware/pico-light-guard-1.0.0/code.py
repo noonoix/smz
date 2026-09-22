@@ -577,9 +577,12 @@ def _diagnostic_route(self, decision):
             # Keep simple Pico-only routes off the large plan_engine import.
             _run_light_route(PlanContext(self), commands)
         else:
-            route_plan = runtime.plan_engine.parse_plan(text)
+            # Keep the large PLAN|2 engine out of boot. Container routes load
+            # it only when the selected Route actually needs it.
+            import plan_engine as _plan_engine
+            route_plan = _plan_engine.parse_plan(text)
             try:
-                runtime.plan_engine.run_plan(route_plan, PlanContext(self))
+                _plan_engine.run_plan(route_plan, PlanContext(self))
             finally:
                 del route_plan
         self.arm.flush()

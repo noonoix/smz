@@ -5,7 +5,7 @@ root = Path(__file__).resolve().parents[3]
 entry = root / "firmware/pico-light-guard-1.0.0/code.py"
 entry_text = entry.read_text(encoding="utf-8")
 
-compile(compile(entry_text, str(entry), "exec"), str(entry), "exec")
+compile(entry_text, str(entry), "exec")
 loader_pos = entry_text.index('import live_light_guard as _guard_bundle')
 assert entry_text.index('if not hasattr(_real_os, "path"):') < loader_pos
 assert "class _PathCompat:" in entry_text

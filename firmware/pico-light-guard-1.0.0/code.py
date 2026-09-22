@@ -598,6 +598,40 @@ def _diagnostic_route(self, decision):
 
 runtime.Combined.route = _diagnostic_route
 
+_ARM_ROUTE_COMMANDS = {"RMOUSE", "MOVETO", "CLICK", "WHEEL", "WSND", "TRGSND", "IFSND", "RAW"}
+
+
+def _route_requires_arm(self, name, seen=None):
+    """Return whether a route actually owns work for the Pro Micro.
+
+    SCREEN/SPEED are metadata and must never make a Pico-only keyboard route
+    contact the ARM. Inspect the route operations instead, including safe
+    INCLUDE files, so cursor origin synchronization is performed only for a
+    real mouse or sound-sensor route.
+    """
+    seen = set() if seen is None else seen
+    if name in seen:
+        return False
+    seen.add(name)
+    try:
+        with open("/" + name, "r") as fh:
+            lines = fh.read().splitlines()
+    except Exception:
+        return False
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        fields = line.split("|", 1)
+        op = fields[0].upper()
+        if op in _ARM_ROUTE_COMMANDS:
+            return True
+        if op == "INCLUDE" and len(fields) == 2 and fields[1].startswith("file="):
+            if _route_requires_arm(self, fields[1][5:].strip(), seen):
+                return True
+    return False
+
+
 def _audible_loop(self):
     self.emit("combined-pico-guard-executor|GP4 start/stop hold3s=calibration|GP3 pause/resume|GP6 piezo")
     last = 0
@@ -623,10 +657,14 @@ def _audible_loop(self):
                     if decision.get("execute"):
                         route_name = decision.get("route")
                         _debug_event(self, "ROUTE", "start %s lux=%.1f" % (route_name, lux), persist=True)
-                        if not _apply_pending_cursor(self, force=True):
-                            _debug_event(self, "CURSOR", "sync-failed-before-route", persist=True)
-                            raise RuntimeError("ARM cursor origin not acknowledged")
-                        _debug_event(self, "CURSOR", "sync-ok-before-route", persist=True)
+                        # Keyboard/logic routes belong entirely to the Pico.
+                        # Only a route containing an actual ARM operation may
+                        # require cursor-origin synchronization.
+                        if _route_requires_arm(self, route_name):
+                            if not _apply_pending_cursor(self, force=True):
+                                _debug_event(self, "CURSOR", "sync-failed-before-route", persist=True)
+                                raise RuntimeError("ARM cursor origin not acknowledged")
+                            _debug_event(self, "CURSOR", "sync-ok-before-route", persist=True)
                         completed = self.route(decision)
                         if completed is False:
                             _debug_event(self, "ROUTE", "aborted %s" % route_name, persist=True)
@@ -724,7 +762,9 @@ def _live_host_poll(self):
                 if x < 0 or y < 0:
                     raise ValueError("CURSOR range")
                 _CURSOR_PENDING = (x, y)
-                _apply_pending_cursor(self)
+                # Defer HSETCUR until a route with real mouse/sound work is
+                # selected. Host cursor telemetry alone must not wake ARM for
+                # a Pico-only keyboard route.
                 reply = None
             elif line == "GUARD|ON":
                 # A host Start is a new run request. Reset the one-shot light
@@ -733,7 +773,8 @@ def _live_host_poll(self):
                 self.guard.reset()
                 self.guard.last_decision = None
                 self.debug_last_state = None
-                _apply_pending_cursor(self, force=True)
+                # Do not synchronize ARM on a generic host start. The route
+                # ownership gate above will do it only for mouse/sound work.
                 self.controls.start()
                 self.guard_start_tone()
                 reply = "OK|GUARD|ON"

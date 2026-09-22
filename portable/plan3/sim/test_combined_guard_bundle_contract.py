@@ -11,6 +11,7 @@ sys.path.insert(0, str(root / "portable/plan3/CIRCUITPY"))
 from live_light_guard import (
     GuardBundleError,
     HASHED_BUNDLE_FILES,
+    OPTIONAL_COMPATIBILITY_SIDECARS,
     LightStateGuard,
     REQUIRED_BUNDLE_FILES,
     ROUTE_FILES,
@@ -76,8 +77,21 @@ with tempfile.TemporaryDirectory() as temporary:
     assert loaded["revision"] == REVISION
     assert len(loaded["states"]) == 6
     assert len({state["id"] for state in loaded["states"]}) == 6
-    assert len(ROUTE_FILES) == 7
+    assert len(ROUTE_FILES) == 8
     assert isinstance(LightStateGuard.from_bundle(str(bundle)), LightStateGuard)
+
+    # Older Classroom Studio exports included the three Random Package
+    # compatibility sidecars in SHA256SUMS.txt. They must remain bootable while
+    # new exports keep them outside the Golden manifest.
+    sidecar_lines = []
+    for filename in OPTIONAL_COMPATIBILITY_SIDECARS:
+        payload = (Path(filename).name + "\n").encode()
+        (bundle / filename).write_bytes(payload)
+        sidecar_lines.append(hashlib.sha256(payload).hexdigest() + "  " + filename)
+    with (bundle / "SHA256SUMS.txt").open("a", encoding="utf-8") as manifest_file:
+        manifest_file.write("\n".join(sidecar_lines) + "\n")
+    loaded_compat = load_guard_bundle(str(bundle))
+    assert loaded_compat["revision"] == REVISION
 
     manifest_path = bundle / "guard-transition.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))

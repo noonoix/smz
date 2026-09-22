@@ -26,6 +26,12 @@ public static class PortableGuardBundle
     {
         "plan_engine.py", "live_light_guard.py", "guard_transition.py", "guard_calibration_protocol.py", "error_policy.py", "combined_guard_runtime.py",
     };
+    // These three files are part of the Golden Pico staging contract but are
+    // compatibility sidecars: the Golden SHA manifest intentionally excludes them.
+    private static readonly string[] SidecarFiles =
+    {
+        "random_package_runtime.py", "settings.toml", "README-HID-TEST.txt",
+    };
     private static readonly string[] CombinedFirmwareFiles = { "code.py", "boot.py" };
 
     public static readonly IReadOnlyList<string> ExpectedBundleFiles = new[]
@@ -34,8 +40,8 @@ public static class PortableGuardBundle
         "desktop_steps.txt", "entering_game_loading_steps.txt", "error_policy.py", "game_steps.txt",
         "guard-calibration.json", "guard-transition.json", "guard_calibration_protocol.py",
         "guard_transition.py", "live_light_guard.py", "login_or_dc_steps.txt", "pico-calibration.json",
-        "plan.txt", "plan_engine.py", "README-FLASH.md", "resumable_steps.txt", "SHA256SUMS.txt",
-        "targeted_steps.txt",
+        "plan.txt", "plan_engine.py", "README-FLASH.md", "random_package_runtime.py", "README-HID-TEST.txt",
+        "resumable_steps.txt", "settings.toml", "SHA256SUMS.txt", "targeted_steps.txt",
     };
 
     public static IReadOnlyList<string> Export(string planPath, PipelineWorkspace workspace,
@@ -53,8 +59,9 @@ public static class PortableGuardBundle
         var runtimeDirectory = Path.Combine(AppContext.BaseDirectory, "portable-runtime");
         var combinedDirectory = Path.Combine(AppContext.BaseDirectory, "combined-runtime");
         var runtimeSources = RuntimeFiles.Select(name => (Name: name, Path: Path.Combine(runtimeDirectory, name))).ToArray();
+        var sidecarSources = SidecarFiles.Select(name => (Name: name, Path: Path.Combine(runtimeDirectory, name))).ToArray();
         var firmwareSources = CombinedFirmwareFiles.Select(name => (Name: name, Path: Path.Combine(combinedDirectory, name))).ToArray();
-        var missing = runtimeSources.Concat(firmwareSources).Where(item => !File.Exists(item.Path)).Select(item => item.Name).ToArray();
+        var missing = runtimeSources.Concat(sidecarSources).Concat(firmwareSources).Where(item => !File.Exists(item.Path)).Select(item => item.Name).ToArray();
         if (missing.Length > 0) throw new IOException("فایل runtime Combined Guard پیدا نشد: " + string.Join(", ", missing));
 
         var routeTexts = workspace.Tabs.ToDictionary(tab => tab.Kind, tab => tab.Steps.Count == 0 ? "PLAN|2\n" :
@@ -74,7 +81,7 @@ public static class PortableGuardBundle
         foreach (var firmware in firmwareSources)
         {
             var destination = Path.Combine(directory, firmware.Name);
-            AtomicWrite(destination, File.ReadAllBytes(firmware.Path));
+            AtomicWrite(destination, ReadTextPayload(firmware.Path));
             written.Add(destination);
         }
         foreach (var tab in workspace.Tabs)
@@ -95,8 +102,17 @@ public static class PortableGuardBundle
         foreach (var runtime in runtimeSources)
         {
             var destination = Path.Combine(directory, runtime.Name);
-            AtomicWrite(destination, File.ReadAllBytes(runtime.Path));
+            AtomicWrite(destination, ReadTextPayload(runtime.Path));
             written.Add(destination);
+        }
+        // Sidecars must be present for the Golden Pico bundle, but must remain
+        // outside SHA256SUMS.txt for byte-for-byte compatibility with Build 52.
+        var sidecarWritten = new List<string>();
+        foreach (var sidecar in sidecarSources)
+        {
+            var destination = Path.Combine(directory, sidecar.Name);
+            AtomicWrite(destination, ReadTextPayload(sidecar.Path));
+            sidecarWritten.Add(destination);
         }
         var hashesPath = Path.Combine(directory, "SHA256SUMS.txt");
         var files = written.Distinct(StringComparer.OrdinalIgnoreCase).Where(File.Exists).OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase).ToArray();
@@ -104,11 +120,11 @@ public static class PortableGuardBundle
         AtomicWrite(hashesPath, Encoding.UTF8.GetBytes(hashes));
         written.Add(hashesPath);
 
-        var actualNames = written.Select(Path.GetFileName).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
+        var actualNames = written.Concat(sidecarWritten).Select(Path.GetFileName).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
         var expectedNames = ExpectedBundleFiles.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
         if (!actualNames.SequenceEqual(expectedNames, StringComparer.OrdinalIgnoreCase))
             throw new InvalidDataException("Combined Guard bundle inventory mismatch.");
-        return written.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        return written.Concat(sidecarWritten).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     private static string CompileRoute(IEnumerable<StepNode> steps, AppSettings settings,
@@ -122,6 +138,14 @@ public static class PortableGuardBundle
                 ? line[(2 + PortableOpSentinel.Length)..]
                 : line));
 
+        // SCREEN and SPEED are route metadata, not keyboard commands. The shared
+        // PLAN|2 compiler emits them for every route, but the combined runtime
+        // forwards SCREEN as ARM SETRES. A Pico-only route must therefore not
+        // contain those metadata lines: otherwise a keyboard-only macro wakes
+        // the Pro Micro and fails when it is intentionally disconnected.
+        if (!RequiresArm(source))
+            route = StripArmMetadata(route);
+
         // Never silently ship a route that dropped a requested mouse action. This was the
         // failure mode seen in the 46 bundle: the .amsj contained randomMousePosition but
         // desktop_steps.txt did not contain RMOUSE. Fail during export with the route and
@@ -129,6 +153,26 @@ public static class PortableGuardBundle
         ValidateMouseExport(source, route, sourceName);
         return route;
     }
+
+    private static bool RequiresArm(IEnumerable<StepNode> nodes)
+    {
+        // Mouse and sound sensing are the only built-in portable operations that
+        // belong to the Pro Micro. rawCommand is intentionally conservative: it
+        // may carry a user-authored ARM command and must not be stripped of the
+        // route metadata contract.
+        var armOwned = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "randomMousePosition", "mouseMove", "mouseClick", "mouseScroll",
+            "waitForSound", "rawCommand",
+        };
+        return nodes.Any(node =>
+            !node.IsDisabled && (armOwned.Contains(node.Type) || RequiresArm(node.Children)));
+    }
+
+    private static string StripArmMetadata(string route)
+        => string.Join("\n", route.Split('\n').Where(line =>
+            !line.StartsWith("SCREEN|", StringComparison.Ordinal) &&
+            !line.StartsWith("SPEED|", StringComparison.Ordinal)));
 
     private static void ValidateMouseExport(IEnumerable<StepNode> nodes, string route, string sourceName)
     {
@@ -266,7 +310,7 @@ Generated by Classroom Studio v{ExporterVersion}.
 
 ## Safety gate
 
-This is a complete 21-file staging bundle for the Phase 7 combined Pico Guard executor. It is not hardware acceptance. Keep Guard OFF and do not press GP4/GP3 until provenance, `SHA256SUMS.txt`, and physical calibration have been reviewed. `pico-calibration.json` intentionally records `hardwareCalibrationVerified: false`; `guard-calibration.json` is the six-profile runtime calibration source of truth.
+This is a complete 24-file staging bundle for the Phase 7 combined Pico Guard executor. It is not hardware acceptance. Keep Guard OFF and do not press GP4/GP3 until provenance, `SHA256SUMS.txt`, and physical calibration have been reviewed. `pico-calibration.json` intentionally records `hardwareCalibrationVerified: false`; `guard-calibration.json` is the six-profile runtime calibration source of truth.
 
 Validated target: Raspberry Pi Pico running CircuitPython 10.3.0. This runtime includes its own small HID keyboard driver. Do not install or copy `adafruit_hid`; it is not a dependency of `combined_guard_runtime.py`.
 
@@ -274,7 +318,7 @@ Validated target: Raspberry Pi Pico running CircuitPython 10.3.0. This runtime i
 
 {files}
 
-All files must stay together at the root of the staging directory. `SHA256SUMS.txt` contains hashes for the other 20 files. Do not copy a partial subset to `CIRCUITPY`.
+All files must stay together at the root of the staging directory. `SHA256SUMS.txt` contains hashes for the 20 core payload files. `random_package_runtime.py`, `settings.toml`, and `README-HID-TEST.txt` are Golden compatibility sidecars and are intentionally outside the hash manifest. Do not copy a partial subset to `CIRCUITPY`.
 
 ## Wiring contract
 
@@ -287,7 +331,7 @@ All files must stay together at the root of the staging directory. `SHA256SUMS.t
 ## Controlled installation sequence
 
 1. Keep the PR Draft and verify artifact provenance against the reviewed source commit.
-2. Export into a new empty staging directory; verify all 20 manifest hashes and the exact 21-file inventory.
+2. Export into a new empty staging directory; verify all 20 manifest hashes and the exact 24-file inventory.
 3. Confirm `combined_guard_runtime.py` has no `adafruit_hid` import and no `class Keycode`.
 4. Only after an explicit installation approval, copy the complete bundle to a freshly prepared `CIRCUITPY` root.
 5. Boot fail-closed with Guard OFF; do not start a route.
@@ -317,6 +361,18 @@ All files must stay together at the root of the staging directory. `SHA256SUMS.t
         "entering-game-loading" => PipelineKind.EnteringGameLoading, "game" => PipelineKind.Game, "targeted" => PipelineKind.Targeted,
         _ => throw new InvalidDataException("Unknown Guard profile: " + id),
     };
+
+    private static byte[] ReadTextPayload(string path)
+    {
+        // Git/Windows may materialize newly added Python sidecars as CRLF.
+        // CircuitPython can be strict around the entry point; Golden Build 52
+        // is LF-normalized, so preserve that byte-level contract in every
+        // exported text runtime file.
+        var text = File.ReadAllText(path, Encoding.UTF8)
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n');
+        return Encoding.UTF8.GetBytes(text);
+    }
 
     private static void AtomicWrite(string path, byte[] bytes)
     {

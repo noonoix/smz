@@ -2,6 +2,10 @@
 from pathlib import Path
 import sys
 p=Path(sys.argv[1]); s=p.read_text(encoding='utf-8')
+if "# GOLDEN_PICO_RUNTIME_52_RPKG" in s:
+    p.write_text(s, encoding="utf-8", newline="\n")
+    print("Golden Pico runtime preserved", p)
+    raise SystemExit(0)
 for old,new in {
 'raise GuardBundleError("unvalidated route")':'raise runtime.GuardBundleError("unvalidated route")',
 '    if persist or any(kind.startswith(prefix) for prefix in _DEBUG_PERSIST_EVENTS):\n        _debug_persist(self)':'    if kind in ("BOOT", "FAIL"):\n        _debug_persist(self)',
@@ -146,7 +150,43 @@ def _light_key(owner, args, expected_state):
             owner.keyboard.release(codes[pressed])
 
 
+_PLAN_ENGINE_ROUTE_COMMANDS = {"RPKG", "PKGITEM", "ENDPKG", "PGROUP", "PARITEM", "ENDPAR", "CLICK", "WHEEL", "RAW", "WSND", "TRGSND", "IFSND", "IFLUX", "ELSE", "ENDIF", "LABEL", "GOTO", "INCLUDE", "STATELOOP"}
+
+
+def _route_uses_plan_engine(name):
+    try:
+        with open("/" + name, "r") as fh:
+            for raw in fh:
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if line.split("|", 1)[0].upper() in _PLAN_ENGINE_ROUTE_COMMANDS:
+                    return True
+    except Exception:
+        return False
+    return False
+
+
+def _run_plan_engine_route(owner, name):
+    # Keep the large PLAN|2 engine out of boot. RPKG and other containers load
+    # it only when the selected Route actually needs it.
+    import plan_engine as _plan_engine
+    with open("/" + name, "r") as fh:
+        text = fh.read()
+    route_plan = _plan_engine.parse_plan(text)
+    try:
+        _plan_engine.run_plan(route_plan, runtime.PlanContext(owner))
+    finally:
+        del route_plan
+    return True
+
+
 def _run_light_route(owner, name):
+    # PLAN|2 containers such as RPKG are not part of the small streaming
+    # light-route parser. Delegate them to the full engine instead of falling
+    # through to "unsupported light command".
+    if _route_uses_plan_engine(name):
+        return _run_plan_engine_route(owner, name)
     gc.collect()
     owner.emit("EVT|DEBUG|MEM/route-enter free=%d" % gc.mem_free())
     expected = getattr(owner, "debug_last_state", None)

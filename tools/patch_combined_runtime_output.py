@@ -8,15 +8,6 @@ for old,new in {
 }.items():
     if old in s: s=s.replace(old,new)
     elif new not in s: raise SystemExit('missing anchor: '+old)
-# The current combined runtime already contains the ownership-aware route
-# dispatcher. Do not apply the legacy light-route replacement below: that
-# replacement predates PLAN|2 containers and rejects RPKG as an unsupported
-# light command. Keep the small compatibility substitutions above, then leave
-# the current source intact and let it reach the bundle unchanged.
-if "def _light_route_lines(text):" in s and "runtime.plan_engine.parse_plan(text)" in s:
-    p.write_text(s, encoding="utf-8")
-    raise SystemExit(0)
-
 block='''import random as _light_random
 
 _LIGHT_ROUTE_COMMANDS = {"PLAN", "SCREEN", "SPEED", "BEEP", "DELAY", "LOOP", "LOOPTIME", "ENDLOOP", "KEY", "KDOWN", "KUP"}
@@ -155,7 +146,40 @@ def _light_key(owner, args, expected_state):
             owner.keyboard.release(codes[pressed])
 
 
+_PLAN_ENGINE_ROUTE_COMMANDS = {"RPKG", "PKGITEM", "ENDPKG", "PGROUP", "PARITEM", "ENDPAR", "CLICK", "WHEEL", "RAW", "WSND", "TRGSND", "IFSND", "IFLUX", "ELSE", "ENDIF", "LABEL", "GOTO", "INCLUDE", "STATELOOP"}
+
+
+def _route_uses_plan_engine(name):
+    try:
+        with open("/" + name, "r") as fh:
+            for raw in fh:
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if line.split("|", 1)[0].upper() in _PLAN_ENGINE_ROUTE_COMMANDS:
+                    return True
+    except Exception:
+        return False
+    return False
+
+
+def _run_plan_engine_route(owner, name):
+    with open("/" + name, "r") as fh:
+        text = fh.read()
+    route_plan = runtime.plan_engine.parse_plan(text)
+    try:
+        runtime.plan_engine.run_plan(route_plan, runtime.PlanContext(owner))
+    finally:
+        del route_plan
+    return True
+
+
 def _run_light_route(owner, name):
+    # PLAN|2 containers such as RPKG are not part of the small streaming
+    # light-route parser. Delegate them to the full engine instead of falling
+    # through to "unsupported light command".
+    if _route_uses_plan_engine(name):
+        return _run_plan_engine_route(owner, name)
     gc.collect()
     owner.emit("EVT|DEBUG|MEM/route-enter free=%d" % gc.mem_free())
     expected = getattr(owner, "debug_last_state", None)

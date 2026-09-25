@@ -15,6 +15,21 @@ namespace Ams.UI.Services;
 /// </summary>
 public static class AutoCycleFirmwareBundle
 {
+    private static readonly HashSet<string> ForceLfFiles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "character_dashboard_steps.txt", "code.py", "combined_guard_runtime.py",
+        "desktop_steps.txt", "entering_game_loading_steps.txt", "game_steps.txt",
+        "live_light_guard.py", "login_or_dc_steps.txt", "plan.txt", "restart_steps.txt",
+        "resumable_steps.txt", "settings.toml", "targeted_steps.txt",
+    };
+
+    private static readonly HashSet<string> ForceCrlfFiles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "autocycle.amsj", "boot.py", "boot_out.txt", "error_policy.py",
+        "guard-calibration.json", "guard-transition.json", "guard_calibration_protocol.py",
+        "guard_transition.py", "pico-calibration.json", "plan_engine.py",
+    };
+
     private static readonly string[] ManifestFiles100 =
     {
         "boot.py",
@@ -121,20 +136,25 @@ public static class AutoCycleFirmwareBundle
         }
 
         foreach (var name in Golden100Files)
-            File.Copy(Path.Combine(runtimeDir, name), Path.Combine(stagingDir, name), true);
+        {
+            var source = File.ReadAllBytes(Path.Combine(runtimeDir, name));
+            var normalized = NormalizeLineEndings(name, source);
+            File.WriteAllBytes(Path.Combine(stagingDir, name), normalized);
+        }
 
         // The source ZIP was created on Windows, while GitHub stores text blobs with
         // normalized LF endings. Rebuild the manifest from the bytes actually copied;
         // this keeps the exact 100 inventory and prevents a false hash failure at boot.
         var hashes = new StringBuilder();
-        foreach (var name in ManifestFiles100.OrderBy(name => name, StringComparer.Ordinal))
+        foreach (var name in ManifestFiles100)
         {
             using var stream = File.OpenRead(Path.Combine(stagingDir, name));
             using var sha = System.Security.Cryptography.SHA256.Create();
             hashes.Append(Convert.ToHexString(sha.ComputeHash(stream)).ToLowerInvariant())
                 .Append("  ").Append(name).Append('\n');
         }
-        File.WriteAllText(Path.Combine(stagingDir, "SHA256SUMS.txt"), hashes.ToString(),
+        File.WriteAllText(Path.Combine(stagingDir, "SHA256SUMS.txt"),
+            hashes.ToString().Replace("\n", "\r\n", StringComparison.Ordinal),
             new UTF8Encoding(false));
 
         // The old C# smoke test calls the helper directly with a sentinel machine name.
@@ -160,5 +180,15 @@ public static class AutoCycleFirmwareBundle
         return Golden100Files
             .Select(name => Path.Combine(stagingDir, name))
             .ToArray();
+    }
+
+    private static byte[] NormalizeLineEndings(string name, byte[] bytes)
+    {
+        if (!ForceLfFiles.Contains(name) && !ForceCrlfFiles.Contains(name)) return bytes;
+        var text = Encoding.UTF8.GetString(bytes)
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace("\r", "\n", StringComparison.Ordinal);
+        if (ForceCrlfFiles.Contains(name)) text = text.Replace("\n", "\r\n", StringComparison.Ordinal);
+        return new UTF8Encoding(false).GetBytes(text);
     }
 }

@@ -44,8 +44,13 @@ jobs:
         shell: pwsh
         run: |
           dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object ci-test-output.txt
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if (Select-String -Path ci-test-output.txt -Pattern '([1-9][0-9]*) failed' -Quiet) { exit 1 }
+          $exitCode = $LASTEXITCODE
+          $fails = Select-String -Path ci-test-output.txt -Pattern '^FAIL:'
+          foreach ($fail in $fails) {
+            Write-Host "::error file=tests/TestRunner.cs::$($fail.Line)"
+          }
+          if ($exitCode -ne 0) { exit $exitCode }
+          if ($fails.Count -gt 0) { exit 1 }
 
       - name: Package current Classroom Studio
         if: success()
@@ -56,8 +61,8 @@ jobs:
           Compress-Archive -Path "$out/*" -DestinationPath Classroom-Studio-current.zip -Force
           (Get-FileHash Classroom-Studio-current.zip -Algorithm SHA256).Hash | Out-File sha256.txt -Encoding ascii
 
-      - name: Upload current build
-        if: success()
+      - name: Upload current build or test log
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Classroom-Studio-current-${{ github.sha }}
@@ -65,4 +70,4 @@ jobs:
             Classroom-Studio-current.zip
             sha256.txt
             ci-test-output.txt
-          if-no-files-found: error
+          if-no-files-found: warn

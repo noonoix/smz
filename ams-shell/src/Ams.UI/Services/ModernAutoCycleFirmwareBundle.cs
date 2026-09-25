@@ -29,7 +29,19 @@ public static class ModernAutoCycleFirmwareBundle
             ?? throw new IOException("مسیر خروجی firmware نامعتبر است.");
         var runtimeDir = Path.Combine(AppContext.BaseDirectory, "portable-modern-runtime");
 
-        foreach (var name in Files)
+        var sourceManifest = Path.Combine(runtimeDir, "SHA256SUMS.txt");
+        if (!File.Exists(sourceManifest))
+            throw new IOException("Manifest Bundle مدرن پیدا نشد.");
+        var manifestNames = File.ReadAllLines(sourceManifest)
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .Select(line => line.Split(new[] { "  " }, StringSplitOptions.None))
+            .Where(parts => parts.Length == 2)
+            .Select(parts => parts[1].Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (manifestNames.Length != 24)
+            throw new IOException("تعداد فایل‌های Manifest Bundle مدرن نامعتبر است.");
+        foreach (var name in Files.Concat(manifestNames).Distinct(StringComparer.OrdinalIgnoreCase))
         {
             if (!File.Exists(Path.Combine(runtimeDir, name)))
                 throw new IOException("فایل Bundle مدرن پیدا نشد: " + name);
@@ -55,18 +67,19 @@ public static class ModernAutoCycleFirmwareBundle
         foreach (var name in Files)
             File.Copy(Path.Combine(runtimeDir, name), Path.Combine(stagingDir, name), true);
 
-        // Verify the copied manifest payload before the caller touches CIRCUITPY.
-        var manifest = File.ReadAllLines(Path.Combine(stagingDir, "SHA256SUMS.txt"));
-        foreach (var line in manifest)
+        // Rebuild the manifest from the bytes actually copied. Windows checkout
+        // may normalize README/text line endings, so the source manifest cannot
+        // be trusted byte-for-byte after a Windows build.
+        var rebuiltManifest = new List<string>(manifestNames.Length);
+        foreach (var name in manifestNames)
         {
-            var parts = line.Split(new[] { "  " }, StringSplitOptions.None);
-            if (parts.Length != 2 || !File.Exists(Path.Combine(stagingDir, parts[1])))
-                throw new IOException("Manifest فایل Bundle مدرن نامعتبر است: " + line);
-            using var stream = File.OpenRead(Path.Combine(stagingDir, parts[1]));
+            var path = Path.Combine(stagingDir, name);
+            using var stream = File.OpenRead(path);
             var actual = Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
-            if (!string.Equals(actual, parts[0], StringComparison.OrdinalIgnoreCase))
-                throw new IOException("SHA256 فایل Bundle مدرن ناهماهنگ است: " + parts[1]);
+            rebuiltManifest.Add(actual + "  " + name);
         }
+        File.WriteAllText(Path.Combine(stagingDir, "SHA256SUMS.txt"),
+            string.Join(Environment.NewLine, rebuiltManifest) + Environment.NewLine);
 
         return Files.Select(name => Path.Combine(stagingDir, name)).ToArray();
     }

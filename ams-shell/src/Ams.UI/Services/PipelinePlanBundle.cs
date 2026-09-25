@@ -10,6 +10,9 @@ namespace Ams.UI.Services;
 /// </summary>
 public static class PipelinePlanBundle
 {
+    // Legacy compatibility names intentionally remain visible to the exporter contract:
+    // PipelineKind.Launch maps to Restart and launch_steps.txt is still emitted by the
+    // root AutoCyclePlanBundle alongside the new nine route files.
     private const string MainSentinel = "__PIPELINE_CALL_MAIN_DC_RECOVERY__";
     private const string LaunchSentinel = "__PIPELINE_CALL_LAUNCH_DC_RECOVERY__";
 

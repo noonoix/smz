@@ -325,13 +325,16 @@ _GUARD_STOP_PATTERN = ((392, 180), (330, 160), (262, 260), (0, 60), (196, 260))
 _GUARD_PAUSE_PATTERN = ((523, 180), (0, 100), (523, 180), (0, 100), (523, 340))
 _GUARD_RESUME_PATTERN = ((659, 150), (784, 150), (988, 150), (784, 150), (988, 300))
 
+_BOOT_BUNDLE = None
+
 class Combined:
     def __init__(self):
         self.arm = Arm(); self.keyboard = Keyboard(usb_hid.devices); self.controls = Controls(self.arm, self.keyboard); self.sensor = BH1750()
-        # Load the bundle once. Calling from_bundle() here used to parse the
-        # two JSON files a second time and retain duplicate dictionaries, which
-        # left too little contiguous heap for the first plan-engine import.
-        self.bundle = load_guard_bundle("/", verify=False)
+        global _BOOT_BUNDLE
+        self.bundle = _BOOT_BUNDLE
+        _BOOT_BUNDLE = None
+        if self.bundle is None:
+            self.bundle = load_guard_bundle("/", verify=False)
         self.guard = LightStateGuard(self.bundle["states"], self.bundle["stable_ms"], self.bundle["hysteresis"], self.bundle["sensor_timeout_ms"])
         self.guard.bundle = self.bundle
         gc.collect()
@@ -700,28 +703,37 @@ class Combined:
             self.keyboard.release(esc)
         return True
     def route(self, decision):
-        if not decision.get("execute"): return
-        # Keep the 56 KB plan parser out of second-stage boot. It is loaded only
-        # when a validated optical transition actually needs to execute a route.
-        gc.collect()
-        import plan_engine
-        gc.collect()
+        if not decision.get("execute"):
+            return
         name = decision.get("route")
-        if name not in self.bundle["manifest"]["routes"].values(): raise GuardBundleError("unvalidated route")
-        # A parsed plan is consumable: loop/random bookkeeping must not be
-        # reused by a later invocation of the same Route.
-        with open("/" + name, "r") as fh:
-            route_plan = plan_engine.parse_plan(fh.read())
-        self.arm.prepare_route()
+        if name not in self.bundle["manifest"]["routes"].values():
+            raise GuardBundleError("unvalidated route")
+        route_plan = None
         try:
+            # The compact boot handoff leaves the contiguous heap needed by
+            # this lazy import. Always collect before parsing a route.
+            gc.collect()
+            import plan_engine
+            gc.collect()
+            with open("/" + name, "r") as fh:
+                route_plan = plan_engine.parse_plan(fh.read())
+            self.arm.prepare_route()
             if not self._dismiss_dc_popup(decision):
                 return
             plan_engine.run_plan(route_plan, PlanContext(self))
             self.arm.flush()
         finally:
-            # Always leave the Pro Micro neutral even when a plan step fails.
-            self.arm.release(False)
-            del route_plan
+            # Cleanup also covers import/parse failures, which previously left
+            # the partial plan allocation alive and suppressed the Stop cue.
+            try:
+                self.keyboard.release_all()
+            except Exception:
+                pass
+            try:
+                self.arm.release(False)
+            except Exception:
+                pass
+            route_plan = None
             gc.collect()
     def host_poll(self):
         if self.usb.in_waiting: self.host.extend(self.usb.read(self.usb.in_waiting))
@@ -750,6 +762,8 @@ class Combined:
                     if self.guard.last_decision is not None: self.route(self.guard.last_decision)
                 except Exception as exc:
                     self.controls.stop()
+                    self._audio_stop()
+                    self.guard_stop_tone()
                     self.emit("ERR|GUARD|FAIL|%s:%s" % (type(exc).__name__, str(exc)[:48]))
             time.sleep(.01)
 

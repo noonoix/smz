@@ -328,7 +328,13 @@ _GUARD_RESUME_PATTERN = ((659, 150), (784, 150), (988, 150), (784, 150), (988, 3
 class Combined:
     def __init__(self):
         self.arm = Arm(); self.keyboard = Keyboard(usb_hid.devices); self.controls = Controls(self.arm, self.keyboard); self.sensor = BH1750()
-        self.bundle = load_guard_bundle("/", verify=False); self.guard = LightStateGuard.from_bundle("/", verify=False); self.routes = {}
+        # Load the bundle once. Calling from_bundle() here used to parse the
+        # two JSON files a second time and retain duplicate dictionaries, which
+        # left too little contiguous heap for the first plan-engine import.
+        self.bundle = load_guard_bundle("/", verify=False)
+        self.guard = LightStateGuard(self.bundle["states"], self.bundle["stable_ms"], self.bundle["hysteresis"], self.bundle["sensor_timeout_ms"])
+        self.guard.bundle = self.bundle
+        gc.collect()
         self.blue = Button(board.GP4); self.yellow = Button(board.GP3); self.usb = usb_cdc.data or usb_cdc.console; self.host = bytearray()
         self.calibrating = False; self.stage = 0; self.samples = []; self.sample_started = 0; self.result = None; self.saved = False; self.saved_ids = set(); self.last_cal_error = None; self.session_saved_ids = set(); self.audio_tone = None; self.audio_until = 0; self.audio_pattern = (); self.audio_index = 0
     def _audio_stop(self):
@@ -737,7 +743,7 @@ class Combined:
         self.emit("combined-pico-guard-executor|GP4 start/stop hold3s=calibration|GP3 pause/resume|GP6 piezo"); last = 0
         while True:
             self.host_poll(); self.buttons(); self.arm.pump(); self._audio_tick()
-            if self.controls.running and not self.calibrating and time.monotonic() - last >= .25:
+            if self.controls.running and not self.calibrating and not self.audio_pattern and time.monotonic() - last >= .25:
                 last = time.monotonic()
                 try:
                     self.guard.update(self.sensor.lux(), int(last * 1000))

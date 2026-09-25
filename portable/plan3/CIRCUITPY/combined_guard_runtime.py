@@ -99,11 +99,14 @@ class Keyboard:
                 pass
 
 # Combined Guard routes are executed only by the bounded streaming runner.
-# The verifier/protocol dependencies are bound by code.py after this module
-# imports. This avoids a nested allocation peak on the RP2040.
-# Contract markers for the deferred bindings:
-# from guard_calibration_protocol import build_calibration_get, parse_calibration_set
-# from live_light_guard import HASHED_BUNDLE_FILES, GuardBundleError, LightStateGuard, _file_sha256, load_guard_bundle
+from guard_calibration_protocol import build_calibration_get, parse_calibration_set
+from live_light_guard import (
+    HASHED_BUNDLE_FILES,
+    GuardBundleError,
+    LightStateGuard,
+    _file_sha256,
+    load_guard_bundle,
+)
 
 PROFILES = ("desktop", "login-or-dc", "character-dashboard", "entering-game-loading", "game", "targeted")
 PENDING_REVISION = "pending"
@@ -497,10 +500,6 @@ class Combined:
         # marks a stable observation from stages 3–5 as context=dc, so ESC is
         # never injected on the actual login path.
         if decision.get("context") != "dc":
-            return True
-        # New bundles carry the explicit DC tab as dc_steps.txt. Keep the inline
-        # injector only for legacy bundles that do not publish that route.
-        if decision.get("route") == "dc_steps.txt":
             return True
         delay_ms = random.randint(DC_ESC_DELAY_MIN_MS, DC_ESC_DELAY_MAX_MS)
         self.emit("EVT|DC|ESC|phase=delay|delay-ms=%d" % delay_ms)

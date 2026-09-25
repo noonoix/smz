@@ -63,33 +63,21 @@ if not hasattr(_real_hashlib, "sha256"):
 
 # plan_engine is intentionally absent from Combined Guard.
 
-# Import the hardware runtime before the verifier and bundle load. The
-# verifier is bound after the large runtime module is resident so the RP2040
-# keeps a contiguous heap block during boot.
-gc.collect()
-import combined_guard_runtime as runtime
-from combined_guard_runtime import main
-runtime.plan_engine = sys.modules["plan_engine"]
-
-gc.collect()
 import live_light_guard as _guard_bundle
-from guard_calibration_protocol import build_calibration_get, parse_calibration_set
-runtime.HASHED_BUNDLE_FILES = _guard_bundle.HASHED_BUNDLE_FILES
-runtime.GuardBundleError = _guard_bundle.GuardBundleError
-runtime.LightStateGuard = _guard_bundle.LightStateGuard
-runtime._file_sha256 = _guard_bundle._file_sha256
-runtime.load_guard_bundle = _guard_bundle.load_guard_bundle
-runtime.build_calibration_get = build_calibration_get
-runtime.parse_calibration_set = parse_calibration_set
 
 # Classroom Studio's complete 21-file export hashes every payload except the
-# hash manifest itself. Extend the verifier inventory before loading the bundle.
+# hash manifest itself. Extend the verifier inventory before loading the bundle
+# and before importing the large executor module.
 for _name in ("pico-calibration.json", "README-FLASH.md"):
     if _name not in _guard_bundle.HASHED_BUNDLE_FILES:
         _guard_bundle.HASHED_BUNDLE_FILES += (_name,)
-runtime.HASHED_BUNDLE_FILES = _guard_bundle.HASHED_BUNDLE_FILES
 _BOOT_BUNDLE = _guard_bundle.load_guard_bundle("/")
 
+# Keep the contractually required order (verify/load before importing the
+# executor), but discard export-only JSON fields while the executor is compiled.
+# The full manifest/calibration objects are mostly redundant metadata; runtime
+# only needs the route map and the six editable profile values. Retaining a
+# compact copy leaves a contiguous heap block for combined_guard_runtime.py.
 def _compact_boot_bundle(bundle):
     manifest = bundle["manifest"]
     calibration = bundle["calibration"]
@@ -132,6 +120,8 @@ _BOOT_BUNDLE = _compact_boot_bundle(_BOOT_BUNDLE)
 del _name, _guard_bundle
 gc.collect()
 
+import combined_guard_runtime as runtime
+from combined_guard_runtime import main
 
 _DEBUG_FILE = "/guard-debug.log"
 _DEBUG_MAX_BYTES = 8192

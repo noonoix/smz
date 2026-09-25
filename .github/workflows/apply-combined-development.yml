@@ -31,6 +31,16 @@ jobs:
           PY
           git apply --check combined-development.patch
           git apply combined-development.patch
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('ams-shell/src/Ams.UI/Views/StepDialog.xaml.cs')
+          text = p.read_text(encoding='utf-8')
+          old = 'Foreground = (Brush)Application.Current.Resources["TextSecondaryBrush"],'
+          new = 'Foreground = (System.Windows.Media.Brush)System.Windows.Application.Current.Resources["TextSecondaryBrush"],'
+          if text.count(old) != 1:
+              raise SystemExit('expected exactly one unqualified WPF brush expression')
+          p.write_text(text.replace(old, new), encoding='utf-8')
+          PY
           git diff --check
       - uses: actions/setup-python@v5
         with:

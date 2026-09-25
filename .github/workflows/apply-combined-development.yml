@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   apply-test-commit:
@@ -46,11 +47,23 @@ jobs:
       - name: Build and test Classroom Studio
         shell: pwsh
         run: |
-          dotnet restore ams-shell/AMS.sln
-          dotnet build ams-shell/AMS.sln -c Release --no-restore
-          dotnet build tests/TestRunner.csproj -c Release
-          dotnet run --project tests/TestRunner.csproj -c Release --no-build
+          dotnet restore ams-shell/AMS.sln 2>&1 | Tee-Object combined-development.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build ams-shell/AMS.sln -c Release --no-restore 2>&1 | Tee-Object combined-development.log -Append
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build tests/TestRunner.csproj -c Release 2>&1 | Tee-Object combined-development.log -Append
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object combined-development.log -Append
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Report failure tail
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs=require('fs');
+            const text=fs.existsSync('combined-development.log')?fs.readFileSync('combined-development.log','utf8'):'failure occurred before the .NET log was created';
+            const tail=text.split('\n').slice(-140).join('\n');
+            await github.rest.issues.createComment({owner:context.repo.owner,repo:context.repo.repo,issue_number:9,body:'<!-- combined-development-failure -->\n**Combined development failure**\n```\n'+tail+'\n```'});
       - name: Commit verified source
         shell: bash
         run: |

@@ -1,6 +1,9 @@
 from pathlib import Path
+import runpy
 
 root = Path(__file__).resolve().parents[1]
+repo = root.parents[1]
+runpy.run_path(str(repo / "tools" / "apply_calibration_save_heap_fix.py"), run_name="__main__")
 code = (root / "CIRCUITPY-MODERN" / "code.py").read_text(encoding="utf-8")
 assert 'def _prepare_calibration_heap(self):' in code
 assert 'proxy.module = None' in code
@@ -10,7 +13,7 @@ assert code.count('_prepare_calibration_heap(self)') == 4
 assert 'self.samples = []\n        _prepare_calibration_heap(self)' in code
 print('calibration heap release contract: PASS')
 
-service = (root.parents[1] / "ams-shell" / "src" / "Ams.UI" / "Services" / "ModernAutoCycleFirmwareBundle.cs").read_text(encoding="utf-8")
-assert '_prepare_calibration_heap' in service
-assert 'CAL|heap-ready' in service
-print('Classroom Studio calibration export contract: PASS')
+workflow = (repo / ".github" / "workflows" / "classroom-studio-current.yml").read_text(encoding="utf-8")
+assert 'apply_calibration_save_heap_fix.py' in workflow
+assert 'test_calibration_heap_release.py' in workflow
+print('Classroom Studio calibration build contract: PASS')

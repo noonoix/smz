@@ -1,5 +1,6 @@
 # Combined Phase 7 board-owned runtime. It validates the exported bundle before routing.
 import gc
+import json
 import math
 import os
 import random
@@ -244,16 +245,11 @@ class Button:
     def poll(self, now):
         pressed = not self.io.value
         if pressed != self.down and now - self.changed >= .04:
-            self.changed = now
-            self.down = pressed
-            if pressed:
-                self.started = now
-                return "down"
-            was_long = self.long or (now - self.started >= 3)
-            self.long = False
-            return "long-up" if was_long else "up"
+            self.changed = now; self.down = pressed
+            if pressed: self.started = now; self.long = False; return "down"
+            return "up"
+        if pressed and not self.long and now - self.started >= 3: self.long = True; return "long"
         return None
-
 
 class Controls:
     def __init__(self, arm, keyboard): self.arm = arm; self.keyboard = keyboard; self.running = False; self.paused = False; self.aborted = False
@@ -319,116 +315,12 @@ class PlanContext:
             if not self.sleep_ms(20): return False
         return False
 
-_CAL_NOTES = (262, 294, 330, 349, 392, 440)
-_GUARD_START_PATTERN = ((784, 160), (988, 160), (1175, 200), (0, 80), (1175, 280))
-_GUARD_STOP_PATTERN = ((392, 180), (330, 160), (262, 260), (0, 60), (196, 260))
-_GUARD_PAUSE_PATTERN = ((523, 180), (0, 100), (523, 180), (0, 100), (523, 340))
-_GUARD_RESUME_PATTERN = ((659, 150), (784, 150), (988, 150), (784, 150), (988, 300))
-
-_BOOT_BUNDLE = None
-
 class Combined:
     def __init__(self):
         self.arm = Arm(); self.keyboard = Keyboard(usb_hid.devices); self.controls = Controls(self.arm, self.keyboard); self.sensor = BH1750()
-        global _BOOT_BUNDLE
-        self.bundle = _BOOT_BUNDLE
-        _BOOT_BUNDLE = None
-        if self.bundle is None:
-            self.bundle = load_guard_bundle("/", verify=False)
-        self.guard = LightStateGuard(self.bundle["states"], self.bundle["stable_ms"], self.bundle["hysteresis"], self.bundle["sensor_timeout_ms"])
-        self.guard.bundle = self.bundle
-        gc.collect()
+        self.bundle = load_guard_bundle("/"); self.guard = LightStateGuard.from_bundle("/"); self.routes = {}
         self.blue = Button(board.GP4); self.yellow = Button(board.GP3); self.usb = usb_cdc.data or usb_cdc.console; self.host = bytearray()
-        self.calibrating = False; self.stage = 0; self.samples = []; self.sample_started = 0; self.result = None; self.saved = False; self.saved_ids = set(); self.last_cal_error = None; self.session_saved_ids = set(); self.audio_tone = None; self.audio_until = 0; self.audio_pattern = (); self.audio_index = 0
-    def _audio_stop(self):
-        if self.audio_tone is not None:
-            try:
-                self.audio_tone.duty_cycle = 0
-                self.audio_tone.deinit()
-            except Exception:
-                pass
-            self.audio_tone = None
-        self.audio_pattern = ()
-        self.audio_index = 0
-
-    def _audio_start_next(self):
-        if self.audio_index >= len(self.audio_pattern):
-            self.audio_pattern = ()
-            return
-        frequency, duration_ms = self.audio_pattern[self.audio_index]
-        self.audio_index += 1
-        if frequency <= 0:
-            self.audio_until = time.monotonic() + max(0, duration_ms) / 1000
-            return
-        try:
-            gc.collect()
-            self.audio_tone = pwmio.PWMOut(board.GP6, duty_cycle=32768,
-                                            frequency=int(frequency),
-                                            variable_frequency=True)
-            self.audio_until = time.monotonic() + max(0, duration_ms) / 1000
-        except Exception:
-            self.audio_tone = None
-            self.audio_pattern = ()
-            self.audio_index = 0
-            self.emit("ERR|CAL|AUDIO")
-
-    def _audio_play(self, pattern):
-        self._audio_stop()
-        self.audio_pattern = pattern
-        self.audio_index = 0
-        self._audio_start_next()
-
-    def _audio_tick(self):
-        if self.audio_pattern and time.monotonic() >= self.audio_until:
-            if self.audio_tone is not None:
-                try:
-                    self.audio_tone.duty_cycle = 0
-                    self.audio_tone.deinit()
-                except Exception:
-                    pass
-                self.audio_tone = None
-            self._audio_start_next()
-
-    def _cal_beep(self, frequency, duration_ms):
-        self._audio_play(((frequency, duration_ms),))
-
-    def cal_position_tone(self):
-        self._cal_beep(_CAL_NOTES[self.stage], 220)
-
-    def cal_record_start_tone(self):
-        self._cal_beep(660, 65)
-
-    def cal_stage_complete_tone(self):
-        note = _CAL_NOTES[self.stage]
-        self._audio_play(((note, 110), (0, 60), (note, 190)))
-
-    def cal_save_success_tone(self):
-        self._audio_play(((880, 90), (0, 50), (1320, 180)))
-
-    def cal_refused_tone(self):
-        self._audio_play(((180, 180), (0, 70), (180, 180)))
-
-    def cal_exit_tone(self):
-        self._audio_play(((440, 100), (330, 180), (220, 240)))
-
-    def cal_complete_melody(self):
-        self._audio_play(tuple((note, 90) for note in _CAL_NOTES))
-
-    def _guard_pattern(self, pattern):
-        self._audio_play(pattern)
-
-    def guard_start_tone(self):
-        self._guard_pattern(_GUARD_START_PATTERN)
-
-    def guard_stop_tone(self):
-        self._guard_pattern(_GUARD_STOP_PATTERN)
-
-    def guard_pause_tone(self):
-        self._guard_pattern(_GUARD_PAUSE_PATTERN)
-
-    def guard_resume_tone(self):
-        self._guard_pattern(_GUARD_RESUME_PATTERN)
-
+        self.calibrating = False; self.stage = 0; self.samples = []; self.sample_started = 0; self.result = None; self.saved = False; self.saved_ids = set(); self.last_cal_error = None
     def key(self, vk):
         # Convert Windows virtual-key values directly to USB HID usages.
         # Keep this branch-only mapping allocation-free on CircuitPython's small heap.
@@ -504,7 +396,6 @@ class Combined:
         lines = ["%s  %s" % (_file_sha256("/", name), name) for name in sorted(HASHED_BUNDLE_FILES)]
         return "\n".join(lines) + "\n"
     def _publish_calibration(self, revision, profile_id, profile):
-        import json
         manifest = json.loads(json.dumps(self.bundle["manifest"]))
         calibration = json.loads(json.dumps(self.bundle["calibration"]))
         manifest["calibrationRevision"] = revision
@@ -569,120 +460,40 @@ class Combined:
             return "ERR|CALSET|SAVE"
         return "OK|CALSET|%s|revision=%s|count=%d" % (payload["id"], payload["revision"], self.calibration_count())
     def start_cal(self):
-        self.controls.stop(); self.calibrating = True; self.stage = 0; self.samples = []; self.sample_started = 0; self.result = None; self.saved = False; self.saved_ids = set(PROFILES); self.session_saved_ids = set(); self.emit("EVT|CAL|mode=ready|stage=1|id=" + PROFILES[0] + "|seconds=5|saved=0"); self.cal_position_tone()
+        self.controls.stop(); self.calibrating = True; self.stage = 0; self.samples = []; self.sample_started = 0; self.result = None; self.saved = False; self.saved_ids = set(); self.emit("EVT|CAL|mode=ready|stage=1|id=" + PROFILES[0] + "|seconds=5|saved=0")
     def end_cal(self):
         if self.result is not None and self.result != "sampling" and not self.saved: self.emit("ERR|CAL|UNSAVED|stage=%d" % (self.stage + 1)); return
-        self.calibrating = False; self.result = None; self.samples = []; self._audio_play(((440, 100), (330, 180), (220, 240))); self.emit("EVT|CAL|mode=exited|saved=%d" % len(self.session_saved_ids))
+        self.calibrating = False; self.result = None; self.emit("EVT|CAL|mode=exited|saved=%d" % len(self.saved_ids))
     def save_cal(self):
-        if not isinstance(self.result, dict):
-            self.emit("ERR|CAL|BUSY|stage=%d" % (self.stage + 1))
-            return False
-        try:
-            self._publish_calibration(PENDING_REVISION, PROFILES[self.stage], self.result)
+        if not isinstance(self.result, dict): self.emit("ERR|CAL|BUSY|stage=%d" % (self.stage + 1)); return
+        try: self._publish_calibration(PENDING_REVISION, PROFILES[self.stage], self.result)
         except Exception as exc:
             self.last_cal_error = type(exc).__name__ + ":" + str(exc)[:80]
-            self.saved = False
             self.emit("ERR|CAL|SAVE|stage=%d|detail=%s" % (self.stage + 1, self.last_cal_error))
-            self.cal_refused_tone()
-            return False
-        self.saved = True
-        self.saved_ids.add(PROFILES[self.stage])
-        self.session_saved_ids.add(PROFILES[self.stage])
-        self.emit("EVT|CAL|mode=saved-stage|stage=%d|id=%s|saved=%d" % (self.stage + 1, PROFILES[self.stage], len(self.session_saved_ids)))
-        if len(self.session_saved_ids) == len(PROFILES):
-            self.cal_complete_melody()
-        else:
-            self.cal_save_success_tone()
-        return True
+            return
+        self.saved = True; self.saved_ids.add(PROFILES[self.stage]); self.emit("EVT|CAL|mode=saved-stage|stage=%d|id=%s|saved=%d" % (self.stage+1, PROFILES[self.stage], len(self.saved_ids)))
     def yellow_action(self):
-        if not self.calibrating:
-            was_paused = self.controls.paused
-            self.controls.paused = not self.controls.paused
-            if self.controls.running and self.controls.paused != was_paused:
-                self.guard_pause_tone() if self.controls.paused else self.guard_resume_tone()
-            return
-        if self.result == "sampling":
-            self.emit("ERR|CAL|BUSY|stage=%d" % (self.stage + 1))
-            self.cal_refused_tone()
-            return
-        self.samples = []
-        self.sample_started = time.monotonic()
-        self.result = "sampling"
-        self.saved = False
-        self.emit("EVT|CAL|mode=started|stage=%d|id=%s|seconds=5|saved=%d" % (self.stage + 1, PROFILES[self.stage], len(self.session_saved_ids)))
-        self.cal_record_start_tone()
-    def _candidate_overlaps(self, center, tolerance):
-        candidate_low = center - tolerance
-        candidate_high = center + tolerance
-        for item in self.bundle.get("manifest", {}).get("profiles", []):
-            pid = item.get("id")
-            if pid == PROFILES[self.stage] or pid not in self.saved_ids:
-                continue
-            other_center = float(item.get("center", 0))
-            other_tolerance = float(item.get("tolerance", 0))
-            if candidate_low <= other_center + other_tolerance and other_center - other_tolerance <= candidate_high:
-                return pid
-        return None
-
+        if not self.calibrating: self.controls.paused = not self.controls.paused; return
+        if self.result == "sampling": self.emit("ERR|CAL|BUSY|stage=%d" % (self.stage + 1)); return
+        if self.result is not None: self.save_cal(); return
+        self.samples = []; self.sample_started = time.monotonic(); self.result = "sampling"; self.emit("EVT|CAL|mode=started|stage=%d|id=%s|seconds=5|saved=%d" % (self.stage+1, PROFILES[self.stage], len(self.saved_ids)))
     def cal_tick(self):
-        if not self.calibrating or self.result != "sampling":
-            return
+        if not self.calibrating or self.result != "sampling": return
         self.samples.append(self.sensor.lux())
-        if time.monotonic() - self.sample_started < 5:
-            return
-        values = sorted(self.samples)
-        center = values[len(values) // 2]
-        spread = max(values) - min(values)
-        tolerance = max(2.0, spread * 1.5)
-        if len(values) < 5 or spread > 5:
-            self.result = None
-            self.saved = False
-            self.emit("ERR|CAL|UNSTABLE|stage=%d|spread=%.1f" % (self.stage + 1, spread))
-            self.cal_refused_tone()
-            return
-        overlap = self._candidate_overlaps(center, tolerance)
-        if overlap is not None:
-            self.result = None
-            self.saved = False
-            self.emit("ERR|CAL|OVERLAP|stage=%d|with=%s" % (self.stage + 1, overlap))
-            self.cal_refused_tone()
-            return
-        self.result = {"center": center, "tolerance": tolerance, "stable_ms": 750}
-        self.emit("EVT|CAL|mode=complete-stage|stage=%d|id=%s|center=%.1f|spread=%.1f|tolerance=%.1f|saved=0" % (self.stage + 1, PROFILES[self.stage], center, spread, tolerance))
-        self.save_cal()
+        if time.monotonic() - self.sample_started < 5: return
+        values = sorted(self.samples); center = values[len(values)//2]; spread = max(values)-min(values)
+        if len(values) < 5 or spread > 5: self.result = None; self.emit("ERR|CAL|UNSTABLE|stage=%d|spread=%.1f" % (self.stage+1, spread)); return
+        self.result = {"center":center,"tolerance":max(2.0,spread*1.5),"stable_ms":750}; self.saved = False; self.emit("EVT|CAL|mode=complete-stage|stage=%d|id=%s|center=%.1f|spread=%.1f|tolerance=%.1f|saved=0" % (self.stage+1, PROFILES[self.stage], center, spread, self.result["tolerance"]))
     def next_cal(self):
-        if not self.calibrating:
-            return
-        if not self.saved:
-            self.emit("ERR|CAL|UNSAVED|stage=%d" % (self.stage + 1))
-            self.cal_refused_tone()
-            return
-        if self.stage >= len(PROFILES) - 1:
-            self.emit("EVT|CAL|mode=last|stage=%d|saved=%d" % (self.stage + 1, len(self.session_saved_ids)))
-            return
-        self.stage += 1
-        self.result = None
-        self.saved = False
-        self.emit("EVT|CAL|mode=ready|stage=%d|id=%s|seconds=5|saved=%d" % (self.stage + 1, PROFILES[self.stage], len(self.session_saved_ids)))
-        self.cal_position_tone()
+        if not self.calibrating: return
+        if self.result is not None and self.result != "sampling" and not self.saved: self.emit("ERR|CAL|UNSAVED|stage=%d" % (self.stage+1)); return
+        if self.stage >= 5: self.emit("EVT|CAL|mode=last|stage=6|saved=%d" % len(self.saved_ids)); return
+        self.stage += 1; self.result = None; self.saved = False; self.emit("EVT|CAL|mode=ready|stage=%d|id=%s|seconds=5|saved=%d" % (self.stage+1, PROFILES[self.stage], len(self.saved_ids)))
     def buttons(self):
-        now = time.monotonic()
-        blue = self.blue.poll(now)
-        yellow = self.yellow.poll(now)
-        if blue == "long-up":
-            self.end_cal() if self.calibrating else self.start_cal()
-        elif blue == "up":
-            if self.calibrating:
-                self.next_cal()
-            elif self.controls.running:
-                self.controls.stop()
-                self.guard_stop_tone()
-            else:
-                self.guard.reset()
-                self.controls.start()
-                self.guard_start_tone()
-        if yellow == "up":
-            self.yellow_action()
+        now = time.monotonic(); blue = self.blue.poll(now); yellow = self.yellow.poll(now)
+        if blue == "long": self.end_cal() if self.calibrating else self.start_cal()
+        elif blue == "up" and not self.blue.long: self.next_cal() if self.calibrating else (self.controls.stop() if self.controls.running else (self.guard.reset(), self.controls.start()))
+        if yellow == "up" and not self.yellow.long: self.yellow_action()
         self.cal_tick()
     def _dismiss_dc_popup(self, decision):
         # Login and DC share the same optical profile. The transition policy
@@ -703,37 +514,23 @@ class Combined:
             self.keyboard.release(esc)
         return True
     def route(self, decision):
-        if not decision.get("execute"):
-            return
+        if not decision.get("execute"): return
         name = decision.get("route")
-        if name not in self.bundle["manifest"]["routes"].values():
-            raise GuardBundleError("unvalidated route")
-        route_plan = None
+        if name not in self.bundle["manifest"]["routes"].values(): raise GuardBundleError("unvalidated route")
+        # A parsed plan is consumable: loop/random bookkeeping must not be
+        # reused by a later invocation of the same Route.
+        with open("/" + name, "r") as fh:
+            route_plan = plan_engine.parse_plan(fh.read())
+        self.arm.prepare_route()
         try:
-            # The compact boot handoff leaves the contiguous heap needed by
-            # this lazy import. Always collect before parsing a route.
-            gc.collect()
-            import plan_engine
-            gc.collect()
-            with open("/" + name, "r") as fh:
-                route_plan = plan_engine.parse_plan(fh.read())
-            self.arm.prepare_route()
             if not self._dismiss_dc_popup(decision):
                 return
             plan_engine.run_plan(route_plan, PlanContext(self))
             self.arm.flush()
         finally:
-            # Cleanup also covers import/parse failures, which previously left
-            # the partial plan allocation alive and suppressed the Stop cue.
-            try:
-                self.keyboard.release_all()
-            except Exception:
-                pass
-            try:
-                self.arm.release(False)
-            except Exception:
-                pass
-            route_plan = None
+            # Always leave the Pro Micro neutral even when a plan step fails.
+            self.arm.release(False)
+            del route_plan
             gc.collect()
     def host_poll(self):
         if self.usb.in_waiting: self.host.extend(self.usb.read(self.usb.in_waiting))
@@ -741,7 +538,7 @@ class Combined:
             raw, self.host = self.host.split(b"\n", 1); line = raw.decode("utf-8", "replace").strip()
             if not line: continue
             try:
-                if line == "PING": reply = "OK|PONG|combined-pico-guard-executor|hid=on|uart=on|profiles=6|role=brain"
+                if line == "PING": reply = "OK|PONG|combined-pico-guard-executor|hid=on|uart=on|profiles=6"
                 elif line == "CALGET": reply = self.calget()
                 elif line == "CALSTATUS": reply = self.calstatus()
                 elif line.startswith("CALSET|"): reply = self.calset(line)
@@ -754,21 +551,16 @@ class Combined:
     def loop(self):
         self.emit("combined-pico-guard-executor|GP4 start/stop hold3s=calibration|GP3 pause/resume|GP6 piezo"); last = 0
         while True:
-            self.host_poll(); self.buttons(); self.arm.pump(); self._audio_tick()
-            if self.controls.running and not self.calibrating and not self.audio_pattern and time.monotonic() - last >= .25:
+            self.host_poll(); self.buttons(); self.arm.pump()
+            if self.controls.running and not self.calibrating and time.monotonic() - last >= .25:
                 last = time.monotonic()
                 try:
                     self.guard.update(self.sensor.lux(), int(last * 1000))
                     if self.guard.last_decision is not None: self.route(self.guard.last_decision)
-                except Exception as exc:
-                    self.controls.stop()
-                    self._audio_stop()
-                    self.guard_stop_tone()
-                    self.emit("ERR|GUARD|FAIL|%s:%s" % (type(exc).__name__, str(exc)[:48]))
+                except Exception as exc: self.controls.stop(); self.emit("ERR|GUARD|FAIL|" + str(exc)[:60])
             time.sleep(.01)
 
 def main():
     try: Combined().loop()
     except GuardBundleError as exc: print("combined Guard bundle rejected:", exc)
     except Exception as exc: print("combined Guard stopped:", exc)
-

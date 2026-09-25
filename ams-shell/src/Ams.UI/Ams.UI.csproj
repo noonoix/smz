@@ -38,8 +38,6 @@
     <None Include="..\..\..\portable\plan3\CIRCUITPY\boot_out.txt"><Link>portable-runtime\boot_out.txt</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY\character_dashboard_steps.txt"><Link>portable-runtime\character_dashboard_steps.txt</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY\code.py"><Link>portable-runtime\code.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
-    <None Include="..\..\..\portable\plan3\CIRCUITPY\guard_main.py"><Link>portable-runtime\guard_main.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
-    <None Include="..\..\..\portable\plan3\CIRCUITPY\guard_validate.py"><Link>portable-runtime\guard_validate.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY\combined_guard_runtime.py"><Link>portable-runtime\combined_guard_runtime.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY\desktop_steps.txt"><Link>portable-runtime\desktop_steps.txt</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY\entering_game_loading_steps.txt"><Link>portable-runtime\entering_game_loading_steps.txt</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
@@ -68,3 +66,4 @@
   </ItemGroup>
 
 </Project>
+

@@ -3,6 +3,8 @@
 # The bundle loader below is deliberately independent from Classroom Studio and RunEngine.
 
 import gc
+import hashlib
+import json
 import math
 import os
 
@@ -53,7 +55,6 @@ class GuardBundleError(ValueError):
 
 
 def _read_json(root, name):
-    import json
     try:
         with open(os.path.join(root, name), "r") as fh:
             return json.load(fh)
@@ -72,7 +73,6 @@ def _file_sha256(root, name):
     # after the runtime and plan engine are loaded. Keep the read buffer small
     # and collect before each file so bundle verification cannot fail merely
     # because a previous file left a fragmented temporary allocation.
-    import hashlib
     gc.collect()
     digest = hashlib.sha256()
     try:
@@ -122,7 +122,7 @@ def _verify_hash_manifest(root):
             raise GuardBundleError("SHA256SUMS hash mismatch: " + name)
 
 
-def load_guard_bundle(root="/", verify=True):
+def load_guard_bundle(root="/"):
     """Load and fail closed on the exported transition/calibration contract.
 
     The manifest and calibration revision must agree, every exported runtime and
@@ -140,8 +140,7 @@ def load_guard_bundle(root="/", verify=True):
     for filename in REQUIRED_BUNDLE_FILES:
         if not os.path.isfile(os.path.join(root, filename)):
             raise GuardBundleError("missing Guard runtime file: " + filename)
-    if verify:
-        _verify_hash_manifest(root)
+    _verify_hash_manifest(root)
 
     routes = manifest.get("routes")
     if routes != ROUTE_FILES:
@@ -201,8 +200,8 @@ class LightStateGuard:
     """Debounced, hysteretic light-state selector with optional ordered routing."""
 
     @classmethod
-    def from_bundle(cls, root="/", verify=True):
-        bundle = load_guard_bundle(root, verify=verify)
+    def from_bundle(cls, root="/"):
+        bundle = load_guard_bundle(root)
         guard = cls(bundle["states"], bundle["stable_ms"], bundle["hysteresis"], bundle["sensor_timeout_ms"])
         guard.bundle = bundle
         return guard
@@ -317,4 +316,3 @@ class LightStateGuard:
 
 def state_spec(state_id, low, high, route):
     return {"id": str(state_id), "lo": int(low), "hi": int(high), "route": str(route)}
-

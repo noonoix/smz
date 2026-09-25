@@ -3383,6 +3383,10 @@ class TestRunner
                 "v0.9.55: version pins for this release (csproj + banner + bundle)");
         }
 
+        // Modern exporter/runtime contracts are kept out of the Golden-100
+        // contract. The full TestRunner still executes them when this guard is true.
+        if (Environment.GetEnvironmentVariable("GOLDEN_100_ONLY") != "1")
+        {
         // ── Step 56: v0.9.56 — UART arm moved from GP0/GP1 to GP16/GP17 (wiring v6) ──
         Console.WriteLine();
         Console.WriteLine("--- Step 56: v0.9.56 UART GP0/GP1 -> GP16/GP17 ---");
@@ -4047,6 +4051,8 @@ class TestRunner
             }
             finally { if (Directory.Exists(pexTmp)) Directory.Delete(pexTmp, true); }
         }
+        }
+
         // Current Studio contract: the one-click AutoCycle export is the exact
         // Golden-100 inventory. Resumable remains archived and must not add a
         // resume runtime to the active export.

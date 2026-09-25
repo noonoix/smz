@@ -58,6 +58,12 @@
     <None Include="..\..\..\portable\plan3\CIRCUITPY\targeted_steps.txt"><Link>portable-runtime\targeted_steps.txt</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\autocycle_h6_patch.json"><Link>portable-runtime\autocycle_h6_patch.json</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY-MODERN\**\*"><Link>portable-modern-runtime\%(RecursiveDir)%(Filename)%(Extension)</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="..\..\..\portable\plan3\CIRCUITPY-SPLIT\plan_cycle.py"><Link>portable-runtime\plan_cycle.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="..\..\..\portable\plan3\CIRCUITPY-SPLIT\cycle_runtime.py"><Link>portable-runtime\cycle_runtime.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="..\..\..\portable\plan3\CIRCUITPY-SPLIT\restart_windows.py"><Link>portable-runtime\restart_windows.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="..\..\..\portable\plan3\CIRCUITPY-SPLIT\auto_resume_boot.py"><Link>portable-runtime\auto_resume_boot.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="..\..\..\portable\plan3\CIRCUITPY-SPLIT\resume_essentials_runtime.py"><Link>portable-runtime\resume_essentials_runtime.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="..\..\..\portable\plan3\CIRCUITPY-SPLIT\recovery_runtime.py"><Link>portable-runtime\recovery_runtime.py</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
   </ItemGroup>
 
 </Project>

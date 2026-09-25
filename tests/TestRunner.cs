@@ -4103,6 +4103,13 @@ class TestRunner
             Assert(File.ReadAllText(Path.Combine(modernTmp, "code.py")).Length < 40000
                    && File.ReadAllText(Path.Combine(modernTmp, "code.py")).Contains("DeferredPlanEngine"),
                 "modern AutoCycle export uses the small deferred-loading entrypoint");
+            var modernRuntime = File.ReadAllText(Path.Combine(modernTmp, "combined_guard_runtime.py"));
+            var modernExec = File.ReadAllText(Path.Combine(modernTmp, "plan_engine_exec.py"));
+            Assert(modernRuntime.Contains("mouse_mode = \"relative\"")
+                   && modernRuntime.Contains("MMOVE|%d,%d,rel,2")
+                   && modernExec.Contains("ctx.mmove_relative(dx, dy)")
+                   && File.ReadAllText(Path.Combine(modernTmp, "code.py")).Contains("relative-native-before-route"),
+                "modern AutoCycle export uses hostless relative mouse without a cursor bridge");
         }
         finally { if (Directory.Exists(modernTmp)) Directory.Delete(modernTmp, true); }
 

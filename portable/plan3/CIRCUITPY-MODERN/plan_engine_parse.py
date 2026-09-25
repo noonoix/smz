@@ -48,6 +48,11 @@ def _load_mouse_pos(ctx, ops):
         if op == "SCREEN":
             sw, sh = prm["v"]
             break
+    # Fully portable mode uses genuine relative HID reports on the Pro Micro.
+    # The coordinates below are only a virtual canvas for shaping a human path;
+    # they are never sent as an absolute Windows cursor position.
+    if getattr(ctx, "mouse_mode", "") == "relative":
+        return [sw // 2, sh // 2]
     saved = None
     getter = getattr(ctx, "get_mouse_pos", None)
     if getter is not None:
@@ -68,6 +73,8 @@ def _load_mouse_pos(ctx, ops):
 
 
 def _save_mouse_pos(ctx, pos):
+    if getattr(ctx, "mouse_mode", "") == "relative":
+        return
     setter = getattr(ctx, "set_mouse_pos", None)
     if setter is not None:
         setter(int(pos[0]), int(pos[1]))

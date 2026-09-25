@@ -321,6 +321,11 @@ def run_plan(ops, ctx, _pos=None, _pauses=None, _inc=()):
 
 def _exec_rmouse(prm, ctx, pauses, pos, target=None):
     rx, ry, rw, rh = prm.get("region", (0, 0, ctx.screen_w, ctx.screen_h))   # v2: MOVETO has no region
+    relative = target is None and getattr(ctx, "mouse_mode", "") == "relative"
+    if target is not None and getattr(ctx, "mouse_mode", "") == "relative":
+        # MOVETO is an absolute contract. Pretending it is portable would
+        # silently reintroduce the old centre/origin jump.
+        raise ValueError("MOVETO needs an absolute cursor origin")
     c = dict(_DEFAULT_CFG)
     c["speed_min"], c["speed_max"] = ctx.speed_min, ctx.speed_max
     if "mt" in prm:
@@ -337,31 +342,61 @@ def _exec_rmouse(prm, ctx, pauses, pos, target=None):
         (c["idle_every_min"], c["idle_every_max"]), (c["idle_pause_min"], c["idle_pause_max"]) = prm["idle"]
     if "over" in prm:
         c["over_chance"] = prm["over"]
-    if target is None:
+    if relative:
+        # No HID device can query the Windows cursor position. Shape the move
+        # around a virtual centre, then transmit only point-to-point deltas.
+        # Region dimensions limit the wandering distance; its absolute x/y are
+        # intentionally ignored because they cannot be honoured hostlessly.
+        sx, sy = ctx.screen_w // 2, ctx.screen_h // 2
+        xlim = max(1, min(max(1, rw - 1), max(32, ctx.screen_w // 4)))
+        ylim = max(1, min(max(1, rh - 1), max(32, ctx.screen_h // 4)))
+        xmag = random.randint(max(1, xlim // 3), xlim)
+        ymag = random.randint(max(1, ylim // 3), ylim)
+        tx = sx + (xmag if random.randint(0, 1) else -xmag)
+        ty = sy + (ymag if random.randint(0, 1) else -ymag)
+        pos[0], pos[1] = sx, sy
+    elif target is None:
         tx = random.randint(rx, rx + max(0, rw - 1))
         ty = random.randint(ry, ry + max(0, rh - 1))
     else:
         tx, ty = target                      # v2 MOVETO: the app's fixed human move target
     if prm.get("human", 1) == 0:
         # v2 MOVETO human=0 - the app's human=off instant firmware move (single jump)
-        ctx.mmove(tx, ty)
+        if relative:
+            ctx.mmove_relative(tx - pos[0], ty - pos[1])
+        else:
+            ctx.mmove(tx, ty)
         pos[0], pos[1] = tx, ty
-        _save_mouse_pos(ctx, pos)
+        if not relative:
+            _save_mouse_pos(ctx, pos)
         return
     plan = plan_move(pos[0], pos[1], tx, ty, c, pauses, ctx.screen_w, ctx.screen_h)
-    ctx.log("rmouse -> (%d,%d) %d pts" % (tx, ty, len(plan["pts"])))
+    if relative:
+        ctx.log("rmouse-rel -> (%+d,%+d) %d pts" %
+                (tx - pos[0], ty - pos[1], len(plan["pts"])))
+    else:
+        ctx.log("rmouse -> (%d,%d) %d pts" % (tx, ty, len(plan["pts"])))
     if not ctx.sleep_ms(plan["before"]):
         raise PlanAbort()
+    previous_x, previous_y = pos[0], pos[1]
     for pt in plan["pts"]:
-        ctx.mmove(pt[0], pt[1])
+        if relative:
+            dx, dy = pt[0] - previous_x, pt[1] - previous_y
+            if dx or dy:
+                ctx.mmove_relative(dx, dy)
+            previous_x, previous_y = pt[0], pt[1]
+        else:
+            ctx.mmove(pt[0], pt[1])
         # Persist immediately, before the abortable delay: Stop in the middle of
         # a path resumes from the last point that was actually sent to the arm.
         pos[0], pos[1] = pt[0], pt[1]
-        _save_mouse_pos(ctx, pos)
+        if not relative:
+            _save_mouse_pos(ctx, pos)
         if not ctx.sleep_ms(pt[2]):
             raise PlanAbort()
     pos[0], pos[1] = plan["target"]
-    _save_mouse_pos(ctx, pos)
+    if not relative:
+        _save_mouse_pos(ctx, pos)
     if not ctx.sleep_ms(plan["after"]):
         raise PlanAbort()
     if plan["long"] > 0:

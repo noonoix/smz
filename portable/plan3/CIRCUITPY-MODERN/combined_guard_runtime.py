@@ -109,6 +109,7 @@ class Arm:
     def __init__(self):
         self.uart = busio.UART(board.GP16, board.GP17, baudrate=57600, timeout=.05)
         self.buf = bytearray(); self.pending = 0; self.held = set()
+        self.relative_ready = None
     def frame(self, line): return ("#%02X|%s\n" % (sum(line.encode()) & 255, line)).encode()
     def write(self, line):
         data = self.frame(line); count = self.uart.write(data)
@@ -118,7 +119,8 @@ class Arm:
         replies = []
         while b"\n" in self.buf:
             raw, self.buf = self.buf.split(b"\n", 1); line = raw.decode("utf-8", "replace").strip()
-            if line.startswith("OK|MMOVE"): self.pending = max(0, self.pending - 1)
+            if line.startswith("OK|MMOVE"):
+                self.pending = max(0, self.pending - 1)
             elif line.startswith("EVT|"): print(line)
             elif line: replies.append(line)
         return replies
@@ -129,6 +131,18 @@ class Arm:
             if time.monotonic() > end: raise RuntimeError("arm back-pressure timeout")
             time.sleep(.001)
         self.write("MMOVE|%d,%d,abs,2" % (x, y)); self.pending += 1
+    def move_relative(self, dx, dy):
+        if self.relative_ready is None:
+            reply = self.send("HVER", 3)
+            self.relative_ready = "|REL=1" in reply
+        if not self.relative_ready:
+            raise RuntimeError("ARM 2.8 relative mouse firmware required")
+        end = time.monotonic() + 2
+        while self.pending >= 2:
+            self.pump()
+            if time.monotonic() > end: raise RuntimeError("arm back-pressure timeout")
+            time.sleep(.001)
+        self.write("MMOVE|%d,%d,rel,2" % (dx, dy)); self.pending += 1
     def _track_button_command(self, line):
         head, sep, payload = line.partition("|")
         button = payload.split(",", 1)[0].strip().lower() if sep else ""
@@ -256,6 +270,7 @@ class Controls:
 
 class PlanContext:
     plan_api = 3; screen_w = 1920; screen_h = 1080; speed_min = 0; speed_max = 2000
+    mouse_mode = "relative"
     def __init__(self, runtime): self.r = runtime
     def get_mouse_pos(self):
         value = getattr(self.r, "mouse_pos", None)
@@ -269,6 +284,7 @@ class PlanContext:
     def sleep_ms(self, ms): return self.r.controls.sleep(ms)
     def log(self, text): print("plan:", text)
     def mmove(self, x, y): self.r.arm.move(x, y)
+    def mmove_relative(self, dx, dy): self.r.arm.move_relative(dx, dy)
     def mclick(self, button, count, hmin, hmax): self.r.arm.send("MCLICK|%s,%d,%d,%d" % (button, count, hmin, hmax), 8)
     def ktext(self, hmin, hmax, text): self.r.type_text(text, hmin, hmax, self)
     def kcombo(self, value): self.key_combo([value], 0, 0)

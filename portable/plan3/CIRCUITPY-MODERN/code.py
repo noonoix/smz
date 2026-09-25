@@ -665,11 +665,14 @@ def _diagnostic_route(self, decision):
                 raise
             self.emit("EVT|DEBUG|ROUTE|stage=after-plan-parse|free=%d" % gc.mem_free())
             route_ctx = runtime.PlanContext(self)
-            origin = route_ctx.get_mouse_pos()
-            if origin is None:
-                self.emit("EVT|DEBUG|CURSOR|plan-origin=unknown")
+            if getattr(route_ctx, "mouse_mode", "") == "relative":
+                self.emit("EVT|DEBUG|CURSOR|plan-mode=relative-native")
             else:
-                self.emit("EVT|DEBUG|CURSOR|plan-origin=%d,%d" % (origin[0], origin[1]))
+                origin = route_ctx.get_mouse_pos()
+                if origin is None:
+                    self.emit("EVT|DEBUG|CURSOR|plan-origin=unknown")
+                else:
+                    self.emit("EVT|DEBUG|CURSOR|plan-origin=%d,%d" % (origin[0], origin[1]))
             try:
                 runtime.plan_engine.run_plan(route_plan, route_ctx)
             finally:
@@ -715,10 +718,13 @@ def _audible_loop(self):
                     if decision.get("execute"):
                         route_name = decision.get("route")
                         _debug_event(self, "ROUTE", "start %s lux=%.1f" % (route_name, lux), persist=True)
-                        if not _apply_pending_cursor(self, force=True):
-                            _debug_event(self, "CURSOR", "sync-failed-before-route", persist=True)
-                            raise RuntimeError("ARM cursor origin not acknowledged")
-                        _debug_event(self, "CURSOR", "sync-ok-before-route", persist=True)
+                        if getattr(runtime.PlanContext, "mouse_mode", "") == "relative":
+                            _debug_event(self, "CURSOR", "relative-native-before-route", persist=True)
+                        else:
+                            if not _apply_pending_cursor(self, force=True):
+                                _debug_event(self, "CURSOR", "sync-failed-before-route", persist=True)
+                                raise RuntimeError("ARM cursor origin not acknowledged")
+                            _debug_event(self, "CURSOR", "sync-ok-before-route", persist=True)
                         completed = self.route(decision)
                         if completed is False:
                             _debug_event(self, "ROUTE", "aborted %s" % route_name, persist=True)

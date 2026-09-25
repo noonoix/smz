@@ -46,10 +46,15 @@ jobs:
           dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object ci-test-output.txt
           $exitCode = $LASTEXITCODE
           $fails = Select-String -Path ci-test-output.txt -Pattern '^FAIL:'
+          if ($exitCode -ne 0) {
+            foreach ($line in (Get-Content ci-test-output.txt -Tail 100)) {
+              Write-Host "::error::$line"
+            }
+            exit $exitCode
+          }
           foreach ($fail in $fails) {
             Write-Host "::error file=tests/TestRunner.cs::$($fail.Line)"
           }
-          if ($exitCode -ne 0) { exit $exitCode }
           if ($fails.Count -gt 0) { exit 1 }
 
       - name: Package current Classroom Studio

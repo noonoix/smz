@@ -21,6 +21,7 @@ public static class AutoCycleFirmwareBundle
         "desktop_steps.txt", "entering_game_loading_steps.txt", "game_steps.txt",
         "live_light_guard.py", "login_or_dc_steps.txt", "plan.txt", "restart_steps.txt",
         "resumable_steps.txt", "settings.toml", "targeted_steps.txt",
+        "guard_main.py", "guard_validate.py",
     };
 
     private static readonly HashSet<string> ForceCrlfFiles = new(StringComparer.OrdinalIgnoreCase)
@@ -35,6 +36,8 @@ public static class AutoCycleFirmwareBundle
         "boot.py",
         "character_dashboard_steps.txt",
         "code.py",
+        "guard_main.py",
+        "guard_validate.py",
         "combined_guard_runtime.py",
         "desktop_steps.txt",
         "entering_game_loading_steps.txt",
@@ -64,6 +67,8 @@ public static class AutoCycleFirmwareBundle
         "boot_out.txt",
         "character_dashboard_steps.txt",
         "code.py",
+        "guard_main.py",
+        "guard_validate.py",
         "combined_guard_runtime.py",
         "desktop_steps.txt",
         "entering_game_loading_steps.txt",

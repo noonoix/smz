@@ -47,6 +47,9 @@ public static class PipelinePlanBundle
 
         // Preserve the two recovery filenames consumed by older portable bundles. They now
         // mirror the dedicated DC route and remain harmless compatibility aliases.
+        // Keep the retired route file as an empty compatibility payload; it is no longer a tab.
+        payloads.Add(("resumable_steps.txt", new UTF8Encoding(false).GetBytes("PLAN|2\n")));
+
         var dc = payloads.Single(x => x.Name == "dc_steps.txt").Bytes;
         payloads.Add(("launch_recovery.txt", dc));
         payloads.Add(("main_recovery.txt", dc));

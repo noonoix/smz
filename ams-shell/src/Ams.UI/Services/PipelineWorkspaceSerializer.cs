@@ -74,12 +74,13 @@ public static class PipelineWorkspaceSerializer
             "EnteringGameLoading" => PipelineKind.EnteringGameLoading,
             "Game" => PipelineKind.Game,
             "Targeted" => PipelineKind.Targeted,
-            "Resumable" => PipelineKind.Resumable,
+            // The Resumable tab was retired; its old data is intentionally ignored.
+            "Resumable" => null,
             // v1 five-tab names
             "Launch" => PipelineKind.Restart,
             "Main" => PipelineKind.Desktop,
             "LaunchRecovery" or "MainRecovery" => PipelineKind.Dc,
-            "ResumeEssentials" => PipelineKind.Resumable,
+            "ResumeEssentials" => null,
             _ => null,
         };
     }

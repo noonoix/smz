@@ -14,14 +14,16 @@ public enum PipelineKind
     EnteringGameLoading,
     Game,
     Targeted,
-    Resumable,
+    // Resume is intentionally not a UI tab for now; keep the enum name only as a
+    // source-compatibility alias for the old exporter.
 
     // Names kept as value-compatible aliases for the earlier five-tab workspace.
     Launch = Restart,
     Main = Desktop,
     LaunchRecovery = Dc,
     MainRecovery = Dc,
-    ResumeEssentials = Resumable,
+    Resumable = Restart,
+    ResumeEssentials = Restart,
 }
 
 public sealed class PipelineTabDocument
@@ -43,6 +45,7 @@ public sealed class PipelineWorkspace
 {
     // Compatibility contract for older exporters: launch_steps.txt, plan.txt,
     // launch_recovery.txt, main_recovery.txt and resume_essentials.txt remain emitted
+    // resumable_steps.txt is still emitted as an empty firmware compatibility file
     // alongside the current desktop/restart/DC route files. PipelineKind.Main is the
     // value-compatible name for Desktop in those documents.
     public const int FormatVersion = 2;

@@ -3,7 +3,7 @@ name: Classroom Studio current branch
 on:
   workflow_dispatch:
   push:
-    branches: [feat/dc-auto-esc-88-188]
+    branches: [feat/dc-auto-esc-88-188, fix/cursor-origin-sync]
     paths:
       - 'ams-shell/**'
       - 'tests/**'

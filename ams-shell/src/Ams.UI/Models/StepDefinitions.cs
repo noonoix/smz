@@ -176,8 +176,10 @@ public static class StepDefinitions
                 new("thinkChance", "Thinking pause chance % per word (0 = off · humans pause to think)", FieldKind.Int, "0", HideWhenKey: "mode", HideWhenValue: "clipboard"),
                 new("thinkMin", "Thinking pause — min (ms)", FieldKind.Int, "800", HideWhenKey: "mode", HideWhenValue: "clipboard"),
                 new("thinkMax", "Thinking pause — max (ms)", FieldKind.Int, "2200", HideWhenKey: "mode", HideWhenValue: "clipboard"),
-                new("typoEveryMin", "Typo every N words — min N · 0/0 = off (slip + backspace correction)", FieldKind.Int, "0", HideWhenKey: "mode", HideWhenValue: "clipboard"),
-                new("typoEveryMax", "Typo every N words — max N · cadence re-rolled after each correction (e.g. 8–20 looks real)", FieldKind.Int, "0", HideWhenKey: "mode", HideWhenValue: "clipboard"),
+                // Keep the persisted property names for old .amsj files, but their user-facing
+                // meaning is now the requested per-TYPE typo count (not an every-N-words cadence).
+                new("typoEveryMin", "Typos in this text — minimum count · 0/0 = off (slip + backspace correction)", FieldKind.Int, "0", HideWhenKey: "mode", HideWhenValue: "clipboard"),
+                new("typoEveryMax", "Typos in this text — maximum count · re-rolled for each TYPE execution", FieldKind.Int, "0", HideWhenKey: "mode", HideWhenValue: "clipboard"),
             },
             Summarize = s =>
             {
@@ -192,7 +194,7 @@ public static class StepDefinitions
                 if (PropEx.GetInt(s.Props, "pmax") > 0) hint += " · punct";
                 if (PropEx.GetInt(s.Props, "thinkChance") > 0) hint += $" · think {PropEx.GetInt(s.Props, "thinkChance")}%";
                 int tyMax = PropEx.GetInt(s.Props, "typoEveryMax");
-                if (tyMax > 0) hint += $" · typo every {PropEx.GetInt(s.Props, "typoEveryMin")}–{tyMax} words";
+                if (tyMax > 0) hint += $" · typos {PropEx.GetInt(s.Props, "typoEveryMin")}–{tyMax} per text";
                 else if (PropEx.GetInt(s.Props, "typoChance") > 0) hint += $" · typos {PropEx.GetInt(s.Props, "typoChance")}%";
                 return $"Type text · {hint} · \"{t}\"" + KeyboardBoardHint(s.Props);
             },
@@ -747,17 +749,14 @@ public static class StepDefinitions
         int thinkMin = Math.Max(0, PropEx.GetInt(p, "thinkMin", 800));
         int thinkMax = Math.Max(0, PropEx.GetInt(p, "thinkMax", 2200));
         if (thinkMax < thinkMin) (thinkMin, thinkMax) = (thinkMax, thinkMin);
-        // v0.9.12 — typo cadence: one slip every N words, N freshly re-drawn from
-        // [typoEveryMin, typoEveryMax] after each correction (same planner pattern as the
-        // mouse every-N-moves long break). 0/0 = off. Legacy typoChance (% per word) still
-        // works for old files, but the cadence range takes precedence when both are set.
-        int typoEveryMin = Math.Max(0, PropEx.GetInt(p, "typoEveryMin"));
-        int typoEveryMax = Math.Max(0, PropEx.GetInt(p, "typoEveryMax"));
-        if (typoEveryMax < typoEveryMin) (typoEveryMin, typoEveryMax) = (typoEveryMax, typoEveryMin);
+        // The persisted property names are retained for .amsj compatibility, but this range is
+        // now a count of corrected slips in this TYPE execution. It therefore also works for a
+        // one-word login/password. Legacy typoChance remains a fallback for old project files.
+        int typoCountMin = Math.Max(0, PropEx.GetInt(p, "typoEveryMin"));
+        int typoCountMax = Math.Max(0, PropEx.GetInt(p, "typoEveryMax"));
+        if (typoCountMax < typoCountMin) (typoCountMin, typoCountMax) = (typoCountMax, typoCountMin);
         int typoChance = Math.Clamp(PropEx.GetInt(p, "typoChance"), 0, 100);
-        bool typoCadence = typoEveryMax > 0;
-        int nextTypoAt = typoCadence ? Math.Max(1, RandRange(typoEveryMin, typoEveryMax)) : -1;
-        int wordsSinceTypo = 0;
+        bool typoCountMode = typoCountMax > 0;
         // v0.9.13 — word pause PROBABILITY: 100 = after every word (the old metronome feel the
         // user reported: a pause after every space). 40–70 looks human. Files saved before this
         // field existed have no key and keep 100, so their behavior is unchanged.
@@ -766,15 +765,39 @@ public static class StepDefinitions
             : 100;
         // Word segmentation is needed by word pauses AND every v0.9.11+ layer; with all of them
         // off, keep the legacy whole-line 60-char chunking byte-identical for old files.
-        bool wordMode = wmax > 0 || pmax > 0 || thinkChance > 0 || typoChance > 0 || typoCadence;
+        bool wordMode = wmax > 0 || pmax > 0 || thinkChance > 0 || typoChance > 0 || typoCountMode;
         var cmds = new List<string>();
         var lines = normalized.Split('\n');
+        var lineWords = lines.Select(line => Regex.Split(line, @"\s+").Where(w => w.Length > 0).ToArray()).ToArray();
+        var typoPositions = new Dictionary<(int Line, int Word), List<int>>();
+        if (typoCountMode)
+        {
+            var candidates = new List<(int Line, int Word, int Pos)>();
+            for (int li = 0; li < lineWords.Length; li++)
+                for (int wi = 0; wi < lineWords[li].Length; wi++)
+                    for (int pos = 0; pos < lineWords[li][wi].Length; pos++)
+                        if ("1234567890qwertyuiopasdfghjklzxcvbnm".IndexOf(
+                                char.ToLowerInvariant(lineWords[li][wi][pos])) >= 0)
+                            candidates.Add((li, wi, pos));
+            int wanted = Math.Min(candidates.Count, RandRange(typoCountMin, typoCountMax));
+            for (int i = 0; i < wanted; i++)
+            {
+                int j = i + NextInt(candidates.Count - i);
+                (candidates[i], candidates[j]) = (candidates[j], candidates[i]);
+                var candidate = candidates[i];
+                var key = (candidate.Line, candidate.Word);
+                if (!typoPositions.TryGetValue(key, out var positions))
+                    typoPositions[key] = positions = new List<int>();
+                positions.Add(candidate.Pos);
+            }
+            foreach (var positions in typoPositions.Values) positions.Sort();
+        }
         for (int li = 0; li < lines.Length; li++)
         {
             var line = lines[li];
             if (wordMode)
             {
-                var words = Regex.Split(line, @"\s+").Where(w => w.Length > 0).ToArray();
+                var words = lineWords[li];
                 // v0.9.13 — stream merging: text accumulates in `pending` and is chunked ONLY at
                 // real pause points (word/thinking/punctuation/typo). Previously every word was
                 // its own KTEXT command, so the serial round-trip after each word's space made a
@@ -795,29 +818,38 @@ public static class StepDefinitions
                     string tail = wi < words.Length - 1 ? " " : "";
                     string typed = words[wi] + tail;
 
-                    // v0.9.12 — cadence mode: a typo is DUE once N words passed since the last
-                    // correction. Unsuitable words (too long for one frame / single char) or a
-                    // punctuation slip target do NOT consume the trigger — the next word stays
-                    // due. Legacy chance mode rolls per word. The slip itself: QWERTY-neighbor
-                    // char, a brief "noticed it" pause, Backspace, then retype the remainder.
-                    bool typoDue = typoCadence && ++wordsSinceTypo >= nextTypoAt;
-                    bool typoRoll = !typoCadence && typoChance > 0 && NextInt(100) < typoChance;
-                    if ((typoDue || typoRoll) && words[wi].Length >= 2 && words[wi].Length <= 60)
+                    // Count mode picks unique eligible characters across the whole TYPE step.
+                    // Each slip uses an adjacent QWERTY key, pauses, Backspaces, and resumes from
+                    // the correct character. Multiple slips can occur in the same one-word text.
+                    if (typoPositions.TryGetValue((li, wi), out var selected))
                     {
-                        int pos = 1 + NextInt(words[wi].Length - 1);   // never the first char
+                        int start = 0;
+                        foreach (int pos in selected)
+                        {
+                            if (QwertyNeighbor(words[wi][pos]) is not char wrong) continue;
+                            FlushPending();
+                            string slip = words[wi][start..pos] + wrong;
+                            for (int i = 0; i < slip.Length; i += 60)
+                                cmds.Add($"KTEXT|{hmin},{hmax},{slip.Substring(i, Math.Min(60, slip.Length - i))}");
+                            cmds.Add($"DLY|{RandRange(Math.Max(hmax, 120), hmax * 2 + 200)}");   // noticed the slip
+                            cmds.Add("KCOMBO|8");                                                // Backspace
+                            cmds.Add($"DLY|{RandRange(hmin, hmax)}");
+                            start = pos;                                                         // correct char is next
+                        }
+                        typed = words[wi][start..] + tail;
+                    }
+                    else if (!typoCountMode && typoChance > 0 && NextInt(100) < typoChance
+                             && words[wi].Length >= 2 && words[wi].Length <= 60)
+                    {
+                        int pos = 1 + NextInt(words[wi].Length - 1);
                         if (QwertyNeighbor(words[wi][pos]) is char wrong)
                         {
-                            FlushPending();   // v0.9.13 — stream everything up to the slip first
+                            FlushPending();
                             cmds.Add($"KTEXT|{hmin},{hmax},{words[wi][..pos]}{wrong}");
-                            cmds.Add($"DLY|{RandRange(Math.Max(hmax, 120), hmax * 2 + 200)}");   // noticed the slip
-                            cmds.Add("KCOMBO|8");                                                 // Backspace
+                            cmds.Add($"DLY|{RandRange(Math.Max(hmax, 120), hmax * 2 + 200)}");
+                            cmds.Add("KCOMBO|8");
                             cmds.Add($"DLY|{RandRange(hmin, hmax)}");
-                            typed = words[wi][pos..] + tail;                                      // retype from the correct char
-                            if (typoCadence)
-                            {
-                                wordsSinceTypo = 0;
-                                nextTypoAt = Math.Max(1, RandRange(typoEveryMin, typoEveryMax));  // fresh cadence
-                            }
+                            typed = words[wi][pos..] + tail;
                         }
                     }
 

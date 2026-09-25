@@ -11,7 +11,9 @@
 #   RMOUSE|region=x,y,w,h|mt=mn,mx|curve=mn,mx|before=mn,mx|after=mn,mx|
 #         mid=chance:mn,mx|idle=everyMn,everyMx:pauseMn,pauseMx|over=pct
 #   CLICK|btn=left|n=1|hold=mn,mx
-#   TYPE|h=mn,mx|w=mn,mx|wp=pct|p=mn,mx|think=chance:mn,mx|typo=mn,mx|text=<encoded>
+#   TYPE|h=mn,mx|w=mn,mx|wp=pct|p=mn,mx|think=chance:mn,mx|typos=mn,mx|text=<encoded>
+#        typos is the number of corrected slips in this TYPE execution.
+#        Legacy typo=mn,mx (one slip every N words) remains accepted.
 #   DELAY|mn,mx
 #   LOOP|n  ... ENDLOOP                   n = pass count, 0 = forever
 #   LOOPTIME|sec ... ENDLOOP              repeats until the deadline passes
@@ -494,7 +496,7 @@ def parse_plan(text):
                 if "text" not in prm:
                     raise ValueError("line %d: TYPE needs text=" % line_no)
                 prm["text"] = pct_dec(prm["text"])
-                for k in ("h", "w", "p", "typo"):
+                for k in ("h", "w", "p", "typo", "typos"):
                     if k in prm:
                         prm[k] = _pair(prm[k], k, line_no)
                 if "think" in prm:

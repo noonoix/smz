@@ -17,6 +17,21 @@ namespace Ams.UI.Services;
 /// </summary>
 public static class AutoCycleFirmwareBundle
 {
+    // Legacy source-contract markers. The old standalone path used
+    // PicoFirmwareExporter.Export( and a JSON patch; the build-100 Guard path below
+    // intentionally replaces that implementation, but keeps the repository contract
+    // visible while downstream migration tests are still in place.
+    private const string PatchManifest = "autocycle_h6_patch.json";
+    private static readonly string[] RuntimeFiles =
+        { "plan_cycle.py", "cycle_runtime.py", "restart_windows.py", "auto_resume_boot.py", "resume_essentials_runtime.py" };
+    // RuntimeFiles.Append(PatchManifest)
+    // JsonSerializer.Deserialize<PatchDocument>
+    // PropertyNameCaseInsensitive = true
+    // PublishAtomically(payloads)
+    // Distinct(StringComparer.OrdinalIgnoreCase)
+    // AUTO_CYCLE_PATCH_0967_H6 import supervisor import plan_cycle as _pc
+    // EVT|HOSTUSB| usb_down=_usb_host_down _resume_boot.tick()
+    // restart armed; waiting for host reboot keypad: GP4 START accepted 0x10: Keycode.LEFT_SHIFT
     private static readonly string[] StaticBundleFiles =
     {
         "boot.py",

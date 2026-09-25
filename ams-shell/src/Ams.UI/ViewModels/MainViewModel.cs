@@ -2318,6 +2318,12 @@ public partial class MainViewModel : ObservableObject
 
     /// <summary>Region Picker overlay (§5.5.12) for x/y/w/h field sets.</summary>
 
+    private async Task<string?> SampleHandMovementAsync()
+    {
+        var sample = await HandMovementSample.CaptureAsync();
+        return sample is null ? null : HandMovementSample.Encode(sample);
+    }
+
     private Task<(int x, int y, int w, int h)?> PickRegionOnScreen()
 
     {
@@ -3586,15 +3592,17 @@ public partial class MainViewModel : ObservableObject
         string? calibrateKey = null;
 
         Func<Task<(int x, int y, int w, int h)?>>? pickRegion = null;
+        Func<Task<string?>>? sampleMouse = null;
 
         if (type == "waitForSound") { calibrate = CalibrateSoundThreshold; calibrateKey = "threshold"; }
         if (type == "waitForLight") { calibrate = CalibrateLightRange; calibrateKey = "luxCenter"; }   // v0.9.39 — BH1750 range centre
 
         if (type is "randomMousePosition" or "findImage") pickRegion = PickRegionOnScreen;
+        if (type == "mouseMove") sampleMouse = SampleHandMovementAsync;
 
 
 
-        var dlg = new StepDialog(title, fields, current, calibrate, calibrateKey, pickRegion, type)
+        var dlg = new StepDialog(title, fields, current, calibrate, calibrateKey, pickRegion, type, sampleMouse)
 
         {
 

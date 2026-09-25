@@ -176,7 +176,16 @@ public static class ScriptGenerator
             {
                 // v0.9.0 — humanized via the same engine (Gentle preset) when the step's
                 // "human" box is checked; raw instant MMOVE otherwise.
-                if (PropEx.GetBool(n.Props, "human", true))
+                if (PropEx.GetString(n.Props, "moveMode", "fixed") == "handSample"
+                    && HandMovementSample.TryDecode(PropEx.GetString(n.Props, "handSample"), out var sample))
+                {
+                    foreach (var seg in HandMovementSample.Compact(sample.Segments, 48))
+                    {
+                        if (seg.Dx != 0 || seg.Dy != 0) sb.AppendLine($"{pad}Send-Cmd \"MMOVE|{seg.Dx},{seg.Dy},rel,2\"");
+                        sb.AppendLine($"{pad}Step-Delay {seg.DelayMs}");
+                    }
+                }
+                else if (PropEx.GetBool(n.Props, "human", true))
                     sb.AppendLine($"{pad}Move-HumanMouse {PropEx.GetInt(n.Props, "x", 600)} {PropEx.GetInt(n.Props, "y", 497)} {screenW} {screenH} @{{ {GentleHashFromProps(n.Props, mouseSpeedMin, mouseSpeedMax)} }}");
                 else
                     sb.AppendLine($"{pad}Send-Cmd \"MMOVE|{PropEx.GetInt(n.Props, "x", 600)},{PropEx.GetInt(n.Props, "y", 497)},abs,0\"");

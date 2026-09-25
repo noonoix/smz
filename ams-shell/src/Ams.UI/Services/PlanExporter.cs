@@ -317,7 +317,25 @@ public static class PlanExporter
             Emit(n, new[] { "RMOUSE|region=" + x + "," + y + "," + w + "," + h + Tuning(n, idle) }, "RMOUSE");
         }
 
-        private void EmitMouseMove(StepNode n){int x=PropEx.GetInt(n.Props,"x",600),y=PropEx.GetInt(n.Props,"y",497);if(!PropEx.GetBool(n.Props,"human",true)){Emit(n,new[]{"MOVETO|x="+x+"|y="+y+"|human=0"},"MOVETO");return;}Emit(n,new[]{"MOVETO|x="+x+"|y="+y+Tuning(n,(1,1,0,0))},"MOVETO");}
+        private void EmitMouseMove(StepNode n)
+        {
+            int x=PropEx.GetInt(n.Props,"x",600), y=PropEx.GetInt(n.Props,"y",497);
+            if (PropEx.GetString(n.Props, "moveMode", "fixed") == "handSample")
+            {
+                if (!HandMovementSample.TryDecode(PropEx.GetString(n.Props, "handSample"), out var sample))
+                { Error(n, "handSample mode needs a valid ten-second mouse sample"); return; }
+                var lines = new List<string>();
+                foreach (var seg in HandMovementSample.Compact(sample.Segments, 48))
+                {
+                    if (seg.Dx != 0 || seg.Dy != 0) lines.Add("RAW|MMOVE|"+seg.Dx+","+seg.Dy+",rel,2");
+                    lines.Add("DELAY|"+seg.DelayMs);
+                }
+                Emit(n, lines, "HANDPATH");
+                return;
+            }
+            if(!PropEx.GetBool(n.Props,"human",true)){Emit(n,new[]{"MOVETO|x="+x+"|y="+y+"|human=0"},"MOVETO");return;}
+            Emit(n,new[]{"MOVETO|x="+x+"|y="+y+Tuning(n,(1,1,0,0))},"MOVETO");
+        }
 
         private void EmitMouseClick(StepNode n)
         {

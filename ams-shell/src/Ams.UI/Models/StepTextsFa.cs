@@ -38,6 +38,8 @@ public static class StepTextsFa
 
         // ── mouse actions ──
         ["button"] = "دکمه‌ی موس",
+        ["moveMode"] = "منبع حرکت (fixed = مقصد ثابت · handSample = نمونه‌ی ده‌ثانیه‌ای دست)",
+        ["handSample"] = "نمونه‌ی ذخیره‌شده‌ی حرکت دست",
         ["action"] = "نوع کلیک",
         ["delta"] = "مقدار ویل (عدد منفی = پایین)",
         ["scrollDelta"] = "مقدار اسکرول (منفی = پایین، مثبت = بالا)",

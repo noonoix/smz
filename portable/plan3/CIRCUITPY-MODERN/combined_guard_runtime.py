@@ -73,7 +73,7 @@ class Keyboard:
         self._send()
 
 import plan_engine
-from guard_calibration_protocol import build_calibration_get, parse_calibration_set
+from guard_calibration_protocol import build_calibration_get, parse_calibration_set, find_profile_overlap
 from live_light_guard import (
     HASHED_BUNDLE_FILES,
     GuardBundleError,
@@ -84,6 +84,11 @@ from live_light_guard import (
 
 PROFILES = ("desktop", "login-or-dc", "character-dashboard", "entering-game-loading", "game", "targeted")
 PENDING_REVISION = "pending"
+
+class CalibrationOverlapError(Exception):
+    def __init__(self, other_id, width):
+        self.other_id = other_id; self.width = width
+
 DC_ESC_DELAY_MIN_MS = 88
 DC_ESC_DELAY_MAX_MS = 188
 
@@ -401,6 +406,10 @@ class Combined:
         lines = ["%s  %s" % (_file_sha256("/", name), name) for name in sorted(HASHED_BUNDLE_FILES)]
         return "\n".join(lines) + "\n"
     def _publish_calibration(self, revision, profile_id, profile):
+        existing_profiles = self.bundle.get("calibration", {}).get("profiles", {})
+        overlap = find_profile_overlap(existing_profiles, profile_id, profile)
+        if overlap is not None:
+            raise CalibrationOverlapError(overlap["with"], overlap["width"])
         manifest = json.loads(json.dumps(self.bundle["manifest"]))
         calibration = json.loads(json.dumps(self.bundle["calibration"]))
         manifest["calibrationRevision"] = revision
@@ -461,6 +470,8 @@ class Combined:
         if error is not None: return "ERR|CALSET|" + error
         try:
             self._publish_calibration(payload["revision"], payload["id"], payload)
+        except CalibrationOverlapError as exc:
+            return "ERR|CALSET|OVERLAP|with=%s|lux=%.3f" % (exc.other_id, exc.width)
         except Exception:
             return "ERR|CALSET|SAVE"
         return "OK|CALSET|%s|revision=%s|count=%d" % (payload["id"], payload["revision"], self.calibration_count())
@@ -482,6 +493,11 @@ class Combined:
     def save_cal(self):
         if not isinstance(self.result, dict): self.emit("ERR|CAL|BUSY|stage=%d" % (self.stage + 1)); return
         try: self._publish_calibration(PENDING_REVISION, PROFILES[self.stage], self.result)
+        except CalibrationOverlapError as exc:
+            self.last_cal_error = "OVERLAP:%s:%.3f" % (exc.other_id, exc.width)
+            self.emit("ERR|CAL|OVERLAP|stage=%d|id=%s|with=%s|lux=%.3f" %
+                      (self.stage + 1, PROFILES[self.stage], exc.other_id, exc.width))
+            return
         except Exception as exc:
             self.last_cal_error = type(exc).__name__ + ":" + str(exc)[:80]
             self.emit("ERR|CAL|SAVE|stage=%d|detail=%s" % (self.stage + 1, self.last_cal_error))

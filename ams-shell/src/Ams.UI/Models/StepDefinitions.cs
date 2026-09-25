@@ -79,11 +79,13 @@ public static class StepDefinitions
         },
         ["mouseMove"] = new StepDefinition
         {
-            Label = "Mouse Position", ColorResourceKey = "StepMouseBrush", DefaultDelay = 1000,
+            Label = "Move to Position", ColorResourceKey = "StepMouseBrush", DefaultDelay = 1000,
             Fields = new FieldDef[]
             {
                 new("x", "X", FieldKind.Int, "600"),
                 new("y", "Y", FieldKind.Int, "497"),
+                new("moveMode", "Movement source", FieldKind.Combo, "fixed", new[] { "fixed", "handSample" }),
+                new("handSample", "Recorded hand movement", FieldKind.Text, ""),
                 new("human", "Humanized movement (app-side WindMouse path + pauses — off = instant firmware move)", FieldKind.Check, "true"),
                 new("pauseBeforeMin", "Pause BEFORE move — min (ms)", FieldKind.Int, "60", HideWhenKey: "human", HideWhenValue: "false"),
                 new("pauseBeforeMax", "Pause BEFORE move — max (ms)", FieldKind.Int, "220", HideWhenKey: "human", HideWhenValue: "false"),
@@ -98,7 +100,8 @@ public static class StepDefinitions
                 new("moveTimeMin", "Move duration — min (ms) · 0/0 = speed-based (Options)", FieldKind.Int, "0", HideWhenKey: "human", HideWhenValue: "false"),
                 new("moveTimeMax", "Move duration — max (ms)", FieldKind.Int, "0", HideWhenKey: "human", HideWhenValue: "false"),
             },
-            Summarize = s => $"Mouse Position ({PropEx.GetInt(s.Props, "x")}, {PropEx.GetInt(s.Props, "y")})",
+            Summarize = s => $"Move to Position ({PropEx.GetInt(s.Props, "x")}, {PropEx.GetInt(s.Props, "y")})" +
+                (PropEx.GetString(s.Props, "moveMode", "fixed") == "handSample" ? " · 10s hand sample" : ""),
             Commands = s => new[] { $"MMOVE|{PropEx.GetInt(s.Props, "x")},{PropEx.GetInt(s.Props, "y")},abs,{(PropEx.GetBool(s.Props, "human", true) ? 1 : 0)}" },
         },
         ["mouseScroll"] = new StepDefinition

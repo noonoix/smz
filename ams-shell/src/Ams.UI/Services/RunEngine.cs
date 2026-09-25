@@ -472,9 +472,16 @@ public sealed class RunEngine
 
                 case "mouseMove":
                 {
-                    // v0.9.0 — "human" checked → the same app-side humanized path with the Gentle
-                    // preset (human trail + light pauses, NO long idle breaks). Unchecked → raw MMOVE.
-                    if (PropEx.GetBool(s.Props, "human", true))
+                    // handSample replays the user's ten-second cursor trace, rotated/scaled so
+                    // its final point lands on this step's configured destination. Old projects
+                    // have no moveMode and therefore retain the fixed/WindMouse behavior.
+                    if (PropEx.GetString(s.Props, "moveMode", "fixed") == "handSample"
+                        && HandMovementSample.TryDecode(PropEx.GetString(s.Props, "handSample"), out var handSample))
+                    {
+                        await ReplayHandMovementAsync(handSample, PropEx.GetInt(s.Props, "x", 600),
+                                                      PropEx.GetInt(s.Props, "y", 497), ct);
+                    }
+                    else if (PropEx.GetBool(s.Props, "human", true))
                     {
                         // v0.9.14 — tunable per step (dialog fields, Gentle defaults) instead of
                         // the fixed preset; every cursor move in the app is now configurable.
@@ -1027,6 +1034,38 @@ public sealed class RunEngine
             _log($"mouse: idle break {plan.LongPauseMs} ms (human every-N-moves pause)");
             await PausableDelay(plan.LongPauseMs, ct);
         }
+    }
+
+    private async Task ReplayHandMovementAsync(HandMovementSample.Sample sample, int targetX, int targetY, CancellationToken ct)
+    {
+        var start = _mouseAnchor ?? System.Windows.Forms.Cursor.Position;
+        double sx = sample.End.X - sample.Start.X, sy = sample.End.Y - sample.Start.Y;
+        double tx = targetX - start.X, ty = targetY - start.Y;
+        double sourceLen = Math.Sqrt(sx * sx + sy * sy), targetLen = Math.Sqrt(tx * tx + ty * ty);
+        if (sourceLen < 1 || targetLen < 1) return;
+        double scale = targetLen / sourceLen;
+        double cos = (sx * tx + sy * ty) / (sourceLen * targetLen);
+        double sin = (sx * ty - sy * tx) / (sourceLen * targetLen);
+        int srcX = 0, srcY = 0;
+        var path = new List<(int x, int y, int delayMs)>(sample.Segments.Count);
+        foreach (var segment in sample.Segments)
+        {
+            srcX += segment.Dx; srcY += segment.Dy;
+            int x = start.X + (int)Math.Round(scale * (srcX * cos - srcY * sin));
+            int y = start.Y + (int)Math.Round(scale * (srcX * sin + srcY * cos));
+            path.Add((Math.Clamp(x, 0, _screenW - 1), Math.Clamp(y, 0, _screenH - 1), segment.DelayMs));
+        }
+        path[^1] = (Math.Clamp(targetX, 0, _screenW - 1), Math.Clamp(targetY, 0, _screenH - 1), path[^1].delayMs);
+        _log($"mouse: 10s hand sample → ({targetX},{targetY}) · {path.Count} segments");
+        if (_parallelDepth == 0)
+            await _bridge.SendPathAsync(path, ct);
+        else
+            foreach (var point in path)
+            {
+                await Send($"MMOVE|{point.x},{point.y},abs,0", ct, quiet: true);
+                if (point.delayMs > 0) await PausableDelay(point.delayMs, ct);
+            }
+        _mouseAnchor = new System.Drawing.Point(targetX, targetY);
     }
 
     /// <summary>v0.9.0 — a delay that respects Pause: time spent paused does NOT count down the

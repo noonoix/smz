@@ -2273,7 +2273,7 @@ class TestRunner
             "v0.9.41: no reboot scheduling is left in the run loop");
 
         // 11-14) the vertical rail mirrors the Insert tab, grouped into per-section submenus
-        string[] v41types = { "mouseClick", "mouseMove", "mouseScroll", "randomMousePosition", "keystroke", "typeText", "keyDown", "keyUp", "delay", "forLoop", "randomPackage", "parallelGroup", "findImage", "waitForSound", "waitForLight", "openFile", "playAudio", "runExe", "playScript", "label", "gotoLabel", "comment", "rawCommand" };
+        string[] v41types = { "mouseClick", "mouseMove", "mouseScroll", "randomMousePosition", "keystroke", "typeText", "keyDown", "keyUp", "delay", "forLoop", "randomPackage", "parallelGroup", "findImage", "waitForSound", "waitForLight", "openFile", "buzzer", "runExe", "playScript", "label", "gotoLabel", "comment", "rawCommand" };
         int v41rs = v41xaml.IndexOf("<!-- Icon rail", StringComparison.Ordinal);
         int v41rj = v41xaml.IndexOf("<!-- Steps column", StringComparison.Ordinal);
         Assert(v41rs > 0 && v41rj > v41rs,
@@ -3699,6 +3699,30 @@ class TestRunner
             }, pexSettings, 1920, 1080, "f", "T");
             Assert(pexNoHuman.Text.Contains("MOVETO|x=5|y=6|human=0\n"),
                 "v0.9.66: human=false emits native non-human MOVETO");
+
+            var hand = new HandMovementSample.Sample(10_000, new System.Drawing.Point(100, 100),
+                new System.Drawing.Point(130, 106), new[]
+                {
+                    new HandMovementSample.Segment(100, 10, 2),
+                    new HandMovementSample.Segment(120, 12, 3),
+                    new HandMovementSample.Segment(140, 8, 1),
+                });
+            var encodedHand = HandMovementSample.Encode(hand);
+            Assert(HandMovementSample.TryDecode(encodedHand, out var decodedHand)
+                   && decodedHand.Segments.Count == 3 && decodedHand.End.X == 130,
+                "v0.9.68: ten-second hand sample codec round-trips without keyboard/text data");
+            Assert(StepDefinitions.Get("mouseMove").Label == "Move to Position"
+                   && StepDefinitions.Get("mouseMove").Fields.Any(f => f.Key == "moveMode")
+                   && StepDefinitions.Get("mouseMove").Fields.Any(f => f.Key == "handSample"),
+                "v0.9.68: Mouse Position is repurposed as Move to Position with sample mode");
+            var pexHand = PlanExporter.Compile(new List<StepNode>
+            {
+                PexStep("mouseMove", new Dictionary<string, object?>
+                { ["x"] = 130, ["y"] = 106, ["moveMode"] = "handSample", ["handSample"] = encodedHand }),
+            }, pexSettings, 1920, 1080, "f", "T");
+            Assert(pexHand.Text.Contains("RAW|MMOVE|10,2,rel,2\n")
+                   && pexHand.Text.Contains("DELAY|100\n") && !pexHand.Text.Contains("MOVETO|"),
+                "v0.9.68: sampled hand motion exports as native relative HID commands");
 
             // CLICK with swapped hold bounds
             var pexClick = PlanExporter.Compile(new List<StepNode>

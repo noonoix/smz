@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Ams.UI.Models;
+using Ams.UI.Services;
 
 namespace Ams.UI.Views;
 
@@ -23,13 +24,16 @@ public partial class StepDialog : Window
     private readonly Func<Task<int?>>? _calibrate;
     private readonly string? _calibrateTargetKey;
     private readonly Func<Task<(int x, int y, int w, int h)?>>? _pickRegion;
+    private readonly Func<Task<string?>>? _sampleMouse;
+    private System.Windows.Controls.TextBlock? _sampleStatus;
 
     /// <summary>Edited values when the dialog closes with OK; otherwise null.</summary>
     public Dictionary<string, object?>? Values { get; private set; }
 
     public StepDialog(string title, IReadOnlyList<FieldDef> fields, IReadOnlyDictionary<string, object?>? current,
                       Func<Task<int?>>? calibrate = null, string? calibrateTargetKey = null,
-                      Func<Task<(int x, int y, int w, int h)?>>? pickRegion = null, string? stepType = null)
+                      Func<Task<(int x, int y, int w, int h)?>>? pickRegion = null, string? stepType = null,
+                      Func<Task<string?>>? sampleMouse = null)
     {
         InitializeComponent();
         // v0.9.24 — Persian dialog chrome: translate the New:/Edit: prefix; action names stay English
@@ -41,6 +45,7 @@ public partial class StepDialog : Window
         _calibrate = calibrate;
         _calibrateTargetKey = calibrateTargetKey;
         _pickRegion = pickRegion;
+        _sampleMouse = sampleMouse;
         BuildForm(current);
         WireConditionalVisibility();   // v0.9.14 — hide fields ruled out by the current mode/toggle
     }
@@ -50,6 +55,16 @@ public partial class StepDialog : Window
         foreach (var f in _fields)
         {
             object? cur = current is not null && current.TryGetValue(f.Key, out var v) ? v : f.Default;
+
+            // The recorded path is an opaque compact payload. Keep it in the dialog model,
+            // never expose it as an editable textbox; the sampler/status controls own it.
+            if (_stepType == "mouseMove" && f.Key == "handSample")
+            {
+                var hidden = new Wpf.Ui.Controls.TextBox { Text = PropAsString(cur), Visibility = Visibility.Collapsed };
+                _controls[f.Key] = hidden;
+                _rows.Add((f, null, hidden));
+                continue;
+            }
 
             System.Windows.Controls.TextBlock? label = null;
             if (f.Kind != FieldKind.Check)
@@ -115,6 +130,29 @@ public partial class StepDialog : Window
 
             FormPanel.Children.Add(c);
 
+            if (_stepType == "mouseMove" && f.Key == "moveMode" && _sampleMouse is not null)
+            {
+                var sampleButton = new Wpf.Ui.Controls.Button
+                {
+                    Content = "نمونه‌گیری از حرکت دست — ۱۰ ثانیه…",
+                    Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+                    Margin = new Thickness(0, 6, 0, 0),
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                };
+                sampleButton.Click += OnSampleMouse;
+                FormPanel.Children.Add(sampleButton);
+                _sampleStatus = new System.Windows.Controls.TextBlock
+                {
+                    Text = current is not null && current.TryGetValue("handSample", out var stored)
+                           && HandMovementSample.TryDecode(PropAsString(stored), out var ready)
+                        ? $"نمونه آماده: {ready.Segments.Count} بخش · مقصد ({ready.End.X},{ready.End.Y})"
+                        : "هنوز نمونه‌ای ثبت نشده است.",
+                    Foreground = (System.Windows.Media.Brush)System.Windows.Application.Current.Resources["TextSecondaryBrush"],
+                    Margin = new Thickness(0, 4, 0, 2), TextWrapping = TextWrapping.Wrap,
+                };
+                FormPanel.Children.Add(_sampleStatus);
+            }
+
             // Browse button for path-type fields (playAudio / runExe / openFile) (§5.5.x)
             // Uses a plain WPF Button so it stays visible on the dark panel background.
             if (!string.IsNullOrWhiteSpace(f.BrowseFilter))
@@ -153,6 +191,27 @@ public partial class StepDialog : Window
         }
     }
 
+
+    private async void OnSampleMouse(object sender, RoutedEventArgs e)
+    {
+        if (_sampleMouse is null || sender is not Wpf.Ui.Controls.Button btn) return;
+        btn.IsEnabled = false; btn.Content = "در حال ضبط حرکت دست — ۱۰ ثانیه…";
+        if (_sampleStatus is not null) _sampleStatus.Text = "فقط حرکت نشانگر ثبت می‌شود؛ متن، کلید و کلیک ثبت نمی‌شوند.";
+        try
+        {
+            var encoded = await _sampleMouse();
+            if (encoded is null || !HandMovementSample.TryDecode(encoded, out var sample))
+            {
+                if (_sampleStatus is not null) _sampleStatus.Text = "حرکتی ثبت نشد؛ دوباره تلاش کنید.";
+                return;
+            }
+            if (_controls.TryGetValue("handSample", out var payload) && payload is Wpf.Ui.Controls.TextBox hidden) hidden.Text = encoded;
+            SetIntText("x", sample.End.X); SetIntText("y", sample.End.Y);
+            if (_controls.TryGetValue("moveMode", out var mode) && mode is System.Windows.Controls.ComboBox cb) cb.SelectedItem = "handSample";
+            if (_sampleStatus is not null) _sampleStatus.Text = $"نمونه آماده: {sample.Segments.Count} بخش · مقصد ({sample.End.X},{sample.End.Y})";
+        }
+        finally { btn.IsEnabled = true; btn.Content = "نمونه‌گیری از حرکت دست — ۱۰ ثانیه…"; }
+    }
     private async void OnCalibrate(object sender, RoutedEventArgs e)
     {
         if (sender is not Wpf.Ui.Controls.Button btn || _calibrate is null || _calibrateTargetKey is null) return;
@@ -199,6 +258,8 @@ public partial class StepDialog : Window
     // mode; Find Image human-move fields hide when the humanMove box is off).
     private void WireConditionalVisibility()
     {
+        if (_controls.TryGetValue("moveMode", out var moveMode) && moveMode is System.Windows.Controls.ComboBox modeCombo)
+            modeCombo.SelectionChanged += (_, _) => ApplyConditionalVisibility();
         foreach (var dep in _rows.Where(r => _rows.Any(x => x.Def.HideWhenKey == r.Def.Key)))
         {
             if (dep.Control is System.Windows.Controls.ComboBox combo)
@@ -226,10 +287,28 @@ public partial class StepDialog : Window
             };
             // v0.9.29 — HideUnlessValue joins HideWhenValue: forLoop.mode has three laws and a field can be hidden by two
             var vis = StepFieldVisibility.FieldVisible(depValue, def.HideWhenValue, def.HideUnlessValue) ? Visibility.Visible : Visibility.Collapsed;
+            if (_stepType == "mouseMove" && IsHandSampleMode() && HandSampleTuningKeys.Contains(def.Key)) vis = Visibility.Collapsed;
             control.Visibility = vis;
             if (label is not null) label.Visibility = vis;
         }
+        if (_stepType == "mouseMove")
+            foreach (var row in _rows.Where(r => HandSampleTuningKeys.Contains(r.Def.Key)))
+            {
+                var vis = IsHandSampleMode() ? Visibility.Collapsed : Visibility.Visible;
+                row.Control.Visibility = vis; if (row.Label is not null) row.Label.Visibility = vis;
+            }
     }
+
+    private bool IsHandSampleMode()
+        => _controls.TryGetValue("moveMode", out var mode) && mode is System.Windows.Controls.ComboBox cb
+           && (cb.SelectedItem as string) == "handSample";
+
+    private static readonly HashSet<string> HandSampleTuningKeys = new(StringComparer.Ordinal)
+    {
+        "human", "pauseBeforeMin", "pauseBeforeMax", "pauseAfterMin", "pauseAfterMax",
+        "midPauseChance", "midPauseMin", "midPauseMax", "overshootChance", "curveMinPct",
+        "curveMaxPct", "moveTimeMin", "moveTimeMax"
+    };
 
     // v0.9.43 — the audio output device is picked by NAME from the devices actually present
     // (user request: a dropdown instead of the numeric "شاخص خروجی صدا"). Tag = the int index.

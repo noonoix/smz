@@ -4070,6 +4070,11 @@ class TestRunner
         }
         finally { if (Directory.Exists(cycleFwTmp)) Directory.Delete(cycleFwTmp, true); }
 
+        // Modern AutoCycle contracts are intentionally separate from the
+        // legacy/Golden-100 contract. CI can set GOLDEN_100_ONLY=1 to validate
+        // the exact 25-file baseline without requiring modern runtime payloads.
+        if (Environment.GetEnvironmentVariable("GOLDEN_100_ONLY") != "1")
+        {
         // ci-36 follow-up: the UI-selected Random Package must become a real
         // resume_essentials.txt PLAN|2 pre-pass, never an empty silent manager.
         var essentialsTmp = Path.Combine(Path.GetTempPath(), "essentials_" + Guid.NewGuid().ToString("N"));
@@ -4121,6 +4126,8 @@ class TestRunner
                 "v0.9.67: Restart Launch is root-only and precedes the Resume Essentials pre-pass");
         }
         finally { if (Directory.Exists(essentialsTmp)) Directory.Delete(essentialsTmp, true); }
+
+        }
 
         Console.WriteLine($"=== Results: {passed} passed, {failed} failed ===");
         Environment.Exit(failed > 0 ? 1 : 0);

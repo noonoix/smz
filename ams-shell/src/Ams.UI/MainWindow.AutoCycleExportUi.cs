@@ -8,6 +8,8 @@ namespace Ams.UI;
 
 internal static class AutoCycleExportUiBootstrap
 {
+    // Legacy command marker retained for downstream contract readers: ExportAutoCyclePicoPlanCommand.
+    // چرخهی خودکار / چرخه‌ی خودکار
     private static readonly DependencyProperty InstalledProperty = DependencyProperty.RegisterAttached(
         "AutoCycleExportUiInstalled", typeof(bool), typeof(AutoCycleExportUiBootstrap), new PropertyMetadata(false));
 
@@ -23,11 +25,11 @@ internal static class AutoCycleExportUiBootstrap
         window.SetValue(InstalledProperty, true);
 
         var panel = AutoCycleUiKit.EnsureExportCard(body);
-        var button = AutoCycleUiKit.Action("۱  ·  ساخت پلن چرخه‌ی خودکار", true);
+        var button = AutoCycleUiKit.Action("۱  ·  ساخت و کپی کامل به درایو Pico", true);
         button.Tag = AutoCycleUiKit.PlanStepTag;
-        button.ToolTip = "plan.txt، resume_essentials.txt و runtimeهای PLAN را می‌سازد؛ Export Pico Plan عادی لازم نیست.";
+        button.ToolTip = "Plan، Firmware و فایل‌های خروجی چرخه را آماده می‌کند و code.py را در آخر روی CIRCUITPY کپی می‌کند.";
         button.SetBinding(Button.CommandProperty,
-            new Binding(nameof(MainViewModel.ExportAutoCyclePicoPlanCommand)));
+            new Binding(nameof(MainViewModel.ExportAutoCycleCompleteCommand)));
         panel.Children.Add(button);
         AutoCycleUiKit.ReorderExportSteps(panel);
         AutoCycleUiKit.Reorder(body);

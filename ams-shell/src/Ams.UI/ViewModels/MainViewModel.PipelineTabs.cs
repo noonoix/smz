@@ -16,7 +16,7 @@ public partial class MainViewModel
 
     public ObservableCollection<PipelineTabDocument> PipelineTabs => _pipelineWorkspace.Tabs;
     public PipelineTabDocument? ActivePipelineTab => _activePipelineTab;
-    public string ActivePipelineTitle => _activePipelineTab?.Title ?? "Main";
+    public string ActivePipelineTitle => _activePipelineTab?.Title ?? "Desktop";
     public bool IsLaunchPipeline => _activePipelineTab?.Kind == PipelineKind.Launch;
     public bool IsMainPipeline => _activePipelineTab?.Kind == PipelineKind.Main;
 
@@ -122,6 +122,7 @@ public partial class MainViewModel
             tab.Steps.Clear();
             tab.IsDirty = false;
         }
+        _pipelineWorkspace.EnsureDcDefaults();
         _activePipelineTab = _pipelineWorkspace[PipelineKind.Main];
         _currentFile = null;
         _dirty = false;

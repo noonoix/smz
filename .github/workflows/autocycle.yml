@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   portable-contracts:
-    name: autocycle / portable contracts
+    name: modern-autocycle / portable contracts
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -53,7 +53,7 @@ jobs:
             await github.rest.issues.createComment({owner:context.repo.owner,repo:context.repo.repo,issue_number:context.issue.number,body:'<!-- autocycle-portable-failure -->\n**AutoCycle portable failure tail**\n```\n'+tail+'\n```'});
 
   windows-app:
-    name: autocycle / Windows app build-test
+    name: modern-autocycle / Windows TestRunner
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -122,7 +122,7 @@ jobs:
             await github.rest.issues.createComment({owner:context.repo.owner,repo:context.repo.repo,issue_number:context.issue.number,body:'<!-- autocycle-windows-failure -->\n**AutoCycle Windows failure diagnostics**\n```\n'+report+'\n```'});
 
   test-package:
-    name: autocycle / downloadable test package
+    name: modern-autocycle / diagnostic package
     if: github.event_name == 'pull_request' && github.head_ref == 'feature/light-state-profiles'
     needs: [portable-contracts, windows-app]
     runs-on: ubuntu-latest

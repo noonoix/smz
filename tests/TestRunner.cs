@@ -581,6 +581,7 @@ class TestRunner
                 EnvironmentVariables = { ["PYTHONIOENCODING"] = "utf-8" }
             };
             using var p = Process.Start(psi);
+            if (p is null) throw new InvalidOperationException("PNG decoder process could not be started");
             // Read both streams concurrently to avoid pipe-buffer deadlock
             var outTask = p.StandardOutput.ReadToEndAsync();
             var errTask = p.StandardError.ReadToEndAsync();
@@ -3382,6 +3383,10 @@ class TestRunner
                 "v0.9.55: version pins for this release (csproj + banner + bundle)");
         }
 
+        // Modern exporter/runtime contracts are kept out of the Golden-100
+        // contract. The full TestRunner still executes them when this guard is true.
+        if (Environment.GetEnvironmentVariable("GOLDEN_100_ONLY") != "1")
+        {
         // ── Step 56: v0.9.56 — UART arm moved from GP0/GP1 to GP16/GP17 (wiring v6) ──
         Console.WriteLine();
         Console.WriteLine("--- Step 56: v0.9.56 UART GP0/GP1 -> GP16/GP17 ---");
@@ -4046,29 +4051,36 @@ class TestRunner
             }
             finally { if (Directory.Exists(pexTmp)) Directory.Delete(pexTmp, true); }
         }
-        // v0.9.67 hotfix regression: exercise the real per-system exporter before
-        // applying the AutoCycle manifest. The old parity fixture alone missed template drift.
+        }
+
+        // Current Studio contract: the one-click AutoCycle export is the exact
+        // Golden-100 inventory. Resumable remains archived and must not add a
+        // resume runtime to the active export.
         var cycleFwTmp = Path.Combine(Path.GetTempPath(), "cyclefw_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(cycleFwTmp);
         try
         {
             var cycleCode = Path.Combine(cycleFwTmp, "code.py");
             var cycleWritten = AutoCycleFirmwareBundle.Export(cycleCode, Array.Empty<StepNode>(),
-                "REAL-EXPORT-REGRESSION", "once", 1, 0, false);
+                "CURRENT-EXPORT-REGRESSION", "once", 1, 0, false);
             var cycleText = File.ReadAllText(cycleCode);
-            Assert(cycleWritten.Count == 9
-                   && File.Exists(Path.Combine(cycleFwTmp, "resume_essentials_runtime.py")),
-                "v0.9.67: real Pico exporter + AutoCycle writes the complete nine-file firmware bundle");
-            Assert(cycleText.Contains("AUTO_CYCLE_PATCH_0967_H6")
-                   && cycleText.Contains("import plan_cycle as _pc")
-                   && cycleText.Contains("_resume_boot.tick()")
-                   && cycleText.Contains("restart armed; waiting for host reboot")
-                   && cycleText.Contains("board.GP6")
-                   && cycleText.Contains("0x10: Keycode.LEFT_SHIFT"),
-                "v0.9.67: AutoCycle manifest patches the real per-system firmware output");
+            Assert(cycleWritten.Count == 25
+                   && File.Exists(Path.Combine(cycleFwTmp, "SHA256SUMS.txt"))
+                   && File.Exists(Path.Combine(cycleFwTmp, "code.py"))
+                   && !File.Exists(Path.Combine(cycleFwTmp, "resume_essentials_runtime.py")),
+                "current Studio: one-click Pico export writes the complete Golden-100 inventory");
+            Assert(cycleText.Length > 50000
+                   && !cycleText.Contains("AUTO_CYCLE_PATCH_0967_H6")
+                   && !cycleText.Contains("import plan_cycle as _pc"),
+                "current Studio: export preserves the Golden-100 code.py without modern runtime patches");
         }
         finally { if (Directory.Exists(cycleFwTmp)) Directory.Delete(cycleFwTmp, true); }
 
+        // Modern AutoCycle contracts are intentionally separate from the
+        // legacy/Golden-100 contract. CI can set GOLDEN_100_ONLY=1 to validate
+        // the exact 25-file baseline without requiring modern runtime payloads.
+        if (Environment.GetEnvironmentVariable("GOLDEN_100_ONLY") != "1")
+        {
         // ci-36 follow-up: the UI-selected Random Package must become a real
         // resume_essentials.txt PLAN|2 pre-pass, never an empty silent manager.
         var essentialsTmp = Path.Combine(Path.GetTempPath(), "essentials_" + Guid.NewGuid().ToString("N"));
@@ -4120,6 +4132,8 @@ class TestRunner
                 "v0.9.67: Restart Launch is root-only and precedes the Resume Essentials pre-pass");
         }
         finally { if (Directory.Exists(essentialsTmp)) Directory.Delete(essentialsTmp, true); }
+
+        }
 
         Console.WriteLine($"=== Results: {passed} passed, {failed} failed ===");
         Environment.Exit(failed > 0 ? 1 : 0);

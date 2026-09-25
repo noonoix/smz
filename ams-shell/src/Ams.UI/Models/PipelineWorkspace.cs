@@ -37,7 +37,7 @@ public sealed class PipelineTabDocument
 }
 
 /// <summary>
-/// Owns the nine stable workflow tabs. Login/DC remains one optical profile, while DC is a
+/// Owns the eight active workflow tabs. Login/DC remains one optical profile, while DC is a
 /// separate executable route selected by GuardTransition whenever the same light is observed
 /// after the ordered flow has already entered the game environment.
 /// </summary>
@@ -59,7 +59,6 @@ public sealed class PipelineWorkspace
         new() { Kind = PipelineKind.EnteringGameLoading, Title = "Entering Game / Loading", FileName = "entering_game_loading_steps.txt" },
         new() { Kind = PipelineKind.Game, Title = "Game", FileName = "game_steps.txt" },
         new() { Kind = PipelineKind.Targeted, Title = "Targeted", FileName = "targeted_steps.txt" },
-        new() { Kind = PipelineKind.Resumable, Title = "Resumable", FileName = "resumable_steps.txt" },
     };
 
     public PipelineTabDocument this[PipelineKind kind] => Tabs.Single(x => x.Kind == kind);

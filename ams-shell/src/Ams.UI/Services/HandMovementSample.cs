@@ -12,6 +12,7 @@ public static class HandMovementSample
     public readonly record struct Segment(int DelayMs, int Dx, int Dy);
     public sealed record Sample(int DurationMs, Point Start, Point End, IReadOnlyList<Segment> Segments);
 
+    // The v1 payload is intentionally limited to cursor coordinates, relative deltas, and timing.
     public static async Task<Sample?> CaptureAsync(CancellationToken ct = default)
     {
         var start = System.Windows.Forms.Cursor.Position;

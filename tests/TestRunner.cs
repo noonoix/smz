@@ -167,50 +167,49 @@ class TestRunner
         Assert(typoTyped.Length == "hello world".Length + 2,
             $"typo sequence types exactly one slip char per word before correcting (typed {typoTyped.Length} chars)");
 
-        // ── v0.9.12 — typo cadence: one slip every N words, N drawn from a range ──
+        // ── Per-TYPE typo count: min/max corrected slips across eligible characters ──
         var tenWords = string.Join(" ", Enumerable.Range(0, 10).Select(i => $"word{i}"));
         cmds = StepDefinitions.GetCommands(new StepNode
         {
             Type = "typeText",
-            Props = new Dictionary<string, object?> { { "text", tenWords }, { "typoEveryMin", 3 }, { "typoEveryMax", 3 } }
+            Props = new Dictionary<string, object?> { { "text", "zodiak999999" }, { "typoEveryMin", 3 }, { "typoEveryMax", 3 } }
         });
         Assert(cmds.Count(c => c == "KCOMBO|8") == 3,
-            $"typo cadence 3/3 over 10 words fires exactly at words 3, 6, 9 (got {cmds.Count(c => c == "KCOMBO|8")})");
+            $"typo count 3/3 injects three corrections into one word (got {cmds.Count(c => c == "KCOMBO|8")})");
 
-        int cadMin = int.MaxValue, cadMax = 0;
+        int countMin = int.MaxValue, countMax = 0;
         var correctionCounts = new HashSet<int>();
         for (int seed = 0; seed < 24; seed++)
         {
-            // v0.9.16 — use seeded overload so each run is independent of the global RNG state.
             var cc = StepDefinitions.GetCommands(new StepNode
             {
                 Type = "typeText",
-                Props = new Dictionary<string, object?> { { "text", tenWords }, { "typoEveryMin", 2 }, { "typoEveryMax", 4 } }
+                Props = new Dictionary<string, object?> { { "text", "zodiak999999" }, { "typoEveryMin", 2 }, { "typoEveryMax", 4 } }
             }, seed);
             int bs = cc.Count(x => x == "KCOMBO|8");
-            cadMin = Math.Min(cadMin, bs); cadMax = Math.Max(cadMax, bs);
+            countMin = Math.Min(countMin, bs); countMax = Math.Max(countMax, bs);
             correctionCounts.Add(bs);
         }
-        Assert(cadMin >= 2 && cadMax <= 5,
-            $"typo cadence 2–4 over 10 words stays in bounds (got {cadMin}–{cadMax} corrections)");
+        Assert(countMin >= 2 && countMax <= 4,
+            $"typo count 2–4 stays in exact bounds (got {countMin}–{countMax} corrections)");
         Assert(correctionCounts.Count > 1,
-            $"typo cadence re-rolls N after each correction (distinct counts: {string.Join(",", correctionCounts.OrderBy(x=>x))})");
+            $"typo count is re-rolled for each TYPE execution (distinct counts: {string.Join(",", correctionCounts.OrderBy(x=>x))})");
 
         cmds = StepDefinitions.GetCommands(new StepNode
         {
             Type = "typeText",
-            Props = new Dictionary<string, object?> { { "text", "a bb cc" }, { "typoEveryMin", 1 }, { "typoEveryMax", 1 } }
+            Props = new Dictionary<string, object?> { { "text", "a" }, { "typoEveryMin", 1 }, { "typoEveryMax", 1 } }
         });
-        Assert(cmds.Count(c => c == "KCOMBO|8") == 2,
-            $"single-char words cannot take a slip and do not consume the cadence (got {cmds.Count(c => c == "KCOMBO|8")})");
+        Assert(cmds.Count(c => c == "KCOMBO|8") == 1,
+            $"single-character text supports one corrected slip (got {cmds.Count(c => c == "KCOMBO|8")})");
 
         cmds = StepDefinitions.GetCommands(new StepNode
         {
             Type = "typeText",
             Props = new Dictionary<string, object?> { { "text", tenWords }, { "typoChance", 100 }, { "typoEveryMin", 5 }, { "typoEveryMax", 5 } }
         });
-        Assert(cmds.Count(c => c == "KCOMBO|8") == 2,
-            $"cadence range takes precedence over legacy typoChance (got {cmds.Count(c => c == "KCOMBO|8")}, chance mode would give 10)");
+        Assert(cmds.Count(c => c == "KCOMBO|8") == 5,
+            $"per-text count takes precedence over legacy typoChance (got {cmds.Count(c => c == "KCOMBO|8")}, chance mode would give 10)");
 
         // ── v0.9.13 — word-pause probability + stream merging (no fixed gap after space) ──
         cmds = StepDefinitions.GetCommands(new StepNode

@@ -4087,6 +4087,25 @@ class TestRunner
         // the exact 25-file baseline without requiring modern runtime payloads.
         if (Environment.GetEnvironmentVariable("GOLDEN_100_ONLY") != "1")
         {
+        // Modern split-memory export is a separate contract; it must not replace
+        // or mutate the legacy Golden-100 exporter.
+        var modernTmp = Path.Combine(Path.GetTempPath(), "modernfw_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(modernTmp);
+        try
+        {
+            var modernWritten = ModernAutoCycleFirmwareBundle.Export(Path.Combine(modernTmp, "code.py"));
+            Assert(modernWritten.Count == 28
+                   && File.Exists(Path.Combine(modernTmp, "plan_engine_parse.py"))
+                   && File.Exists(Path.Combine(modernTmp, "plan_engine_human.py"))
+                   && File.Exists(Path.Combine(modernTmp, "plan_engine_exec.py"))
+                   && File.ReadAllText(Path.Combine(modernTmp, "SHA256SUMS.txt")).Split('\n', StringSplitOptions.RemoveEmptyEntries).Length == 24,
+                "modern AutoCycle export writes the split-memory bundle and manifest");
+            Assert(File.ReadAllText(Path.Combine(modernTmp, "code.py")).Length < 40000
+                   && File.ReadAllText(Path.Combine(modernTmp, "code.py")).Contains("DeferredPlanEngine"),
+                "modern AutoCycle export uses the small deferred-loading entrypoint");
+        }
+        finally { if (Directory.Exists(modernTmp)) Directory.Delete(modernTmp, true); }
+
         // ci-36 follow-up: the UI-selected Random Package must become a real
         // resume_essentials.txt PLAN|2 pre-pass, never an empty silent manager.
         var essentialsTmp = Path.Combine(Path.GetTempPath(), "essentials_" + Guid.NewGuid().ToString("N"));

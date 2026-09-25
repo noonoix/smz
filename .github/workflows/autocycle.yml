@@ -31,6 +31,7 @@ jobs:
           set -euo pipefail
           {
             python -m py_compile portable/plan3/CIRCUITPY/*.py
+            python -m py_compile portable/plan3/CIRCUITPY-MODERN/*.py
             python -m py_compile portable/plan3/CIRCUITPY-SPLIT/*.py
             python -m py_compile portable/plan3/tools/*.py portable/plan3/sim/*.py
             count=0

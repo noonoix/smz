@@ -57,6 +57,7 @@
     <None Include="..\..\..\portable\plan3\CIRCUITPY\settings.toml"><Link>portable-runtime\settings.toml</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\CIRCUITPY\targeted_steps.txt"><Link>portable-runtime\targeted_steps.txt</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Include="..\..\..\portable\plan3\autocycle_h6_patch.json"><Link>portable-runtime\autocycle_h6_patch.json</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="..\..\..\portable\plan3\CIRCUITPY-MODERN\**\*"><Link>portable-modern-runtime\%(RecursiveDir)%(Filename)%(Extension)</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
   </ItemGroup>
 
 </Project>

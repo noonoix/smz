@@ -31,6 +31,12 @@ internal static class AutoCycleExportUiBootstrap
         button.SetBinding(Button.CommandProperty,
             new Binding(nameof(MainViewModel.ExportAutoCycleCompleteCommand)));
         panel.Children.Add(button);
+        var modern = AutoCycleUiKit.Action("۲  ·  ساخت و کپی Bundle مدرن حافظه‌ای", false);
+        modern.Tag = AutoCycleUiKit.FirmwareStepTag;
+        modern.ToolTip = "نسخهٔ split-memory فعلی را با plan_engine تکه‌ای و مبدأ واقعی موس کپی می‌کند؛ Golden 100 را تغییر نمی‌دهد.";
+        modern.SetBinding(Button.CommandProperty,
+            new Binding(nameof(MainViewModel.ExportAutoCycleModernCommand)));
+        panel.Children.Add(modern);
         AutoCycleUiKit.ReorderExportSteps(panel);
         AutoCycleUiKit.Reorder(body);
     }

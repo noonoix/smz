@@ -2,9 +2,9 @@
   "generator": "Classroom Studio v0.9.67",
   "bundle": "combined-pico-guard-executor",
   "system": "PC-13458",
-  "generatedUtc": "2026-09-25 00:35:17",
+  "generatedUtc": "2026-09-25 22:23:19",
   "hardwareCalibrationVerified": false,
-  "calibrationRevision": "guard-a01636aa4b847b72",
+  "calibrationRevision": "guard-2fbd7fd4fffc3e00",
   "sensor": {
     "chip": "BH1750",
     "board": "GY-302/GY-30",

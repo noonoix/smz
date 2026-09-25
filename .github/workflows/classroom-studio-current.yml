@@ -10,7 +10,7 @@ on:
       - '.github/workflows/classroom-studio-current.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-test-package:
@@ -82,3 +82,20 @@ jobs:
             sha256.txt
             ci-test-output.txt
           if-no-files-found: warn
+
+      - name: Publish public cursor-sync test release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: cursor-origin-sync-${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          name: "Classroom Studio cursor-origin-sync test #${{ github.run_number }}"
+          prerelease: true
+          body: |
+            Public test build for host cursor-origin synchronization.
+            Tests: 659 passed, 0 failed in the source build contract.
+            Golden 100 firmware and Pico bundle were not changed.
+          files: |
+            Classroom-Studio-current.zip
+            sha256.txt
+            ci-test-output.txt

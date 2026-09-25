@@ -41,6 +41,10 @@ public sealed class PipelineTabDocument
 /// </summary>
 public sealed class PipelineWorkspace
 {
+    // Compatibility contract for older exporters: launch_steps.txt, plan.txt,
+    // launch_recovery.txt, main_recovery.txt and resume_essentials.txt remain emitted
+    // alongside the current desktop/restart/DC route files. PipelineKind.Main is the
+    // value-compatible name for Desktop in those documents.
     public const int FormatVersion = 2;
     public ObservableCollection<PipelineTabDocument> Tabs { get; } = new()
     {

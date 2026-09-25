@@ -17,14 +17,64 @@ jobs:
 
       - name: Create backup archive
         run: |
-          git clone --mirror "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" repo-backup.git
+          git clone "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" repo-backup.git
           tar -czf repo-backup.tar.gz repo-backup.git
 
       - name: Upload to Google Drive
-        uses: adityak74/google-drive-upload-git-action@main
-        with:
-          credentials: ${{ secrets.GDRIVE_CREDENTIALS }}
-          folderId: ${{ secrets.GDRIVE_FOLDER_ID }}
-          filename: "repo-backup.tar.gz"
-          name: "latest-backup.tar.gz"   # همیشه یک فایل ثابت
-          overwrite: "true"              # روی فایل قبلی بازنویسی میشه
+        env:
+          GDRIVE_CREDENTIALS: ${{ secrets.GDRIVE_CREDENTIALS }}
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+        run: |
+          python -m pip install --quiet --disable-pip-version-check google-api-python-client google-auth
+          printf '%s' "$GDRIVE_CREDENTIALS" | base64 --decode > "$RUNNER_TEMP/gdrive-service-account.json"
+          export GDRIVE_CREDENTIALS_FILE="$RUNNER_TEMP/gdrive-service-account.json"
+          python - <<'PY'
+          import os
+          from google.oauth2 import service_account
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaFileUpload
+
+          folder_id = os.environ["GDRIVE_FOLDER_ID"].strip()
+          credentials = service_account.Credentials.from_service_account_file(
+              os.environ["GDRIVE_CREDENTIALS_FILE"],
+              scopes=["https://www.googleapis.com/auth/drive"],
+          )
+          drive = build("drive", "v3", credentials=credentials, cache_discovery=False)
+          query = (
+              f"'{folder_id}' in parents and "
+              "name = 'latest-backup.tar.gz' and trashed = false"
+          )
+          result = drive.files().list(
+              q=query,
+              spaces="drive",
+              fields="files(id,name)",
+              includeItemsFromAllDrives=True,
+              supportsAllDrives=True,
+          ).execute()
+          matches = result.get("files", [])
+          media = MediaFileUpload(
+              "repo-backup.tar.gz",
+              mimetype="application/gzip",
+              resumable=True,
+          )
+
+          if matches:
+              file_id = matches[0]["id"]
+              drive.files().update(
+                  fileId=file_id,
+                  media_body=media,
+                  supportsAllDrives=True,
+              ).execute()
+              print("Updated latest-backup.tar.gz")
+          else:
+              drive.files().create(
+                  body={
+                      "name": "latest-backup.tar.gz",
+                      "parents": [folder_id],
+                  },
+                  media_body=media,
+                  fields="id",
+                  supportsAllDrives=True,
+              ).execute()
+              print("Created latest-backup.tar.gz")
+          PY

@@ -28,61 +28,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Validate exact Golden 100 inventory and SHA256 manifest
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from hashlib import sha256
-          from pathlib import Path
-          import re
-
-          root = Path('portable/plan3/CIRCUITPY')
-          expected_files = {
-              'README-FLASH.md', 'SHA256SUMS.txt', 'autocycle.amsj', 'boot.py',
-              'boot_out.txt', 'character_dashboard_steps.txt', 'code.py',
-              'combined_guard_runtime.py', 'desktop_steps.txt',
-              'entering_game_loading_steps.txt', 'error_policy.py', 'game_steps.txt',
-              'guard-calibration.json', 'guard-transition.json',
-              'guard_calibration_protocol.py', 'guard_transition.py',
-              'live_light_guard.py', 'login_or_dc_steps.txt', 'pico-calibration.json',
-              'plan.txt', 'plan_engine.py', 'restart_steps.txt',
-              'resumable_steps.txt', 'settings.toml', 'targeted_steps.txt',
-          }
-          expected_manifest = {
-              'boot.py', 'character_dashboard_steps.txt', 'code.py',
-              'combined_guard_runtime.py', 'desktop_steps.txt',
-              'entering_game_loading_steps.txt', 'error_policy.py', 'game_steps.txt',
-              'guard-calibration.json', 'guard-transition.json',
-              'guard_calibration_protocol.py', 'guard_transition.py',
-              'live_light_guard.py', 'login_or_dc_steps.txt', 'pico-calibration.json',
-              'plan.txt', 'plan_engine.py', 'README-FLASH.md',
-              'restart_steps.txt', 'resumable_steps.txt', 'targeted_steps.txt',
-          }
-          actual_files = {p.name for p in root.iterdir() if p.is_file()}
-          assert actual_files == expected_files, (sorted(actual_files ^ expected_files), sorted(actual_files))
-
-          rows = []
-          for line in (root / 'SHA256SUMS.txt').read_text(encoding='utf-8').splitlines():
-              if line.strip():
-                  digest, name = line.split(None, 1)
-                  rows.append((digest, name))
-          assert {name for _, name in rows} == expected_manifest
-          assert len(rows) == 21
-          for digest, name in rows:
-              actual = sha256((root / name).read_bytes()).hexdigest()
-              assert actual == digest, (name, digest, actual)
-
-          py = list(root.glob('*.py'))
-          text = '\n'.join(p.read_text(encoding='utf-8', errors='ignore') for p in py)
-          assert not re.search(r'^\s*(?:from|import)\s+adafruit_hid\b', text, re.MULTILINE)
-          code = (root / 'code.py').read_text(encoding='utf-8')
-          assert '_run_light_route' in code
-          assert 'fh.readline()' in code
-          assert 'self.guard.last_decision = None' in code
-          print('Golden 100 inventory: 25 files')
-          print('Golden 100 SHA256 manifest: 21/21 verified')
-          print('Golden 100 runtime markers and no adafruit_hid import: PASS')
-          PY
+        run: python .github/scripts/golden_100_contract.py portable/plan3/CIRCUITPY
       - name: Compile Golden 100 Python sources
         run: python -m py_compile portable/plan3/CIRCUITPY/*.py
 
@@ -92,40 +38,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Validate Golden 100 contract on Windows
         shell: pwsh
-        run: |
-          $root = Join-Path $env:GITHUB_WORKSPACE 'portable\plan3\CIRCUITPY'
-          $expected = @(
-            'README-FLASH.md','SHA256SUMS.txt','autocycle.amsj','boot.py','boot_out.txt',
-            'character_dashboard_steps.txt','code.py','combined_guard_runtime.py',
-            'desktop_steps.txt','entering_game_loading_steps.txt','error_policy.py',
-            'game_steps.txt','guard-calibration.json','guard-transition.json',
-            'guard_calibration_protocol.py','guard_transition.py','live_light_guard.py',
-            'login_or_dc_steps.txt','pico-calibration.json','plan.txt','plan_engine.py',
-            'restart_steps.txt','resumable_steps.txt','settings.toml','targeted_steps.txt'
-          ) | Sort-Object
-          $actual = @(Get-ChildItem -LiteralPath $root -File | ForEach-Object Name | Sort-Object)
-          if ((Compare-Object $expected $actual).Count -ne 0) {
-            Compare-Object $expected $actual | Format-Table | Out-String | Write-Error
-            exit 1
-          }
-          $manifest = @(Get-Content -LiteralPath (Join-Path $root 'SHA256SUMS.txt')) | Where-Object { $_.Trim() }
-          if ($manifest.Count -ne 21) { throw "Expected 21 SHA256 entries, got $($manifest.Count)" }
-          foreach ($line in $manifest) {
-            $parts = $line -split '\s+', 2
-            $file = Join-Path $root $parts[1]
-            $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $file).Hash.ToLowerInvariant()
-            if ($actualHash -ne $parts[0]) { throw "SHA256 mismatch: $($parts[1])" }
-          }
-          $py = Get-ChildItem -LiteralPath $root -Filter '*.py' -File
-          $all = ($py | ForEach-Object { Get-Content -Raw -LiteralPath $_.FullName }) -join "`n"
-          if ($all -match '(?m)^\s*(from|import)\s+adafruit_hid\b') { throw 'adafruit_hid import found' }
-          $code = Get-Content -Raw -LiteralPath (Join-Path $root 'code.py')
-          foreach ($marker in @('_run_light_route','fh.readline()','self.guard.last_decision = None')) {
-            if ($code.IndexOf($marker, [System.StringComparison]::Ordinal) -lt 0) { throw "Missing Golden 100 marker: $marker" }
-          }
-          Write-Host 'legacy/golden-100 Windows contract: 25 files, 21 SHA256 entries, runtime markers PASS'
+        run: python .github/scripts/golden_100_contract.py portable/plan3/CIRCUITPY
 
   flashable-golden-100:
     name: golden-100 / flashable bundle

@@ -3,13 +3,13 @@ using Ams.UI.Models;
 
 namespace Ams.UI.Services;
 
-/// <summary>Versioned persistence envelope for browser-style pipeline tabs.</summary>
+/// <summary>Versioned persistence for the nine workflow tabs, including build-100 import.</summary>
 public static class PipelineWorkspaceSerializer
 {
     private sealed class Envelope
     {
         public string app { get; set; } = "AMS";
-        public int pipelineVersion { get; set; } = PipelineWorkspace.FormatVersion;
+        public int pipelineVersion { get; set; }
         public Dictionary<string, List<StepNode>> pipelines { get; set; } = new();
     }
 
@@ -17,7 +17,8 @@ public static class PipelineWorkspaceSerializer
 
     public static string Serialize(PipelineWorkspace workspace)
     {
-        var envelope = new Envelope();
+        workspace.EnsureDcDefaults();
+        var envelope = new Envelope { pipelineVersion = PipelineWorkspace.FormatVersion };
         foreach (var tab in workspace.Tabs)
             envelope.pipelines[tab.Kind.ToString()] = tab.Steps.ToList();
         return JsonSerializer.Serialize(envelope, Options);
@@ -25,22 +26,61 @@ public static class PipelineWorkspaceSerializer
 
     public static PipelineWorkspace Deserialize(string json)
     {
-        var envelope = JsonSerializer.Deserialize<Envelope>(json, Options)
-            ?? throw new InvalidDataException("Not an AMS pipeline document.");
-        if (envelope.app != "AMS" || envelope.pipelineVersion != PipelineWorkspace.FormatVersion)
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        if (!root.TryGetProperty("app", out var app) || app.GetString() != "AMS")
+            throw new InvalidDataException("Not an AMS pipeline document.");
+        if (!root.TryGetProperty("pipelines", out var pipelines) || pipelines.ValueKind != JsonValueKind.Object)
+            throw new InvalidDataException("Pipeline document has no pipelines.");
+
+        var version = root.TryGetProperty("pipelineVersion", out var versionValue)
+            && versionValue.TryGetInt32(out var parsed) ? parsed : 0;
+        if (version is not (1 or 2 or 3))
             throw new InvalidDataException("Unsupported AMS pipeline document.");
 
         var workspace = new PipelineWorkspace();
-        foreach (var tab in workspace.Tabs)
+        foreach (var tab in workspace.Tabs) tab.Steps.Clear();
+        var hasDc = false;
+        foreach (var property in pipelines.EnumerateObject())
         {
-            tab.Steps.Clear();
-            if (!envelope.pipelines.TryGetValue(tab.Kind.ToString(), out var roots)) continue;
-            foreach (var root in roots)
+            var target = Map(property.Name);
+            if (target is null) continue;
+            var roots = property.Value.Deserialize<List<StepNode>>() ?? new();
+            var tab = workspace[target.Value];
+            foreach (var rootNode in roots)
             {
-                DocumentService.FixParents(root, null);
-                tab.Steps.Add(root);
+                DocumentService.FixParents(rootNode, null);
+                tab.Steps.Add(rootNode);
             }
+            if (target == PipelineKind.Dc) hasDc = true;
         }
+        // Build 100 predates the dedicated DC tab. Give it the safe ESC route on import.
+        // An explicitly empty DC tab receives the same default so a blank tab never disables
+        // popup dismissal by accident.
+        if (!hasDc || workspace[PipelineKind.Dc].Steps.Count == 0)
+            workspace.EnsureDcDefaults();
         return workspace;
+    }
+
+    private static PipelineKind? Map(string name)
+    {
+        return name switch
+        {
+            "Desktop" => PipelineKind.Desktop,
+            "Restart" => PipelineKind.Restart,
+            "LoginOrDc" or "Login" => PipelineKind.LoginOrDc,
+            "Dc" or "DC" => PipelineKind.Dc,
+            "CharacterDashboard" => PipelineKind.CharacterDashboard,
+            "EnteringGameLoading" => PipelineKind.EnteringGameLoading,
+            "Game" => PipelineKind.Game,
+            "Targeted" => PipelineKind.Targeted,
+            "Resumable" => PipelineKind.Resumable,
+            // v1 five-tab names
+            "Launch" => PipelineKind.Restart,
+            "Main" => PipelineKind.Desktop,
+            "LaunchRecovery" or "MainRecovery" => PipelineKind.Dc,
+            "ResumeEssentials" => PipelineKind.Resumable,
+            _ => null,
+        };
     }
 }

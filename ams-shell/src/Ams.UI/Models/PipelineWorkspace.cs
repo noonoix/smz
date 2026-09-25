@@ -3,14 +3,25 @@ using Ams.UI.Services;
 
 namespace Ams.UI.Models;
 
-/// <summary>Fixed browser-style step workspaces. Launch is shared by initial start and Auto Resume.</summary>
+/// <summary>Fixed workflow tabs used by Classroom Studio and the portable Guard exporter.</summary>
 public enum PipelineKind
 {
-    Launch,
-    Main,
-    LaunchRecovery,
-    MainRecovery,
-    ResumeEssentials,
+    Desktop,
+    Restart,
+    LoginOrDc,
+    Dc,
+    CharacterDashboard,
+    EnteringGameLoading,
+    Game,
+    Targeted,
+    Resumable,
+
+    // Names kept as value-compatible aliases for the earlier five-tab workspace.
+    Launch = Restart,
+    Main = Desktop,
+    LaunchRecovery = Dc,
+    MainRecovery = Dc,
+    ResumeEssentials = Resumable,
 }
 
 public sealed class PipelineTabDocument
@@ -24,25 +35,56 @@ public sealed class PipelineTabDocument
 }
 
 /// <summary>
-/// Owns the five fixed step trees. Tabs are non-closable and have stable ordering so export,
-/// checkpoint and recovery contracts never depend on UI position or a marked For Loop.
+/// Owns the nine stable workflow tabs. Login/DC remains one optical profile, while DC is a
+/// separate executable route selected by GuardTransition whenever the same light is observed
+/// after the ordered flow has already entered the game environment.
 /// </summary>
 public sealed class PipelineWorkspace
 {
-    public const int FormatVersion = 1;
+    public const int FormatVersion = 2;
     public ObservableCollection<PipelineTabDocument> Tabs { get; } = new()
     {
-        new() { Kind = PipelineKind.Launch, Title = "Launch", FileName = "launch_steps.txt" },
-        new() { Kind = PipelineKind.Main, Title = "Main", FileName = "plan.txt" },
-        new() { Kind = PipelineKind.LaunchRecovery, Title = "Launch DC Recovery", FileName = "launch_recovery.txt" },
-        new() { Kind = PipelineKind.MainRecovery, Title = "Main DC Recovery", FileName = "main_recovery.txt" },
-        new() { Kind = PipelineKind.ResumeEssentials, Title = "Resume Essentials", FileName = "resume_essentials.txt" },
+        new() { Kind = PipelineKind.Desktop, Title = "Desktop", FileName = "desktop_steps.txt" },
+        new() { Kind = PipelineKind.Restart, Title = "Restart", FileName = "restart_steps.txt" },
+        new() { Kind = PipelineKind.LoginOrDc, Title = "Login / DC", FileName = "login_or_dc_steps.txt" },
+        new() { Kind = PipelineKind.Dc, Title = "DC", FileName = "dc_steps.txt" },
+        new() { Kind = PipelineKind.CharacterDashboard, Title = "Character Dashboard", FileName = "character_dashboard_steps.txt" },
+        new() { Kind = PipelineKind.EnteringGameLoading, Title = "Entering Game / Loading", FileName = "entering_game_loading_steps.txt" },
+        new() { Kind = PipelineKind.Game, Title = "Game", FileName = "game_steps.txt" },
+        new() { Kind = PipelineKind.Targeted, Title = "Targeted", FileName = "targeted_steps.txt" },
+        new() { Kind = PipelineKind.Resumable, Title = "Resumable", FileName = "resumable_steps.txt" },
     };
 
     public PipelineTabDocument this[PipelineKind kind] => Tabs.Single(x => x.Kind == kind);
 
-    /// <summary>Legacy .amsj files migrate losslessly into the requested active tab.</summary>
-    public static PipelineWorkspace FromLegacy(IEnumerable<StepNode> roots, PipelineKind target = PipelineKind.Main)
+    /// <summary>Install the safe default DC popup dismissal when the tab is empty.</summary>
+    public void EnsureDcDefaults()
+    {
+        var dc = this[PipelineKind.Dc];
+        if (dc.Steps.Count != 0) return;
+        dc.Steps.Add(new StepNode
+        {
+            Type = "delay",
+            Name = "تأخیر تصادفی قبل از بستن Popup DC",
+            Props = new Dictionary<string, object?> { ["minMs"] = 88, ["maxMs"] = 188 },
+        });
+        dc.Steps.Add(new StepNode
+        {
+            Type = "keyDown",
+            Name = "ESC — رد Popup قطع اتصال",
+            Props = new Dictionary<string, object?> { ["key"] = "ESC", ["keyboardBoard"] = "default" },
+        });
+        dc.Steps.Add(new StepNode
+        {
+            Type = "keyUp",
+            Name = "آزادکردن ESC",
+            Props = new Dictionary<string, object?> { ["key"] = "ESC", ["keyboardBoard"] = "default" },
+        });
+        foreach (var node in dc.Steps) node.Parent = null;
+    }
+
+    /// <summary>Legacy .amsj files migrate into the requested active tab without losing roots.</summary>
+    public static PipelineWorkspace FromLegacy(IEnumerable<StepNode> roots, PipelineKind target = PipelineKind.Desktop)
     {
         var workspace = new PipelineWorkspace();
         foreach (var root in roots)
@@ -50,6 +92,7 @@ public sealed class PipelineWorkspace
             DocumentService.FixParents(root, null);
             workspace[target].Steps.Add(root);
         }
+        workspace.EnsureDcDefaults();
         return workspace;
     }
 }

@@ -3,7 +3,11 @@ using Ams.UI.Models;
 
 namespace Ams.UI.Services;
 
-/// <summary>Exports every first-class pipeline tab with the ordinary PLAN|2 compiler.</summary>
+/// <summary>
+/// Exports the Classroom Studio workflow tabs and keeps the root automatic-cycle contract.
+/// The dedicated DC route is emitted as dc_steps.txt and is selected by GuardTransition when
+/// the Login/DC light is observed after stage 2.
+/// </summary>
 public static class PipelinePlanBundle
 {
     private const string MainSentinel = "__PIPELINE_CALL_MAIN_DC_RECOVERY__";
@@ -13,21 +17,32 @@ public static class PipelinePlanBundle
         AppSettings settings, int screenW, int screenH, string sourceName, string machine)
     {
         ValidateRecoveryCalls(workspace);
-        var mainSteps = NormalizeRecoveryCalls(workspace[PipelineKind.Main].Steps);
-        var written = AutoCyclePlanBundle.Export(planPath, mainSteps,
-            settings, screenW, screenH, sourceName + "#main", machine).ToList();
+        workspace.EnsureDcDefaults();
+        var desktop = NormalizeRecoveryCalls(workspace[PipelineKind.Desktop].Steps);
+        var written = AutoCyclePlanBundle.Export(planPath, desktop, settings, screenW, screenH,
+            sourceName + "#desktop", machine).ToList();
         var directory = Path.GetDirectoryName(Path.GetFullPath(planPath))
             ?? throw new IOException("مسیر خروجی Pipeline نامعتبر است.");
 
-        var rootText = ExpandRecoveryCalls(File.ReadAllText(Path.GetFullPath(planPath)));
-        AtomicWrite(Path.GetFullPath(planPath), new UTF8Encoding(false).GetBytes(rootText));
-        var payloads = new[]
+        var payloads = new List<(string Name, byte[] Bytes)>();
+        foreach (var tab in workspace.Tabs)
         {
-            Compile(PipelineKind.Launch, "launch_steps.txt"),
-            Compile(PipelineKind.LaunchRecovery, "launch_recovery.txt"),
-            Compile(PipelineKind.MainRecovery, "main_recovery.txt"),
-            Compile(PipelineKind.ResumeEssentials, "resume_essentials.txt"),
-        };
+            var normalized = NormalizeRecoveryCalls(tab.Steps);
+            var text = normalized.Count == 0
+                ? "PLAN|2\n"
+                : PlanExporter.CompileOnce(normalized, settings, screenW, screenH,
+                    sourceName + "#" + tab.Kind, machine).Text;
+            text = ExpandRecoveryCalls(text);
+            if (tab.Kind != PipelineKind.Desktop && ContainsCycleDirective(text))
+                throw new PlanExporter.PlanBlockedException(new[] { tab.FileName + ": directive چرخه فقط در plan.txt مجاز است." });
+            payloads.Add((tab.FileName, new UTF8Encoding(false).GetBytes(text)));
+        }
+
+        // Preserve the two recovery filenames consumed by older portable bundles. They now
+        // mirror the dedicated DC route and remain harmless compatibility aliases.
+        var dc = payloads.Single(x => x.Name == "dc_steps.txt").Bytes;
+        payloads.Add(("launch_recovery.txt", dc));
+        payloads.Add(("main_recovery.txt", dc));
         foreach (var payload in payloads)
         {
             var path = Path.Combine(directory, payload.Name);
@@ -36,34 +51,35 @@ public static class PipelinePlanBundle
         }
 
         var recoverySource = Path.Combine(AppContext.BaseDirectory, "portable-runtime", "recovery_runtime.py");
-        if (!File.Exists(recoverySource)) throw new IOException("فایل runtime بازیابی پیدا نشد: recovery_runtime.py");
-        var recoveryTarget = Path.Combine(directory, "recovery_runtime.py");
-        AtomicWrite(recoveryTarget, File.ReadAllBytes(recoverySource));
-        written.Add(recoveryTarget);
-        return written.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-
-        (string Name, byte[] Bytes) Compile(PipelineKind kind, string name)
+        if (File.Exists(recoverySource))
         {
-            var normalized = NormalizeRecoveryCalls(workspace[kind].Steps);
-            var text = normalized.Count == 0 ? "PLAN|2\n" : PlanExporter.CompileOnce(normalized, settings, screenW, screenH, sourceName + "#" + kind, machine).Text;
-            text = ExpandRecoveryCalls(text);
-            if (text.Contains("RUNFOR|", StringComparison.Ordinal) || text.Contains("AUTORESUME|", StringComparison.Ordinal) || text.Contains("POSTLAUNCH|", StringComparison.Ordinal) || text.Contains("LAUNCH|", StringComparison.Ordinal))
-                throw new PlanExporter.PlanBlockedException(new[] { name + ": directive چرخه فقط در plan.txt مجاز است." });
-            return (name, new UTF8Encoding(false).GetBytes(text));
+            var recoveryTarget = Path.Combine(directory, "recovery_runtime.py");
+            AtomicWrite(recoveryTarget, File.ReadAllBytes(recoverySource));
+            written.Add(recoveryTarget);
         }
+        return written.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
+
+    private static bool ContainsCycleDirective(string text)
+        => text.Contains("RUNFOR|", StringComparison.Ordinal)
+        || text.Contains("AUTORESUME|", StringComparison.Ordinal)
+        || text.Contains("POSTLAUNCH|", StringComparison.Ordinal)
+        || text.Contains("LAUNCH|", StringComparison.Ordinal);
 
     private static void ValidateRecoveryCalls(PipelineWorkspace workspace)
     {
         var errors = new List<string>();
         foreach (var tab in workspace.Tabs) Visit(tab.Steps, tab.Kind, tab.Title, errors);
         if (errors.Count > 0) throw new PlanExporter.PlanBlockedException(errors);
+
         static void Visit(IEnumerable<StepNode> nodes, PipelineKind kind, string title, List<string> errors)
         {
             foreach (var node in nodes)
             {
-                if (node.Type == RecoveryCallStepDefinitions.CallMain && kind != PipelineKind.Main) errors.Add(title + ": استپ Run/Call Main DC Recovery فقط در تب Main مجاز است.");
-                if (node.Type == RecoveryCallStepDefinitions.CallLaunch && kind != PipelineKind.Launch) errors.Add(title + ": استپ Run/Call Launch DC Recovery فقط در تب Launch مجاز است.");
+                if (node.Type == RecoveryCallStepDefinitions.CallMain && kind != PipelineKind.Desktop)
+                    errors.Add(title + ": استپ Run/Call Main DC Recovery فقط در تب Desktop مجاز است.");
+                if (node.Type == RecoveryCallStepDefinitions.CallLaunch && kind != PipelineKind.Restart)
+                    errors.Add(title + ": استپ Run/Call Launch DC Recovery فقط در تب Restart مجاز است.");
                 Visit(node.Children, kind, title, errors);
             }
         }
@@ -74,14 +90,28 @@ public static class PipelinePlanBundle
         var result = new List<StepNode>();
         foreach (var source in nodes)
         {
-            var mapped = source.Type switch { RecoveryCallStepDefinitions.CallMain => MainSentinel, RecoveryCallStepDefinitions.CallLaunch => LaunchSentinel, _ => null };
+            var mapped = source.Type switch
+            {
+                RecoveryCallStepDefinitions.CallMain => MainSentinel,
+                RecoveryCallStepDefinitions.CallLaunch => LaunchSentinel,
+                _ => null,
+            };
             var clone = new StepNode
             {
-                Type = mapped is null ? source.Type : "comment", Name = source.Name, Delay = source.Delay,
-                DelayMax = source.DelayMax, IsDisabled = source.IsDisabled,
-                Props = mapped is null ? new Dictionary<string, object?>(source.Props) : new Dictionary<string, object?> { ["text"] = mapped },
+                Type = mapped is null ? source.Type : "comment",
+                Name = source.Name,
+                Delay = source.Delay,
+                DelayMax = source.DelayMax,
+                IsDisabled = source.IsDisabled,
+                Props = mapped is null
+                    ? new Dictionary<string, object?>(source.Props)
+                    : new Dictionary<string, object?> { ["text"] = mapped },
             };
-            foreach (var child in NormalizeRecoveryCalls(source.Children)) { child.Parent = clone; clone.Children.Add(child); }
+            foreach (var child in NormalizeRecoveryCalls(source.Children))
+            {
+                child.Parent = clone;
+                clone.Children.Add(child);
+            }
             result.Add(clone);
         }
         return result;

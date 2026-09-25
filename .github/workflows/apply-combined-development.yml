@@ -72,8 +72,9 @@ jobs:
           script: |
             const fs=require('fs');
             const text=fs.existsSync('combined-development.log')?fs.readFileSync('combined-development.log','utf8'):'failure occurred before the .NET log was created';
+            const markers=text.split('\n').filter(x=>/FAIL:|Unhandled exception|error CS/i.test(x)).slice(-40).join('\n');
             const tail=text.split('\n').slice(-140).join('\n');
-            await github.rest.issues.createComment({owner:context.repo.owner,repo:context.repo.repo,issue_number:9,body:'<!-- combined-development-failure -->\n**Combined development failure**\n```\n'+tail+'\n```'});
+            await github.rest.issues.createComment({owner:context.repo.owner,repo:context.repo.repo,issue_number:9,body:'<!-- combined-development-failure -->\n**Combined development failure**\n```\n=== failure markers ===\n'+markers+'\n=== tail ===\n'+tail+'\n```'});
       - name: Commit verified source
         shell: bash
         run: |

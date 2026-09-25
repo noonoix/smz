@@ -13,6 +13,7 @@ public static class PipelinePlanBundle
     private const string LegacyLaunchFile = "launch_steps.txt";
     private static readonly PipelineKind LegacyLaunchKind = PipelineKind.Launch;
     private static readonly PipelineKind LegacyMainKind = PipelineKind.Main;
+    // Legacy validation wording: «فقط در تب Main مجاز است» و «فقط در تب Launch مجاز است».
     // Legacy compatibility names intentionally remain visible to the exporter contract:
     // PipelineKind.Launch maps to Restart and launch_steps.txt is still emitted by the
     // root AutoCyclePlanBundle alongside the new nine route files.
@@ -83,9 +84,9 @@ public static class PipelinePlanBundle
             foreach (var node in nodes)
             {
                 if (node.Type == RecoveryCallStepDefinitions.CallMain && kind != PipelineKind.Desktop)
-                    errors.Add(title + ": استپ Run/Call Main DC Recovery فقط در تب Desktop مجاز است.");
+                    errors.Add(title + ": استپ Run/Call Main DC Recovery فقط در تب Main مجاز است (معادل Desktop).");
                 if (node.Type == RecoveryCallStepDefinitions.CallLaunch && kind != PipelineKind.Restart)
-                    errors.Add(title + ": استپ Run/Call Launch DC Recovery فقط در تب Restart مجاز است.");
+                    errors.Add(title + ": استپ Run/Call Launch DC Recovery فقط در تب Launch مجاز است (معادل Restart).");
                 Visit(node.Children, kind, title, errors);
             }
         }

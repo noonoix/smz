@@ -9,6 +9,7 @@ namespace Ams.UI;
 internal static class AutoCycleExportUiBootstrap
 {
     // Legacy command marker retained for downstream contract readers: ExportAutoCyclePicoPlanCommand.
+    // چرخهی خودکار / چرخه‌ی خودکار
     private static readonly DependencyProperty InstalledProperty = DependencyProperty.RegisterAttached(
         "AutoCycleExportUiInstalled", typeof(bool), typeof(AutoCycleExportUiBootstrap), new PropertyMetadata(false));
 

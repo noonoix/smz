@@ -8,6 +8,7 @@ namespace Ams.UI.ViewModels;
 
 public partial class MainViewModel
 {
+    // چرخهی خودکار / چرخه‌ی خودکار
     /// <summary>
     /// Builds both sides of the portable workflow in a temporary staging directory, then copies
     /// every generated file to CIRCUITPY with code.py last. CircuitPython may reboot as soon as

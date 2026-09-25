@@ -10,6 +10,8 @@ namespace Ams.UI.Services;
 /// </summary>
 public static class PipelinePlanBundle
 {
+    private const string LegacyLaunchFile = "launch_steps.txt";
+    private static readonly PipelineKind LegacyLaunchKind = PipelineKind.Launch;
     // Legacy compatibility names intentionally remain visible to the exporter contract:
     // PipelineKind.Launch maps to Restart and launch_steps.txt is still emitted by the
     // root AutoCyclePlanBundle alongside the new nine route files.

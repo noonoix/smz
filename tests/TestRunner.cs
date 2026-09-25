@@ -4047,26 +4047,26 @@ class TestRunner
             }
             finally { if (Directory.Exists(pexTmp)) Directory.Delete(pexTmp, true); }
         }
-        // v0.9.67 hotfix regression: exercise the real per-system exporter before
-        // applying the AutoCycle manifest. The old parity fixture alone missed template drift.
+        // Current Studio contract: the one-click AutoCycle export is the exact
+        // Golden-100 inventory. Resumable remains archived and must not add a
+        // resume runtime to the active export.
         var cycleFwTmp = Path.Combine(Path.GetTempPath(), "cyclefw_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(cycleFwTmp);
         try
         {
             var cycleCode = Path.Combine(cycleFwTmp, "code.py");
             var cycleWritten = AutoCycleFirmwareBundle.Export(cycleCode, Array.Empty<StepNode>(),
-                "REAL-EXPORT-REGRESSION", "once", 1, 0, false);
+                "CURRENT-EXPORT-REGRESSION", "once", 1, 0, false);
             var cycleText = File.ReadAllText(cycleCode);
-            Assert(cycleWritten.Count == 9
-                   && File.Exists(Path.Combine(cycleFwTmp, "resume_essentials_runtime.py")),
-                "v0.9.67: real Pico exporter + AutoCycle writes the complete nine-file firmware bundle");
-            Assert(cycleText.Contains("AUTO_CYCLE_PATCH_0967_H6")
-                   && cycleText.Contains("import plan_cycle as _pc")
-                   && cycleText.Contains("_resume_boot.tick()")
-                   && cycleText.Contains("restart armed; waiting for host reboot")
-                   && cycleText.Contains("board.GP6")
-                   && cycleText.Contains("0x10: Keycode.LEFT_SHIFT"),
-                "v0.9.67: AutoCycle manifest patches the real per-system firmware output");
+            Assert(cycleWritten.Count == 26
+                   && File.Exists(Path.Combine(cycleFwTmp, "SHA256SUMS.txt"))
+                   && File.Exists(Path.Combine(cycleFwTmp, "code.py"))
+                   && !File.Exists(Path.Combine(cycleFwTmp, "resume_essentials_runtime.py")),
+                "current Studio: one-click Pico export writes the complete Golden-100 inventory");
+            Assert(cycleText.Length > 50000
+                   && !cycleText.Contains("AUTO_CYCLE_PATCH_0967_H6")
+                   && !cycleText.Contains("import plan_cycle as _pc"),
+                "current Studio: export preserves the Golden-100 code.py without modern runtime patches");
         }
         finally { if (Directory.Exists(cycleFwTmp)) Directory.Delete(cycleFwTmp, true); }
 

@@ -15,6 +15,31 @@ namespace Ams.UI.Services;
 /// </summary>
 public static class AutoCycleFirmwareBundle
 {
+    private static readonly string[] ManifestFiles100 =
+    {
+        "boot.py",
+        "character_dashboard_steps.txt",
+        "code.py",
+        "combined_guard_runtime.py",
+        "desktop_steps.txt",
+        "entering_game_loading_steps.txt",
+        "error_policy.py",
+        "game_steps.txt",
+        "guard-calibration.json",
+        "guard-transition.json",
+        "guard_calibration_protocol.py",
+        "guard_transition.py",
+        "live_light_guard.py",
+        "login_or_dc_steps.txt",
+        "pico-calibration.json",
+        "plan.txt",
+        "plan_engine.py",
+        "restart_steps.txt",
+        "resumable_steps.txt",
+        "targeted_steps.txt",
+        "README-FLASH.md",
+    };
+
     private static readonly string[] Golden100Files =
     {
         "README-FLASH.md",
@@ -97,6 +122,20 @@ public static class AutoCycleFirmwareBundle
 
         foreach (var name in Golden100Files)
             File.Copy(Path.Combine(runtimeDir, name), Path.Combine(stagingDir, name), true);
+
+        // The source ZIP was created on Windows, while GitHub stores text blobs with
+        // normalized LF endings. Rebuild the manifest from the bytes actually copied;
+        // this keeps the exact 100 inventory and prevents a false hash failure at boot.
+        var hashes = new StringBuilder();
+        foreach (var name in ManifestFiles100.OrderBy(name => name, StringComparer.Ordinal))
+        {
+            using var stream = File.OpenRead(Path.Combine(stagingDir, name));
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            hashes.Append(Convert.ToHexString(sha.ComputeHash(stream)).ToLowerInvariant())
+                .Append("  ").Append(name).Append('\n');
+        }
+        File.WriteAllText(Path.Combine(stagingDir, "SHA256SUMS.txt"), hashes.ToString(),
+            new UTF8Encoding(false));
 
         // The old C# smoke test calls the helper directly with a sentinel machine name.
         // Keep that fixture alive without changing the production build-100 bytes.

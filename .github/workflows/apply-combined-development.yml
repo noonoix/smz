@@ -40,6 +40,18 @@ jobs:
           if text.count(old) != 1:
               raise SystemExit('expected exactly one unqualified WPF brush expression')
           p.write_text(text.replace(old, new), encoding='utf-8')
+
+          p = Path('ams-shell/src/Ams.UI/Models/StepTextsFa.cs')
+          text = p.read_text(encoding='utf-8')
+          replacements = {
+              '["mouseMove:moveMode"]': '["moveMode"]',
+              '["mouseMove:handSample"]': '["handSample"]',
+          }
+          for old, new in replacements.items():
+              if text.count(old) != 1:
+                  raise SystemExit('expected exactly one Persian lookup key: ' + old)
+              text = text.replace(old, new)
+          p.write_text(text, encoding='utf-8')
           PY
           git diff --check
       - uses: actions/setup-python@v5

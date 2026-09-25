@@ -1,0 +1,27 @@
+name: Hourly Backup to Google Drive
+
+on:
+  schedule:
+    - cron: '0 * * * *' # هر ساعت یکبار
+  workflow_dispatch: # برای تست دستی
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create backup archive
+        run: |
+          git clone --mirror https://github.com/${{ github.repository }}.git repo-backup.git
+          tar -czf repo-backup.tar.gz repo-backup.git
+
+      - name: Upload to Google Drive
+        uses: adityak74/google-drive-upload-git-action@main
+        with:
+          credentials: ${{ secrets.GDRIVE_CREDENTIALS }}
+          folderId: ${{ secrets.GDRIVE_FOLDER_ID }}
+          filename: "repo-backup.tar.gz"
+          name: "latest-backup.tar.gz"   # همیشه یک فایل ثابت
+          overwrite: "true"              # روی فایل قبلی بازنویسی میشه

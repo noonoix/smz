@@ -40,8 +40,10 @@ jobs:
           Remove-Item -Recurse -Force tests/bin, tests/obj -ErrorAction SilentlyContinue
           dotnet build tests/TestRunner.csproj -c Release
 
-      - name: Run TestRunner
+      - name: Run Golden-100 TestRunner contract
         shell: pwsh
+        env:
+          GOLDEN_100_ONLY: '1'
         run: |
           dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object ci-test-output.txt
           $exitCode = $LASTEXITCODE

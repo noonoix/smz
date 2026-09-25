@@ -244,11 +244,16 @@ class Button:
     def poll(self, now):
         pressed = not self.io.value
         if pressed != self.down and now - self.changed >= .04:
-            self.changed = now; self.down = pressed
-            if pressed: self.started = now; self.long = False; return "down"
-            return "up"
-        if pressed and not self.long and now - self.started >= 3: self.long = True; return "long"
+            self.changed = now
+            self.down = pressed
+            if pressed:
+                self.started = now
+                return "down"
+            was_long = self.long or (now - self.started >= 3)
+            self.long = False
+            return "long-up" if was_long else "up"
         return None
+
 
 class Controls:
     def __init__(self, arm, keyboard): self.arm = arm; self.keyboard = keyboard; self.running = False; self.paused = False; self.aborted = False
@@ -325,27 +330,58 @@ class Combined:
         self.arm = Arm(); self.keyboard = Keyboard(usb_hid.devices); self.controls = Controls(self.arm, self.keyboard); self.sensor = BH1750()
         self.bundle = load_guard_bundle("/", verify=False); self.guard = LightStateGuard.from_bundle("/", verify=False); self.routes = {}
         self.blue = Button(board.GP4); self.yellow = Button(board.GP3); self.usb = usb_cdc.data or usb_cdc.console; self.host = bytearray()
-        self.calibrating = False; self.stage = 0; self.samples = []; self.sample_started = 0; self.result = None; self.saved = False; self.saved_ids = set(); self.last_cal_error = None
-    def _cal_beep(self, frequency, duration_ms):
-        # GP6 is the passive piezo output. Create/deinit one PWM object per
-        # cue and collect around it so calibration audio does not fragment the
-        # small RP2040 heap.
-        tone = None
-        gc.collect()
+        self.calibrating = False; self.stage = 0; self.samples = []; self.sample_started = 0; self.result = None; self.saved = False; self.saved_ids = set(); self.last_cal_error = None; self.session_saved_ids = set(); self.audio_tone = None; self.audio_until = 0; self.audio_pattern = (); self.audio_index = 0
+    def _audio_stop(self):
+        if self.audio_tone is not None:
+            try:
+                self.audio_tone.duty_cycle = 0
+                self.audio_tone.deinit()
+            except Exception:
+                pass
+            self.audio_tone = None
+        self.audio_pattern = ()
+        self.audio_index = 0
+
+    def _audio_start_next(self):
+        if self.audio_index >= len(self.audio_pattern):
+            self.audio_pattern = ()
+            return
+        frequency, duration_ms = self.audio_pattern[self.audio_index]
+        self.audio_index += 1
+        if frequency <= 0:
+            self.audio_until = time.monotonic() + max(0, duration_ms) / 1000
+            return
         try:
-            tone = pwmio.PWMOut(board.GP6, duty_cycle=32768,
-                                 frequency=int(frequency), variable_frequency=True)
-            time.sleep(max(0, duration_ms) / 1000)
+            gc.collect()
+            self.audio_tone = pwmio.PWMOut(board.GP6, duty_cycle=32768,
+                                            frequency=int(frequency),
+                                            variable_frequency=True)
+            self.audio_until = time.monotonic() + max(0, duration_ms) / 1000
         except Exception:
+            self.audio_tone = None
+            self.audio_pattern = ()
+            self.audio_index = 0
             self.emit("ERR|CAL|AUDIO")
-        finally:
-            if tone is not None:
+
+    def _audio_play(self, pattern):
+        self._audio_stop()
+        self.audio_pattern = pattern
+        self.audio_index = 0
+        self._audio_start_next()
+
+    def _audio_tick(self):
+        if self.audio_pattern and time.monotonic() >= self.audio_until:
+            if self.audio_tone is not None:
                 try:
-                    tone.duty_cycle = 0
-                    tone.deinit()
+                    self.audio_tone.duty_cycle = 0
+                    self.audio_tone.deinit()
                 except Exception:
                     pass
-            gc.collect()
+                self.audio_tone = None
+            self._audio_start_next()
+
+    def _cal_beep(self, frequency, duration_ms):
+        self._audio_play(((frequency, duration_ms),))
 
     def cal_position_tone(self):
         self._cal_beep(_CAL_NOTES[self.stage], 220)
@@ -355,26 +391,22 @@ class Combined:
 
     def cal_stage_complete_tone(self):
         note = _CAL_NOTES[self.stage]
-        self._cal_beep(note, 110)
-        time.sleep(.06)
-        self._cal_beep(note, 190)
+        self._audio_play(((note, 110), (0, 60), (note, 190)))
 
     def cal_save_success_tone(self):
-        self._cal_beep(880, 90)
-        time.sleep(.05)
-        self._cal_beep(1320, 180)
+        self._audio_play(((880, 90), (0, 50), (1320, 180)))
+
+    def cal_refused_tone(self):
+        self._audio_play(((180, 180), (0, 70), (180, 180)))
+
+    def cal_exit_tone(self):
+        self._audio_play(((440, 100), (330, 180), (220, 240)))
 
     def cal_complete_melody(self):
-        for note in _CAL_NOTES:
-            self._cal_beep(note, 90)
-            time.sleep(.035)
+        self._audio_play(tuple((note, 90) for note in _CAL_NOTES))
 
     def _guard_pattern(self, pattern):
-        for frequency, duration_ms in pattern:
-            if frequency <= 0:
-                time.sleep(duration_ms / 1000)
-            else:
-                self._cal_beep(frequency, duration_ms)
+        self._audio_play(pattern)
 
     def guard_start_tone(self):
         self._guard_pattern(_GUARD_START_PATTERN)
@@ -528,51 +560,120 @@ class Combined:
             return "ERR|CALSET|SAVE"
         return "OK|CALSET|%s|revision=%s|count=%d" % (payload["id"], payload["revision"], self.calibration_count())
     def start_cal(self):
-        self.controls.stop(); self.calibrating = True; self.stage = 0; self.samples = []; self.sample_started = 0; self.result = None; self.saved = False; self.saved_ids = set(); self.emit("EVT|CAL|mode=ready|stage=1|id=" + PROFILES[0] + "|seconds=5|saved=0"); self.cal_position_tone()
+        self.controls.stop(); self.calibrating = True; self.stage = 0; self.samples = []; self.sample_started = 0; self.result = None; self.saved = False; self.saved_ids = set(PROFILES); self.session_saved_ids = set(); self.emit("EVT|CAL|mode=ready|stage=1|id=" + PROFILES[0] + "|seconds=5|saved=0"); self.cal_position_tone()
     def end_cal(self):
         if self.result is not None and self.result != "sampling" and not self.saved: self.emit("ERR|CAL|UNSAVED|stage=%d" % (self.stage + 1)); return
-        self.calibrating = False; self.result = None; self.emit("EVT|CAL|mode=exited|saved=%d" % len(self.saved_ids)); self.guard_stop_tone()
+        self.calibrating = False; self.result = None; self.samples = []; self._audio_play(((440, 100), (330, 180), (220, 240))); self.emit("EVT|CAL|mode=exited|saved=%d" % len(self.session_saved_ids))
     def save_cal(self):
-        if not isinstance(self.result, dict): self.emit("ERR|CAL|BUSY|stage=%d" % (self.stage + 1)); return
-        try: self._publish_calibration(PENDING_REVISION, PROFILES[self.stage], self.result)
+        if not isinstance(self.result, dict):
+            self.emit("ERR|CAL|BUSY|stage=%d" % (self.stage + 1))
+            return False
+        try:
+            self._publish_calibration(PENDING_REVISION, PROFILES[self.stage], self.result)
         except Exception as exc:
             self.last_cal_error = type(exc).__name__ + ":" + str(exc)[:80]
+            self.saved = False
             self.emit("ERR|CAL|SAVE|stage=%d|detail=%s" % (self.stage + 1, self.last_cal_error))
-            return
-        self.saved = True; self.saved_ids.add(PROFILES[self.stage]); self.emit("EVT|CAL|mode=saved-stage|stage=%d|id=%s|saved=%d" % (self.stage+1, PROFILES[self.stage], len(self.saved_ids))); self.cal_complete_melody() if len(self.saved_ids) == len(PROFILES) else self.cal_save_success_tone()
+            self.cal_refused_tone()
+            return False
+        self.saved = True
+        self.saved_ids.add(PROFILES[self.stage])
+        self.session_saved_ids.add(PROFILES[self.stage])
+        self.emit("EVT|CAL|mode=saved-stage|stage=%d|id=%s|saved=%d" % (self.stage + 1, PROFILES[self.stage], len(self.session_saved_ids)))
+        if len(self.session_saved_ids) == len(PROFILES):
+            self.cal_complete_melody()
+        else:
+            self.cal_save_success_tone()
+        return True
     def yellow_action(self):
-        if not self.calibrating: self.controls.paused = not self.controls.paused; return
-        if self.result == "sampling": self.emit("ERR|CAL|BUSY|stage=%d" % (self.stage + 1)); return
-        if self.result is not None: self.save_cal(); return
-        self.samples = []; self.sample_started = time.monotonic(); self.result = "sampling"; self.emit("EVT|CAL|mode=started|stage=%d|id=%s|seconds=5|saved=%d" % (self.stage+1, PROFILES[self.stage], len(self.saved_ids))); self.cal_record_start_tone()
+        if not self.calibrating:
+            was_paused = self.controls.paused
+            self.controls.paused = not self.controls.paused
+            if self.controls.running and self.controls.paused != was_paused:
+                self.guard_pause_tone() if self.controls.paused else self.guard_resume_tone()
+            return
+        if self.result == "sampling":
+            self.emit("ERR|CAL|BUSY|stage=%d" % (self.stage + 1))
+            self.cal_refused_tone()
+            return
+        self.samples = []
+        self.sample_started = time.monotonic()
+        self.result = "sampling"
+        self.saved = False
+        self.emit("EVT|CAL|mode=started|stage=%d|id=%s|seconds=5|saved=%d" % (self.stage + 1, PROFILES[self.stage], len(self.session_saved_ids)))
+        self.cal_record_start_tone()
+    def _candidate_overlaps(self, center, tolerance):
+        candidate_low = center - tolerance
+        candidate_high = center + tolerance
+        for item in self.bundle.get("manifest", {}).get("profiles", []):
+            pid = item.get("id")
+            if pid == PROFILES[self.stage] or pid not in self.saved_ids:
+                continue
+            other_center = float(item.get("center", 0))
+            other_tolerance = float(item.get("tolerance", 0))
+            if candidate_low <= other_center + other_tolerance and other_center - other_tolerance <= candidate_high:
+                return pid
+        return None
+
     def cal_tick(self):
-        if not self.calibrating or self.result != "sampling": return
+        if not self.calibrating or self.result != "sampling":
+            return
         self.samples.append(self.sensor.lux())
-        if time.monotonic() - self.sample_started < 5: return
-        values = sorted(self.samples); center = values[len(values)//2]; spread = max(values)-min(values)
-        if len(values) < 5 or spread > 5: self.result = None; self.emit("ERR|CAL|UNSTABLE|stage=%d|spread=%.1f" % (self.stage+1, spread)); return
-        self.result = {"center":center,"tolerance":max(2.0,spread*1.5),"stable_ms":750}; self.saved = False; self.emit("EVT|CAL|mode=complete-stage|stage=%d|id=%s|center=%.1f|spread=%.1f|tolerance=%.1f|saved=0" % (self.stage+1, PROFILES[self.stage], center, spread, self.result["tolerance"])); self.cal_stage_complete_tone()
+        if time.monotonic() - self.sample_started < 5:
+            return
+        values = sorted(self.samples)
+        center = values[len(values) // 2]
+        spread = max(values) - min(values)
+        tolerance = max(2.0, spread * 1.5)
+        if len(values) < 5 or spread > 5:
+            self.result = None
+            self.saved = False
+            self.emit("ERR|CAL|UNSTABLE|stage=%d|spread=%.1f" % (self.stage + 1, spread))
+            self.cal_refused_tone()
+            return
+        overlap = self._candidate_overlaps(center, tolerance)
+        if overlap is not None:
+            self.result = None
+            self.saved = False
+            self.emit("ERR|CAL|OVERLAP|stage=%d|with=%s" % (self.stage + 1, overlap))
+            self.cal_refused_tone()
+            return
+        self.result = {"center": center, "tolerance": tolerance, "stable_ms": 750}
+        self.emit("EVT|CAL|mode=complete-stage|stage=%d|id=%s|center=%.1f|spread=%.1f|tolerance=%.1f|saved=0" % (self.stage + 1, PROFILES[self.stage], center, spread, tolerance))
+        self.save_cal()
     def next_cal(self):
-        if not self.calibrating: return
-        if self.result is not None and self.result != "sampling" and not self.saved: self.emit("ERR|CAL|UNSAVED|stage=%d" % (self.stage+1)); return
-        if self.stage >= 5: self.emit("EVT|CAL|mode=last|stage=6|saved=%d" % len(self.saved_ids)); return
-        self.stage += 1; self.result = None; self.saved = False; self.emit("EVT|CAL|mode=ready|stage=%d|id=%s|seconds=5|saved=%d" % (self.stage+1, PROFILES[self.stage], len(self.saved_ids))); self.cal_position_tone()
+        if not self.calibrating:
+            return
+        if not self.saved:
+            self.emit("ERR|CAL|UNSAVED|stage=%d" % (self.stage + 1))
+            self.cal_refused_tone()
+            return
+        if self.stage >= len(PROFILES) - 1:
+            self.emit("EVT|CAL|mode=last|stage=%d|saved=%d" % (self.stage + 1, len(self.session_saved_ids)))
+            return
+        self.stage += 1
+        self.result = None
+        self.saved = False
+        self.emit("EVT|CAL|mode=ready|stage=%d|id=%s|seconds=5|saved=%d" % (self.stage + 1, PROFILES[self.stage], len(self.session_saved_ids)))
+        self.cal_position_tone()
     def buttons(self):
-        now = time.monotonic(); blue = self.blue.poll(now); yellow = self.yellow.poll(now)
-        if blue == "long":
+        now = time.monotonic()
+        blue = self.blue.poll(now)
+        yellow = self.yellow.poll(now)
+        if blue == "long-up":
             self.end_cal() if self.calibrating else self.start_cal()
-        elif blue == "up" and not self.blue.long:
+        elif blue == "up":
             if self.calibrating:
                 self.next_cal()
             elif self.controls.running:
-                self.controls.stop(); self.guard_stop_tone()
+                self.controls.stop()
+                self.guard_stop_tone()
             else:
-                self.guard.reset(); self.controls.start(); self.guard_start_tone()
-        if yellow == "up" and not self.yellow.long:
-            was_paused = self.controls.paused
+                self.guard.reset()
+                self.controls.start()
+                self.guard_start_tone()
+        if yellow == "up":
             self.yellow_action()
-            if not self.calibrating and self.controls.running and self.controls.paused != was_paused:
-                self.guard_pause_tone() if self.controls.paused else self.guard_resume_tone()
         self.cal_tick()
     def _dismiss_dc_popup(self, decision):
         # Login and DC share the same optical profile. The transition policy
@@ -635,7 +736,7 @@ class Combined:
     def loop(self):
         self.emit("combined-pico-guard-executor|GP4 start/stop hold3s=calibration|GP3 pause/resume|GP6 piezo"); last = 0
         while True:
-            self.host_poll(); self.buttons(); self.arm.pump()
+            self.host_poll(); self.buttons(); self.arm.pump(); self._audio_tick()
             if self.controls.running and not self.calibrating and time.monotonic() - last >= .25:
                 last = time.monotonic()
                 try:

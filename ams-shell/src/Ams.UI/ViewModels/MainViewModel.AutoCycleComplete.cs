@@ -10,9 +10,9 @@ public partial class MainViewModel
 {
     // چرخهی خودکار / چرخه‌ی خودکار
     /// <summary>
-    /// Builds both sides of the portable workflow in a temporary staging directory, then copies
-    /// every generated file to CIRCUITPY with code.py last. CircuitPython may reboot as soon as
-    /// code.py changes, so publishing it last prevents a partial bundle from starting.
+    /// Publishes the reviewed Golden-100 Pico bundle to CIRCUITPY in a safe order.
+    /// The bundle already contains plan.txt and all required route/runtime files;
+    /// Modern AutoCycle runtime files remain outside this legacy debug path.
     /// </summary>
     [RelayCommand]
     private void ExportAutoCycleComplete()
@@ -31,6 +31,9 @@ public partial class MainViewModel
         {
             staging = Path.Combine(Path.GetTempPath(), "ClassroomStudio-pico-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(staging);
+
+            // Golden-100 is the current physical-debug baseline. It owns plan.txt,
+            // route files and the exact code.py; do not invoke PipelinePlanBundle here.
             var mode = _settings.PlayRepeatMode;
             var seconds = mode == "timed"
                 ? (int)(_settings.PlayRepeatUnit switch
@@ -40,12 +43,8 @@ public partial class MainViewModel
                     _ => TimeSpan.FromMinutes(Math.Max(1, _settings.PlayRepeatValue)),
                 }).TotalSeconds
                 : 0;
-            var workspace = CapturePipelineWorkspaceForExport();
-            PipelinePlanBundle.Export(Path.Combine(staging, "plan.txt"), workspace, _settings,
-                (int)SystemParameters.PrimaryScreenWidth, (int)SystemParameters.PrimaryScreenHeight,
-                _currentFile ?? "untitled", Environment.MachineName);
-            AutoCycleFirmwareBundle.Export(Path.Combine(staging, "code.py"), Steps, Environment.MachineName,
-                mode, Math.Max(1, _settings.PlayRepeatTimes), seconds, false);
+            AutoCycleFirmwareBundle.Export(Path.Combine(staging, "code.py"), Steps,
+                Environment.MachineName, mode, Math.Max(1, _settings.PlayRepeatTimes), seconds, false);
 
             var files = Directory.GetFiles(staging, "*", SearchOption.TopDirectoryOnly)
                 .Where(path => !path.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase))
@@ -64,7 +63,7 @@ public partial class MainViewModel
                 Log("pico complete export: " + Path.GetFileName(source));
             }
             MessageBox.Show(
-                $"بستهٔ کامل ساخته و روی CIRCUITPY کپی شد ({files.Length} فایل).\n"
+                $"بستهٔ کامل Golden 100 ساخته و روی CIRCUITPY کپی شد ({files.Length} فایل).\n"
                 + "code.py عمداً آخرین فایل کپی شد تا برد قبل از کامل‌شدن Bundle اجرا نشود.",
                 "Complete Pico export", MessageBoxButton.OK, MessageBoxImage.Information);
         }

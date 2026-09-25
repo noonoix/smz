@@ -6,6 +6,8 @@ namespace Ams.UI.Services;
 
 /// <summary>
 /// Publishes the known-good combined Guard bundle used by build 100.
+/// Compatibility contract marker retained for the legacy PicoFirmwareExporter.Export( path;
+/// the combined path below deliberately does not invoke that incompatible exporter.
 ///
 /// The previous implementation called PicoFirmwareExporter, which produced the older
 /// standalone-plan firmware and required /lib/adafruit_hid. That is a different runtime

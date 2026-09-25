@@ -1,6 +1,5 @@
 # Combined Phase 7 board-owned runtime. It validates the exported bundle before routing.
 import gc
-import json
 import math
 import os
 import random
@@ -396,6 +395,7 @@ class Combined:
         lines = ["%s  %s" % (_file_sha256("/", name), name) for name in sorted(HASHED_BUNDLE_FILES)]
         return "\n".join(lines) + "\n"
     def _publish_calibration(self, revision, profile_id, profile):
+        import json
         manifest = json.loads(json.dumps(self.bundle["manifest"]))
         calibration = json.loads(json.dumps(self.bundle["calibration"]))
         manifest["calibrationRevision"] = revision

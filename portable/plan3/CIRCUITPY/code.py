@@ -118,6 +118,12 @@ def _compact_boot_bundle(bundle):
 
 _BOOT_BUNDLE = _compact_boot_bundle(_BOOT_BUNDLE)
 del _name, _guard_bundle
+# json is needed only while validating the two Guard manifests. Removing the
+# cached parser before importing the large executor returns its heap to Pico.
+try:
+    sys.modules.pop("json", None)
+except Exception:
+    pass
 gc.collect()
 
 import combined_guard_runtime as runtime

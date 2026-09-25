@@ -3,8 +3,6 @@
 # The bundle loader below is deliberately independent from Classroom Studio and RunEngine.
 
 import gc
-import hashlib
-import json
 import math
 import os
 
@@ -55,6 +53,7 @@ class GuardBundleError(ValueError):
 
 
 def _read_json(root, name):
+    import json
     try:
         with open(os.path.join(root, name), "r") as fh:
             return json.load(fh)
@@ -73,6 +72,7 @@ def _file_sha256(root, name):
     # after the runtime and plan engine are loaded. Keep the read buffer small
     # and collect before each file so bundle verification cannot fail merely
     # because a previous file left a fragmented temporary allocation.
+    import hashlib
     gc.collect()
     digest = hashlib.sha256()
     try:

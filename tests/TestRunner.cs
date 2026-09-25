@@ -67,6 +67,12 @@ class TestRunner
         cmds = StepDefinitions.GetCommands(mouseMove);
         Assert(cmds.Contains("MMOVE|100,200,abs,1"), $"mouseMove command correct (got: {string.Join(", ", cmds)})");
 
+        // Modern autonomous Pico Guard receives the real Windows cursor origin
+        // from Studio; it must never silently fall back to screen centre.
+        var cursorCommand = CursorOriginSync.Command(new System.Drawing.Point(321, 654));
+        Assert(cursorCommand == "CURSOR|321,654", "cursor origin command preserves the real host position");
+        Assert(CursorOriginSync.IsAcknowledged("OK|CURSOR"), "cursor origin local acknowledgement is accepted");
+
         var typeTextSecret = new StepNode
         {
             Type = "typeText",

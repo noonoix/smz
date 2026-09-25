@@ -1848,6 +1848,7 @@ public partial class MainViewModel : ObservableObject
             Connection = ConnectionState.Disconnected;
 
             PicoPresent = ArmPresent = false;   // v0.9.44 — both presence lights go out
+            StopCursorSync();
 
             ConnectButtonText = "Connect";
 
@@ -1896,6 +1897,7 @@ public partial class MainViewModel : ObservableObject
                 (PicoPresent, ArmPresent) = ParseBoardPresence(pong);
 
                 Log($"board identity: {pong} → pico={(PicoPresent ? "on" : "off")}, arm={(ArmPresent ? "on" : "off")}");
+                StartCursorSync();
 
             }
 
@@ -1905,6 +1907,7 @@ public partial class MainViewModel : ObservableObject
 
                 PicoPresent = false; ArmPresent = true;   // a plain firmware-1.6 board is the Pro Micro arm alone
 
+                StopCursorSync();
                 Log("board identity probe failed: " + ex.Message);
 
             }
@@ -1915,6 +1918,7 @@ public partial class MainViewModel : ObservableObject
 
         {
 
+            StopCursorSync();
             Connection = ConnectionState.Disconnected;
 
             ConnectButtonText = "Connect";
@@ -2379,6 +2383,7 @@ public partial class MainViewModel : ObservableObject
     {
 
         _runCts?.Cancel();
+        StopCursorSync();
 
         if (_bridge is not null)
 

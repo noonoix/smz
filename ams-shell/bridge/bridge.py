@@ -372,11 +372,15 @@ def main():
                     cmd = req["cmd"]
                     abort_flag.clear()
                     _drain_stale(link)         # v0.9.60e - eat leftovers of write-only aborts
-                    if cmd.split("|", 1)[0] == "MMOVE":
-                        # v0.9.60e - firmware 60c made MMOVE fire-and-forget (no reply is
-                        # ever sent): a lone MMOVE via a "send" op would wait 5 s and die.
+                    cmd_head = cmd.split("|", 1)[0]
+                    if cmd_head in ("MMOVE", "CURSOR"):
+                        # v0.9.60e / cursor-origin-sync - these are write-only transport
+                        # hints. MMOVE has no board reply, and the modern Pico accepts
+                        # CURSOR as a coalesced host-origin sample with no reply. Return a
+                        # local acknowledgement so the WPF side does not wait for a reply
+                        # that the firmware intentionally does not emit.
                         link._send(cmd)
-                        reply = "OK|MMOVE"      # local ack, same contract as send_path
+                        reply = f"OK|{cmd_head}"  # local ack, same contract as send_path
                     else:
                         reply = link.command(cmd, timeout=_ktext_timeout(cmd, req.get("timeout", 5.0)))
                     if abort_flag.is_set():

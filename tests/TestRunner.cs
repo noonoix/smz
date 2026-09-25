@@ -4058,7 +4058,7 @@ class TestRunner
             var cycleWritten = AutoCycleFirmwareBundle.Export(cycleCode, Array.Empty<StepNode>(),
                 "CURRENT-EXPORT-REGRESSION", "once", 1, 0, false);
             var cycleText = File.ReadAllText(cycleCode);
-            Assert(cycleWritten.Count == 26
+            Assert(cycleWritten.Count == 25
                    && File.Exists(Path.Combine(cycleFwTmp, "SHA256SUMS.txt"))
                    && File.Exists(Path.Combine(cycleFwTmp, "code.py"))
                    && !File.Exists(Path.Combine(cycleFwTmp, "resume_essentials_runtime.py")),

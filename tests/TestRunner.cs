@@ -581,6 +581,7 @@ class TestRunner
                 EnvironmentVariables = { ["PYTHONIOENCODING"] = "utf-8" }
             };
             using var p = Process.Start(psi);
+            if (p is null) throw new InvalidOperationException("PNG decoder process could not be started");
             // Read both streams concurrently to avoid pipe-buffer deadlock
             var outTask = p.StandardOutput.ReadToEndAsync();
             var errTask = p.StandardError.ReadToEndAsync();

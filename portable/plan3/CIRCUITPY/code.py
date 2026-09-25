@@ -1,6 +1,6 @@
 import supervisor
 
-_MARKER = "/.guard_verified_v2"
+_MARKER = "/.guard_verified_v3"
 
 
 def _verified():

@@ -3,10 +3,13 @@ name: Classroom Studio current branch
 on:
   workflow_dispatch:
   push:
-    branches: [feat/dc-auto-esc-88-188, fix/cursor-origin-sync]
+    branches: [feat/dc-auto-esc-88-188, fix/cursor-origin-sync, fix/portable-relative-mouse]
     paths:
       - 'ams-shell/**'
       - 'tests/**'
+      - 'portable/plan3/CIRCUITPY-MODERN/**'
+      - 'portable/plan3/sim/test_calibration_heap_release.py'
+      - 'tools/apply_calibration_save_heap_fix.py'
       - '.github/workflows/classroom-studio-current.yml'
 
 permissions:
@@ -21,6 +24,13 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
+      - name: Apply and verify calibration-save memory fix
+        shell: pwsh
+        run: |
+          python tools/apply_calibration_save_heap_fix.py
+          python portable/plan3/sim/test_calibration_heap_release.py
+          python -m py_compile portable/plan3/CIRCUITPY-MODERN/code.py
 
       - name: Compile-check bridge stack
         run: python -m py_compile ams-shell/bridge/bridge.py ams-shell/bridge/ams_serial.py ams-shell/bridge/ams_crypto.py
@@ -83,18 +93,17 @@ jobs:
             ci-test-output.txt
           if-no-files-found: warn
 
-      - name: Publish public cursor-sync test release
+      - name: Publish current Classroom Studio test release
         if: success()
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: cursor-origin-sync-${{ github.run_number }}
+          tag_name: classroom-current-${{ github.run_number }}
           target_commitish: ${{ github.sha }}
-          name: "Classroom Studio cursor-origin-sync test #${{ github.run_number }}"
+          name: "Classroom Studio current test #${{ github.run_number }}"
           prerelease: true
           body: |
-            Public test build for host cursor-origin synchronization.
-            Tests: 659 passed, 0 failed in the source build contract.
-            Golden 100 firmware and Pico bundle were not changed.
+            Current test build with the verified calibration-save heap fix, relative-native mouse, start-from-current-state Guard, and per-TYPE typo counts.
+            Golden 100 remains separate and unchanged.
           files: |
             Classroom-Studio-current.zip
             sha256.txt

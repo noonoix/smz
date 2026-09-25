@@ -46,6 +46,10 @@ public static class ModernAutoCycleFirmwareBundle
             if (!File.Exists(Path.Combine(runtimeDir, name)))
                 throw new IOException("فایل Bundle مدرن پیدا نشد: " + name);
         }
+        var modernCode = File.ReadAllText(Path.Combine(runtimeDir, "code.py"));
+        if (!modernCode.Contains("_prepare_calibration_heap", StringComparison.Ordinal)
+            || !modernCode.Contains("CAL|heap-ready", StringComparison.Ordinal))
+            throw new IOException("Runtime مدرن قدیمی است و اصلاح حافظهٔ ذخیرهٔ کالیبراسیون را ندارد.");
 
         // Remove only known legacy/experimental runtime leftovers. Do not touch
         // unrelated user files on CIRCUITPY.

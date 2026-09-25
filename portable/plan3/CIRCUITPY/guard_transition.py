@@ -5,6 +5,7 @@
 PROFILE_TO_ROUTE = {
     "desktop": "desktop_steps.txt",
     "login-or-dc": "login_or_dc_steps.txt",
+    "dc": "dc_steps.txt",
     "character-dashboard": "character_dashboard_steps.txt",
     "entering-game-loading": "entering_game_loading_steps.txt",
     "game": "game_steps.txt",
@@ -70,7 +71,7 @@ class GuardTransition:
             # observation returns from Targeted without executing Game a second time.
             self.stage = 2
             return self._execute("login-or-dc", "dc", 2, 2,
-                                 "dc-fallback-to-stage-2")
+                                 "dc-fallback-to-stage-2", "dc_steps.txt")
         if self.stage == 1:
             self.stage = 2
             return self._execute("login-or-dc", "login", 2, 2,
@@ -108,11 +109,11 @@ class GuardTransition:
         return self._execute("targeted", "targeted", 5, 5,
                              "game-to-targeted-side-state")
 
-    def _execute(self, profile_id, context, stage, next_stage, reason):
+    def _execute(self, profile_id, context, stage, next_stage, reason, route_override=None):
         return {
             "execute": True,
             "profile": profile_id,
-            "route": PROFILE_TO_ROUTE[profile_id],
+            "route": route_override or PROFILE_TO_ROUTE[profile_id],
             "context": context,
             "stage": stage,
             "next_stage": next_stage,

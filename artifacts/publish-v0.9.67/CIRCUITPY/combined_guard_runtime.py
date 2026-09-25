@@ -498,6 +498,10 @@ class Combined:
         # never injected on the actual login path.
         if decision.get("context") != "dc":
             return True
+        # New bundles carry the explicit DC tab as dc_steps.txt. Keep the inline
+        # injector only for legacy bundles that do not publish that route.
+        if decision.get("route") == "dc_steps.txt":
+            return True
         delay_ms = random.randint(DC_ESC_DELAY_MIN_MS, DC_ESC_DELAY_MAX_MS)
         self.emit("EVT|DC|ESC|phase=delay|delay-ms=%d" % delay_ms)
         if not self.controls.sleep(delay_ms):

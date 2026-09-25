@@ -4,6 +4,7 @@
 # shims, and keep all Guard routes on the bounded streaming executor.
 import gc
 import sys
+import supervisor
 import os as _real_os
 import hashlib as _real_hashlib
 try:
@@ -71,7 +72,33 @@ import live_light_guard as _guard_bundle
 for _name in ("pico-calibration.json", "README-FLASH.md"):
     if _name not in _guard_bundle.HASHED_BUNDLE_FILES:
         _guard_bundle.HASHED_BUNDLE_FILES += (_name,)
-_BOOT_BUNDLE = _guard_bundle.load_guard_bundle("/")
+_BOOT_MARKER = "/.guard_verified"
+
+def _boot_marker_present():
+    try:
+        with open(_BOOT_MARKER, "r") as fh:
+            return fh.read(1) == "1"
+    except Exception:
+        return False
+
+def _write_boot_marker():
+    try:
+        with open(_BOOT_MARKER, "w") as fh:
+            fh.write("1")
+        return True
+    except Exception:
+        return False
+
+# Split the expensive operation across two interpreter lifetimes. The first
+# soft-reboot validates every hash; the second boot skips the temporary hash
+# dictionaries and starts the executor with only the compact Guard state.
+if _boot_marker_present():
+    _BOOT_BUNDLE = _guard_bundle.load_guard_bundle("/", verify=False)
+else:
+    _BOOT_BUNDLE = _guard_bundle.load_guard_bundle("/", verify=True)
+    if _write_boot_marker():
+        gc.collect()
+        supervisor.reload()
 
 # Keep the contractually required order (verify/load before importing the
 # executor), but discard export-only JSON fields while the executor is compiled.

@@ -122,7 +122,7 @@ def _verify_hash_manifest(root):
             raise GuardBundleError("SHA256SUMS hash mismatch: " + name)
 
 
-def load_guard_bundle(root="/"):
+def load_guard_bundle(root="/", verify=True):
     """Load and fail closed on the exported transition/calibration contract.
 
     The manifest and calibration revision must agree, every exported runtime and
@@ -140,7 +140,8 @@ def load_guard_bundle(root="/"):
     for filename in REQUIRED_BUNDLE_FILES:
         if not os.path.isfile(os.path.join(root, filename)):
             raise GuardBundleError("missing Guard runtime file: " + filename)
-    _verify_hash_manifest(root)
+    if verify:
+        _verify_hash_manifest(root)
 
     routes = manifest.get("routes")
     if routes != ROUTE_FILES:

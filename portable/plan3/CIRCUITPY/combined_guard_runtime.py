@@ -541,7 +541,7 @@ class Combined:
             raw, self.host = self.host.split(b"\n", 1); line = raw.decode("utf-8", "replace").strip()
             if not line: continue
             try:
-                if line == "PING": reply = "OK|PONG|combined-pico-guard-executor|hid=on|uart=on|profiles=6"
+                if line == "PING": reply = "OK|PONG|combined-pico-guard-executor|hid=on|uart=on|profiles=6|role=brain"
                 elif line == "CALGET": reply = self.calget()
                 elif line == "CALSTATUS": reply = self.calstatus()
                 elif line.startswith("CALSET|"): reply = self.calset(line)

@@ -24,13 +24,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: arduino/setup-arduino-cli@v2
-      - name: Install AVR core and HID-Project
+      - name: Install AVR core
         shell: bash
         run: |
           set -euo pipefail
           arduino-cli core update-index
           arduino-cli core install arduino:avr
-          arduino-cli lib install HID-Project
       - name: Compile Pro Micro firmware with a non-secret test key
         shell: bash
         run: |
@@ -39,6 +38,7 @@ jobs:
           cp firmware/arm28/ams_board28.ino \
              firmware/arm28/ams_board26_impl.h \
              firmware/arm28/human_mouse_v3.h \
+             firmware/arm28/portable_relative_mouse.h \
              /tmp/ams_board28/
           cp firmware/arm28/ams_key.example.h /tmp/ams_board28/ams_key.h
           arduino-cli compile --fqbn arduino:avr:leonardo /tmp/ams_board28

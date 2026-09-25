@@ -67,8 +67,12 @@ print("PASS portable MOVETO fails closed")
 arm_dir = ROOT.parents[1] / "firmware" / "arm28"
 source = (arm_dir / "ams_board28.ino").read_text(encoding="utf-8")
 impl = (arm_dir / "ams_board26_impl.h").read_text(encoding="utf-8")
-assert "BootMouse.begin();" in impl
-assert "BootMouse.move(sx, sy, 0);" in impl
+portable_hid = (arm_dir / "portable_relative_mouse.h").read_text(encoding="utf-8")
+assert "PortableMouse.begin();" in impl
+assert "PortableMouse.move(sx, sy, 0);" in impl
+assert '#include "portable_relative_mouse.h"' in impl
+assert "HID-Project.h" not in impl
+assert "class PortableMouse_" in portable_hid
 assert 'if (!strcmp(mode, "rel"))' in impl
 rel_branch = impl.split('if (!strcmp(mode, "rel"))', 1)[1].split("else if", 1)[0]
 assert "mouse_move_relative_native(x, y)" in rel_branch

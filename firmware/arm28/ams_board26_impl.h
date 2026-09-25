@@ -3,7 +3,7 @@
    Target: Arduino Pro Micro (ATmega32U4, 5V/16MHz)
 
    Layers (single firmware, no interference — peripherals are independent):
-     1) USB HID: BootMouse relative interface (real host cursor, no centre reset)
+     1) USB HID: PortableMouse relative interface (real host cursor, no centre reset)
      2) USB CDC serial command channel, AES-128-CTR encrypted after HELLO handshake
      3) ADC sound detection on pin A0 (AUX tap / mic module), non-blocking + HALT-abortable
      4) Brain link on Serial1 (pins 0/1): plain-text commands from the Pico brain (fw 1.7)
@@ -17,7 +17,7 @@
    Commands: PING VER HELLO HALT SETRES MMOVE MCLICK MDOWN MUP MDRAG MWHEEL
              WSND SCAL TRGSND
 */
-#include <HID-Project.h>
+#include "portable_relative_mouse.h"
 #include "ams_key.h"   // static const uint8_t AMS_PSK[16] = {...};
 
 // fw 2.6 (11 Sep 2026): debounced HOSTUSB UP/SUSPEND/DOWN events on Serial1; no PC helper.
@@ -254,10 +254,10 @@ static void mouse_delta_report(int32_t dx, int32_t dy, signed char wheel = 0) {
   while (dx || dy) {
     int8_t sx = (int8_t)constrain(dx, -127L, 127L);
     int8_t sy = (int8_t)constrain(dy, -127L, 127L);
-    BootMouse.move(sx, sy, 0);
+    PortableMouse.move(sx, sy, 0);
     dx -= sx; dy -= sy;
   }
-  if (wheel) BootMouse.move(0, 0, wheel);
+  if (wheel) PortableMouse.move(0, 0, wheel);
 }
 
 static void mouse_report(int32_t x, int32_t y, signed char wheel = 0) {
@@ -540,7 +540,7 @@ static bool read_line_blocking(uint16_t timeoutMs) {
 // ================= HALT =================
 static void do_halt() {
   g_buttons = 0;
-  BootMouse.releaseAll();
+  PortableMouse.releaseAll();
   mouse_report(g_curX, g_curY);
 }
 
@@ -652,10 +652,10 @@ static void handle(char* cmd) {
     cursor_sync();            // fw 1.8: click at the tracked position, never at centre
     for (int i = 0; i < cnt; i++) {
       g_buttons |= b;
-      BootMouse.press(b);
+      PortableMouse.press(b);
       int hold = (hmx > hmn && hmn > 0) ? (int)random(hmn, hmx + 1) : 45;
       if (!wait_mouse_hold_or_abort((uint16_t)hold)) return;
-      BootMouse.release(b);
+      PortableMouse.release(b);
       g_buttons &= (uint8_t)~b;
       if (i + 1 < cnt) delay((uint16_t)random(60, 140));
     }
@@ -666,14 +666,14 @@ static void handle(char* cmd) {
     cursor_sync();            // fw 1.8
     uint8_t b = parse_button(args);
     g_buttons |= b;
-    BootMouse.press(b);
+    PortableMouse.press(b);
     reply_ok("MDOWN");
     return;
   }
   if (!strcmp(cmd, "MUP"))   {
     cursor_sync();            // fw 1.8
     uint8_t b = parse_button(args);
-    BootMouse.release(b);
+    PortableMouse.release(b);
     g_buttons &= (uint8_t)~b;
     reply_ok("MUP");
     return;
@@ -684,10 +684,10 @@ static void handle(char* cmd) {
       uint8_t b = parse_button(bs);
       cursor_sync();          // fw 1.8
       g_buttons |= b;
-      BootMouse.press(b); delay(60);
+      PortableMouse.press(b); delay(60);
       mouse_move_abs(g_curX + dx, g_curY + dy, false);   // fw 1.8: drag delta in PIXELS (was axis units)
       delay(60);
-      BootMouse.release(b);
+      PortableMouse.release(b);
       g_buttons &= (uint8_t)~b;
       reply_ok("MDRAG");
     } else reply_err("ARG");
@@ -771,7 +771,7 @@ static void handle(char* cmd) {
     uint8_t b = (act == 2) ? MOUSE_RIGHT : (act == 3) ? MOUSE_MIDDLE : MOUSE_LEFT;
     cursor_sync();            // fw 1.8: the armed click must not jump to centre
     g_buttons |= b;
-    BootMouse.press(b); delay((uint16_t)hold); BootMouse.release(b);
+    PortableMouse.press(b); delay((uint16_t)hold); PortableMouse.release(b);
     g_buttons &= (uint8_t)~b;
     char eb[80]; snprintf(eb, sizeof(eb), "EVT|TRG|react=%ld|hold=%ld|t=%lu", react, hold, (unsigned long)millis());
     send_line(eb);
@@ -818,7 +818,7 @@ void setup() {
   pinMode(LED_ERR, OUTPUT); digitalWrite(LED_ERR, HIGH);   // LED off (active low)
   Serial.begin(115200);
   Serial1.begin(BRAIN_BAUD);   // fw 2.4: 57600 - double the edge margin on the BSS138 shifter
-  BootMouse.begin();
+  PortableMouse.begin();
   // seed random from analog noise on A0 (LSBs) + micros
   uint32_t seed = 0;
   for (uint8_t i = 0; i < 32; i++) {

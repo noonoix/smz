@@ -1,0 +1,61 @@
+name: Apply combined Guard and hand-mouse development
+
+on:
+  push:
+    branches: [fix/portable-relative-mouse]
+    paths:
+      - 'tools/combined-development.patch.gz.b64'
+      - '.github/workflows/apply-combined-development.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-test-commit:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Decode and apply source patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import base64, gzip
+          from pathlib import Path
+          raw = ''.join(Path('tools/combined-development.patch.gz.b64').read_text().split())
+          Path('combined-development.patch').write_bytes(gzip.decompress(base64.b64decode(raw)))
+          PY
+          git apply --check combined-development.patch
+          git apply combined-development.patch
+          git diff --check
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Run focused portable contracts
+        shell: bash
+        run: |
+          python portable/plan3/sim/test_calibration_overlap_guard.py
+          python portable/plan3/sim/test_modern_random_package_runtime.py
+          python -m py_compile portable/plan3/CIRCUITPY-MODERN/*.py
+      - name: Build and test Classroom Studio
+        shell: pwsh
+        run: |
+          dotnet restore ams-shell/AMS.sln
+          dotnet build ams-shell/AMS.sln -c Release --no-restore
+          dotnet build tests/TestRunner.csproj -c Release
+          dotnet run --project tests/TestRunner.csproj -c Release --no-build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Commit verified source
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ams-shell/src/Ams.UI portable/plan3/CIRCUITPY-MODERN portable/plan3/sim/test_calibration_overlap_guard.py tests/TestRunner.cs
+          git commit -m "feat: add overlap-safe calibration and hand-mouse sampling"
+          git push

@@ -46,6 +46,10 @@ jobs:
           dotnet run --project tests/TestRunner.csproj -c Release --no-build 2>&1 | Tee-Object ci-test-output.txt
           $exitCode = $LASTEXITCODE
           $fails = Select-String -Path ci-test-output.txt -Pattern '^FAIL:'
+          $summary = Select-String -Path ci-test-output.txt -Pattern '^(FAIL:|=== Results|Unhandled|.*Exception|.*error)'
+          foreach ($line in $summary) {
+            Write-Host "::error file=tests/TestRunner.cs::$($line.Line)"
+          }
           if ($exitCode -ne 0) {
             foreach ($line in (Get-Content ci-test-output.txt -Tail 100)) {
               Write-Host "::error::$line"

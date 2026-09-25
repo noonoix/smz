@@ -317,7 +317,7 @@ class PlanContext:
 class Combined:
     def __init__(self):
         self.arm = Arm(); self.keyboard = Keyboard(usb_hid.devices); self.controls = Controls(self.arm, self.keyboard); self.sensor = BH1750()
-        self.bundle = load_guard_bundle("/"); self.guard = LightStateGuard.from_bundle("/"); self.routes = {}
+        self.bundle = load_guard_bundle("/", verify=False); self.guard = LightStateGuard.from_bundle("/", verify=False); self.routes = {}
         self.blue = Button(board.GP4); self.yellow = Button(board.GP3); self.usb = usb_cdc.data or usb_cdc.console; self.host = bytearray()
         self.calibrating = False; self.stage = 0; self.samples = []; self.sample_started = 0; self.result = None; self.saved = False; self.saved_ids = set(); self.last_cal_error = None
     def key(self, vk):
@@ -515,6 +515,9 @@ class Combined:
         return True
     def route(self, decision):
         if not decision.get("execute"): return
+        # Keep the 56 KB plan parser out of second-stage boot. It is loaded only
+        # when a validated optical transition actually needs to execute a route.
+        import plan_engine
         name = decision.get("route")
         if name not in self.bundle["manifest"]["routes"].values(): raise GuardBundleError("unvalidated route")
         # A parsed plan is consumable: loop/random bookkeeping must not be
@@ -564,3 +567,4 @@ def main():
     try: Combined().loop()
     except GuardBundleError as exc: print("combined Guard bundle rejected:", exc)
     except Exception as exc: print("combined Guard stopped:", exc)
+

@@ -1,6 +1,6 @@
 import supervisor
 
-_MARKER = "/.guard_verified"
+_MARKER = "/.guard_verified_v2"
 
 
 def _verified():
@@ -21,3 +21,4 @@ else:
     with open(_MARKER, "w") as fh:
         fh.write("1")
     supervisor.reload()
+

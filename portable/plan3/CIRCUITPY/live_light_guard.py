@@ -201,8 +201,8 @@ class LightStateGuard:
     """Debounced, hysteretic light-state selector with optional ordered routing."""
 
     @classmethod
-    def from_bundle(cls, root="/"):
-        bundle = load_guard_bundle(root)
+    def from_bundle(cls, root="/", verify=True):
+        bundle = load_guard_bundle(root, verify=verify)
         guard = cls(bundle["states"], bundle["stable_ms"], bundle["hysteresis"], bundle["sensor_timeout_ms"])
         guard.bundle = bundle
         return guard
@@ -317,3 +317,4 @@ class LightStateGuard:
 
 def state_spec(state_id, low, high, route):
     return {"id": str(state_id), "lo": int(low), "hi": int(high), "route": str(route)}
+

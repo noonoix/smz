@@ -17,7 +17,7 @@ jobs:
 
       - name: Create backup archive
         run: |
-          git clone "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" repo-backup.git
+          git clone --mirror "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" repo-backup.git
           tar -czf repo-backup.tar.gz repo-backup.git
 
       - name: Upload to Google Drive

@@ -302,6 +302,7 @@ _GUARD_PAUSE_PATTERN = ((523, 180), (0, 100), (523, 180), (0, 100), (523, 340))
 _GUARD_RESUME_PATTERN = ((659, 150), (784, 150), (988, 150), (784, 150), (988, 300))
 _CAL_ENTER_PATTERN = ((523, 100), (659, 120), (784, 180))
 _CAL_EXIT_PATTERN = ((784, 100), (659, 120), (523, 220))
+_CAL_SAVE_ERROR_PATTERN = ((220, 140), (0, 80), (220, 260))
 
 def _cal_beep(self, frequency, duration_ms):
     tone = None
@@ -332,6 +333,9 @@ def _cal_save_success_tone(self):
     self._cal_beep(880, 90)
     runtime.time.sleep(.05)
     self._cal_beep(1320, 180)
+
+def _cal_save_error_tone(self):
+    self._guard_pattern(_CAL_SAVE_ERROR_PATTERN)
 
 def _cal_complete_melody(self):
     for note in _CAL_NOTES:
@@ -402,6 +406,7 @@ def _immediate_audible_start(self):
     self.blue_start_consumed = True
 
 def _enter_calibration_from_pending_start(self):
+    _prepare_calibration_heap(self)
     # The user held the same blue press that initially cued Start. Cancel the
     # not-yet-routable start state and enter calibration directly, without
     # playing a Stop cue or waiting on optional arm cleanup.
@@ -431,7 +436,31 @@ _original_cal_tick = runtime.Combined.cal_tick
 _original_save_cal = runtime.Combined.save_cal
 _original_yellow_action = runtime.Combined.yellow_action
 
+_PLAN_MODULES = ("plan_engine_exec", "plan_engine_human", "plan_engine_parallel", "plan_engine_parse")
+
+def _prepare_calibration_heap(self):
+    # Complex routes lazily import the split plan engine. CircuitPython keeps
+    # those modules cached after Stop/PlanAbort, leaving a fragmented heap that
+    # can fail the 2–3 KB atomic calibration JSON write. Calibration never runs
+    # concurrently with a route, so return the deferred proxy to its cold state
+    # and release all split-engine modules before sampling or saving.
+    proxy = runtime.plan_engine
+    try:
+        if hasattr(proxy, "module"):
+            proxy.module = None
+    except Exception:
+        pass
+    for name in _PLAN_MODULES:
+        sys.modules.pop(name, None)
+    sys.modules["plan_engine"] = proxy
+    gc.collect()
+    try:
+        self.emit("EVT|DEBUG|CAL|heap-ready|free=%d" % gc.mem_free())
+    except Exception:
+        pass
+
 def _audible_start_cal(self):
+    _prepare_calibration_heap(self)
     _original_start_cal(self)
     if self.calibrating:
         self.calibration_enter_tone()
@@ -446,6 +475,7 @@ def _audible_end_cal(self):
 
 def _audible_next_cal(self):
     previous = self.stage
+    blocked_unsaved = (self.calibrating and isinstance(self.result, dict) and not self.saved)
     can_wrap = (self.calibrating and
         self.stage == len(runtime.PROFILES) - 1 and
         self.result != "sampling" and
@@ -460,11 +490,19 @@ def _audible_next_cal(self):
         _original_next_cal(self)
     if self.calibrating and self.stage != previous:
         self.cal_position_tone()
+    elif blocked_unsaved and self.stage == previous:
+        # Short blue cannot advance past a rejected/unsaved profile. Make that
+        # guard audible instead of looking like a dead button.
+        self.cal_save_error_tone()
 
 def _audible_cal_tick(self):
     was_sampling = self.result == "sampling"
     _original_cal_tick(self)
     if was_sampling and isinstance(self.result, dict):
+        # The raw float samples are no longer needed once center/spread exist.
+        # Drop them before the atomic JSON/manifest write to reduce heap pressure.
+        self.samples = []
+        _prepare_calibration_heap(self)
         # Sampling completion is silent; save_cal emits the single success cue.
         self.save_cal()
 
@@ -477,6 +515,11 @@ def _audible_save_cal(self):
             self.cal_complete_melody()
         else:
             self.cal_save_success_tone()
+    elif had_pending_result and not self.saved and self.last_cal_error:
+        # A rejected overlap or storage failure must be audible. Previously
+        # the user heard nothing and the UNSAVED guard made both short buttons
+        # appear dead even though the runtime was deliberately holding stage.
+        self.cal_save_error_tone()
 
 def _repeatable_yellow_action(self):
     # Handle both first samples and same-position retries explicitly. A saved
@@ -493,6 +536,19 @@ def _repeatable_yellow_action(self):
         _original_yellow_action(self)
         return
     if isinstance(self.result, dict) and not self.saved:
+        if (self.last_cal_error or "").startswith("OVERLAP:"):
+            # Re-saving the identical rejected sample can never fix an overlap.
+            # A yellow press therefore starts a fresh five-second sample on the
+            # same stage; short blue remains blocked until a valid save, while
+            # long blue can still exit Calibration.
+            self.samples = []
+            self.sample_started = runtime.time.monotonic()
+            self.result = "sampling"
+            self.last_cal_error = None
+            self.emit("EVT|CAL|mode=started|stage=%d|id=%s|seconds=5|saved=%d|retry=1" %
+                (self.stage + 1, runtime.PROFILES[self.stage], len(self.saved_ids)))
+            self.cal_record_start_tone()
+            return
         self.save_cal()
         return
     retry = 1 if self.saved and isinstance(self.result, dict) else 0
@@ -985,6 +1041,7 @@ runtime.Combined.cal_position_tone = _cal_position_tone
 runtime.Combined.cal_record_start_tone = _cal_record_start_tone
 runtime.Combined.cal_stage_complete_tone = _cal_stage_complete_tone
 runtime.Combined.cal_save_success_tone = _cal_save_success_tone
+runtime.Combined.cal_save_error_tone = _cal_save_error_tone
 runtime.Combined.cal_complete_melody = _cal_complete_melody
 runtime.Combined._guard_pattern = _guard_pattern
 runtime.Combined.guard_start_tone = _guard_start_tone

@@ -12,7 +12,8 @@
 
 | Build | نتیجهٔ سخت‌افزاری | مسئله/تغییر اصلی | وضعیت |
 | --- | --- | --- | --- |
-| {{BUILD_NUMBER}} | در انتظار تست سخت‌افزاری | بازهٔ تصادفی زمان بازپخش Hand Sample | CI candidate |
+| {{BUILD_NUMBER}} | در انتظار تست سخت‌افزاری | Chunk کم‌حافظهٔ HANDPATH | CI candidate |
+| 51 | MemoryError پیش از Import در Route 8.7KB | بازهٔ تصادفی زمان بازپخش Hand Sample | Superseded by next build |
 | 50 | A و B کامل؛ Record تست C تحلیل شد | Changelog اجباری؛ همان Runtime Build 49 | C انسانی‌ترین؛ B نرم‌ترین |
 | 49 | Route تست A کامل شد | Runner سبک RMOUSE بدون Executor کامل | Functional pass؛ کیفیت حرکت در حال تیون |
 | 48 | Import و Parse موفق؛ اجرا شکست خورد | Lazy import Parser/Executor | Superseded by 49 |
@@ -25,7 +26,40 @@
 | 39 | Facade صحیح در Export پروژهٔ جاری | Export ordering | Verified foundation |
 | 38 | Split executor اولیه | کاهش فشار Import | Superseded by 39 |
 
-## Build {{BUILD_NUMBER}} — بازهٔ زمان بازپخش Hand Sample
+## Build {{BUILD_NUMBER}} — Chunk کم‌حافظهٔ HANDPATH
+
+**Previous build:** 51  
+**Status:** CI candidate; hardware retest pending  
+**Commit:** `{{COMMIT_SHA}}`
+
+### Problem observed
+
+Bundle 140 در Desktop پس از خواندن Route با `MemoryError` برای تخصیص 8745 بایت متوقف شد. فایل Route شامل یک خط `HANDPATH` تقریباً 8.7KB بود.
+
+### Root cause
+
+خود Route با موفقیت خوانده شد، اما `splitlines()` برای خط بزرگ HANDPATH یک بلوک پیوسته هم‌اندازه می‌خواست. Heap در آن لحظه 52,688 بایت آزاد داشت، ولی به‌علت Fragmentation بلوک پیوستهٔ 8,745 بایتی موجود نبود.
+
+### Change
+
+- Exporter مسیر ضبط‌شده را بدون حذف Segmentها به خط‌های حداکثر 96 Segment تقسیم می‌کند.
+- بازهٔ ۹ تا ۱۱ ثانیه به‌صورت تناسبی بین Chunkها توزیع می‌شود و مجموع Min/Max دقیقاً حفظ می‌شود.
+- Runtime سبک Pico اکنون `mt=min,max` را مستقیم اجرا و Delay هر Chunk را تجمعی Scale می‌کند.
+- پیش از اجرای Route سبک، نسخهٔ کامل متن Route حذف و `gc.collect()` اجرا می‌شود.
+- قرارداد قدیمی تک‌خطی همچنان پذیرفته می‌شود.
+
+### Validation
+
+- Route آزمایشی 240 Segment به سه خط HANDPATH کمتر از 1KB تبدیل شد.
+- Runtime مدرن با `py_compile` معتبر است.
+- Manifest برای `code.py` جدید بازسازی شد.
+- هیچ Segment، Delta یا Micro-step حذف نشده است.
+
+### Next test
+
+Bundle را با Build جدید کامل بازسازی کنید و همان `11hand3.amsj` را اجرا کنید. پس از `after-route-read` باید `light-route` دیده شود؛ تخصیص 8745 بایت نباید تکرار شود و حرکت باید کامل شود.
+
+## Build 51 — بازهٔ زمان بازپخش Hand Sample
 
 **Previous build:** 50  
 **Status:** CI candidate; hardware test pending  

@@ -336,14 +336,31 @@ public static class PlanExporter
                     sample,
                     PropEx.GetInt(n.Props, "handReplayTimeMin", sample.DurationMs * 9 / 10),
                     PropEx.GetInt(n.Props, "handReplayTimeMax", sample.DurationMs * 11 / 10));
-                // DelayMs is the time BEFORE this captured cursor change. Keep
-                // all samples in one light-runtime command: this preserves the
-                // gesture without allocating one Pico command tuple per point.
-                var payload = string.Join(";", path.Select(seg =>
-                    seg.DelayMs.ToString(CultureInfo.InvariantCulture) + "," +
-                    seg.Dx.ToString(CultureInfo.InvariantCulture) + "," +
-                    seg.Dy.ToString(CultureInfo.InvariantCulture)));
-                Emit(n, new[] { "HANDPATH|mt=" + replayMin + "," + replayMax + "|" + payload }, "HANDPATH");
+                // A ten-second capture can exceed 8 KB. One route line of that
+                // size needs an equally large contiguous RP2040 allocation in
+                // splitlines(), which fails on a healthy but fragmented heap.
+                // Bound every line while preserving every recorded segment.
+                const int segmentsPerLine = 96;
+                int sourceTotal = Math.Max(1, path.Sum(seg => seg.DelayMs));
+                int sourceElapsed = 0, minElapsed = 0, maxElapsed = 0;
+                var commands = new List<string>();
+                for (int offset = 0; offset < path.Count; offset += segmentsPerLine)
+                {
+                    var chunk = path.Skip(offset).Take(segmentsPerLine).ToArray();
+                    sourceElapsed += chunk.Sum(seg => seg.DelayMs);
+                    int minDue = (int)Math.Round(sourceElapsed * (double)replayMin / sourceTotal);
+                    int maxDue = (int)Math.Round(sourceElapsed * (double)replayMax / sourceTotal);
+                    int chunkMin = Math.Max(1, minDue - minElapsed);
+                    int chunkMax = Math.Max(chunkMin, maxDue - maxElapsed);
+                    minElapsed = minDue;
+                    maxElapsed = maxDue;
+                    var payload = string.Join(";", chunk.Select(seg =>
+                        seg.DelayMs.ToString(CultureInfo.InvariantCulture) + "," +
+                        seg.Dx.ToString(CultureInfo.InvariantCulture) + "," +
+                        seg.Dy.ToString(CultureInfo.InvariantCulture)));
+                    commands.Add("HANDPATH|mt=" + chunkMin + "," + chunkMax + "|" + payload);
+                }
+                Emit(n, commands, "HANDPATH");
                 return;
             }
             if(!PropEx.GetBool(n.Props,"human",true)){Emit(n,new[]{"MOVETO|x="+x+"|y="+y+"|human=0"},"MOVETO");return;}

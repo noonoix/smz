@@ -2,7 +2,7 @@
 # ordinary Desktop/Login routes keep the low-memory split executor footprint.
 import gc
 import random
-from plan_engine_parse import PlanAbort, _below, rand_range
+from plan_engine_parse import PlanAbort, _below, handpath_events, rand_range
 from plan_engine_human import (_DEFAULT_CFG, plan_move, plan_typing,
                                relative_mouse_events)
 
@@ -117,15 +117,8 @@ def _parallel_events(ops, ctx, pos, pauses, inc):
                 for event in _parallel_events(progs[item], ctx, pos, pauses, inc):
                     yield event
         elif op == "HANDPATH":
-            raw = prm["path"]
-            start = 0
-            while start < len(raw):
-                end = raw.find(";", start)
-                if end < 0:
-                    end = len(raw)
-                delay, dx, dy = (int(v) for v in raw[start:end].split(",", 2))
+            for delay, dx, dy in handpath_events(prm["path"], prm.get("mt")):
                 yield ("move", delay, dx, dy, True)
-                start = end + 1
         elif op == "TYPE":
             for cmd in plan_typing(prm["text"], prm):
                 if cmd[0] == "KTEXT":

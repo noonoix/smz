@@ -2,7 +2,8 @@ import gc
 import math
 import random
 
-from plan_engine_parse import (PlanAbort, _V2_OPS, _clamp, _load_mouse_pos, _save_mouse_pos, parse_plan, rand_range)
+from plan_engine_parse import (PlanAbort, _V2_OPS, _clamp, _load_mouse_pos, _save_mouse_pos,
+                               handpath_events, parse_plan, rand_range)
 from plan_engine_human import (PausePlanner, _DEFAULT_CFG, plan_move, plan_typing,
                                relative_mouse_events)
 
@@ -180,18 +181,11 @@ def run_plan(ops, ctx, _pos=None, _pauses=None, _inc=()):
                 else:
                     ctx.kcombo(cmd[1])
         elif op == "HANDPATH":
-            raw = prm["path"]
-            start = 0
-            while start < len(raw):
-                end = raw.find(";", start)
-                if end < 0:
-                    end = len(raw)
-                delay, dx, dy = (int(v) for v in raw[start:end].split(",", 2))
+            for delay, dx, dy in handpath_events(prm["path"], prm.get("mt")):
                 if not ctx.sleep_ms(delay):
                     raise PlanAbort()
                 if dx or dy:
                     ctx.mmove_relative(dx, dy)
-                start = end + 1
         elif op == "STATELOOP":
             # v4: the portable live light guard owns routing and returns only
             # when the keypad stops the run or the sensor becomes unsafe.

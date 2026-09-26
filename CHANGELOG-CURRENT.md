@@ -4,14 +4,16 @@
 
 ## وضعیت فعلی در یک نگاه
 
-- **آخرین Build دارای تست سخت‌افزاری:** Build 49
-- **وضعیت عملکرد A:** موفق؛ Route کامل شد و `MemoryError` رخ نداد.
-- **وضعیت کیفیت حرکت:** هنوز نهایی نیست؛ رکورد A فاصله‌های زمانی حدود 52–53ms را نشان می‌دهد.
+- **آخرین Build دارای تست سخت‌افزاری:** Build 50
+- **وضعیت عملکرد A و B:** هر دو موفق؛ Route کامل شد و `MemoryError` رخ نداد. برای C فعلاً Record دریافت شده است.
+- **وضعیت کیفیت حرکت:** B نرم‌ترین الگوی آهسته است؛ C با تنوع زمانی و Curve بیشتر، انسانی‌ترین گزینهٔ فعلی است.
 - **معماری:** Pico مسئول Keyboard/Guard/Route، و Pro Micro مسئول Mouse HID و Sound است.
 - **Golden 100:** جدا و بدون تغییر باقی مانده است.
 
 | Build | نتیجهٔ سخت‌افزاری | مسئله/تغییر اصلی | وضعیت |
 | --- | --- | --- | --- |
+| {{BUILD_NUMBER}} | در انتظار تست سخت‌افزاری | بازهٔ تصادفی زمان بازپخش Hand Sample | CI candidate |
+| 50 | A و B کامل؛ Record تست C تحلیل شد | Changelog اجباری؛ همان Runtime Build 49 | C انسانی‌ترین؛ B نرم‌ترین |
 | 49 | Route تست A کامل شد | Runner سبک RMOUSE بدون Executor کامل | Functional pass؛ کیفیت حرکت در حال تیون |
 | 48 | Import و Parse موفق؛ اجرا شکست خورد | Lazy import Parser/Executor | Superseded by 49 |
 | 47 | تست A در Import شکست خورد | Fishing timeout + cadence 128-point | Superseded by 48/49 |
@@ -23,38 +25,104 @@
 | 39 | Facade صحیح در Export پروژهٔ جاری | Export ordering | Verified foundation |
 | 38 | Split executor اولیه | کاهش فشار Import | Superseded by 39 |
 
-## Build {{BUILD_NUMBER}} — Changelog اجباری و تأیید سخت‌افزاری A
+## Build {{BUILD_NUMBER}} — بازهٔ زمان بازپخش Hand Sample
 
-**Previous build:** 49  
-**Status:** CI candidate; Build 49 hardware result recorded  
+**Previous build:** 50  
+**Status:** CI candidate; hardware test pending  
 **Commit:** `{{COMMIT_SHA}}`
 
 ### Problem observed
 
-اطلاعات علت شکست و اصلاح هر Build در PRها و صفحهٔ داخلی پراکنده بود. متن Release نیز برای همهٔ Buildها یک متن عمومی تکراری داشت؛ بنابراین توسعه‌دهندهٔ بعدی نمی‌توانست وضعیت فعلی را سریع بفهمد.
+در حالت `handSample` فیلدهای عمومی Human Mouse مخفی بودند و دو مقدار صفرِ پایین Dialog فقط Delay بعد از Step را کنترل می‌کردند. خود مسیر ده‌ثانیه‌ای همیشه با Timing ثابت Payload بازپخش می‌شد؛ بنابراین تکرار آن داخل Loop یا Random Package می‌توانست ریتم قابل‌تشخیص ایجاد کند.
 
 ### Root cause
 
-Workflow انتشار متن Release را به‌صورت ثابت تولید می‌کرد و هیچ بررسی‌ای وجود نداشت که تغییرات Build همراه با ورودی Changelog باشند.
+قرارداد `HANDPATH` فقط `delay,dx,dy` داشت و هیچ بازهٔ Min/Max برای مدت کل بازپخش تعریف نمی‌کرد. رابط نیز کنترل اختصاصی این بازه را نمایش نمی‌داد.
 
 ### Change
 
-- این فایل به‌عنوان مرجع تجمعی وضعیت سخت‌افزاری اضافه شد.
-- README مستقیماً به این سند و آخرین Release اشاره می‌کند.
-- Workflow برای هر Build بخش نخست این فایل را به‌عنوان Release notes استخراج می‌کند.
-- هر Commit مؤثر بر Build باید همین Changelog را تغییر دهد؛ در غیر این صورت Job بسته‌بندی Fail می‌شود.
-- نتیجهٔ سخت‌افزاری Build 49 و آمار Record آزمون A ثبت شد.
+- دو فیلد اختصاصی «حداقل/حداکثر زمان بازپخش نمونه» فقط در حالت `handSample` نمایش داده می‌شوند.
+- پس از نمونه‌گیری ۱۰ثانیه‌ای، پیش‌فرض ۹۰۰۰ تا ۱۱۰۰۰ms تنظیم می‌شود.
+- Exporter قرارداد سازگار `HANDPATH|mt=min,max|...` تولید می‌کند.
+- Desktop، ScriptGenerator، Executor عادی Pico و Parallel Scheduler در هر اجرا یک مدت تازه انتخاب و Delayهای ثبت‌شده را متناسب Scale می‌کنند؛ Deltaها و شکل مسیر تغییر نمی‌کنند.
+- پروژه‌ها و Planهای قدیمی بدون `mt` همچنان Timing اصلی Payload را اجرا می‌کنند.
 
 ### Validation
 
-- لاگ Build 49: `after-plan-engine-import=68880` و `after-plan-parse=68512`.
-- Route `desktop_steps.txt` تا `ROUTE/complete` اجرا شد و `MemoryError` رخ نداد.
-- Record آزمون A: 1,928 موقعیت، 1,927 Segment، گام میانه 2.00px، صدک 95 گام 2.24px و بیشینه 2.83px.
-- فاصلهٔ زمانی میانه 2ms بود، اما صدک 80 برابر 52ms، صدک 95 برابر 53ms و 862 فاصلهٔ حداقل 40ms ثبت شد؛ بنابراین اندازهٔ Micro-step صحیح است ولی نرمی زمانی هنوز نیازمند مقایسهٔ B/C/D است.
+- Codec و Deltaهای نمونه دست‌نخورده باقی ماندند.
+- Validator بازهٔ ۱ تا ۶۰ ثانیه و ترتیب Min/Max را کنترل می‌کند.
+- Scaling تجمعی، مجموع Delayها را دقیقاً به مدت تصادفی انتخاب‌شده می‌رساند و خطای گردکردن بین Segmentها جمع نمی‌شود.
+- تست قرارداد Export، نمایش فیلدهای اختصاصی و مسیر Desktop به‌روزرسانی شد.
 
 ### Next test
 
-پروژه‌های B، C و D را با Build 49 جداگانه اجرا و Record هرکدام را ثبت کنید. معیار انتخاب: کاهش فاصله‌های 40ms به بالا، حفظ Micro-step حداکثر سه پیکسل و نبودن `MemoryError`.
+یک Hand Sample ده‌ثانیه‌ای را چند بار داخل Random Package اجرا کنید. زمان هر اجرا باید بین ۹ تا ۱۱ ثانیه تغییر کند، پایان Relative Delta ثابت بماند و حرکت روی Pico بدون `MemoryError` یا وقفهٔ مصنوعی کامل شود.
+
+## Build 50 — ثبت نتایج سخت‌افزاری B و C
+
+**Previous build:** 50  
+**Status:** CI candidate; Build 50 tuning results B/C recorded  
+**Commit:** `{{COMMIT_SHA}}`
+
+### Problem observed
+
+تست A از نظر حافظه موفق بود، اما Record آن 862 فاصلهٔ حداقل 40ms داشت. B وقفه‌ها را رفع کرد، ولی برای معیار اصلی «انسانی‌بودن» باید تنوع زمانی و انحنای C نیز با B مقایسه می‌شد.
+
+### Root cause
+
+حرکت انسانی نباید زمان و هندسهٔ ثابت داشته باشد. B با `mt=900..1400` و `curve=0..8` عمدی آهسته و نرم است؛ C با `mt=600..900` و `curve=3..18` دامنهٔ سرعت و انحنای بیشتری دارد.
+
+### Change
+
+- کد Runtime تغییر نکرد.
+- نتیجهٔ تست B با `curve=0..8` و `mt=900..1400` و Record تست C در Changelog ثبت شد.
+- Bundle ارسالی B بررسی شد و هر 25 Hash در Manifest معتبر بود.
+- B به‌عنوان نرم‌ترین گزینهٔ آهسته و C به‌عنوان انسانی‌ترین گزینهٔ فعلی علامت‌گذاری شدند.
+
+### Validation
+
+- لاگ Build 50: پیش از Route مقدار 74,080، پس از Import مقدار 68,896 و پس از Parse مقدار 68,512 بایت آزاد بود.
+- Route `desktop_steps.txt` تا `ROUTE/complete` اجرا شد و `MemoryError` رخ نداد.
+- Record B: 2,342 موقعیت، 2,341 Segment و 28,863ms زمان ثبت‌شده.
+- گام میانه 2.24px، صدک 95 و بیشینه هر دو 2.83px بودند؛ سقف Micro-step حفظ شد.
+- فاصلهٔ زمانی میانه 13ms، صدک 80 برابر 14ms و صدک 95 برابر 15ms بود.
+- فقط 13 فاصلهٔ حداقل 40ms ثبت شد؛ نسبت به 862 مورد A حدود 98.5٪ کاهش داشت و تقریباً به مکث‌های عمدی Route محدود شد.
+- Record C شامل 2,339 موقعیت، 2,338 Segment و 32,864ms زمان ثبت‌شده بود.
+- در C فاصلهٔ زمانی میانه 2ms، صدک 80 و 95 هر دو 14ms و فقط 13 فاصلهٔ حداقل 40ms بود.
+- گام C میانه 1.41px، صدک 95 و بیشینه 2.83px بود.
+- تنوع فعال C بیشتر از B بود: ضریب تغییرات فاصله‌ها 0.88 در برابر 0.67 و Entropy نرمال‌شده 0.607 در برابر 0.594. این اختلاف کوچک اما همراه با Curve گسترده‌تر، C را از نظر الگوی غیررباتی جلو می‌اندازد.
+
+### Next test
+
+پروژهٔ D را با Build 50 اجرا و Guard log، Record و Bundle را ثبت کنید. معیار اصلی انسانی‌بودن است: دامنهٔ زمانی/انحنا باید متغیر باشد، وقفه‌های ناخواسته پایین بمانند و Micro-step از سه پیکسل عبور نکند.
+
+## Build 50 — Changelog اجباری و تأیید سخت‌افزاری A
+
+**Previous build:** 49  
+**Status:** CI passed; A hardware result recorded  
+**Commit:** [`535cc4cf`](https://github.com/noonoix/smz/commit/535cc4cf77238b357c8cfcfe31ff3788caaf17e8)  
+**Release:** [classroom-current-50](https://github.com/noonoix/smz/releases/tag/classroom-current-50)  
+**SHA256:** `1e6d2fe654a7020701b26470d5348eae9c45cb5b1dd8f9399ec7616962169cf4`
+
+### Problem observed
+
+اطلاعات علت شکست و اصلاح هر Build در PRها و صفحهٔ داخلی پراکنده بود و متن Release عمومی و تکراری بود.
+
+### Root cause
+
+Workflow انتشار متن ثابت داشت و تغییر Build بدون ورودی Changelog قابل انتشار بود.
+
+### Change
+
+Changelog تجمعی، لینک README، کنترل اجباری Workflow و Release notes تولیدشده از جدیدترین ورودی اضافه شدند.
+
+### Validation
+
+Build 50 نخستین Release با متن واقعی Changelog بود. نتیجهٔ سخت‌افزاری A نیز بدون `MemoryError` تا `ROUTE/complete` رسید.
+
+### Next test
+
+B، C و D برای انتخاب Tempo و Curve مناسب مقایسه شوند.
 
 ## Build 49 — Runner سبک RMOUSE
 

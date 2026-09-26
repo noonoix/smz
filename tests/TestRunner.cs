@@ -3717,16 +3717,20 @@ class TestRunner
                 "v0.9.69: hand capture retains 8ms detail without exceeding the safe UART replay rate");
             Assert(StepDefinitions.Get("mouseMove").Label == "Mouse Movement"
                    && StepDefinitions.Get("mouseMove").Fields.Any(f => f.Key == "moveMode")
-                   && StepDefinitions.Get("mouseMove").Fields.Any(f => f.Key == "handSample"),
-                "v0.9.69: mouse movement exposes fixed and relative hand-gesture modes");
+                   && StepDefinitions.Get("mouseMove").Fields.Any(f => f.Key == "handSample")
+                   && StepDefinitions.Get("mouseMove").Fields.Any(f => f.Key == "handReplayTimeMin" && f.HideUnlessValue == "handSample")
+                   && StepDefinitions.Get("mouseMove").Fields.Any(f => f.Key == "handReplayTimeMax" && f.HideUnlessValue == "handSample"),
+                "hand sample exposes a dedicated randomized replay-duration range");
+            Assert(HandMovementSample.NormalizeReplayRange(hand, 11_000, 9_000) == (9_000, 11_000),
+                "hand-sample replay duration is swap-tolerant");
             var pexHand = PlanExporter.Compile(new List<StepNode>
             {
                 PexStep("mouseMove", new Dictionary<string, object?>
                 { ["x"] = 130, ["y"] = 106, ["moveMode"] = "handSample", ["handSample"] = encodedHand }),
             }, pexSettings, 1920, 1080, "f", "T");
-            Assert(pexHand.Text.Contains("HANDPATH|100,10,2;120,12,3;140,8,1\n")
+            Assert(pexHand.Text.Contains("HANDPATH|mt=9000,11000|100,10,2;120,12,3;140,8,1\n")
                    && !pexHand.Text.Contains("RAW|MMOVE|") && !pexHand.Text.Contains("MOVETO|"),
-                "v0.9.69: sampled hand motion exports as a compact native relative HID path");
+                "sampled hand motion exports with a randomized replay-duration range");
             var handNode = PexStep("mouseMove", new Dictionary<string, object?>
                 { ["x"] = 999, ["y"] = 777, ["moveMode"] = "handSample", ["handSample"] = encodedHand });
             Assert(StepDefinitions.Get("mouseMove").Summarize(handNode).Contains("Δ(30, 6)")
@@ -3734,8 +3738,9 @@ class TestRunner
                 "v0.9.69: hand gesture summary reports relative displacement, never an absolute destination");
             var runEngineSource = V27ReadSrc(Path.Combine("Services", "RunEngine.cs"));
             Assert(runEngineSource.Contains("MMOVE|{segment.Dx},{segment.Dy},rel,2")
-                   && !runEngineSource.Contains("ReplayHandMovementAsync(handSample, PropEx.GetInt"),
-                "v0.9.69: desktop replay uses the same relative HID contract as portable export");
+                   && runEngineSource.Contains("handReplayTimeMin")
+                   && runEngineSource.Contains("targetMs"),
+                "desktop replay scales captured timing to a fresh duration on every execution");
             var cadenceSample = new HandMovementSample.Sample(10_000,
                 new System.Drawing.Point(0, 0), new System.Drawing.Point(35, 0), new[]
                 {
@@ -3784,6 +3789,7 @@ class TestRunner
             var stepDialogSource = V27ReadSrc(Path.Combine("Views", "StepDialog.xaml.cs"));
             var mainVmMouseSource = V27ReadSrc(Path.Combine("ViewModels", "MainViewModel.cs"));
             Assert(stepDialogSource.Contains("randomMousePosition\" && f.Key == \"h\"")
+                   && stepDialogSource.Contains("SetIntText(\"handReplayTimeMin\"")
                    && stepDialogSource.Contains("انتخاب مختصات روی صفحه")
                    && mainVmMouseSource.Contains("PickPointOnScreen")
                    && V27ReadSrc(Path.Combine("Views", "PointPickerWindow.xaml")).Contains("PointPickerWindow")

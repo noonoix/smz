@@ -40,6 +40,8 @@ public static class StepTextsFa
         ["button"] = "دکمه‌ی موس",
         ["moveMode"] = "حالت حرکت (fixed = مقصد مطلق · handSample = بازپخش نسبی نمونه از موقعیت فعلی نشانگر)",
         ["handSample"] = "نمونه‌ی نسبی ذخیره‌شده‌ی حرکت دست",
+        ["handReplayTimeMin"] = "زمان بازپخش Hand Sample — حداقل (ms)",
+        ["handReplayTimeMax"] = "زمان بازپخش Hand Sample — حداکثر (ms) · هر اجرا یک مقدار تصادفی تازه انتخاب می‌کند",
         ["action"] = "نوع کلیک",
         ["delta"] = "مقدار ویل (عدد منفی = پایین)",
         ["scrollDelta"] = "مقدار اسکرول (منفی = پایین، مثبت = بالا)",

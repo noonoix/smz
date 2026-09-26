@@ -117,6 +117,15 @@ public static class HandMovementSample
         return new Point(x, y);
     }
 
+    /// <summary>Normalizes the randomized per-execution replay duration.</summary>
+    public static (int Min, int Max) NormalizeReplayRange(Sample sample, int minimum, int maximum)
+    {
+        minimum = Math.Clamp(minimum, 1, 60_000);
+        maximum = Math.Clamp(maximum, 1, 60_000);
+        if (maximum < minimum) (minimum, maximum) = (maximum, minimum);
+        return (minimum, maximum);
+    }
+
     /// <summary>
     /// Robust personal speed band for Random Mouse Position. The 20th/80th
     /// percentiles reject click pauses and isolated scheduling spikes while

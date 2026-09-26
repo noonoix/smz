@@ -294,6 +294,10 @@ public static class PlanExporter
             parts.Add("over=" + Math.Max(0, Math.Min(100, PropEx.GetInt(p, "overshootChance", 12))));
             var (t0, t1) = Pair(PropEx.GetInt(p, "moveTimeMin", 0), PropEx.GetInt(p, "moveTimeMax", 0));
             if (t1 > 0) parts.Add("mt=" + t0 + "," + t1);
+            if (n.Type == "randomMousePosition"
+                && HandMovementSample.TryDecode(PropEx.GetString(p, "handSample"), out var sample)
+                && HandMovementSample.TryGetSpeedRange(sample, out var sampledMin, out var sampledMax))
+                parts.Add("speed=" + sampledMin + "," + sampledMax);
             parts.Add("idle=" + idle.i0 + "," + idle.i1 + ":" + idle.p0 + "," + idle.p1);
             return "|" + string.Join("|", parts);
         }

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
+using System.Runtime.InteropServices;
 
 namespace Ams.UI.Services;
 
@@ -19,32 +20,48 @@ public static class HandMovementSample
     public readonly record struct Segment(int DelayMs, int Dx, int Dy);
     public sealed record Sample(int DurationMs, Point Start, Point End, IReadOnlyList<Segment> Segments);
 
+    [DllImport("winmm.dll")]
+    private static extern uint timeBeginPeriod(uint period);
+    [DllImport("winmm.dll")]
+    private static extern uint timeEndPeriod(uint period);
+
     // The v1 payload is intentionally limited to cursor coordinates, relative deltas, and timing.
     public static async Task<Sample?> CaptureAsync(CancellationToken ct = default)
     {
-        var start = System.Windows.Forms.Cursor.Position;
-        var previous = start;
-        var lastChangeMs = 0;
-        var segments = new List<Segment>();
-        var sw = Stopwatch.StartNew();
-        while (sw.ElapsedMilliseconds < CaptureDurationMs)
+        // Task.Delay(8) otherwise resolves to about 15.6 ms on many Windows
+        // systems. Scope the 1 ms multimedia timer request to this ten-second
+        // capture only; the finally block also covers cancellation/errors.
+        uint timerResult = timeBeginPeriod(1);
+        try
         {
-            ct.ThrowIfCancellationRequested();
-            await Task.Delay(CaptureIntervalMs, ct);
-            var now = System.Windows.Forms.Cursor.Position;
-            int elapsed = (int)Math.Min(CaptureDurationMs, sw.ElapsedMilliseconds);
-            int dx = now.X - previous.X, dy = now.Y - previous.Y;
-            if (dx != 0 || dy != 0)
+            var start = System.Windows.Forms.Cursor.Position;
+            var previous = start;
+            var lastChangeMs = 0;
+            var segments = new List<Segment>();
+            var sw = Stopwatch.StartNew();
+            while (sw.ElapsedMilliseconds < CaptureDurationMs)
             {
-                segments.Add(new Segment(Math.Max(1, elapsed - lastChangeMs), dx, dy));
-                previous = now;
-                lastChangeMs = elapsed;
+                ct.ThrowIfCancellationRequested();
+                await Task.Delay(CaptureIntervalMs, ct);
+                var now = System.Windows.Forms.Cursor.Position;
+                int elapsed = (int)Math.Min(CaptureDurationMs, sw.ElapsedMilliseconds);
+                int dx = now.X - previous.X, dy = now.Y - previous.Y;
+                if (dx != 0 || dy != 0)
+                {
+                    segments.Add(new Segment(Math.Max(1, elapsed - lastChangeMs), dx, dy));
+                    previous = now;
+                    lastChangeMs = elapsed;
+                }
             }
+            if (segments.Count == 0) return null;
+            int trailing = Math.Max(1, CaptureDurationMs - lastChangeMs);
+            segments.Add(new Segment(trailing, 0, 0));
+            return new Sample(CaptureDurationMs, start, previous, segments.ToArray());
         }
-        if (segments.Count == 0) return null;
-        int trailing = Math.Max(1, CaptureDurationMs - lastChangeMs);
-        segments.Add(new Segment(trailing, 0, 0));
-        return new Sample(CaptureDurationMs, start, previous, segments.ToArray());
+        finally
+        {
+            if (timerResult == 0) timeEndPeriod(1);
+        }
     }
 
     public static string Encode(Sample sample)
@@ -98,6 +115,27 @@ public static class HandMovementSample
         int x = 0, y = 0;
         foreach (var segment in sample.Segments) { x += segment.Dx; y += segment.Dy; }
         return new Point(x, y);
+    }
+
+    /// <summary>
+    /// Robust personal speed band for Random Mouse Position. The 20th/80th
+    /// percentiles reject click pauses and isolated scheduling spikes while
+    /// preserving the user's measured acceleration range.
+    /// </summary>
+    public static bool TryGetSpeedRange(Sample sample, out int minimum, out int maximum)
+    {
+        var speeds = new List<double>();
+        foreach (var segment in sample.Segments)
+        {
+            if (segment.DelayMs < 4 || (segment.Dx == 0 && segment.Dy == 0)) continue;
+            double distance = Math.Sqrt(segment.Dx * (double)segment.Dx + segment.Dy * (double)segment.Dy);
+            speeds.Add(distance * 1000.0 / segment.DelayMs);
+        }
+        if (speeds.Count < 5) { minimum = maximum = 0; return false; }
+        speeds.Sort();
+        minimum = Math.Clamp((int)Math.Round(speeds[(speeds.Count - 1) * 20 / 100]), 150, 3000);
+        maximum = Math.Clamp((int)Math.Round(speeds[(speeds.Count - 1) * 80 / 100]), minimum, 3000);
+        return true;
     }
 
     private static bool TryPoint(string text, out Point point)

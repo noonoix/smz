@@ -2348,6 +2348,19 @@ public partial class MainViewModel : ObservableObject
 
     }
 
+    private Task<(int x, int y)?> PickPointOnScreen()
+    {
+        var picker = new PointPickerWindow { Owner = System.Windows.Application.Current.MainWindow };
+        if (picker.ShowDialog() == true)
+        {
+            var point = (picker.ScreenX, picker.ScreenY);
+            Log($"point picked: ({point.ScreenX},{point.ScreenY})");
+            return Task.FromResult<(int, int)?>(point);
+        }
+        Log("point pick cancelled");
+        return Task.FromResult<(int, int)?>(null);
+    }
+
 
 
     // ═══════════════ lifecycle ═══════════════
@@ -3592,17 +3605,19 @@ public partial class MainViewModel : ObservableObject
         string? calibrateKey = null;
 
         Func<Task<(int x, int y, int w, int h)?>>? pickRegion = null;
+        Func<Task<(int x, int y)?>>? pickPoint = null;
         Func<Task<string?>>? sampleMouse = null;
 
         if (type == "waitForSound") { calibrate = CalibrateSoundThreshold; calibrateKey = "threshold"; }
         if (type == "waitForLight") { calibrate = CalibrateLightRange; calibrateKey = "luxCenter"; }   // v0.9.39 — BH1750 range centre
 
         if (type is "randomMousePosition" or "findImage") pickRegion = PickRegionOnScreen;
-        if (type == "mouseMove") sampleMouse = SampleHandMovementAsync;
+        if (type == "mouseMove") pickPoint = PickPointOnScreen;
+        if (type is "mouseMove" or "randomMousePosition") sampleMouse = SampleHandMovementAsync;
 
 
 
-        var dlg = new StepDialog(title, fields, current, calibrate, calibrateKey, pickRegion, type, sampleMouse)
+        var dlg = new StepDialog(title, fields, current, calibrate, calibrateKey, pickRegion, type, sampleMouse, pickPoint)
 
         {
 

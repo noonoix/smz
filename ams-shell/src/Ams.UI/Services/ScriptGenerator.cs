@@ -239,6 +239,9 @@ public static class ScriptGenerator
     private static string CfgHash(System.Collections.Generic.IReadOnlyDictionary<string, object?> p, int speedMin, int speedMax)
     {
         int G(string k, int d) => PropEx.GetInt(p, k, d);
+        if (HandMovementSample.TryDecode(PropEx.GetString(p, "handSample"), out var sample)
+            && HandMovementSample.TryGetSpeedRange(sample, out var sampledMin, out var sampledMax))
+            (speedMin, speedMax) = (sampledMin, sampledMax);
         int legacy = Math.Clamp(G("curvePct", 30), 0, 200);
         int curveMin = p.ContainsKey("curveMinPct") ? Math.Clamp(G("curveMinPct", 15), 0, 200) : Math.Max(0, legacy - 15);
         int curveMax = p.ContainsKey("curveMaxPct") ? Math.Clamp(G("curveMaxPct", 45), 0, 200) : Math.Min(200, legacy + 15);

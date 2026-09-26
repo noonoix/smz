@@ -328,6 +328,8 @@ def _exec_rmouse(prm, ctx, pauses, pos, target=None):
         raise ValueError("MOVETO needs an absolute cursor origin")
     c = dict(_DEFAULT_CFG)
     c["speed_min"], c["speed_max"] = ctx.speed_min, ctx.speed_max
+    if "speed" in prm:
+        c["speed_min"], c["speed_max"] = prm["speed"]
     if "mt" in prm:
         c["mt_min"], c["mt_max"] = prm["mt"]
     if "curve" in prm:

@@ -132,6 +132,9 @@ public static class StepDefinitions
                 new("y", "Region Y", FieldKind.Int, "0"),
                 new("w", "Region width", FieldKind.Int, "378"),
                 new("h", "Region height", FieldKind.Int, "1049"),
+                // Captured style source for the sampled-RMOUSE profile. The
+                // dialog owns this opaque payload; it is never hand-edited.
+                new("handSample", "Recorded hand movement", FieldKind.Text, ""),
                 new("pauseBeforeMin", "Reaction pause BEFORE the move — min (ms)", FieldKind.Int, "120"),
                 new("pauseBeforeMax", "Reaction pause BEFORE the move — max (ms)", FieldKind.Int, "450"),
                 new("pauseAfterMin", "Settle pause AFTER arrival — min (ms)", FieldKind.Int, "150"),

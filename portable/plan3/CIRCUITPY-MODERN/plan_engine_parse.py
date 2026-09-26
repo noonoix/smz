@@ -476,7 +476,7 @@ def parse_plan(text):
                 if "region" not in prm:
                     raise ValueError("line %d: RMOUSE needs region=x,y,w,h" % line_no)
                 prm["region"] = _quad(prm["region"], "region", line_no)
-                for k in ("mt", "curve", "before", "after"):
+                for k in ("mt", "curve", "before", "after", "speed"):
                     if k in prm:
                         prm[k] = _pair(prm[k], k, line_no)
                 if "mid" in prm:                       # chance:mn,mx

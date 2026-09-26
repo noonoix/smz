@@ -3736,6 +3736,38 @@ class TestRunner
             Assert(runEngineSource.Contains("MMOVE|{segment.Dx},{segment.Dy},rel,2")
                    && !runEngineSource.Contains("ReplayHandMovementAsync(handSample, PropEx.GetInt"),
                 "v0.9.69: desktop replay uses the same relative HID contract as portable export");
+            var cadenceSample = new HandMovementSample.Sample(10_000,
+                new System.Drawing.Point(0, 0), new System.Drawing.Point(35, 0), new[]
+                {
+                    new HandMovementSample.Segment(10, 5, 0),
+                    new HandMovementSample.Segment(10, 6, 0),
+                    new HandMovementSample.Segment(10, 7, 0),
+                    new HandMovementSample.Segment(10, 8, 0),
+                    new HandMovementSample.Segment(10, 9, 0),
+                });
+            var encodedCadence = HandMovementSample.Encode(cadenceSample);
+            Assert(HandMovementSample.TryGetSpeedRange(cadenceSample, out var cadenceMin, out var cadenceMax)
+                   && cadenceMin == 500 && cadenceMax == 800,
+                "sampled Random Mouse cadence uses robust 20th/80th percentile speeds");
+            Assert(StepDefinitions.Get("randomMousePosition").Fields.Any(f => f.Key == "handSample"),
+                "Random Mouse Position exposes a stored hand-sample profile");
+            var sampledRandom = PlanExporter.Compile(new List<StepNode>
+            {
+                PexStep("randomMousePosition", new Dictionary<string, object?>
+                {
+                    ["x"] = 10, ["y"] = 20, ["w"] = 300, ["h"] = 200,
+                    ["handSample"] = encodedCadence,
+                }),
+            }, pexSettings, 1920, 1080, "f", "T");
+            Assert(sampledRandom.Text.Contains("|speed=500,800|"),
+                "sampled Random Mouse exports the user's measured speed band");
+            var stepDialogSource = V27ReadSrc(Path.Combine("Views", "StepDialog.xaml.cs"));
+            var mainVmMouseSource = V27ReadSrc(Path.Combine("ViewModels", "MainViewModel.cs"));
+            Assert(stepDialogSource.Contains("randomMousePosition\" && f.Key == \"h\"")
+                   && stepDialogSource.Contains("انتخاب مختصات روی صفحه")
+                   && mainVmMouseSource.Contains("PickPointOnScreen")
+                   && V27ReadSrc(Path.Combine("Views", "PointPickerWindow.xaml")).Contains("PointPickerWindow"),
+                "Random Mouse has sampling UI and Move to Position has a one-click point picker");
 
             // CLICK with swapped hold bounds
             var pexClick = PlanExporter.Compile(new List<StepNode>

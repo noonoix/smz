@@ -167,50 +167,49 @@ class TestRunner
         Assert(typoTyped.Length == "hello world".Length + 2,
             $"typo sequence types exactly one slip char per word before correcting (typed {typoTyped.Length} chars)");
 
-        // ── v0.9.12 — typo cadence: one slip every N words, N drawn from a range ──
+        // ── Per-TYPE typo count: min/max corrected slips across eligible characters ──
         var tenWords = string.Join(" ", Enumerable.Range(0, 10).Select(i => $"word{i}"));
         cmds = StepDefinitions.GetCommands(new StepNode
         {
             Type = "typeText",
-            Props = new Dictionary<string, object?> { { "text", tenWords }, { "typoEveryMin", 3 }, { "typoEveryMax", 3 } }
+            Props = new Dictionary<string, object?> { { "text", "zodiak999999" }, { "typoEveryMin", 3 }, { "typoEveryMax", 3 } }
         });
         Assert(cmds.Count(c => c == "KCOMBO|8") == 3,
-            $"typo cadence 3/3 over 10 words fires exactly at words 3, 6, 9 (got {cmds.Count(c => c == "KCOMBO|8")})");
+            $"typo count 3/3 injects three corrections into one word (got {cmds.Count(c => c == "KCOMBO|8")})");
 
-        int cadMin = int.MaxValue, cadMax = 0;
+        int countMin = int.MaxValue, countMax = 0;
         var correctionCounts = new HashSet<int>();
         for (int seed = 0; seed < 24; seed++)
         {
-            // v0.9.16 — use seeded overload so each run is independent of the global RNG state.
             var cc = StepDefinitions.GetCommands(new StepNode
             {
                 Type = "typeText",
-                Props = new Dictionary<string, object?> { { "text", tenWords }, { "typoEveryMin", 2 }, { "typoEveryMax", 4 } }
+                Props = new Dictionary<string, object?> { { "text", "zodiak999999" }, { "typoEveryMin", 2 }, { "typoEveryMax", 4 } }
             }, seed);
             int bs = cc.Count(x => x == "KCOMBO|8");
-            cadMin = Math.Min(cadMin, bs); cadMax = Math.Max(cadMax, bs);
+            countMin = Math.Min(countMin, bs); countMax = Math.Max(countMax, bs);
             correctionCounts.Add(bs);
         }
-        Assert(cadMin >= 2 && cadMax <= 5,
-            $"typo cadence 2–4 over 10 words stays in bounds (got {cadMin}–{cadMax} corrections)");
+        Assert(countMin >= 2 && countMax <= 4,
+            $"typo count 2–4 stays in exact bounds (got {countMin}–{countMax} corrections)");
         Assert(correctionCounts.Count > 1,
-            $"typo cadence re-rolls N after each correction (distinct counts: {string.Join(",", correctionCounts.OrderBy(x=>x))})");
+            $"typo count is re-rolled for each TYPE execution (distinct counts: {string.Join(",", correctionCounts.OrderBy(x=>x))})");
 
         cmds = StepDefinitions.GetCommands(new StepNode
         {
             Type = "typeText",
-            Props = new Dictionary<string, object?> { { "text", "a bb cc" }, { "typoEveryMin", 1 }, { "typoEveryMax", 1 } }
+            Props = new Dictionary<string, object?> { { "text", "a" }, { "typoEveryMin", 1 }, { "typoEveryMax", 1 } }
         });
-        Assert(cmds.Count(c => c == "KCOMBO|8") == 2,
-            $"single-char words cannot take a slip and do not consume the cadence (got {cmds.Count(c => c == "KCOMBO|8")})");
+        Assert(cmds.Count(c => c == "KCOMBO|8") == 1,
+            $"single-character text supports one corrected slip (got {cmds.Count(c => c == "KCOMBO|8")})");
 
         cmds = StepDefinitions.GetCommands(new StepNode
         {
             Type = "typeText",
             Props = new Dictionary<string, object?> { { "text", tenWords }, { "typoChance", 100 }, { "typoEveryMin", 5 }, { "typoEveryMax", 5 } }
         });
-        Assert(cmds.Count(c => c == "KCOMBO|8") == 2,
-            $"cadence range takes precedence over legacy typoChance (got {cmds.Count(c => c == "KCOMBO|8")}, chance mode would give 10)");
+        Assert(cmds.Count(c => c == "KCOMBO|8") == 5,
+            $"per-text count takes precedence over legacy typoChance (got {cmds.Count(c => c == "KCOMBO|8")}, chance mode would give 10)");
 
         // ── v0.9.13 — word-pause probability + stream merging (no fixed gap after space) ──
         cmds = StepDefinitions.GetCommands(new StepNode
@@ -2274,7 +2273,7 @@ class TestRunner
             "v0.9.41: no reboot scheduling is left in the run loop");
 
         // 11-14) the vertical rail mirrors the Insert tab, grouped into per-section submenus
-        string[] v41types = { "mouseClick", "mouseMove", "mouseScroll", "randomMousePosition", "keystroke", "typeText", "keyDown", "keyUp", "delay", "forLoop", "randomPackage", "parallelGroup", "findImage", "waitForSound", "waitForLight", "openFile", "playAudio", "runExe", "playScript", "label", "gotoLabel", "comment", "rawCommand" };
+        string[] v41types = { "mouseClick", "mouseMove", "mouseScroll", "randomMousePosition", "keystroke", "typeText", "keyDown", "keyUp", "delay", "forLoop", "randomPackage", "parallelGroup", "findImage", "waitForSound", "waitForLight", "openFile", "buzzer", "runExe", "playScript", "label", "gotoLabel", "comment", "rawCommand" };
         int v41rs = v41xaml.IndexOf("<!-- Icon rail", StringComparison.Ordinal);
         int v41rj = v41xaml.IndexOf("<!-- Steps column", StringComparison.Ordinal);
         Assert(v41rs > 0 && v41rj > v41rs,
@@ -3701,6 +3700,118 @@ class TestRunner
             Assert(pexNoHuman.Text.Contains("MOVETO|x=5|y=6|human=0\n"),
                 "v0.9.66: human=false emits native non-human MOVETO");
 
+            var hand = new HandMovementSample.Sample(10_000, new System.Drawing.Point(100, 100),
+                new System.Drawing.Point(130, 106), new[]
+                {
+                    new HandMovementSample.Segment(100, 10, 2),
+                    new HandMovementSample.Segment(120, 12, 3),
+                    new HandMovementSample.Segment(140, 8, 1),
+                });
+            var encodedHand = HandMovementSample.Encode(hand);
+            Assert(HandMovementSample.TryDecode(encodedHand, out var decodedHand)
+                   && decodedHand.Segments.Count == 3 && decodedHand.End.X == 130
+                   && HandMovementSample.Displacement(decodedHand) == new System.Drawing.Point(30, 6),
+                "v0.9.68: ten-second hand sample codec round-trips without keyboard/text data");
+            Assert(HandMovementSample.CaptureIntervalMs == 8
+                   && HandMovementSample.ReplaySegmentLimit == 1280,
+                "v0.9.69: hand capture retains 8ms detail without exceeding the safe UART replay rate");
+            Assert(StepDefinitions.Get("mouseMove").Label == "Mouse Movement"
+                   && StepDefinitions.Get("mouseMove").Fields.Any(f => f.Key == "moveMode")
+                   && StepDefinitions.Get("mouseMove").Fields.Any(f => f.Key == "handSample")
+                   && StepDefinitions.Get("mouseMove").Fields.Any(f => f.Key == "handReplayTimeMin" && f.HideUnlessValue == "handSample")
+                   && StepDefinitions.Get("mouseMove").Fields.Any(f => f.Key == "handReplayTimeMax" && f.HideUnlessValue == "handSample"),
+                "hand sample exposes a dedicated randomized replay-duration range");
+            Assert(HandMovementSample.NormalizeReplayRange(hand, 11_000, 9_000) == (9_000, 11_000),
+                "hand-sample replay duration is swap-tolerant");
+            var pexHand = PlanExporter.Compile(new List<StepNode>
+            {
+                PexStep("mouseMove", new Dictionary<string, object?>
+                { ["x"] = 130, ["y"] = 106, ["moveMode"] = "handSample", ["handSample"] = encodedHand }),
+            }, pexSettings, 1920, 1080, "f", "T");
+            Assert(pexHand.Text.Contains("HANDPATH|mt=9000,11000|100,10,2;120,12,3;140,8,1\n")
+                   && !pexHand.Text.Contains("RAW|MMOVE|") && !pexHand.Text.Contains("MOVETO|"),
+                "sampled hand motion exports with a randomized replay-duration range");
+            var longHand = new HandMovementSample.Sample(10_000, new System.Drawing.Point(0, 0),
+                new System.Drawing.Point(240, 0),
+                Enumerable.Range(0, 240).Select(_ => new HandMovementSample.Segment(40, 1, 0)).ToArray());
+            var pexLongHand = PlanExporter.Compile(new List<StepNode>
+            {
+                PexStep("mouseMove", new Dictionary<string, object?>
+                {
+                    ["moveMode"] = "handSample",
+                    ["handSample"] = HandMovementSample.Encode(longHand),
+                    ["handReplayTimeMin"] = 9000,
+                    ["handReplayTimeMax"] = 11000,
+                }),
+            }, pexSettings, 1920, 1080, "f", "T");
+            var handLines = pexLongHand.Text.Split('\n').Where(line => line.StartsWith("HANDPATH|")).ToArray();
+            Assert(handLines.Length == 3 && handLines.All(line => line.Length < 1024),
+                "long Hand Sample is split into bounded Pico route lines");
+            var handNode = PexStep("mouseMove", new Dictionary<string, object?>
+                { ["x"] = 999, ["y"] = 777, ["moveMode"] = "handSample", ["handSample"] = encodedHand });
+            Assert(StepDefinitions.Get("mouseMove").Summarize(handNode).Contains("Δ(30, 6)")
+                   && !StepDefinitions.Get("mouseMove").Summarize(handNode).Contains("999"),
+                "v0.9.69: hand gesture summary reports relative displacement, never an absolute destination");
+            var runEngineSource = V27ReadSrc(Path.Combine("Services", "RunEngine.cs"));
+            Assert(runEngineSource.Contains("MMOVE|{segment.Dx},{segment.Dy},rel,2")
+                   && runEngineSource.Contains("handReplayTimeMin")
+                   && runEngineSource.Contains("targetMs"),
+                "desktop replay scales captured timing to a fresh duration on every execution");
+            var cadenceSample = new HandMovementSample.Sample(10_000,
+                new System.Drawing.Point(0, 0), new System.Drawing.Point(35, 0), new[]
+                {
+                    new HandMovementSample.Segment(10, 5, 0),
+                    new HandMovementSample.Segment(10, 6, 0),
+                    new HandMovementSample.Segment(10, 7, 0),
+                    new HandMovementSample.Segment(10, 8, 0),
+                    new HandMovementSample.Segment(10, 9, 0),
+                });
+            var encodedCadence = HandMovementSample.Encode(cadenceSample);
+            Assert(HandMovementSample.TryGetSpeedRange(cadenceSample, out var cadenceMin, out var cadenceMax)
+                   && cadenceMin == 500 && cadenceMax == 800,
+                "sampled Random Mouse cadence uses robust 20th/80th percentile speeds");
+            Assert(StepDefinitions.Get("randomMousePosition").Fields.Any(f => f.Key == "handSample"),
+                "Random Mouse Position exposes a stored hand-sample profile");
+            var sampledRandom = PlanExporter.Compile(new List<StepNode>
+            {
+                PexStep("randomMousePosition", new Dictionary<string, object?>
+                {
+                    ["x"] = 10, ["y"] = 20, ["w"] = 300, ["h"] = 200,
+                    ["handSample"] = encodedCadence,
+                }),
+            }, pexSettings, 1920, 1080, "f", "T");
+            Assert(sampledRandom.Text.Contains("|speed=500,800|"),
+                "sampled Random Mouse exports the user's measured speed band");
+            var sampledRandomWithLegacyDuration = PlanExporter.Compile(new List<StepNode>
+            {
+                PexStep("randomMousePosition", new Dictionary<string, object?>
+                {
+                    ["x"] = 10, ["y"] = 20, ["w"] = 300, ["h"] = 200,
+                    ["handSample"] = encodedCadence,
+                    ["moveTimeMin"] = 16, ["moveTimeMax"] = 159,
+                }),
+            }, pexSettings, 1920, 1080, "f", "T");
+            Assert(sampledRandomWithLegacyDuration.Text.Contains("|speed=500,800|")
+                   && !sampledRandomWithLegacyDuration.Text.Contains("|mt="),
+                "fresh Random Mouse hand sample overrides stale explicit duration fields");
+            var sampledCfg = HumanMouse.Config.FromProps(new Dictionary<string, object?>
+            {
+                ["handSample"] = encodedCadence,
+                ["moveTimeMin"] = 16, ["moveTimeMax"] = 159,
+            }, 300, 2000);
+            Assert(sampledCfg.SpeedMinPxPerSec == 500 && sampledCfg.SpeedMaxPxPerSec == 800
+                   && sampledCfg.MoveTimeMinMs == 0 && sampledCfg.MoveTimeMaxMs == 0,
+                "desktop Random Mouse uses sampled cadence as its single timing source");
+            var stepDialogSource = V27ReadSrc(Path.Combine("Views", "StepDialog.xaml.cs"));
+            var mainVmMouseSource = V27ReadSrc(Path.Combine("ViewModels", "MainViewModel.cs"));
+            Assert(stepDialogSource.Contains("randomMousePosition\" && f.Key == \"h\"")
+                   && stepDialogSource.Contains("SetIntText(\"handReplayTimeMin\"")
+                   && stepDialogSource.Contains("انتخاب مختصات روی صفحه")
+                   && mainVmMouseSource.Contains("PickPointOnScreen")
+                   && V27ReadSrc(Path.Combine("Views", "PointPickerWindow.xaml")).Contains("PointPickerWindow")
+                   && stepDialogSource.Contains("مقصد و هندسه همچنان تصادفی‌اند"),
+                "Random Mouse has sampling UI and Move to Position has a one-click point picker");
+
             // CLICK with swapped hold bounds
             var pexClick = PlanExporter.Compile(new List<StepNode>
             {
@@ -4094,15 +4205,71 @@ class TestRunner
         try
         {
             var modernWritten = ModernAutoCycleFirmwareBundle.Export(Path.Combine(modernTmp, "code.py"));
-            Assert(modernWritten.Count == 28
+            Assert(modernWritten.Count == 29
                    && File.Exists(Path.Combine(modernTmp, "plan_engine_parse.py"))
                    && File.Exists(Path.Combine(modernTmp, "plan_engine_human.py"))
                    && File.Exists(Path.Combine(modernTmp, "plan_engine_exec.py"))
-                   && File.ReadAllText(Path.Combine(modernTmp, "SHA256SUMS.txt")).Split('\n', StringSplitOptions.RemoveEmptyEntries).Length == 24,
+                   && File.Exists(Path.Combine(modernTmp, "plan_engine_parallel.py"))
+                   && File.ReadAllText(Path.Combine(modernTmp, "SHA256SUMS.txt")).Split('\n', StringSplitOptions.RemoveEmptyEntries).Length == 25,
                 "modern AutoCycle export writes the split-memory bundle and manifest");
-            Assert(File.ReadAllText(Path.Combine(modernTmp, "code.py")).Length < 40000
+            // Windows checkout expands LF to CRLF and the packaging workflow applies the
+            // verified calibration-heap overlay. Keep a bounded deferred entrypoint without
+            // pinning the old pre-overlay byte count.
+            Assert(File.ReadAllText(Path.Combine(modernTmp, "code.py")).Length < 48000
                    && File.ReadAllText(Path.Combine(modernTmp, "code.py")).Contains("DeferredPlanEngine"),
                 "modern AutoCycle export uses the small deferred-loading entrypoint");
+            var modernRuntime = File.ReadAllText(Path.Combine(modernTmp, "combined_guard_runtime.py"));
+            var modernExec = File.ReadAllText(Path.Combine(modernTmp, "plan_engine_exec.py"));
+            Assert(modernRuntime.Contains("mouse_mode = \"relative\"")
+                   && modernRuntime.Contains("MMOVE|%d,%d,rel,2")
+                   && modernExec.Contains("ctx.mmove_relative(dx, dy)")
+                   && File.ReadAllText(Path.Combine(modernTmp, "code.py")).Contains("relative-native-before-route"),
+                "modern AutoCycle export uses hostless relative mouse without a cursor bridge");
+            var modernCode = File.ReadAllText(Path.Combine(modernTmp, "code.py"));
+            Assert(modernCode.Contains("_LIGHT_ROUTE_COMMANDS")
+                   && modernCode.Contains("\"RAW\"")
+                   && modernCode.Contains("\"LOOPTIME\"")
+                   && modernCode.Contains("\"ENDLOOP\"")
+                   && modernCode.Contains("elif command == \"RAW\":")
+                   && modernCode.Contains("ctx.mmove_relative(int(fields[0]), int(fields[1]))"),
+                "looped hand-sampled RAW/MMOVE routes stay on the low-memory light-route executor");
+
+            var current = new PipelineWorkspace();
+            foreach (var tab in current.Tabs) tab.Steps.Clear();
+            current[PipelineKind.Desktop].Steps.Add(new StepNode
+            {
+                Type = "comment",
+                Props = new Dictionary<string, object?> { ["text"] = "CURRENT-MOUSE-TEST-ONLY" },
+            });
+            ModernAutoCycleFirmwareBundle.ExportCurrentProject(
+                Path.Combine(modernTmp, "code.py"), current, new AppSettings(),
+                1920, 1080, "test mous.amsj", "CURRENT-PROJECT-REGRESSION");
+            var currentDesktop = File.ReadAllText(Path.Combine(modernTmp, "desktop_steps.txt"));
+            var currentSnapshot = File.ReadAllText(Path.Combine(modernTmp, "autocycle.amsj"));
+            var currentEngine = File.ReadAllText(Path.Combine(modernTmp, "plan_engine.py"));
+            Assert(currentDesktop.Contains("CURRENT-MOUSE-TEST-ONLY")
+                   && currentSnapshot.Contains("CURRENT-MOUSE-TEST-ONLY")
+                   && !currentDesktop.Contains("Win+2", StringComparison.OrdinalIgnoreCase),
+                "modern one-click export replaces template routes and snapshot with the open project");
+            Assert(currentEngine.Length < 8000
+                   && currentEngine.Contains("from plan_engine_parse import")
+                   && currentEngine.Contains("def run_plan(plan, ctx):")
+                   && currentEngine.Contains("import plan_engine_exec as executor")
+                   && currentEngine.Contains("plan-lite-relative")
+                   && !currentEngine.Contains("Generated memory-fit core"),
+                "modern current-project export preserves the split-engine facade after legacy plan generation");
+            var manifestDesktop = File.ReadLines(Path.Combine(modernTmp, "SHA256SUMS.txt"))
+                .Single(line => line.EndsWith("  desktop_steps.txt", StringComparison.Ordinal));
+            var desktopHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                File.ReadAllBytes(Path.Combine(modernTmp, "desktop_steps.txt")))).ToLowerInvariant();
+            Assert(manifestDesktop == desktopHash + "  desktop_steps.txt",
+                "modern one-click export rebuilds SHA256SUMS after current routes are generated");
+            var manifestEngine = File.ReadLines(Path.Combine(modernTmp, "SHA256SUMS.txt"))
+                .Single(line => line.EndsWith("  plan_engine.py", StringComparison.Ordinal));
+            var engineHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                File.ReadAllBytes(Path.Combine(modernTmp, "plan_engine.py")))).ToLowerInvariant();
+            Assert(manifestEngine == engineHash + "  plan_engine.py",
+                "modern one-click export hashes the restored split-engine facade");
         }
         finally { if (Directory.Exists(modernTmp)) Directory.Delete(modernTmp, true); }
 

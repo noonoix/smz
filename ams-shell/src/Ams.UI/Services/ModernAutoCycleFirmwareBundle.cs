@@ -1,4 +1,6 @@
 using System.Security.Cryptography;
+using System.Text;
+using Ams.UI.Models;
 
 namespace Ams.UI.Services;
 
@@ -19,7 +21,7 @@ public static class ModernAutoCycleFirmwareBundle
         "guard_calibration_protocol.py", "guard_transition.py",
         "live_light_guard.py", "login_or_dc_steps.txt", "pico-calibration.json",
         "plan.txt", "plan_engine.py", "plan_engine_exec.py",
-        "plan_engine_human.py", "plan_engine_parse.py", "restart_steps.txt",
+        "plan_engine_human.py", "plan_engine_parallel.py", "plan_engine_parse.py", "restart_steps.txt",
         "resumable_steps.txt", "settings.toml", "targeted_steps.txt",
     };
 
@@ -32,14 +34,8 @@ public static class ModernAutoCycleFirmwareBundle
         var sourceManifest = Path.Combine(runtimeDir, "SHA256SUMS.txt");
         if (!File.Exists(sourceManifest))
             throw new IOException("Manifest Bundle مدرن پیدا نشد.");
-        var manifestNames = File.ReadAllLines(sourceManifest)
-            .Where(line => !string.IsNullOrWhiteSpace(line))
-            .Select(line => line.Split(new[] { "  " }, StringSplitOptions.None))
-            .Where(parts => parts.Length == 2)
-            .Select(parts => parts[1].Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        if (manifestNames.Length != 24)
+        var manifestNames = ReadManifestNames(sourceManifest);
+        if (manifestNames.Length != 25)
             throw new IOException("تعداد فایل‌های Manifest Bundle مدرن نامعتبر است.");
         foreach (var name in Files.Concat(manifestNames).Distinct(StringComparer.OrdinalIgnoreCase))
         {
@@ -67,10 +63,59 @@ public static class ModernAutoCycleFirmwareBundle
         foreach (var name in Files)
             File.Copy(Path.Combine(runtimeDir, name), Path.Combine(stagingDir, name), true);
 
-        // Rebuild the manifest from the bytes actually copied. Windows checkout
-        // may normalize README/text line endings, so the source manifest cannot
-        // be trusted byte-for-byte after a Windows build.
-        var rebuiltManifest = new List<string>(manifestNames.Length);
+        RebuildManifest(stagingDir, manifestNames);
+        return Files.Select(name => Path.Combine(stagingDir, name)).ToArray();
+    }
+
+    /// <summary>
+    /// Builds the executable modern runtime, then replaces every authorable plan/route and
+    /// the embedded project snapshot with the workspace currently open in Classroom Studio.
+    /// Runtime templates are never allowed to leak their sample project into a user export.
+    /// </summary>
+    public static IReadOnlyList<string> ExportCurrentProject(
+        string codePyPath, PipelineWorkspace workspace, AppSettings settings,
+        int screenW, int screenH, string sourceName, string machine)
+    {
+        var files = Export(codePyPath);
+        var stagingDir = Path.GetDirectoryName(Path.GetFullPath(codePyPath))
+            ?? throw new IOException("مسیر خروجی firmware نامعتبر است.");
+
+        PipelinePlanBundle.Export(Path.Combine(stagingDir, "plan.txt"), workspace, settings,
+            screenW, screenH, sourceName, machine);
+
+        // PipelinePlanBundle intentionally uses the legacy PlanExporter, which also writes
+        // its generated monolithic plan_engine.py next to the plans. That file must never
+        // replace the modern split-memory facade copied by Export(): doing so imports a
+        // ~30 KB source module on Pico and defeats the deferred parse/human/exec modules.
+        // Restore the small facade after all authorable routes have been generated.
+        File.Copy(
+            Path.Combine(AppContext.BaseDirectory, "portable-modern-runtime", "plan_engine.py"),
+            Path.Combine(stagingDir, "plan_engine.py"),
+            true);
+
+        File.WriteAllText(Path.Combine(stagingDir, "autocycle.amsj"),
+            PipelineWorkspaceSerializer.Serialize(workspace), new UTF8Encoding(false));
+
+        var manifestNames = ReadManifestNames(
+            Path.Combine(AppContext.BaseDirectory, "portable-modern-runtime", "SHA256SUMS.txt"));
+        RebuildManifest(stagingDir, manifestNames);
+        return files;
+    }
+
+    private static string[] ReadManifestNames(string sourceManifest)
+        => File.ReadAllLines(sourceManifest)
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .Select(line => line.Split(new[] { "  " }, StringSplitOptions.None))
+            .Where(parts => parts.Length == 2)
+            .Select(parts => parts[1].Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+    private static void RebuildManifest(string stagingDir, IReadOnlyList<string> manifestNames)
+    {
+        // Rebuild from the final bytes after the current project has replaced template routes.
+        // Windows checkout may also normalize README/text line endings.
+        var rebuiltManifest = new List<string>(manifestNames.Count);
         foreach (var name in manifestNames)
         {
             var path = Path.Combine(stagingDir, name);
@@ -80,7 +125,5 @@ public static class ModernAutoCycleFirmwareBundle
         }
         File.WriteAllText(Path.Combine(stagingDir, "SHA256SUMS.txt"),
             string.Join(Environment.NewLine, rebuiltManifest) + Environment.NewLine);
-
-        return Files.Select(name => Path.Combine(stagingDir, name)).ToArray();
     }
 }

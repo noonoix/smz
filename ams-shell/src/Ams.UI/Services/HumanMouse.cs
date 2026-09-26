@@ -110,6 +110,19 @@ public static class HumanMouse
             int mtMin = Math.Max(0, PropEx.GetInt(p, "moveTimeMin", 0));
             int mtMax = Math.Max(0, PropEx.GetInt(p, "moveTimeMax", 0));
             if (mtMax < mtMin) (mtMin, mtMax) = (mtMax, mtMin);
+            int effectiveSpeedMin = speedMin, effectiveSpeedMax = speedMax;
+            bool hasSampledCadence = false;
+            if (!gentleDefaults
+                && HandMovementSample.TryDecode(PropEx.GetString(p, "handSample"), out var sample)
+                && HandMovementSample.TryGetSpeedRange(sample, out var sampledMin, out var sampledMax))
+            {
+                effectiveSpeedMin = sampledMin;
+                effectiveSpeedMax = sampledMax;
+                hasSampledCadence = true;
+            }
+            // A fresh hand sample is the authoritative cadence source for
+            // Random Mouse. Old explicit duration fields must not override it.
+            if (hasSampledCadence) mtMin = mtMax = 0;
 
             return new Config
             {
@@ -127,8 +140,8 @@ public static class HumanMouse
                 OvershootChancePct = Math.Clamp(PropEx.GetInt(p, "overshootChance", gentleDefaults ? 12 : 15), 0, 100),
                 CurveMinPct = curveMin,
                 CurveMaxPct = curveMax,
-                SpeedMinPxPerSec = speedMin,
-                SpeedMaxPxPerSec = speedMax,
+                SpeedMinPxPerSec = effectiveSpeedMin,
+                SpeedMaxPxPerSec = effectiveSpeedMax,
                 MoveTimeMinMs = mtMin,
                 MoveTimeMaxMs = mtMax,
             };

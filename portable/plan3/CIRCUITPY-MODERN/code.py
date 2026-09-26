@@ -107,7 +107,8 @@ runtime.parse_calibration_set = parse_calibration_set
 
 # Classroom Studio's complete 21-file export hashes every payload except the
 # hash manifest itself. Extend the verifier inventory before loading the bundle.
-for _name in ("pico-calibration.json", "README-FLASH.md", "plan_engine_parse.py", "plan_engine_human.py", "plan_engine_exec.py"):
+for _name in ("pico-calibration.json", "README-FLASH.md", "plan_engine_parse.py",
+              "plan_engine_human.py", "plan_engine_exec.py", "plan_engine_parallel.py"):
     if _name not in _guard_bundle.HASHED_BUNDLE_FILES:
         _guard_bundle.HASHED_BUNDLE_FILES += (_name,)
 runtime.HASHED_BUNDLE_FILES = _guard_bundle.HASHED_BUNDLE_FILES
@@ -301,6 +302,7 @@ _GUARD_PAUSE_PATTERN = ((523, 180), (0, 100), (523, 180), (0, 100), (523, 340))
 _GUARD_RESUME_PATTERN = ((659, 150), (784, 150), (988, 150), (784, 150), (988, 300))
 _CAL_ENTER_PATTERN = ((523, 100), (659, 120), (784, 180))
 _CAL_EXIT_PATTERN = ((784, 100), (659, 120), (523, 220))
+_CAL_SAVE_ERROR_PATTERN = ((220, 140), (0, 80), (220, 260))
 
 def _cal_beep(self, frequency, duration_ms):
     tone = None
@@ -331,6 +333,9 @@ def _cal_save_success_tone(self):
     self._cal_beep(880, 90)
     runtime.time.sleep(.05)
     self._cal_beep(1320, 180)
+
+def _cal_save_error_tone(self):
+    self._guard_pattern(_CAL_SAVE_ERROR_PATTERN)
 
 def _cal_complete_melody(self):
     for note in _CAL_NOTES:
@@ -401,6 +406,7 @@ def _immediate_audible_start(self):
     self.blue_start_consumed = True
 
 def _enter_calibration_from_pending_start(self):
+    _prepare_calibration_heap(self)
     # The user held the same blue press that initially cued Start. Cancel the
     # not-yet-routable start state and enter calibration directly, without
     # playing a Stop cue or waiting on optional arm cleanup.
@@ -430,7 +436,35 @@ _original_cal_tick = runtime.Combined.cal_tick
 _original_save_cal = runtime.Combined.save_cal
 _original_yellow_action = runtime.Combined.yellow_action
 
+_PLAN_MODULES = ("plan_engine_exec", "plan_engine_human", "plan_engine_parallel", "plan_engine_parse")
+
+def _release_plan_heap(self, emit_cal=False):
+    # Complex routes lazily import the split plan engine. CircuitPython keeps
+    # those modules cached after Stop/PlanAbort. Return the deferred proxy to
+    # its cold state after every complex route so a second Start cannot retain
+    # the prior parsed Game tree and enter the next parse with ~1 KB free.
+    proxy = runtime.plan_engine
+    try:
+        if hasattr(proxy, "module"):
+            proxy.module = None
+    except Exception:
+        pass
+    for name in _PLAN_MODULES:
+        sys.modules.pop(name, None)
+    sys.modules["plan_engine"] = proxy
+    gc.collect()
+    if emit_cal:
+        try:
+            self.emit("EVT|DEBUG|CAL|heap-ready|free=%d" % gc.mem_free())
+        except Exception:
+            pass
+
+def _prepare_calibration_heap(self):
+    # Calibration also needs a contiguous block for its atomic JSON write.
+    _release_plan_heap(self, True)
+
 def _audible_start_cal(self):
+    _prepare_calibration_heap(self)
     _original_start_cal(self)
     if self.calibrating:
         self.calibration_enter_tone()
@@ -445,6 +479,7 @@ def _audible_end_cal(self):
 
 def _audible_next_cal(self):
     previous = self.stage
+    blocked_unsaved = (self.calibrating and isinstance(self.result, dict) and not self.saved)
     can_wrap = (self.calibrating and
         self.stage == len(runtime.PROFILES) - 1 and
         self.result != "sampling" and
@@ -459,11 +494,19 @@ def _audible_next_cal(self):
         _original_next_cal(self)
     if self.calibrating and self.stage != previous:
         self.cal_position_tone()
+    elif blocked_unsaved and self.stage == previous:
+        # Short blue cannot advance past a rejected/unsaved profile. Make that
+        # guard audible instead of looking like a dead button.
+        self.cal_save_error_tone()
 
 def _audible_cal_tick(self):
     was_sampling = self.result == "sampling"
     _original_cal_tick(self)
     if was_sampling and isinstance(self.result, dict):
+        # The raw float samples are no longer needed once center/spread exist.
+        # Drop them before the atomic JSON/manifest write to reduce heap pressure.
+        self.samples = []
+        _prepare_calibration_heap(self)
         # Sampling completion is silent; save_cal emits the single success cue.
         self.save_cal()
 
@@ -476,6 +519,11 @@ def _audible_save_cal(self):
             self.cal_complete_melody()
         else:
             self.cal_save_success_tone()
+    elif had_pending_result and not self.saved and self.last_cal_error:
+        # A rejected overlap or storage failure must be audible. Previously
+        # the user heard nothing and the UNSAVED guard made both short buttons
+        # appear dead even though the runtime was deliberately holding stage.
+        self.cal_save_error_tone()
 
 def _repeatable_yellow_action(self):
     # Handle both first samples and same-position retries explicitly. A saved
@@ -485,6 +533,14 @@ def _repeatable_yellow_action(self):
         was_paused = self.controls.paused
         _original_yellow_action(self)
         if self.controls.running and self.controls.paused != was_paused:
+            if self.controls.paused:
+                # Pause can be requested from inside Controls.sleep() while a
+                # KEY/COMBO hold is active. Release immediately instead of
+                # leaving Windows to auto-repeat the held key until Resume.
+                try:
+                    self.keyboard.release_all()
+                except Exception:
+                    pass
             self.guard_pause_tone() if self.controls.paused else self.guard_resume_tone()
             _debug_event(self, "GP3", "pause" if self.controls.paused else "resume", persist=True)
         return
@@ -492,6 +548,19 @@ def _repeatable_yellow_action(self):
         _original_yellow_action(self)
         return
     if isinstance(self.result, dict) and not self.saved:
+        if (self.last_cal_error or "").startswith("OVERLAP:"):
+            # Re-saving the identical rejected sample can never fix an overlap.
+            # A yellow press therefore starts a fresh five-second sample on the
+            # same stage; short blue remains blocked until a valid save, while
+            # long blue can still exit Calibration.
+            self.samples = []
+            self.sample_started = runtime.time.monotonic()
+            self.result = "sampling"
+            self.last_cal_error = None
+            self.emit("EVT|CAL|mode=started|stage=%d|id=%s|seconds=5|saved=%d|retry=1" %
+                (self.stage + 1, runtime.PROFILES[self.stage], len(self.saved_ids)))
+            self.cal_record_start_tone()
+            return
         self.save_cal()
         return
     retry = 1 if self.saved and isinstance(self.result, dict) else 0
@@ -567,24 +636,43 @@ def _diagnostic_beep(ctx, frequency, duration):
 runtime.PlanContext.setres = _diagnostic_setres
 runtime.PlanContext.beep = _diagnostic_beep
 
-_LIGHT_ROUTE_COMMANDS = {"PLAN", "SCREEN", "SPEED", "BEEP", "DELAY", "KEY", "KDOWN", "KUP"}
+_LIGHT_ROUTE_COMMANDS = {
+    "PLAN", "SCREEN", "SPEED", "BEEP", "DELAY", "KEY", "KDOWN", "KUP", "RAW",
+    "HANDPATH", "LOOP", "LOOPTIME", "ENDLOOP",
+}
 
 def _light_route_lines(text):
     commands = []
+    loop_depth = 0
     for raw in text.splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
         parts = line.split("|", 1)
-        if len(parts) != 2 or parts[0].upper() not in _LIGHT_ROUTE_COMMANDS:
+        command = parts[0].upper()
+        args = parts[1].strip() if len(parts) == 2 else ""
+        if command not in _LIGHT_ROUTE_COMMANDS:
             return None
-        commands.append((parts[0].upper(), parts[1].strip()))
-    return commands
+        if command in ("LOOP", "LOOPTIME"):
+            if not args:
+                return None
+            loop_depth += 1
+        elif command == "ENDLOOP":
+            if args or loop_depth <= 0:
+                return None
+            loop_depth -= 1
+        elif len(parts) != 2:
+            return None
+        commands.append((command, args))
+    return commands if loop_depth == 0 else None
 
 def _run_light_route(ctx, commands):
-    for command, args in commands:
+    index = 0
+    loops = []  # [LOOP/LOOPTIME command index, remaining count, deadline]
+    while index < len(commands):
+        command, args = commands[index]
         if command == "PLAN":
-            continue
+            pass
         if command == "SCREEN":
             fields = args.replace(",", " ").split()
             if len(fields) != 2:
@@ -593,7 +681,7 @@ def _run_light_route(ctx, commands):
             _debug_event(ctx.r, "STEP", "SCREEN metadata %dx%d" % (ctx.screen_w, ctx.screen_h), persist=True)
         elif command == "SPEED":
             # Speed is route metadata; BEEP/DELAY do not need the Arm.
-            continue
+            pass
         elif command == "DELAY":
             fields = args.replace(",", " ").split()
             if len(fields) == 1:
@@ -623,11 +711,115 @@ def _run_light_route(ctx, commands):
             ctx.kdown(int(args))
         elif command == "KUP":
             ctx.kup(int(args))
+        elif command == "RAW":
+            # Hand-sampled mouse paths are already portable Arm commands
+            # (MMOVE|dx,dy,rel,2). They must use the asynchronous move ledger:
+            # Arm.send() cannot wait for MMOVE because Arm.pump() deliberately
+            # consumes OK|MMOVE to decrement pending back-pressure.
+            if args.startswith("MMOVE|"):
+                fields = args[6:].split(",")
+                if len(fields) != 4 or fields[2].strip().lower() != "rel":
+                    raise ValueError("light RAW MMOVE needs dx,dy,rel,human")
+                ctx.mmove_relative(int(fields[0]), int(fields[1]))
+            elif not args or ctx.raw(args) is None:
+                raise RuntimeError("RAW route command aborted")
+        elif command == "HANDPATH":
+            # Bounded chunks keep splitlines() memory-safe. Each chunk receives
+            # a proportional duration range and is scaled without a segment list.
+            payload = args
+            timing = None
+            if args.startswith("mt="):
+                split_at = args.find("|")
+                if split_at < 0:
+                    raise ValueError("HANDPATH mt needs payload")
+                pair = args[3:split_at].split(",", 1)
+                if len(pair) != 2:
+                    raise ValueError("HANDPATH mt needs min,max")
+                timing = (int(pair[0]), int(pair[1]))
+                if timing[1] < timing[0]:
+                    timing = (timing[1], timing[0])
+                if timing[0] < 1 or timing[1] > 60000:
+                    raise ValueError("HANDPATH mt out of range")
+                payload = args[split_at + 1:]
+            source_total = 0
+            scan = 0
+            while scan < len(payload):
+                stop = payload.find(";", scan)
+                if stop < 0:
+                    stop = len(payload)
+                comma = payload.find(",", scan, stop)
+                if comma < 0:
+                    raise ValueError("HANDPATH needs delay,dx,dy segments")
+                source_total += int(payload[scan:comma])
+                scan = stop + 1
+            target_total = runtime.random.randint(timing[0], timing[1]) if timing else source_total
+            source_elapsed = 0
+            target_elapsed = 0
+            start = 0
+            count = 0
+            size = len(payload)
+            while start < size:
+                end = payload.find(";", start)
+                if end < 0:
+                    end = size
+                token = payload[start:end]
+                fields = token.split(",", 2)
+                if len(fields) != 3:
+                    raise ValueError("HANDPATH needs delay,dx,dy segments")
+                delay_ms = int(fields[0])
+                dx = int(fields[1])
+                dy = int(fields[2])
+                if delay_ms < 1 or delay_ms > 60000 or abs(dx) > 8192 or abs(dy) > 8192:
+                    raise ValueError("HANDPATH segment out of range")
+                source_elapsed += delay_ms
+                target_due = (source_elapsed * target_total + source_total // 2) // max(1, source_total)
+                scaled_delay = max(0, target_due - target_elapsed)
+                target_elapsed = target_due
+                if not ctx.sleep_ms(scaled_delay):
+                    raise RuntimeError("route aborted")
+                if dx or dy:
+                    ctx.mmove_relative(dx, dy)
+                count += 1
+                if count > 2000:
+                    raise ValueError("HANDPATH has too many segments")
+                if not (count & 31):
+                    gc.collect()
+                start = end + 1
+            if not count:
+                raise ValueError("HANDPATH is empty")
+        elif command == "LOOP":
+            count = int(args)
+            if count < 0:
+                raise ValueError("LOOP needs a nonnegative count")
+            loops.append([index, count, None])
+        elif command == "LOOPTIME":
+            seconds = float(args)
+            if seconds <= 0:
+                raise ValueError("LOOPTIME needs positive seconds")
+            loops.append([index, 0, ctx.now() + seconds])
+        elif command == "ENDLOOP":
+            if not loops:
+                raise ValueError("ENDLOOP without LOOP")
+            top = loops[-1]
+            if top[2] is not None:
+                if ctx.now() < top[2]:
+                    index = top[0]
+                else:
+                    loops.pop()
+            elif top[1] == 0:
+                index = top[0]
+            else:
+                top[1] -= 1
+                if top[1] > 0:
+                    index = top[0]
+                else:
+                    loops.pop()
         elif command == "BEEP":
             fields = args.replace(",", " ").split()
             if len(fields) != 2:
                 raise ValueError("BEEP needs frequency,duration")
             ctx.beep(int(fields[0]), int(float(fields[1])))
+        index += 1
 
 def _diagnostic_route(self, decision):
     if not decision.get("execute"):
@@ -647,6 +839,10 @@ def _diagnostic_route(self, decision):
     commands = _light_route_lines(text)
     try:
         if commands is not None:
+            # Commands contain bounded line payloads; release the full route
+            # copy before replay so dense samples do not consume heap twice.
+            del text
+            gc.collect()
             self.emit("EVT|DEBUG|ROUTE|stage=light-route|free=%d" % gc.mem_free())
             # Keep simple Pico-only routes off the large plan_engine import.
             _run_light_route(runtime.PlanContext(self), commands)
@@ -663,17 +859,33 @@ def _diagnostic_route(self, decision):
             except MemoryError:
                 self.emit("EVT|DEBUG|ROUTE|stage=plan-parse-memoryerror")
                 raise
+            # The parser creates many short-lived strings and containers. The
+            # source text is no longer needed once route_plan exists; reclaim
+            # both before the first RMOUSE needs working heap.
+            del text
+            gc.collect()
             self.emit("EVT|DEBUG|ROUTE|stage=after-plan-parse|free=%d" % gc.mem_free())
             route_ctx = runtime.PlanContext(self)
-            origin = route_ctx.get_mouse_pos()
-            if origin is None:
-                self.emit("EVT|DEBUG|CURSOR|plan-origin=unknown")
+            if getattr(route_ctx, "mouse_mode", "") == "relative":
+                self.emit("EVT|DEBUG|CURSOR|plan-mode=relative-native")
             else:
-                self.emit("EVT|DEBUG|CURSOR|plan-origin=%d,%d" % (origin[0], origin[1]))
+                origin = route_ctx.get_mouse_pos()
+                if origin is None:
+                    self.emit("EVT|DEBUG|CURSOR|plan-origin=unknown")
+                else:
+                    self.emit("EVT|DEBUG|CURSOR|plan-origin=%d,%d" % (origin[0], origin[1]))
+            aborted = False
             try:
                 runtime.plan_engine.run_plan(route_plan, route_ctx)
+            except runtime.plan_engine.PlanAbort:
+                # GP4 Stop is normal control flow, not a Guard failure. Catch
+                # it here so no traceback retains the full parsed Game tree.
+                aborted = True
             finally:
                 del route_plan
+                del route_ctx
+            if aborted:
+                return False
         self.arm.flush()
         return True
     finally:
@@ -683,6 +895,8 @@ def _diagnostic_route(self, decision):
             self.arm.release(False)
         except Exception as cleanup:
             _debug_event(self, "CLEANUP", "mouse " + type(cleanup).__name__)
+        if commands is None:
+            _release_plan_heap(self)
         try:
             self.arm.flush()
         except Exception as cleanup:
@@ -715,10 +929,13 @@ def _audible_loop(self):
                     if decision.get("execute"):
                         route_name = decision.get("route")
                         _debug_event(self, "ROUTE", "start %s lux=%.1f" % (route_name, lux), persist=True)
-                        if not _apply_pending_cursor(self, force=True):
-                            _debug_event(self, "CURSOR", "sync-failed-before-route", persist=True)
-                            raise RuntimeError("ARM cursor origin not acknowledged")
-                        _debug_event(self, "CURSOR", "sync-ok-before-route", persist=True)
+                        if getattr(runtime.PlanContext, "mouse_mode", "") == "relative":
+                            _debug_event(self, "CURSOR", "relative-native-before-route", persist=True)
+                        else:
+                            if not _apply_pending_cursor(self, force=True):
+                                _debug_event(self, "CURSOR", "sync-failed-before-route", persist=True)
+                                raise RuntimeError("ARM cursor origin not acknowledged")
+                            _debug_event(self, "CURSOR", "sync-ok-before-route", persist=True)
                         completed = self.route(decision)
                         if completed is False:
                             _debug_event(self, "ROUTE", "aborted %s" % route_name, persist=True)
@@ -886,6 +1103,7 @@ runtime.Combined.cal_position_tone = _cal_position_tone
 runtime.Combined.cal_record_start_tone = _cal_record_start_tone
 runtime.Combined.cal_stage_complete_tone = _cal_stage_complete_tone
 runtime.Combined.cal_save_success_tone = _cal_save_success_tone
+runtime.Combined.cal_save_error_tone = _cal_save_error_tone
 runtime.Combined.cal_complete_melody = _cal_complete_melody
 runtime.Combined._guard_pattern = _guard_pattern
 runtime.Combined.guard_start_tone = _guard_start_tone

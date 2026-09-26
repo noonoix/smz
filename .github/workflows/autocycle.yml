@@ -6,6 +6,7 @@ on:
     paths:
       - 'ams-shell/**'
       - 'firmware/arm26/**'
+      - 'firmware/arm28/**'
       - 'firmware/autocycle-hostusb-v5/**'
       - 'portable/plan3/**'
       - 'tests/LightTelemetryTests/**'
@@ -16,6 +17,32 @@ permissions:
   pull-requests: write
 
 jobs:
+  arm28-compile:
+    name: modern-autocycle / ARM 2.8 compile
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Install AVR core
+        shell: bash
+        run: |
+          set -euo pipefail
+          arduino-cli core update-index
+          arduino-cli core install arduino:avr
+      - name: Compile Pro Micro firmware with a non-secret test key
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/ams_board28
+          cp firmware/arm28/ams_board28.ino \
+             firmware/arm28/ams_board26_impl.h \
+             firmware/arm28/human_mouse_v3.h \
+             firmware/arm28/portable_relative_mouse.h \
+             /tmp/ams_board28/
+          cp firmware/arm28/ams_key.example.h /tmp/ams_board28/ams_key.h
+          arduino-cli compile --fqbn arduino:avr:leonardo /tmp/ams_board28
+
   portable-contracts:
     name: modern-autocycle / portable contracts
     runs-on: ubuntu-latest
@@ -30,6 +57,12 @@ jobs:
         run: |
           set -euo pipefail
           {
+            # Modern AutoCycle contracts historically import these helpers from
+            # CIRCUITPY. Overlay them only in the CI checkout; Golden-100 and
+            # the flashable Golden inventory remain byte-for-byte untouched.
+            for name in plan_cycle.py cycle_runtime.py restart_windows.py auto_resume_boot.py resume_essentials_runtime.py recovery_runtime.py; do
+              cp "portable/plan3/CIRCUITPY-SPLIT/$name" "portable/plan3/CIRCUITPY/$name"
+            done
             python -m py_compile portable/plan3/CIRCUITPY/*.py
             python -m py_compile portable/plan3/CIRCUITPY-MODERN/*.py
             python -m py_compile portable/plan3/CIRCUITPY-SPLIT/*.py

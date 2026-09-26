@@ -25,18 +25,15 @@ internal static class AutoCycleExportUiBootstrap
         window.SetValue(InstalledProperty, true);
 
         var panel = AutoCycleUiKit.EnsureExportCard(body);
-        var button = AutoCycleUiKit.Action("۱  ·  ساخت و کپی کامل به درایو Pico", true);
+        // One authoritative action: current tabs + modern low-memory runtime.
+        // The Golden-100 command remains available to CI/legacy recovery but is not a
+        // user-facing exporter because it intentionally contains a frozen sample project.
+        var button = AutoCycleUiKit.Action("ساخت و کپی کامل پروژهٔ فعلی به درایو Pico", true);
         button.Tag = AutoCycleUiKit.PlanStepTag;
-        button.ToolTip = "Plan، Firmware و فایل‌های خروجی چرخه را آماده می‌کند و code.py را در آخر روی CIRCUITPY کپی می‌کند.";
+        button.ToolTip = "تمام تب‌های پروژهٔ باز را به Route تبدیل می‌کند، Bundle مدرن را می‌سازد و code.py را در آخر روی CIRCUITPY کپی می‌کند.";
         button.SetBinding(Button.CommandProperty,
-            new Binding(nameof(MainViewModel.ExportAutoCycleCompleteCommand)));
-        panel.Children.Add(button);
-        var modern = AutoCycleUiKit.Action("۲  ·  ساخت و کپی Bundle مدرن حافظه‌ای", false);
-        modern.Tag = AutoCycleUiKit.FirmwareStepTag;
-        modern.ToolTip = "نسخهٔ split-memory فعلی را با plan_engine تکه‌ای و مبدأ واقعی موس کپی می‌کند؛ Golden 100 را تغییر نمی‌دهد.";
-        modern.SetBinding(Button.CommandProperty,
             new Binding(nameof(MainViewModel.ExportAutoCycleModernCommand)));
-        panel.Children.Add(modern);
+        panel.Children.Add(button);
         AutoCycleUiKit.ReorderExportSteps(panel);
         AutoCycleUiKit.Reorder(body);
     }

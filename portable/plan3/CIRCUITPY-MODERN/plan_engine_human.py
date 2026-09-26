@@ -274,6 +274,62 @@ _DEFAULT_CFG = dict(before_min=120, before_max=450, after_min=150, after_max=600
                     speed_min=0, speed_max=2000, mt_min=0, mt_max=0)
 
 
+def relative_mouse_events(pos, tx, ty, c, pauses):
+    """Yield a bounded curve; ARM 2.8.1 expands deltas to <=3 px reports."""
+    sx, sy = pos[0], pos[1]
+    dx, dy = tx - sx, ty - sy
+    span = max(abs(dx), abs(dy))
+    cmin, cmax = c["curve_min"], c["curve_max"]
+    if cmax < cmin:
+        cmin, cmax = cmax, cmin
+    amp = min(span // 3, (span * rand_range(int(cmin), int(cmax))) // 100)
+    if _below(2) == 0:
+        amp = -amp
+    denom = max(1, span)
+    pxoff, pyoff = (-dy * amp) // denom, (dx * amp) // denom
+    if c["mt_max"] > 0:
+        total = rand_range(c["mt_min"], c["mt_max"])
+    elif c["speed_max"] > 0:
+        speed = rand_range(max(1, c["speed_min"]),
+                           max(max(1, c["speed_min"]), c["speed_max"]))
+        path = max(abs(dx), abs(dy)) + min(abs(dx), abs(dy)) // 2
+        total = max(0, (path * 1000) // speed - path)
+    else:
+        total = 0
+    # A 32-point path produced visible 40–55 ms burst gaps at slower sampled
+    # speeds: ARM emitted its micro-steps, then waited for the next coarse Pico
+    # point. Keep spatial control points, but add enough timing points to target
+    # an ~8 ms cadence. This is a generator, so 128 points do not consume a
+    # dense list in Pico RAM.
+    spatial = max(8, (span + 11) // 12)
+    timed = (total + 7) // 8 if total > 0 else spatial
+    segments = max(8, min(128, max(spatial, timed)))
+    base, extra = total // segments, total % segments
+    mid, mid_at = pauses.mid_pause(c), 1 + _below(max(1, segments - 1))
+    if c["before_max"] > 0:
+        yield ("wait", rand_range(c["before_min"], c["before_max"]))
+    px, py = sx, sy
+    for step in range(1, segments + 1):
+        t = (step * 1024) // segments
+        ease = (t * t * (3072 - 2 * t)) // 1048576
+        bow = (4 * t * (1024 - t)) // 1024
+        nx = sx + (dx * ease + pxoff * bow) // 1024
+        ny = sy + (dy * ease + pyoff * bow) // 1024
+        if step == segments:
+            nx, ny = tx, ty
+        delay = base + (1 if step <= extra else 0)
+        if mid and step == mid_at:
+            delay += mid
+        yield ("move", delay, nx - px, ny - py)
+        px, py = nx, ny
+        pos[0], pos[1] = px, py
+    if c["after_max"] > 0:
+        yield ("wait", rand_range(c["after_min"], c["after_max"]))
+    long_pause = pauses.roll_long(c)
+    if long_pause:
+        yield ("wait", long_pause)
+
+
 def plan_move(sx, sy, tx, ty, c, pauses, w, h):
     """Full PlanMove port. Returns dict(before, after, long, pts=[[x,y,delayMs]...])."""
     tx = int(_clamp(tx, 0, max(0, w - 1)))
@@ -382,7 +438,8 @@ def _split_punct(s):
 def plan_typing(text, p):
     """Returns [("KTEXT",hmin,hmax,chunk) | ("DLY",ms) | ("KCOMBO",vk), ...].
     p keys: h,w (ms ranges), wp (word pause chance %), p (punct pause range),
-    think ((chance,(mn,mx))), typo ((mn,mx) cadence, 0/0=off)."""
+    think ((chance,(mn,mx))), typos ((mn,mx) corrected slips per TYPE).
+    Legacy typo keeps its old every-N-words cadence."""
     hmin, hmax = p.get("h", (80, 220))
     wmin, wmax = p.get("w", (0, 0))
     wp = _clamp(p.get("wp", 100), 0, 100)
@@ -390,15 +447,41 @@ def plan_typing(text, p):
     think_chance, think_range = p.get("think", (0, (800, 2200)))
     think_chance = _clamp(think_chance, 0, 100)
     think_min, think_max = think_range
+    typo_count_min, typo_count_max = p.get("typos", (0, 0))
+    if typo_count_max < typo_count_min:
+        typo_count_min, typo_count_max = typo_count_max, typo_count_min
+    typo_count_min = max(0, typo_count_min)
+    typo_count_max = max(0, typo_count_max)
+    typo_count_mode = typo_count_max > 0
     typo_min, typo_max = p.get("typo", (0, 0))
-    typo_cadence = typo_max > 0
+    typo_cadence = not typo_count_mode and typo_max > 0
     next_typo_at = max(1, rand_range(typo_min, typo_max)) if typo_cadence else -1
     words_since_typo = 0
-    word_mode = wmax > 0 or pmax > 0 or think_chance > 0 or typo_cadence
+    word_mode = wmax > 0 or pmax > 0 or think_chance > 0 or typo_count_mode or typo_cadence
 
     cmds = []
     lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    line_words = [[wd for wd in line.split() if wd] for line in lines]
     pending = []
+    typo_positions = {}
+
+    # Pick the requested number once per TYPE execution. Positions are unique, so
+    # a short one-word password can still receive several realistic corrected slips.
+    if typo_count_mode:
+        candidates = []
+        for li, words in enumerate(line_words):
+            for wi, word in enumerate(words):
+                for pos, ch in enumerate(word):
+                    if ch.lower() in "1234567890qwertyuiopasdfghjklzxcvbnm":
+                        candidates.append((li, wi, pos))
+        wanted = min(len(candidates), rand_range(typo_count_min, typo_count_max))
+        for i in range(wanted):
+            j = i + _below(len(candidates) - i)
+            candidates[i], candidates[j] = candidates[j], candidates[i]
+            li, wi, pos = candidates[i]
+            typo_positions.setdefault((li, wi), []).append(pos)
+        for positions in typo_positions.values():
+            positions.sort()
 
     def flush():
         s = "".join(pending)
@@ -408,23 +491,40 @@ def plan_typing(text, p):
 
     for li, line in enumerate(lines):
         if word_mode:
-            words = [wd for wd in line.split() if wd]
+            words = line_words[li]
             for wi, word in enumerate(words):
                 tail = " " if wi < len(words) - 1 else ""
                 typed = word + tail
-                typo_due = typo_cadence and (words_since_typo := words_since_typo + 1) >= next_typo_at
-                if typo_due and 2 <= len(word) <= 60:
-                    pos = 1 + _below(len(word) - 1)      # never the first char
-                    wrong = _qwerty_neighbor(word[pos])
-                    if wrong is not None:
+                selected = typo_positions.get((li, wi), ())
+                if selected:
+                    start = 0
+                    for pos in selected:
+                        wrong = _qwerty_neighbor(word[pos])
+                        if wrong is None:
+                            continue
                         flush()
-                        cmds.append(("KTEXT", hmin, hmax, word[:pos] + wrong))
+                        slip = word[start:pos] + wrong
+                        for ci in range(0, len(slip), 60):
+                            cmds.append(("KTEXT", hmin, hmax, slip[ci:ci + 60]))
                         cmds.append(("DLY", rand_range(max(hmax, 120), hmax * 2 + 200)))
                         cmds.append(("KCOMBO", 8))       # Backspace
                         cmds.append(("DLY", rand_range(hmin, hmax)))
-                        typed = word[pos:] + tail
-                        words_since_typo = 0
-                        next_typo_at = max(1, rand_range(typo_min, typo_max))
+                        start = pos                      # retype the correct char next
+                    typed = word[start:] + tail
+                else:
+                    typo_due = typo_cadence and (words_since_typo := words_since_typo + 1) >= next_typo_at
+                    if typo_due and 2 <= len(word) <= 60:
+                        pos = 1 + _below(len(word) - 1)  # legacy cadence never used first char
+                        wrong = _qwerty_neighbor(word[pos])
+                        if wrong is not None:
+                            flush()
+                            cmds.append(("KTEXT", hmin, hmax, word[:pos] + wrong))
+                            cmds.append(("DLY", rand_range(max(hmax, 120), hmax * 2 + 200)))
+                            cmds.append(("KCOMBO", 8))   # Backspace
+                            cmds.append(("DLY", rand_range(hmin, hmax)))
+                            typed = word[pos:] + tail
+                            words_since_typo = 0
+                            next_typo_at = max(1, rand_range(typo_min, typo_max))
                 segs = _split_punct(typed) if pmax > 0 else [typed]
                 for si, seg in enumerate(segs):
                     pending.append(seg)

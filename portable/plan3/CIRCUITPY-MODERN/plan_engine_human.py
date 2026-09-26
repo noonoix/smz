@@ -274,6 +274,55 @@ _DEFAULT_CFG = dict(before_min=120, before_max=450, after_min=150, after_max=600
                     speed_min=0, speed_max=2000, mt_min=0, mt_max=0)
 
 
+def relative_mouse_events(pos, tx, ty, c, pauses):
+    """Yield a bounded curve; ARM 2.8.1 expands deltas to <=3 px reports."""
+    sx, sy = pos[0], pos[1]
+    dx, dy = tx - sx, ty - sy
+    span = max(abs(dx), abs(dy))
+    segments = max(8, min(32, (span + 11) // 12))
+    cmin, cmax = c["curve_min"], c["curve_max"]
+    if cmax < cmin:
+        cmin, cmax = cmax, cmin
+    amp = min(span // 3, (span * rand_range(int(cmin), int(cmax))) // 100)
+    if _below(2) == 0:
+        amp = -amp
+    denom = max(1, span)
+    pxoff, pyoff = (-dy * amp) // denom, (dx * amp) // denom
+    if c["mt_max"] > 0:
+        total = rand_range(c["mt_min"], c["mt_max"])
+    elif c["speed_max"] > 0:
+        speed = rand_range(max(1, c["speed_min"]),
+                           max(max(1, c["speed_min"]), c["speed_max"]))
+        path = max(abs(dx), abs(dy)) + min(abs(dx), abs(dy)) // 2
+        total = max(0, (path * 1000) // speed - path)
+    else:
+        total = 0
+    base, extra = total // segments, total % segments
+    mid, mid_at = pauses.mid_pause(c), 1 + _below(max(1, segments - 1))
+    if c["before_max"] > 0:
+        yield ("wait", rand_range(c["before_min"], c["before_max"]))
+    px, py = sx, sy
+    for step in range(1, segments + 1):
+        t = (step * 1024) // segments
+        ease = (t * t * (3072 - 2 * t)) // 1048576
+        bow = (4 * t * (1024 - t)) // 1024
+        nx = sx + (dx * ease + pxoff * bow) // 1024
+        ny = sy + (dy * ease + pyoff * bow) // 1024
+        if step == segments:
+            nx, ny = tx, ty
+        delay = base + (1 if step <= extra else 0)
+        if mid and step == mid_at:
+            delay += mid
+        yield ("move", delay, nx - px, ny - py)
+        px, py = nx, ny
+        pos[0], pos[1] = px, py
+    if c["after_max"] > 0:
+        yield ("wait", rand_range(c["after_min"], c["after_max"]))
+    long_pause = pauses.roll_long(c)
+    if long_pause:
+        yield ("wait", long_pause)
+
+
 def plan_move(sx, sy, tx, ty, c, pauses, w, h):
     """Full PlanMove port. Returns dict(before, after, long, pts=[[x,y,delayMs]...])."""
     tx = int(_clamp(tx, 0, max(0, w - 1)))

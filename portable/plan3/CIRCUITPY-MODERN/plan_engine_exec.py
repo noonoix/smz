@@ -242,6 +242,8 @@ def _run_parallel(prm, ctx, pos, pauses, inc):
             now = int(ctx.now() * 1000)
             progressed = False
             for task in tuple(tasks):
+                if task not in tasks:
+                    continue
                 if task["sound"]:
                     if now < task["poll"]:
                         continue
@@ -251,7 +253,12 @@ def _run_parallel(prm, ctx, pos, pauses, inc):
                         continue
                     task["sound"] = False
                     sound_owner = None
-                    ctx.log("parallel wsnd " + ("heard" if result else "timeout"))
+                    if result:
+                        # A sound wait inside PGROUP is a race gate: once the
+                        # splash is heard, stop sibling mouse/loop/package
+                        # branches and let this branch perform its reaction.
+                        tasks[:] = [task]
+                    ctx.log("parallel wsnd " + ("heard - cancel siblings" if result else "timeout"))
                     progressed = True
                     continue
                 if now < task["due"]:

@@ -48,11 +48,12 @@ ops=plan_engine.parse_plan(plan)
 plan_engine.run_plan(ops,ctx)
 moves=[e for e in ctx.ev if e[0]=='move']
 chars=[e for e in ctx.ev if e[0]=='char']
-assert len(moves)==4,moves
+assert 1 <= len(moves) < 4,moves
 assert ''.join(e[2] for e in chars)=='ok',chars
-# Mouse reports continue while the sound branch is listening.
+# Mouse reports continue while listening, then sound success cancels siblings.
 assert any(e[0]=='move' and 0.0 < e[1] < 0.055 for e in ctx.ev),ctx.ev
-assert chars[0][1] < moves[-1][1],ctx.ev
+assert all(e[1] <= chars[0][1] for e in moves),ctx.ev
+assert ('log','parallel wsnd heard - cancel siblings') in ctx.ev,ctx.ev
 assert any(e[0]=='sound-start' for e in ctx.ev),ctx.ev
 assert ('key',ctx.ev[-1][1],(13,)) in ctx.ev or any(e[0]=='key' and e[2]==(13,) for e in ctx.ev),ctx.ev
 # Parser must still fail closed for the Arm-owned blocking sound/click transaction.

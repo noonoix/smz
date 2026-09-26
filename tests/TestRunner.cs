@@ -4145,9 +4145,11 @@ class TestRunner
                 "modern AutoCycle export uses hostless relative mouse without a cursor bridge");
             var modernCode = File.ReadAllText(Path.Combine(modernTmp, "code.py"));
             Assert(modernCode.Contains("\"RAW\"}")
+                   && modernCode.Contains("\"LOOPTIME\"")
+                   && modernCode.Contains("\"ENDLOOP\"")
                    && modernCode.Contains("elif command == \"RAW\":")
                    && modernCode.Contains("ctx.mmove_relative(int(fields[0]), int(fields[1]))"),
-                "hand-sampled RAW/MMOVE routes stay on the low-memory light-route executor");
+                "looped hand-sampled RAW/MMOVE routes stay on the low-memory light-route executor");
 
             var current = new PipelineWorkspace();
             foreach (var tab in current.Tabs) tab.Steps.Clear();

@@ -567,24 +567,43 @@ def _diagnostic_beep(ctx, frequency, duration):
 runtime.PlanContext.setres = _diagnostic_setres
 runtime.PlanContext.beep = _diagnostic_beep
 
-_LIGHT_ROUTE_COMMANDS = {"PLAN", "SCREEN", "SPEED", "BEEP", "DELAY", "KEY", "KDOWN", "KUP", "RAW"}
+_LIGHT_ROUTE_COMMANDS = {
+    "PLAN", "SCREEN", "SPEED", "BEEP", "DELAY", "KEY", "KDOWN", "KUP", "RAW",
+    "LOOP", "LOOPTIME", "ENDLOOP",
+}
 
 def _light_route_lines(text):
     commands = []
+    loop_depth = 0
     for raw in text.splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
         parts = line.split("|", 1)
-        if len(parts) != 2 or parts[0].upper() not in _LIGHT_ROUTE_COMMANDS:
+        command = parts[0].upper()
+        args = parts[1].strip() if len(parts) == 2 else ""
+        if command not in _LIGHT_ROUTE_COMMANDS:
             return None
-        commands.append((parts[0].upper(), parts[1].strip()))
-    return commands
+        if command in ("LOOP", "LOOPTIME"):
+            if not args:
+                return None
+            loop_depth += 1
+        elif command == "ENDLOOP":
+            if args or loop_depth <= 0:
+                return None
+            loop_depth -= 1
+        elif len(parts) != 2:
+            return None
+        commands.append((command, args))
+    return commands if loop_depth == 0 else None
 
 def _run_light_route(ctx, commands):
-    for command, args in commands:
+    index = 0
+    loops = []  # [LOOP/LOOPTIME command index, remaining count, deadline]
+    while index < len(commands):
+        command, args = commands[index]
         if command == "PLAN":
-            continue
+            pass
         if command == "SCREEN":
             fields = args.replace(",", " ").split()
             if len(fields) != 2:
@@ -593,7 +612,7 @@ def _run_light_route(ctx, commands):
             _debug_event(ctx.r, "STEP", "SCREEN metadata %dx%d" % (ctx.screen_w, ctx.screen_h), persist=True)
         elif command == "SPEED":
             # Speed is route metadata; BEEP/DELAY do not need the Arm.
-            continue
+            pass
         elif command == "DELAY":
             fields = args.replace(",", " ").split()
             if len(fields) == 1:
@@ -635,11 +654,39 @@ def _run_light_route(ctx, commands):
                 ctx.mmove_relative(int(fields[0]), int(fields[1]))
             elif not args or ctx.raw(args) is None:
                 raise RuntimeError("RAW route command aborted")
+        elif command == "LOOP":
+            count = int(args)
+            if count < 0:
+                raise ValueError("LOOP needs a nonnegative count")
+            loops.append([index, count, None])
+        elif command == "LOOPTIME":
+            seconds = float(args)
+            if seconds <= 0:
+                raise ValueError("LOOPTIME needs positive seconds")
+            loops.append([index, 0, ctx.now() + seconds])
+        elif command == "ENDLOOP":
+            if not loops:
+                raise ValueError("ENDLOOP without LOOP")
+            top = loops[-1]
+            if top[2] is not None:
+                if ctx.now() < top[2]:
+                    index = top[0]
+                else:
+                    loops.pop()
+            elif top[1] == 0:
+                index = top[0]
+            else:
+                top[1] -= 1
+                if top[1] > 0:
+                    index = top[0]
+                else:
+                    loops.pop()
         elif command == "BEEP":
             fields = args.replace(",", " ").split()
             if len(fields) != 2:
                 raise ValueError("BEEP needs frequency,duration")
             ctx.beep(int(fields[0]), int(float(fields[1])))
+        index += 1
 
 def _diagnostic_route(self, decision):
     if not decision.get("execute"):

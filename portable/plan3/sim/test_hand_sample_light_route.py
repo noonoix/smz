@@ -24,6 +24,7 @@ class Ctx:
     screen_w = 0
     screen_h = 0
     r = object()
+    elapsed = 0.0
 
     def raw(self, line):
         events.append(("raw", line))
@@ -34,7 +35,11 @@ class Ctx:
 
     def sleep_ms(self, milliseconds):
         events.append(("delay", milliseconds))
+        self.elapsed += milliseconds / 1000.0
         return True
+
+    def now(self):
+        return self.elapsed
 
     def key_combo(self, *args): events.append(("key",) + args)
     def kdown(self, value): events.append(("down", value))
@@ -50,20 +55,20 @@ exec(compile(ast.Module(body=selected, type_ignores=[]), str(code_path), "exec")
 route = """PLAN|2
 SCREEN|1920,1080
 SPEED|300,2000
+LOOPTIME|0.4
 RAW|MMOVE|94,-11,rel,2
-DELAY|304
-RAW|MMOVE|-82,148,rel,2
-DELAY|185
+DELAY|200
+ENDLOOP
 """
 commands = namespace["_light_route_lines"](route)
-assert commands is not None, "RAW/MMOVE hand path fell back to the full plan engine"
-assert [command for command, _ in commands].count("RAW") == 2
+assert commands is not None, "RAW/MMOVE LOOPTIME path fell back to the full plan engine"
+assert [command for command, _ in commands].count("RAW") == 1
 ctx = Ctx()
 namespace["_run_light_route"](ctx, commands)
 assert events == [
     ("relative", 94, -11),
-    ("delay", 304),
-    ("relative", -82, 148),
-    ("delay", 185),
+    ("delay", 200),
+    ("relative", 94, -11),
+    ("delay", 200),
 ], events
-print("hand-sample light route: 5 passed, 0 failed")
+print("hand-sample LOOPTIME light route: 7 passed, 0 failed")

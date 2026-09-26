@@ -32,8 +32,8 @@ public partial class PointPickerWindow : Window
         Horizontal.Y1 = Horizontal.Y2 = p.Y;
         Vertical.Y1 = 0; Vertical.Y2 = Canvas.ActualHeight;
         Vertical.X1 = Vertical.X2 = p.X;
-        Canvas.SetLeft(InfoText, p.X + 14);
-        Canvas.SetTop(InfoText, p.Y + 14);
+        System.Windows.Controls.Canvas.SetLeft(InfoText, p.X + 14);
+        System.Windows.Controls.Canvas.SetTop(InfoText, p.Y + 14);
         InfoText.Text = $"({ScreenX}, {ScreenY})";
     }
 

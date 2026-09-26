@@ -3,6 +3,8 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[3]
 vm = (root / "ams-shell/src/Ams.UI/ViewModels/MainViewModel.AutoCycleExport.cs").read_text(encoding="utf-8")
+modern_vm = (root / "ams-shell/src/Ams.UI/ViewModels/MainViewModel.AutoCycleModern.cs").read_text(encoding="utf-8")
+modern_bundle = (root / "ams-shell/src/Ams.UI/Services/ModernAutoCycleFirmwareBundle.cs").read_text(encoding="utf-8")
 ui = (root / "ams-shell/src/Ams.UI/MainWindow.AutoCycleExportUi.cs").read_text(encoding="utf-8")
 firmware_ui = (root / "ams-shell/src/Ams.UI/MainWindow.AutoCycleFirmwareExportUi.cs").read_text(encoding="utf-8")
 essentials_ui = (root / "ams-shell/src/Ams.UI/MainWindow.ResumeEssentialsUi.cs").read_text(encoding="utf-8")
@@ -29,7 +31,12 @@ assert "EnsureAdvancedPanel(body)" in essentials_ui and "EnsureAdvancedPanel(bod
 assert "ReorderAdvanced" in essentials_ui and "ReorderAdvanced" in schedule_ui
 assert "Restart Launch" in schedule_ui and "PostRestartLaunchEnabled" in schedule_ui
 assert "PostRestartTaskbarSlot" in schedule_ui and "BuildRangeRow" in schedule_ui
-assert "۱  ·" in ui and "۲  ·" in firmware_ui
+assert "ساخت و کپی کامل پروژهٔ فعلی به درایو Pico" in ui
+assert "ExportAutoCycleModernCommand" in ui and "ExportAutoCycleCompleteCommand" not in ui
+assert ui.count("AutoCycleUiKit.Action(") == 1
+assert "CapturePipelineWorkspaceForExport()" in modern_vm and "ExportCurrentProject(" in modern_vm
+assert "PipelinePlanBundle.Export(" in modern_bundle and "PipelineWorkspaceSerializer.Serialize(workspace)" in modern_bundle
+assert "RebuildManifest(stagingDir, manifestNames)" in modern_bundle
 assert "ToolTip" in ui and "ToolTip" in firmware_ui
 assert "GridUnitType.Star" in essentials_ui and "GridUnitType.Star" in schedule_ui
 assert "PipelineTabs" in tabs_ui and "Ctrl" not in tabs_ui or "ModifierKeys.Control" in tabs_ui

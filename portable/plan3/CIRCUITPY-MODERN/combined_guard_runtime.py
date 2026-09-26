@@ -73,7 +73,7 @@ class Keyboard:
         self._send()
 
 import plan_engine
-from guard_calibration_protocol import build_calibration_get, parse_calibration_set
+from guard_calibration_protocol import build_calibration_get, parse_calibration_set, find_profile_overlap
 from live_light_guard import (
     HASHED_BUNDLE_FILES,
     GuardBundleError,
@@ -84,6 +84,11 @@ from live_light_guard import (
 
 PROFILES = ("desktop", "login-or-dc", "character-dashboard", "entering-game-loading", "game", "targeted")
 PENDING_REVISION = "pending"
+
+class CalibrationOverlapError(Exception):
+    def __init__(self, other_id, width):
+        self.other_id = other_id; self.width = width
+
 DC_ESC_DELAY_MIN_MS = 88
 DC_ESC_DELAY_MAX_MS = 188
 
@@ -109,6 +114,8 @@ class Arm:
     def __init__(self):
         self.uart = busio.UART(board.GP16, board.GP17, baudrate=57600, timeout=.05)
         self.buf = bytearray(); self.pending = 0; self.held = set()
+        self.relative_ready = None; self.compact_relative = False; self.batch_relative = False
+        self.event = None
     def frame(self, line): return ("#%02X|%s\n" % (sum(line.encode()) & 255, line)).encode()
     def write(self, line):
         data = self.frame(line); count = self.uart.write(data)
@@ -118,7 +125,8 @@ class Arm:
         replies = []
         while b"\n" in self.buf:
             raw, self.buf = self.buf.split(b"\n", 1); line = raw.decode("utf-8", "replace").strip()
-            if line.startswith("OK|MMOVE"): self.pending = max(0, self.pending - 1)
+            if line.startswith("OK|MMOVE") or line.startswith("OK|MR"):
+                self.pending = max(0, self.pending - 1)
             elif line.startswith("EVT|"): print(line)
             elif line: replies.append(line)
         return replies
@@ -129,6 +137,36 @@ class Arm:
             if time.monotonic() > end: raise RuntimeError("arm back-pressure timeout")
             time.sleep(.001)
         self.write("MMOVE|%d,%d,abs,2" % (x, y)); self.pending += 1
+    def relative_capabilities(self):
+        if self.relative_ready is None:
+            reply = self.send("HVER", 3)
+            self.relative_ready = "|REL=1" in reply
+            self.compact_relative = "|MR=1" in reply
+            self.batch_relative = "|MB=1" in reply
+            if self.event:
+                self.event("ARM", reply, persist=True)
+            return reply
+        return None
+    def move_relative(self, dx, dy):
+        self.relative_capabilities()
+        if not self.relative_ready:
+            raise RuntimeError("ARM 2.8 relative mouse firmware required")
+        end = time.monotonic() + 2
+        while self.pending >= 2:
+            self.pump()
+            if time.monotonic() > end: raise RuntimeError("arm back-pressure timeout")
+            time.sleep(.001)
+        if self.compact_relative:
+            self.write("MR|%d,%d" % (dx, dy))
+        else:
+            self.write("MMOVE|%d,%d,rel,2" % (dx, dy))
+        self.pending += 1
+    def move_relative_batch(self, payload):
+        self.relative_capabilities()
+        if not self.batch_relative:
+            raise RuntimeError("ARM 2.8.5 batched relative firmware required")
+        self.flush()
+        return self.send("MB|" + payload, 3)
     def _track_button_command(self, line):
         head, sep, payload = line.partition("|")
         button = payload.split(",", 1)[0].strip().lower() if sep else ""
@@ -256,7 +294,8 @@ class Controls:
 
 class PlanContext:
     plan_api = 3; screen_w = 1920; screen_h = 1080; speed_min = 0; speed_max = 2000
-    def __init__(self, runtime): self.r = runtime
+    mouse_mode = "relative"
+    def __init__(self, runtime): self.r = runtime; self._parallel_sound = None
     def get_mouse_pos(self):
         value = getattr(self.r, "mouse_pos", None)
         if value is None or len(value) < 2:
@@ -269,8 +308,39 @@ class PlanContext:
     def sleep_ms(self, ms): return self.r.controls.sleep(ms)
     def log(self, text): print("plan:", text)
     def mmove(self, x, y): self.r.arm.move(x, y)
+    def mmove_relative(self, dx, dy): self.r.arm.move_relative(dx, dy)
+    def relative_batch_start(self, replay_started_ms):
+        self.r.arm.relative_capabilities()
+        self._batch = ""; self._batch_count = 0; self._batch_due = 0
+        self._batch_last_target = 0; self._batch_started = replay_started_ms
+        return self.r.arm.batch_relative
+    def _relative_batch_send(self):
+        self.r.arm.move_relative_batch(self._batch)
+        if not self.gate(): raise RuntimeError("route aborted")
+        self._batch = ""; self._batch_count = 0; self._batch_due = 0
+    def relative_batch_add(self, target_due, dx, dy):
+        elapsed = int(self.now() * 1000) - self._batch_started
+        interval = max(0, target_due - elapsed) if not self._batch_count else target_due - self._batch_last_target
+        if self._batch_count and (self._batch_count >= 5 or self._batch_due + interval > 64):
+            self._relative_batch_send()
+            elapsed = int(self.now() * 1000) - self._batch_started
+            interval = max(0, target_due - elapsed)
+        if not self._batch_count and interval > 64:
+            if not self.sleep_ms(interval - 64): raise RuntimeError("route aborted")
+            interval = 64
+        self._batch += "%02X%04X%04X" % (interval, dx & 0xFFFF, dy & 0xFFFF)
+        self._batch_count += 1; self._batch_due += interval
+        self._batch_last_target = target_due
+    def relative_batch_flush(self):
+        if self._batch_count: self._relative_batch_send()
     def mclick(self, button, count, hmin, hmax): self.r.arm.send("MCLICK|%s,%d,%d,%d" % (button, count, hmin, hmax), 8)
     def ktext(self, hmin, hmax, text): self.r.type_text(text, hmin, hmax, self)
+    def type_char(self, ch):
+        value = ord(ch)
+        ascii_alnum = (48 <= value <= 57 or 65 <= value <= 90 or 97 <= value <= 122)
+        code = self.r.key(ord(ch.upper())) if ascii_alnum else self.r.key(32 if ch == " " else 13)
+        self.r.keyboard.press(code)
+        self.r.keyboard.release(code)
     def kcombo(self, value): self.key_combo([value], 0, 0)
     def key(self, vk, hold): self.key_combo([vk], hold, hold)
     def key_combo(self, vks, hmin, hmax):
@@ -286,6 +356,68 @@ class PlanContext:
     def wait_sound(self, threshold, minimum, timeout):
         reply = self.r.arm.send("WSND|%d,%d,%d" % (threshold, minimum, timeout), timeout / 1000 + 3)
         return True if "DETECTED" in reply else False if "TIMEOUT" in reply else None
+    def sound_start(self, threshold, minimum, timeout):
+        self._parallel_sound = {
+            "threshold": int(threshold), "minimum": max(10, int(minimum)),
+            "deadline": time.monotonic() + max(1, int(timeout)) / 1000,
+            "sustained": 0, "polls": 0}
+    def sound_poll(self):
+        state = self._parallel_sound
+        if state is None:
+            return False
+        if time.monotonic() >= state["deadline"]:
+            self._parallel_sound = None
+            return False
+        # ARM 2.8.4 already exposes a short, HALT-abortable sound calibration
+        # window. Reusing 10 ms SCAL slices avoids adding bytes to the nearly
+        # full Leonardo firmware and returns the UART to MMOVE between polls.
+        # MMOVE is pipelined (two outstanding frames). Starting SCAL before
+        # those acknowledgements arrive makes ARM correctly answer ERR|BUSY.
+        # Drain the move queue first and retry only that transient rejection.
+        reply = None
+        for attempt in range(3):
+            self.r.arm.flush()
+            try:
+                reply = self.r.arm.send("SCAL|10", 2)
+                break
+            except RuntimeError as exc:
+                if "SCAL rejected: ERR|BUSY" not in str(exc) or attempt >= 2:
+                    raise
+                self.r.arm.pump()
+                time.sleep(.02)
+        if reply is None:
+            raise RuntimeError("ARM SCAL unavailable")
+        peak = None
+        marker = reply.find("max=")
+        if marker >= 0:
+            marker += 4
+            value = 0
+            digits = 0
+            while marker < len(reply):
+                code = ord(reply[marker])
+                if code < 48 or code > 57:
+                    break
+                value = value * 10 + code - 48
+                digits += 1
+                marker += 1
+            if digits:
+                peak = value
+        if peak is None:
+            raise RuntimeError("ARM SCAL reply has no peak")
+        state["polls"] += 1
+        if state["polls"] >= 32:
+            state["polls"] = 0
+            gc.collect()
+        if peak >= state["threshold"]:
+            state["sustained"] += 10
+            if state["sustained"] >= state["minimum"]:
+                self._parallel_sound = None
+                return True
+        else:
+            state["sustained"] = 0
+        return None
+    def sound_cancel(self):
+        self._parallel_sound = None
     def trg_sound(self, threshold, minimum, timeout, action, rmin, rmax, hmin, hmax):
         return self.r.arm.send("TRGSND|%d,%d,%d,%d,%d,%d,%d,%d" % (threshold, minimum, timeout, action, rmin, rmax, hmin, hmax), timeout / 1000 + 3).startswith("OK|")
     def beep(self, frequency, duration):
@@ -385,6 +517,10 @@ class Combined:
         lines = ["%s  %s" % (_file_sha256("/", name), name) for name in sorted(HASHED_BUNDLE_FILES)]
         return "\n".join(lines) + "\n"
     def _publish_calibration(self, revision, profile_id, profile):
+        existing_profiles = self.bundle.get("calibration", {}).get("profiles", {})
+        overlap = find_profile_overlap(existing_profiles, profile_id, profile)
+        if overlap is not None:
+            raise CalibrationOverlapError(overlap["with"], overlap["width"])
         manifest = json.loads(json.dumps(self.bundle["manifest"]))
         calibration = json.loads(json.dumps(self.bundle["calibration"]))
         manifest["calibrationRevision"] = revision
@@ -445,6 +581,8 @@ class Combined:
         if error is not None: return "ERR|CALSET|" + error
         try:
             self._publish_calibration(payload["revision"], payload["id"], payload)
+        except CalibrationOverlapError as exc:
+            return "ERR|CALSET|OVERLAP|with=%s|lux=%.3f" % (exc.other_id, exc.width)
         except Exception:
             return "ERR|CALSET|SAVE"
         return "OK|CALSET|%s|revision=%s|count=%d" % (payload["id"], payload["revision"], self.calibration_count())
@@ -466,6 +604,11 @@ class Combined:
     def save_cal(self):
         if not isinstance(self.result, dict): self.emit("ERR|CAL|BUSY|stage=%d" % (self.stage + 1)); return
         try: self._publish_calibration(PENDING_REVISION, PROFILES[self.stage], self.result)
+        except CalibrationOverlapError as exc:
+            self.last_cal_error = "OVERLAP:%s:%.3f" % (exc.other_id, exc.width)
+            self.emit("ERR|CAL|OVERLAP|stage=%d|id=%s|with=%s|lux=%.3f" %
+                      (self.stage + 1, PROFILES[self.stage], exc.other_id, exc.width))
+            return
         except Exception as exc:
             self.last_cal_error = type(exc).__name__ + ":" + str(exc)[:80]
             self.emit("ERR|CAL|SAVE|stage=%d|detail=%s" % (self.stage + 1, self.last_cal_error))

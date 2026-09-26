@@ -3,10 +3,17 @@ name: Classroom Studio current branch
 on:
   workflow_dispatch:
   push:
-    branches: [feat/dc-auto-esc-88-188, fix/cursor-origin-sync]
+    branches: [feat/dc-auto-esc-88-188, fix/cursor-origin-sync, fix/portable-relative-mouse]
     paths:
       - 'ams-shell/**'
+      - 'firmware/arm28/**'
       - 'tests/**'
+      - 'portable/plan3/CIRCUITPY-MODERN/**'
+      - 'portable/plan3/sim/test_calibration_heap_release.py'
+      - 'tools/apply_calibration_save_heap_fix.py'
+      - 'tools/current_release_notes.py'
+      - 'CHANGELOG-CURRENT.md'
+      - 'README.md'
       - '.github/workflows/classroom-studio-current.yml'
 
 permissions:
@@ -17,10 +24,32 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
+      - name: Require a current hardware changelog entry
+        shell: pwsh
+        run: |
+          $changed = @(git diff --name-only HEAD^ HEAD)
+          $releaseRelevant = @($changed | Where-Object {
+            $_ -match '^(ams-shell/|firmware/arm28/|tests/|portable/plan3/CIRCUITPY-MODERN/|tools/apply_calibration_save_heap_fix.py|tools/current_release_notes.py|\.github/workflows/classroom-studio-current.yml)'
+          })
+          if ($releaseRelevant.Count -gt 0 -and -not ($changed -contains 'CHANGELOG-CURRENT.md')) {
+            throw 'Build-affecting changes require an update to CHANGELOG-CURRENT.md'
+          }
+          python tools/current_release_notes.py --build-number "${{ github.run_number }}" --sha "${{ github.sha }}"
+          if (-not (Test-Path release-notes.md)) { throw 'release-notes.md was not generated' }
+
+      - name: Apply and verify calibration-save memory fix
+        shell: pwsh
+        run: |
+          python tools/apply_calibration_save_heap_fix.py
+          python portable/plan3/sim/test_calibration_heap_release.py
+          python -m py_compile portable/plan3/CIRCUITPY-MODERN/code.py
 
       - name: Compile-check bridge stack
         run: python -m py_compile ams-shell/bridge/bridge.py ams-shell/bridge/ams_serial.py ams-shell/bridge/ams_crypto.py
@@ -70,7 +99,9 @@ jobs:
           $out = 'ams-shell/src/Ams.UI/bin/Release/net8.0-windows'
           Remove-Item -Recurse -Force "$out/bridge/__pycache__" -ErrorAction SilentlyContinue
           Compress-Archive -Path "$out/*" -DestinationPath Classroom-Studio-current.zip -Force
+          Compress-Archive -Path "firmware/arm28/*" -DestinationPath ARM-2.8.7-source.zip -Force
           (Get-FileHash Classroom-Studio-current.zip -Algorithm SHA256).Hash | Out-File sha256.txt -Encoding ascii
+          (Get-FileHash ARM-2.8.7-source.zip -Algorithm SHA256).Hash | Out-File arm-sha256.txt -Encoding ascii
 
       - name: Upload current build or test log
         if: always()
@@ -79,23 +110,25 @@ jobs:
           name: Classroom-Studio-current-${{ github.sha }}
           path: |
             Classroom-Studio-current.zip
+            ARM-2.8.7-source.zip
             sha256.txt
+            arm-sha256.txt
             ci-test-output.txt
+            release-notes.md
           if-no-files-found: warn
 
-      - name: Publish public cursor-sync test release
+      - name: Publish current Classroom Studio test release
         if: success()
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: cursor-origin-sync-${{ github.run_number }}
+          tag_name: classroom-current-${{ github.run_number }}
           target_commitish: ${{ github.sha }}
-          name: "Classroom Studio cursor-origin-sync test #${{ github.run_number }}"
+          name: "Classroom Studio current test #${{ github.run_number }}"
           prerelease: true
-          body: |
-            Public test build for host cursor-origin synchronization.
-            Tests: 659 passed, 0 failed in the source build contract.
-            Golden 100 firmware and Pico bundle were not changed.
+          body_path: release-notes.md
           files: |
             Classroom-Studio-current.zip
+            ARM-2.8.7-source.zip
             sha256.txt
+            arm-sha256.txt
             ci-test-output.txt

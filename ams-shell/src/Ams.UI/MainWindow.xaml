@@ -199,7 +199,7 @@
                                 <ContextMenu>
                                     <MenuItem Header="Mouse Click" CommandParameter="mouseClick"
                                               Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                    <MenuItem Header="Mouse Position" CommandParameter="mouseMove"
+                                    <MenuItem Header="Move to Position" CommandParameter="mouseMove"
                                               Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                     <MenuItem Header="Mouse Scroll" CommandParameter="mouseScroll"
                                               Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
@@ -398,7 +398,7 @@
                         <MenuItem Header="Add Action">
                             <MenuItem Header="Mouse Click" CommandParameter="mouseClick"
                                       Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                            <MenuItem Header="Mouse Position" CommandParameter="mouseMove"
+                            <MenuItem Header="Move to Position" CommandParameter="mouseMove"
                                       Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                             <MenuItem Header="Mouse Scroll" CommandParameter="mouseScroll"
                                       Command="{Binding PlacementTarget.DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />

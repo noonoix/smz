@@ -3,7 +3,7 @@
   "runtime": "combined-pico-guard-executor",
   "pipelineVersion": 3,
   "pipelineRevision": "F2447139817804BB5E9521D1DB6E82C1C05920F3DFCDAC1F020ECD0B443D2C36",
-  "calibrationRevision": "guard-a01636aa4b847b72",
+  "calibrationRevision": "guard-1e57d529699b3492",
   "orderedStages": [
     "desktop",
     "login-or-dc",
@@ -50,8 +50,8 @@
     },
     {
       "id": "character-dashboard",
-      "center": 15,
-      "tolerance": 3,
+      "center": 14.2,
+      "tolerance": 3.8,
       "stableMs": 750
     },
     {
@@ -62,8 +62,8 @@
     },
     {
       "id": "game",
-      "center": 24.2,
-      "tolerance": 0.5,
+      "center": 22.5,
+      "tolerance": 3.7,
       "stableMs": 750
     },
     {

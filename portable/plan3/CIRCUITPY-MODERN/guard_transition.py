@@ -43,6 +43,15 @@ class GuardTransition:
             return self._deny("duplicate-stable-state")
         self.last_stable = profile_id
 
+        # Start is allowed from the stable section that is physically visible
+        # now. The ordered pipeline constrains later transitions; it must not
+        # force every new GP4 run to wait for Desktop first.
+        if self.stage is None and profile_id in STAGES:
+            self.stage = STAGES[profile_id]
+            context = "login" if profile_id == "login-or-dc" else "normal"
+            return self._execute(profile_id, context, self.stage, self.stage,
+                                 "start-at-current-state")
+
         if profile_id == "desktop":
             return self._desktop()
         if profile_id == "login-or-dc":

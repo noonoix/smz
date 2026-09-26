@@ -73,3 +73,33 @@ def build_calibration_get(revision, count):
     if not isinstance(count, int) or count < 0:
         raise ValueError("count")
     return "OK|CALGET|revision=%s|count=%d" % (revision, count)
+
+# A candidate may touch another range at one boundary, but a positive-width
+# intersection is unsafe. Existing overlaps are grandfathered only when the
+# new sample does not increase them (the current targeted/login side-state
+# layout predates this guard and must remain loadable).
+CAL_OVERLAP_MARGIN_LUX = 0.0
+
+
+def _overlap_width(left, right):
+    lo = max(float(left["center"]) - float(left["tolerance"]),
+             float(right["center"]) - float(right["tolerance"]))
+    hi = min(float(left["center"]) + float(left["tolerance"]),
+             float(right["center"]) + float(right["tolerance"]))
+    return max(0.0, hi - lo)
+
+
+def find_profile_overlap(profiles, profile_id, candidate, margin=CAL_OVERLAP_MARGIN_LUX):
+    """Return {with,width} if candidate introduces/worsens an unsafe overlap."""
+    if profile_id not in PROFILE_IDS or not isinstance(profiles, dict):
+        raise ValueError("profile")
+    current = profiles.get(profile_id)
+    for other_id in PROFILE_IDS:
+        if other_id == profile_id or other_id not in profiles:
+            continue
+        other = profiles[other_id]
+        proposed = _overlap_width(candidate, other)
+        previous = _overlap_width(current, other) if isinstance(current, dict) else 0.0
+        if proposed > margin and proposed > previous + 0.000001:
+            return {"with": other_id, "width": proposed}
+    return None

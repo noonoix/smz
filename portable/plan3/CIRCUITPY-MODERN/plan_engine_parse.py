@@ -11,7 +11,9 @@
 #   RMOUSE|region=x,y,w,h|mt=mn,mx|curve=mn,mx|before=mn,mx|after=mn,mx|
 #         mid=chance:mn,mx|idle=everyMn,everyMx:pauseMn,pauseMx|over=pct
 #   CLICK|btn=left|n=1|hold=mn,mx
-#   TYPE|h=mn,mx|w=mn,mx|wp=pct|p=mn,mx|think=chance:mn,mx|typo=mn,mx|text=<encoded>
+#   TYPE|h=mn,mx|w=mn,mx|wp=pct|p=mn,mx|think=chance:mn,mx|typos=mn,mx|text=<encoded>
+#        typos is the number of corrected slips in this TYPE execution.
+#        Legacy typo=mn,mx (one slip every N words) remains accepted.
 #   DELAY|mn,mx
 #   LOOP|n  ... ENDLOOP                   n = pass count, 0 = forever
 #   LOOPTIME|sec ... ENDLOOP              repeats until the deadline passes
@@ -48,6 +50,11 @@ def _load_mouse_pos(ctx, ops):
         if op == "SCREEN":
             sw, sh = prm["v"]
             break
+    # Fully portable mode uses genuine relative HID reports on the Pro Micro.
+    # The coordinates below are only a virtual canvas for shaping a human path;
+    # they are never sent as an absolute Windows cursor position.
+    if getattr(ctx, "mouse_mode", "") == "relative":
+        return [sw // 2, sh // 2]
     saved = None
     getter = getattr(ctx, "get_mouse_pos", None)
     if getter is not None:
@@ -68,6 +75,8 @@ def _load_mouse_pos(ctx, ops):
 
 
 def _save_mouse_pos(ctx, pos):
+    if getattr(ctx, "mouse_mode", "") == "relative":
+        return
     setter = getattr(ctx, "set_mouse_pos", None)
     if setter is not None:
         setter(int(pos[0]), int(pos[1]))
@@ -95,6 +104,30 @@ def _clamp(v, lo, hi):
     return lo if v < lo else hi if v > hi else v
 
 
+def handpath_events(raw, timing=None):
+    """Scale a recorded path to one freshly selected total without allocating a list."""
+    total = 0
+    start = 0
+    while start < len(raw):
+        end = raw.find(";", start)
+        if end < 0:
+            end = len(raw)
+        total += int(raw[start:end].split(",", 1)[0])
+        start = end + 1
+    target = rand_range(*(timing or (total, total)))
+    source_elapsed = target_elapsed = start = 0
+    while start < len(raw):
+        end = raw.find(";", start)
+        if end < 0:
+            end = len(raw)
+        delay, dx, dy = (int(v) for v in raw[start:end].split(",", 2))
+        source_elapsed += delay
+        due = (source_elapsed * target + total // 2) // max(1, total)
+        yield max(0, due - target_elapsed), dx, dy
+        target_elapsed = due
+        start = end + 1
+
+
 # ── %-codec for TYPE text (|, %, newline are structural in plan.txt) ─────────────────────
 
 def pct_dec(s):
@@ -120,7 +153,7 @@ _OPS = ("PLAN", "SCREEN", "SPEED", "RMOUSE", "CLICK", "TYPE",
         # v2 - Classroom Studio portable parity (sound, keys, flow, includes)
         "MOVETO", "KEY", "KDOWN", "KUP", "WHEEL", "RAW",
         "WSND", "TRGSND", "IFSND", "IFLUX", "ELSE", "ENDIF",
-        "LABEL", "GOTO", "INCLUDE",
+        "LABEL", "GOTO", "INCLUDE", "HANDPATH",
         # v3 - full Classroom Studio parity: packages, parallel groups, buzzer
         "RPKG", "PKGITEM", "ENDPKG", "PGROUP", "PARITEM", "ENDPAR", "RETRY", "ENDRETRY", "BEEP")
 
@@ -186,9 +219,13 @@ def _link_blocks(ops):
 
 # -- v3 containers: randomPackage / parallelGroup -----------------------------
 
-# Inside a parallel group only short, immediate commands keep the "parallel" meaning:
-# a long board-side hold would own the serial channel and serialize the whole group.
-_PAR_OK = ("MOVETO", "CLICK", "KEY", "KDOWN", "KUP", "WHEEL", "TYPE", "DELAY", "RAW", "BEEP")
+# Parallel branches are interpreted by the cooperative scheduler. LOOP/LOOPTIME
+# and RPKG remain structural; HANDPATH, TYPE, RMOUSE and WSND yield between
+# individual timed events. TRGSND deliberately stays out: the Arm-side click is
+# an indivisible legacy transaction and cannot share the sound monitor.
+_PAR_OK = ("RMOUSE", "MOVETO", "CLICK", "KEY", "KDOWN", "KUP", "WHEEL",
+           "TYPE", "DELAY", "RAW", "BEEP", "HANDPATH", "WSND",
+           "LOOP", "LOOPTIME", "ENDLOOP", "RPKG")
 _PKG_MODES = ("pick", "all", "seq")
 
 
@@ -264,6 +301,40 @@ def _parse_v3(op, fields, prm, line_no, ctab):
         if not 30 <= prm["v"][0] <= 20000 or prm["v"][1] < 0:
             raise ValueError("line %d: BEEP out of range (30..20000 Hz)" % line_no)
         return
+    if op == "HANDPATH":
+        if len(fields) == 3 and fields[1].startswith("mt="):
+            prm["mt"] = _pair(fields[1][3:], "HANDPATH mt", line_no)
+            if prm["mt"][0] < 1 or prm["mt"][1] > 60000:
+                raise ValueError("line %d: HANDPATH mt out of range" % line_no)
+            body = fields[2]
+        elif len(fields) != 2:
+            raise ValueError("line %d: HANDPATH needs optional mt and samples" % line_no)
+        if not body:
+            raise ValueError("line %d: HANDPATH needs samples" % line_no)
+        count = 1
+        start = 0
+        size = len(body)
+        while start < size:
+            end = body.find(";", start)
+            if end < 0:
+                end = size
+            token = body[start:end]
+            values = token.split(",", 2)
+            if len(values) != 3:
+                raise ValueError("line %d: HANDPATH needs delay,dx,dy samples" % line_no)
+            try:
+                delay, dx, dy = int(values[0]), int(values[1]), int(values[2])
+            except Exception:
+                raise ValueError("line %d: bad HANDPATH sample" % line_no)
+            if delay < 1 or delay > 60000 or abs(dx) > 8192 or abs(dy) > 8192:
+                raise ValueError("line %d: HANDPATH sample out of range" % line_no)
+            if end < size:
+                count += 1
+            if count > 2000:
+                raise ValueError("line %d: HANDPATH has too many samples" % line_no)
+            start = end + 1
+        prm["path"] = body
+        return
     parts = body.split(",")
     if not parts[-1].startswith("#"):
         raise ValueError("line %d: %s must open a block body" % (line_no, op))
@@ -329,7 +400,7 @@ def parse_plan(text):
             raise ValueError("line %d: unknown op '%s'" % (line_no, fields[0]))
         prm = {}
         prm["_chain"] = tuple(b[2] for b in loop_stack)   # v2: enclosing blocks (GOTO visibility)
-        if op in ("RPKG", "PGROUP", "RETRY", "BEEP", "PKGITEM", "ENDPKG", "PARITEM", "ENDPAR", "ENDRETRY"):
+        if op in ("RPKG", "PGROUP", "RETRY", "BEEP", "HANDPATH", "PKGITEM", "ENDPKG", "PARITEM", "ENDPAR", "ENDRETRY"):
             _parse_v3(op, fields, prm, line_no, _ctab)    # v3
             ops.append((op, prm))
             continue
@@ -467,7 +538,7 @@ def parse_plan(text):
                 if "region" not in prm:
                     raise ValueError("line %d: RMOUSE needs region=x,y,w,h" % line_no)
                 prm["region"] = _quad(prm["region"], "region", line_no)
-                for k in ("mt", "curve", "before", "after"):
+                for k in ("mt", "curve", "before", "after", "speed"):
                     if k in prm:
                         prm[k] = _pair(prm[k], k, line_no)
                 if "mid" in prm:                       # chance:mn,mx
@@ -487,7 +558,7 @@ def parse_plan(text):
                 if "text" not in prm:
                     raise ValueError("line %d: TYPE needs text=" % line_no)
                 prm["text"] = pct_dec(prm["text"])
-                for k in ("h", "w", "p", "typo"):
+                for k in ("h", "w", "p", "typo", "typos"):
                     if k in prm:
                         prm[k] = _pair(prm[k], k, line_no)
                 if "think" in prm:

@@ -26,7 +26,11 @@ public partial class MainViewModel
         {
             staging = Path.Combine(Path.GetTempPath(), "ClassroomStudio-modern-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(staging);
-            var files = ModernAutoCycleFirmwareBundle.Export(Path.Combine(staging, "code.py"))
+            var workspace = CapturePipelineWorkspaceForExport();
+            var files = ModernAutoCycleFirmwareBundle.ExportCurrentProject(
+                    Path.Combine(staging, "code.py"), workspace, _settings,
+                    (int)SystemParameters.PrimaryScreenWidth, (int)SystemParameters.PrimaryScreenHeight,
+                    _currentFile ?? "untitled", Environment.MachineName)
                 .OrderBy(path => Path.GetFileName(path).Equals("code.py", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
                 .ThenBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase)
                 .ToArray();
@@ -36,18 +40,18 @@ public partial class MainViewModel
             {
                 var destination = Path.Combine(targetRoot, Path.GetFileName(source));
                 File.Copy(source, destination, true);
-                Log("pico modern export: " + Path.GetFileName(source));
+                Log("pico current-project export: " + Path.GetFileName(source));
             }
             MessageBox.Show(
-                $"Bundle مدرن split-memory ساخته و روی CIRCUITPY کپی شد ({files.Length} فایل).\n"
-                + "این خروجی جایگزین Golden 100 نیست و برای ادامهٔ تست حافظه استفاده می‌شود.",
-                "Modern Pico export", MessageBoxButton.OK, MessageBoxImage.Information);
+                $"پروژهٔ باز فعلی همراه Bundle مدرن روی CIRCUITPY کپی شد ({files.Length} فایل).\n"
+                + "تمام Routeها، plan.txt و autocycle.amsj از تب‌های همین پروژه ساخته شدند؛ code.py آخر کپی شد.",
+                "Current project Pico export", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            Log("pico modern export failed: " + ex.Message);
-            MessageBox.Show("خروجی Bundle مدرن ناموفق بود: " + ex.Message,
-                "Modern Pico export", MessageBoxButton.OK, MessageBoxImage.Error);
+            Log("pico current-project export failed: " + ex.Message);
+            MessageBox.Show("خروجی پروژهٔ فعلی ناموفق بود: " + ex.Message,
+                "Current project Pico export", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {

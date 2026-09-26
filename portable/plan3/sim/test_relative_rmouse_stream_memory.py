@@ -14,14 +14,6 @@ import plan_engine
 assert "plan_engine_human" not in sys.modules
 assert "plan_engine_parallel" not in sys.modules
 assert "plan_engine_exec" not in sys.modules
-import plan_engine_exec
-
-
-def forbidden_dense_plan(*args, **kwargs):
-    raise AssertionError("relative RMOUSE materialized the dense mouse plan")
-
-
-plan_engine_exec.plan_move = forbidden_dense_plan
 
 
 class RelativeCtx:
@@ -70,5 +62,9 @@ for seed in range(200):
     assert 90 <= abs(dy) <= 270, (seed, dx, dy)
     assert all(abs(x) <= 127 and abs(y) <= 127 for x, y in ctx.rel)
     assert any("rmouse-rel-stream" in line for line in ctx.logs)
+    assert any("plan-lite-relative" in line for line in ctx.logs)
 
+assert "plan_engine_human" not in sys.modules
+assert "plan_engine_parallel" not in sys.modules
+assert "plan_engine_exec" not in sys.modules
 print("relative RMOUSE bounded stream: 200 passed, 0 failed")

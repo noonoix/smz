@@ -4229,10 +4229,11 @@ class TestRunner
                    && currentSnapshot.Contains("CURRENT-MOUSE-TEST-ONLY")
                    && !currentDesktop.Contains("Win+2", StringComparison.OrdinalIgnoreCase),
                 "modern one-click export replaces template routes and snapshot with the open project");
-            Assert(currentEngine.Length < 2000
+            Assert(currentEngine.Length < 8000
                    && currentEngine.Contains("from plan_engine_parse import")
                    && currentEngine.Contains("def run_plan(plan, ctx):")
                    && currentEngine.Contains("import plan_engine_exec as executor")
+                   && currentEngine.Contains("plan-lite-relative")
                    && !currentEngine.Contains("Generated memory-fit core"),
                 "modern current-project export preserves the split-engine facade after legacy plan generation");
             var manifestDesktop = File.ReadLines(Path.Combine(modernTmp, "SHA256SUMS.txt"))

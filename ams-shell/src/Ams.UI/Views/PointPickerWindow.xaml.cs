@@ -23,7 +23,7 @@ public partial class PointPickerWindow : Window
         _oy = (int)SystemParameters.VirtualScreenTop;
     }
 
-    private void Window_MouseMove(object sender, MouseEventArgs e)
+    private void Window_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
         var p = e.GetPosition(Canvas);
         ScreenX = (int)p.X + _ox;
@@ -37,7 +37,7 @@ public partial class PointPickerWindow : Window
         InfoText.Text = $"({ScreenX}, {ScreenY})";
     }
 
-    private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void Window_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
         var p = e.GetPosition(Canvas);
         ScreenX = (int)p.X + _ox;
@@ -45,10 +45,10 @@ public partial class PointPickerWindow : Window
         DialogResult = true;
     }
 
-    private void Window_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    private void Window_MouseRightButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         => DialogResult = false;
 
-    private void Window_KeyDown(object sender, KeyEventArgs e)
+    private void Window_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key == Key.Escape) DialogResult = false;
     }

@@ -7,6 +7,7 @@ runtime=(root/'portable/plan3/CIRCUITPY-MODERN/combined_guard_runtime.py').read_
 executor=root/'portable/plan3/CIRCUITPY-MODERN/plan_engine_exec.py'
 parallel=root/'portable/plan3/CIRCUITPY-MODERN/plan_engine_parallel.py'
 human=root/'portable/plan3/CIRCUITPY-MODERN/plan_engine_human.py'
+facade=root/'portable/plan3/CIRCUITPY-MODERN/plan_engine.py'
 bundle=(root/'ams-shell/src/Ams.UI/Services/ModernAutoCycleFirmwareBundle.cs').read_text()
 assert '"forLoop" or "randomPackage"' in exporter
 assert 'n.Type=="waitForSound"' in exporter
@@ -25,6 +26,7 @@ assert 'plan_engine_parallel.py' in bundle and 'manifestNames.Length != 25' in b
 assert 'def _parallel_relative_mouse_events' in parallel.read_text()
 assert 'relative_mouse_events' in parallel.read_text()
 assert 'segments = max(8, min(128' in human.read_text()
+assert 'plan-lite-relative' in facade.read_text()
 assert 'timeout - cancel group' in parallel.read_text()
 assert 'self.r.arm.flush()' in runtime and 'SCAL rejected: ERR|BUSY' in runtime
 code=(root/'portable/plan3/CIRCUITPY-MODERN/code.py').read_text()

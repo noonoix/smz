@@ -90,7 +90,7 @@ try:
 finally:
     parallel.plan_move=original_plan_move
 stream_moves=[e for e in events if e[0]=='move']
-assert 6 <= len(stream_moves) <= 24,len(stream_moves)
+assert 6 <= len(stream_moves) <= 128,len(stream_moves)
 assert sum(e[2] for e in stream_moves)==pos[0]-960
 assert sum(e[3] for e in stream_moves)==pos[1]-540
 assert all(e[4] is True for e in stream_moves)
@@ -104,7 +104,30 @@ speed_events=list(parallel._parallel_relative_mouse_events(
          before_min=0,before_max=0,after_min=0,after_max=0,
          mid_chance=0,idle_pause_max=0),1260,540))
 speed_moves=[e for e in speed_events if e[0]=='move']
-assert 8 <= len(speed_moves) <= 32,len(speed_moves)
+assert 8 <= len(speed_moves) <= 128,len(speed_moves)
 # 300 px at 500 px/s targets 600 ms; ARM supplies ~300 ms, so waits total 300.
 assert sum(e[1] for e in speed_moves)==300,speed_moves
-print('cooperative parallel runtime: 13 passed, 0 failed')
+assert max(e[1] for e in speed_moves) <= 8,speed_moves
+
+# Timeout is also a race result: cancel the infinite mouse sibling, skip the
+# reaction after WSND, and return so the outer fishing loop can cast again.
+class TimeoutCtx(Ctx):
+    def sound_poll(self):
+        self.ev.append(('sound-poll',round(self.t,3)))
+        return False if self.t>=0.055 else None
+
+timeout_plan='''PLAN|2
+PGROUP
+LOOP|0
+DELAY|10
+ENDLOOP
+PARITEM
+WSND|90,60,500
+KEY|combo=70
+ENDPAR'''
+timeout_ctx=TimeoutCtx()
+plan_engine.run_plan(plan_engine.parse_plan(timeout_plan),timeout_ctx)
+assert not any(e[0]=='key' and e[2]==(70,) for e in timeout_ctx.ev),timeout_ctx.ev
+assert ('log','parallel wsnd timeout - cancel group') in timeout_ctx.ev,timeout_ctx.ev
+assert timeout_ctx.t < 1.0,timeout_ctx.t
+print('cooperative parallel runtime: 17 passed, 0 failed')

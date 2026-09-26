@@ -60,7 +60,7 @@ for seed in range(200):
     random.seed(seed)
     ctx = RelativeCtx()
     plan_engine.run_plan(ops, ctx)
-    assert 1 <= len(ctx.rel) <= 32, (seed, len(ctx.rel))
+    assert 1 <= len(ctx.rel) <= 128, (seed, len(ctx.rel))
     dx = sum(p[0] for p in ctx.rel)
     dy = sum(p[1] for p in ctx.rel)
     assert 125 <= abs(dx) <= 377, (seed, dx, dy)

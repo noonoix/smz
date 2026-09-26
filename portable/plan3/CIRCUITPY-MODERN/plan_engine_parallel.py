@@ -3,76 +3,16 @@
 import gc
 import random
 from plan_engine_parse import PlanAbort, _below, rand_range
-from plan_engine_human import _DEFAULT_CFG, plan_move, plan_typing
+from plan_engine_human import (_DEFAULT_CFG, plan_move, plan_typing,
+                               relative_mouse_events)
 
 def _parallel_relative_mouse_events(prm, ctx, pauses, pos, c, tx, ty):
-    """Stream a bounded eased curve without materializing a dense point list.
-
-    The normal mouse planner intentionally keeps 2–3 px points in RAM. A
-    long-running PGROUP also owns parsed branches plus the sound listener, so
-    repeatedly allocating that dense list fragments the RP2040 heap. Here the
-    Pico emits at most 32 coarse curve points; ARM 2.8.1 still splits every
-    relative delta into <=3 px HID reports, preserving the smooth physical
-    path while keeping the Pico scheduler and UART responsive.
-    """
-    sx, sy = pos[0], pos[1]
-    dx, dy = tx - sx, ty - sy
-    span = max(abs(dx), abs(dy))
-    segments = max(8, min(32, (span + 11) // 12))
-    curve_min, curve_max = c["curve_min"], c["curve_max"]
-    if curve_max < curve_min:
-        curve_min, curve_max = curve_max, curve_min
-    curve_pct = rand_range(int(curve_min), int(curve_max))
-    curve_sign = -1 if _below(2) == 0 else 1
-    curve_amp = curve_sign * min(span // 3, (span * curve_pct) // 100)
-    denom = max(1, span)
-    perp_x = (-dy * curve_amp) // denom
-    perp_y = (dx * curve_amp) // denom
-    if c["mt_max"] > 0:
-        total_ms = rand_range(c["mt_min"], c["mt_max"])
-    elif c["speed_max"] > 0:
-        speed_lo = max(1, c["speed_min"])
-        speed_hi = max(speed_lo, c["speed_max"])
-        speed = rand_range(speed_lo, speed_hi)
-        # Approximate curved Euclidean length without float allocation.
-        path_px = max(abs(dx), abs(dy)) + min(abs(dx), abs(dy)) // 2
-        total_ms = (path_px * 1000) // max(1, speed)
-        # ARM 2.8.1 already spends about 1 ms per travelled pixel while
-        # splitting each command into <=3 px HID reports. Only schedule the
-        # remaining budget here; otherwise sampled cadence is effectively
-        # paid twice and replay looks much slower than the recording.
-        total_ms = max(0, total_ms - path_px)
-    else:
-        total_ms = 0
-    base_delay = total_ms // segments if total_ms > 0 else 0
-    delay_extra = total_ms % segments if total_ms > 0 else 0
-    mid_delay = pauses.mid_pause(c)
-    mid_at = 1 + _below(max(1, segments - 1))
-    if c["before_max"] > 0:
-        yield ("wait", rand_range(c["before_min"], c["before_max"]))
-    px, py = sx, sy
-    scale = 1024
-    for step in range(1, segments + 1):
-        t = (step * scale) // segments
-        # Smoothstep gives zero velocity at both ends. 4t(1-t) adds one
-        # perpendicular bow and returns exactly to the target endpoint.
-        ease = (t * t * (3 * scale - 2 * t)) // (scale * scale)
-        bow = (4 * t * (scale - t)) // scale
-        nx = sx + (dx * ease) // scale + (perp_x * bow) // scale
-        ny = sy + (dy * ease) // scale + (perp_y * bow) // scale
-        if step == segments:
-            nx, ny = tx, ty
-        delay = base_delay + (1 if step <= delay_extra else 0)
-        if mid_delay and step == mid_at:
-            delay += mid_delay
-        yield ("move", delay, nx - px, ny - py, True)
-        px, py = nx, ny
-        pos[0], pos[1] = px, py
-    if c["after_max"] > 0:
-        yield ("wait", rand_range(c["after_min"], c["after_max"]))
-    long_pause = pauses.roll_long(c)
-    if long_pause:
-        yield ("wait", long_pause)
+    """Adapt the shared bounded relative stream to scheduler move events."""
+    for event in relative_mouse_events(pos, tx, ty, c, pauses):
+        if event[0] == "wait":
+            yield event
+        else:
+            yield ("move", event[1], event[2], event[3], True)
 
 
 def _parallel_mouse_events(prm, ctx, pauses, pos, target=None):
@@ -251,7 +191,15 @@ def run_parallel(prm, ctx, pos, pauses, inc):
                         # splash is heard, stop sibling mouse/loop/package
                         # branches and let this branch perform its reaction.
                         tasks[:] = [task]
-                    ctx.log("parallel wsnd " + ("heard - cancel siblings" if result else "timeout"))
+                    else:
+                        # A timed-out fishing race must also stop its infinite
+                        # mouse sibling. End PGROUP without executing the
+                        # reaction that follows WSND; the outer loop can cast
+                        # again instead of remaining trapped in mouse motion.
+                        tasks[:] = []
+                    ctx.log("parallel wsnd " + (
+                        "heard - cancel siblings" if result
+                        else "timeout - cancel group"))
                     progressed = True
                     continue
                 if now < task["due"]:
@@ -294,7 +242,13 @@ def run_parallel(prm, ctx, pos, pauses, inc):
                         raise ValueError("only one WSND listener may be active in a Parallel Group")
                     if start_sound is None or poll_sound is None:
                         result = ctx.wait_sound(event[1], event[2], event[3])
-                        ctx.log("parallel wsnd " + ("heard" if result else "timeout"))
+                        if result:
+                            tasks[:] = [task]
+                        else:
+                            tasks[:] = []
+                        ctx.log("parallel wsnd " + (
+                            "heard - cancel siblings" if result
+                            else "timeout - cancel group"))
                     else:
                         start_sound(event[1], event[2], event[3])
                         task["sound"] = True

@@ -279,7 +279,6 @@ def relative_mouse_events(pos, tx, ty, c, pauses):
     sx, sy = pos[0], pos[1]
     dx, dy = tx - sx, ty - sy
     span = max(abs(dx), abs(dy))
-    segments = max(8, min(32, (span + 11) // 12))
     cmin, cmax = c["curve_min"], c["curve_max"]
     if cmax < cmin:
         cmin, cmax = cmax, cmin
@@ -297,6 +296,14 @@ def relative_mouse_events(pos, tx, ty, c, pauses):
         total = max(0, (path * 1000) // speed - path)
     else:
         total = 0
+    # A 32-point path produced visible 40–55 ms burst gaps at slower sampled
+    # speeds: ARM emitted its micro-steps, then waited for the next coarse Pico
+    # point. Keep spatial control points, but add enough timing points to target
+    # an ~8 ms cadence. This is a generator, so 128 points do not consume a
+    # dense list in Pico RAM.
+    spatial = max(8, (span + 11) // 12)
+    timed = (total + 7) // 8 if total > 0 else spatial
+    segments = max(8, min(128, max(spatial, timed)))
     base, extra = total // segments, total % segments
     mid, mid_at = pauses.mid_pause(c), 1 + _below(max(1, segments - 1))
     if c["before_max"] > 0:

@@ -56,19 +56,22 @@ route = """PLAN|2
 SCREEN|1920,1080
 SPEED|300,2000
 LOOPTIME|0.4
-RAW|MMOVE|94,-11,rel,2
-DELAY|200
+HANDPATH|100,47,-5;100,47,-6
 ENDLOOP
 """
 commands = namespace["_light_route_lines"](route)
-assert commands is not None, "RAW/MMOVE LOOPTIME path fell back to the full plan engine"
-assert [command for command, _ in commands].count("RAW") == 1
+assert commands is not None, "HANDPATH LOOPTIME path fell back to the full plan engine"
+assert [command for command, _ in commands].count("HANDPATH") == 1
 ctx = Ctx()
 namespace["_run_light_route"](ctx, commands)
 assert events == [
-    ("relative", 94, -11),
-    ("delay", 200),
-    ("relative", 94, -11),
-    ("delay", 200),
+    ("delay", 100),
+    ("relative", 47, -5),
+    ("delay", 100),
+    ("relative", 47, -6),
+    ("delay", 100),
+    ("relative", 47, -5),
+    ("delay", 100),
+    ("relative", 47, -6),
 ], events
-print("hand-sample LOOPTIME light route: 7 passed, 0 failed")
+print("hand-sample HANDPATH light route: 10 passed, 0 failed")

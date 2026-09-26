@@ -9,9 +9,11 @@ public static class HandMovementSample
 {
     public const int CaptureDurationMs = 10_000;
     public const int CaptureIntervalMs = 16;
-    // One shared replay budget keeps desktop, generated scripts, and bare-Pico plans identical.
-    // More points materially increase the Pico parser heap without adding useful hand detail.
-    public const int ReplaySegmentLimit = 48;
+    // Ten seconds at the 16 ms capture interval is at most about 625 samples.
+    // Keep those samples instead of merging them into 48 large cursor jumps.
+    // The Pico exporter stores the path as one compact HANDPATH command, so this
+    // no longer creates hundreds of parsed route-command objects on RP2040.
+    public const int ReplaySegmentLimit = 640;
     public readonly record struct Segment(int DelayMs, int Dx, int Dy);
     public sealed record Sample(int DurationMs, Point Start, Point End, IReadOnlyList<Segment> Segments);
 
@@ -40,7 +42,7 @@ public static class HandMovementSample
         if (segments.Count == 0) return null;
         int trailing = Math.Max(1, CaptureDurationMs - lastChangeMs);
         segments.Add(new Segment(trailing, 0, 0));
-        return new Sample(CaptureDurationMs, start, previous, Compact(segments, 240));
+        return new Sample(CaptureDurationMs, start, previous, segments.ToArray());
     }
 
     public static string Encode(Sample sample)

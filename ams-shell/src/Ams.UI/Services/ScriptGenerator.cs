@@ -181,8 +181,8 @@ public static class ScriptGenerator
                 {
                     foreach (var seg in HandMovementSample.Compact(sample.Segments, HandMovementSample.ReplaySegmentLimit))
                     {
-                        if (seg.Dx != 0 || seg.Dy != 0) sb.AppendLine($"{pad}Send-Cmd \"MMOVE|{seg.Dx},{seg.Dy},rel,2\"");
                         sb.AppendLine($"{pad}Step-Delay {seg.DelayMs}");
+                        if (seg.Dx != 0 || seg.Dy != 0) sb.AppendLine($"{pad}Send-Cmd \"MMOVE|{seg.Dx},{seg.Dy},rel,2\"");
                     }
                 }
                 else if (PropEx.GetBool(n.Props, "human", true))

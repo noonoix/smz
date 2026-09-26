@@ -324,13 +324,15 @@ public static class PlanExporter
             {
                 if (!HandMovementSample.TryDecode(PropEx.GetString(n.Props, "handSample"), out var sample))
                 { Error(n, "handSample mode needs a valid ten-second mouse sample"); return; }
-                var lines = new List<string>();
-                foreach (var seg in HandMovementSample.Compact(sample.Segments, HandMovementSample.ReplaySegmentLimit))
-                {
-                    if (seg.Dx != 0 || seg.Dy != 0) lines.Add("RAW|MMOVE|"+seg.Dx+","+seg.Dy+",rel,2");
-                    lines.Add("DELAY|"+seg.DelayMs);
-                }
-                Emit(n, lines, "HANDPATH");
+                var path = HandMovementSample.Compact(sample.Segments, HandMovementSample.ReplaySegmentLimit);
+                // DelayMs is the time BEFORE this captured cursor change. Keep
+                // all samples in one light-runtime command: this preserves the
+                // gesture without allocating one Pico command tuple per point.
+                var payload = string.Join(";", path.Select(seg =>
+                    seg.DelayMs.ToString(CultureInfo.InvariantCulture) + "," +
+                    seg.Dx.ToString(CultureInfo.InvariantCulture) + "," +
+                    seg.Dy.ToString(CultureInfo.InvariantCulture)));
+                Emit(n, new[] { "HANDPATH|" + payload }, "HANDPATH");
                 return;
             }
             if(!PropEx.GetBool(n.Props,"human",true)){Emit(n,new[]{"MOVETO|x="+x+"|y="+y+"|human=0"},"MOVETO");return;}

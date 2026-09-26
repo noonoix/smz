@@ -3721,9 +3721,9 @@ class TestRunner
                 PexStep("mouseMove", new Dictionary<string, object?>
                 { ["x"] = 130, ["y"] = 106, ["moveMode"] = "handSample", ["handSample"] = encodedHand }),
             }, pexSettings, 1920, 1080, "f", "T");
-            Assert(pexHand.Text.Contains("RAW|MMOVE|10,2,rel,2\n")
-                   && pexHand.Text.Contains("DELAY|100\n") && !pexHand.Text.Contains("MOVETO|"),
-                "v0.9.69: sampled hand motion exports as native relative HID commands");
+            Assert(pexHand.Text.Contains("HANDPATH|100,10,2;120,12,3;140,8,1\n")
+                   && !pexHand.Text.Contains("RAW|MMOVE|") && !pexHand.Text.Contains("MOVETO|"),
+                "v0.9.69: sampled hand motion exports as a compact native relative HID path");
             var handNode = PexStep("mouseMove", new Dictionary<string, object?>
                 { ["x"] = 999, ["y"] = 777, ["moveMode"] = "handSample", ["handSample"] = encodedHand });
             Assert(StepDefinitions.Get("mouseMove").Summarize(handNode).Contains("Δ(30, 6)")

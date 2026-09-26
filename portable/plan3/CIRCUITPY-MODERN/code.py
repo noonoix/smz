@@ -569,7 +569,7 @@ runtime.PlanContext.beep = _diagnostic_beep
 
 _LIGHT_ROUTE_COMMANDS = {
     "PLAN", "SCREEN", "SPEED", "BEEP", "DELAY", "KEY", "KDOWN", "KUP", "RAW",
-    "LOOP", "LOOPTIME", "ENDLOOP",
+    "HANDPATH", "LOOP", "LOOPTIME", "ENDLOOP",
 }
 
 def _light_route_lines(text):
@@ -654,6 +654,39 @@ def _run_light_route(ctx, commands):
                 ctx.mmove_relative(int(fields[0]), int(fields[1]))
             elif not args or ctx.raw(args) is None:
                 raise RuntimeError("RAW route command aborted")
+        elif command == "HANDPATH":
+            # Compact streaming replay for a ten-second hand sample.
+            # Format: HANDPATH|delayMs,dx,dy;delayMs,dx,dy;...
+            # Do not split the entire payload: hundreds of list/string objects
+            # would recreate the RP2040 heap pressure this command avoids.
+            start = 0
+            count = 0
+            size = len(args)
+            while start < size:
+                end = args.find(";", start)
+                if end < 0:
+                    end = size
+                token = args[start:end]
+                fields = token.split(",", 2)
+                if len(fields) != 3:
+                    raise ValueError("HANDPATH needs delay,dx,dy segments")
+                delay_ms = int(fields[0])
+                dx = int(fields[1])
+                dy = int(fields[2])
+                if delay_ms < 1 or delay_ms > 60000 or abs(dx) > 8192 or abs(dy) > 8192:
+                    raise ValueError("HANDPATH segment out of range")
+                if not ctx.sleep_ms(delay_ms):
+                    raise RuntimeError("route aborted")
+                if dx or dy:
+                    ctx.mmove_relative(dx, dy)
+                count += 1
+                if count > 2000:
+                    raise ValueError("HANDPATH has too many segments")
+                if not (count & 31):
+                    gc.collect()
+                start = end + 1
+            if not count:
+                raise ValueError("HANDPATH is empty")
         elif command == "LOOP":
             count = int(args)
             if count < 0:

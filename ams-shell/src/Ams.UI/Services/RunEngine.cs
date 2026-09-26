@@ -1044,9 +1044,11 @@ public sealed class RunEngine
         {
             ct.ThrowIfCancellationRequested();
             if (_pauseCheck is not null) await _pauseCheck(ct);
+            // DelayMs was measured from the previous captured position to this
+            // one, so it belongs before the corresponding relative report.
+            if (segment.DelayMs > 0) await PausableDelay(segment.DelayMs, ct);
             if (segment.Dx != 0 || segment.Dy != 0)
                 await Send($"MMOVE|{segment.Dx},{segment.Dy},rel,2", ct, quiet: true);
-            if (segment.DelayMs > 0) await PausableDelay(segment.DelayMs, ct);
         }
         // Windows can report the real post-HID position. Do not invent it by adding raw HID
         // deltas: pointer acceleration means a report delta is not guaranteed to equal pixels.

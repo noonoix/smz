@@ -11,6 +11,9 @@ for name in ("plan_engine", "plan_engine_parse", "plan_engine_human",
              "plan_engine_exec"):
     sys.modules.pop(name, None)
 import plan_engine
+assert "plan_engine_human" not in sys.modules
+assert "plan_engine_parallel" not in sys.modules
+assert "plan_engine_exec" not in sys.modules
 import plan_engine_exec
 
 

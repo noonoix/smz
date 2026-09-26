@@ -8,6 +8,7 @@ sys.path.insert(0,str(MODERN))
 for name in ('plan_engine','plan_engine_exec','plan_engine_human','plan_engine_parse'):
     sys.modules.pop(name,None)
 import plan_engine
+from plan_engine_human import PausePlanner
 assert 'plan_engine_parallel' not in sys.modules, 'parallel scheduler imported before PGROUP'
 
 class Ctx:
@@ -86,7 +87,7 @@ try:
         'region':(1301,0,378,1049),'before':(20,85),'after':(20,103),
         'curve':(0,3),'mid':(36,(144,375)),'over':2,'mt':(16,159),
         'idle':((5,12),(800,3000))
-    },Ctx(),plan_engine.PausePlanner(),pos))
+    },Ctx(),PausePlanner(),pos))
 finally:
     parallel.plan_move=original_plan_move
 stream_moves=[e for e in events if e[0]=='move']
@@ -99,7 +100,7 @@ assert all(e[4] is True for e in stream_moves)
 # own micro-step time so the Pico does not pay the recorded cadence twice.
 random.seed(12)
 speed_events=list(parallel._parallel_relative_mouse_events(
-    {},Ctx(),plan_engine.PausePlanner(),[960,540],
+    {},Ctx(),PausePlanner(),[960,540],
     dict(parallel._DEFAULT_CFG, speed_min=500, speed_max=500, mt_min=0, mt_max=0,
          before_min=0,before_max=0,after_min=0,after_max=0,
          mid_chance=0,idle_pause_max=0),1260,540))

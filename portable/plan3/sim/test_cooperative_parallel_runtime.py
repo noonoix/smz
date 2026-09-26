@@ -8,6 +8,7 @@ sys.path.insert(0,str(MODERN))
 for name in ('plan_engine','plan_engine_exec','plan_engine_human','plan_engine_parse'):
     sys.modules.pop(name,None)
 import plan_engine
+assert 'plan_engine_parallel' not in sys.modules, 'parallel scheduler imported before PGROUP'
 
 class Ctx:
     plan_api=3; screen_w=1920; screen_h=1080; speed_min=300; speed_max=2000; mouse_mode='relative'
@@ -46,6 +47,7 @@ ENDPAR'''
 ctx=Ctx(); random.seed(4)
 ops=plan_engine.parse_plan(plan)
 plan_engine.run_plan(ops,ctx)
+assert 'plan_engine_parallel' in sys.modules, 'parallel scheduler was not loaded at PGROUP'
 moves=[e for e in ctx.ev if e[0]=='move']
 chars=[e for e in ctx.ev if e[0]=='char']
 assert 1 <= len(moves) < 4,moves

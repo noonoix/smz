@@ -107,7 +107,8 @@ runtime.parse_calibration_set = parse_calibration_set
 
 # Classroom Studio's complete 21-file export hashes every payload except the
 # hash manifest itself. Extend the verifier inventory before loading the bundle.
-for _name in ("pico-calibration.json", "README-FLASH.md", "plan_engine_parse.py", "plan_engine_human.py", "plan_engine_exec.py"):
+for _name in ("pico-calibration.json", "README-FLASH.md", "plan_engine_parse.py",
+              "plan_engine_human.py", "plan_engine_exec.py", "plan_engine_parallel.py"):
     if _name not in _guard_bundle.HASHED_BUNDLE_FILES:
         _guard_bundle.HASHED_BUNDLE_FILES += (_name,)
 runtime.HASHED_BUNDLE_FILES = _guard_bundle.HASHED_BUNDLE_FILES

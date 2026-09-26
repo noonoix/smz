@@ -10,6 +10,9 @@ on:
       - 'portable/plan3/CIRCUITPY-MODERN/**'
       - 'portable/plan3/sim/test_calibration_heap_release.py'
       - 'tools/apply_calibration_save_heap_fix.py'
+      - 'tools/current_release_notes.py'
+      - 'CHANGELOG-CURRENT.md'
+      - 'README.md'
       - '.github/workflows/classroom-studio-current.yml'
 
 permissions:
@@ -20,10 +23,25 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
+      - name: Require a current hardware changelog entry
+        shell: pwsh
+        run: |
+          $changed = @(git diff --name-only HEAD^ HEAD)
+          $releaseRelevant = @($changed | Where-Object {
+            $_ -match '^(ams-shell/|tests/|portable/plan3/CIRCUITPY-MODERN/|tools/apply_calibration_save_heap_fix.py|tools/current_release_notes.py|\.github/workflows/classroom-studio-current.yml)'
+          })
+          if ($releaseRelevant.Count -gt 0 -and -not ($changed -contains 'CHANGELOG-CURRENT.md')) {
+            throw 'Build-affecting changes require an update to CHANGELOG-CURRENT.md'
+          }
+          python tools/current_release_notes.py --build-number "${{ github.run_number }}" --sha "${{ github.sha }}"
+          if (-not (Test-Path release-notes.md)) { throw 'release-notes.md was not generated' }
 
       - name: Apply and verify calibration-save memory fix
         shell: pwsh
@@ -91,6 +109,7 @@ jobs:
             Classroom-Studio-current.zip
             sha256.txt
             ci-test-output.txt
+            release-notes.md
           if-no-files-found: warn
 
       - name: Publish current Classroom Studio test release
@@ -101,9 +120,7 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: "Classroom Studio current test #${{ github.run_number }}"
           prerelease: true
-          body: |
-            Current test build with the verified calibration-save heap fix, relative-native mouse, start-from-current-state Guard, and per-TYPE typo counts.
-            Golden 100 remains separate and unchanged.
+          body_path: release-notes.md
           files: |
             Classroom-Studio-current.zip
             sha256.txt

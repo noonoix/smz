@@ -26,14 +26,15 @@ text = replace_once(
     "def _enter_calibration_from_pending_start(self):\n",
     "def _enter_calibration_from_pending_start(self):\n    _prepare_calibration_heap(self)\n",
 )
-text = replace_once(
-    text,
-    """_original_yellow_action = runtime.Combined.yellow_action
+if "def _release_plan_heap(self, emit_cal=False):" not in text:
+    text = replace_once(
+        text,
+        """_original_yellow_action = runtime.Combined.yellow_action
 
 def _audible_start_cal(self):
     _original_start_cal(self)
 """,
-    """_original_yellow_action = runtime.Combined.yellow_action
+        """_original_yellow_action = runtime.Combined.yellow_action
 
 _PLAN_MODULES = (\"plan_engine_exec\", \"plan_engine_human\", \"plan_engine_parallel\", \"plan_engine_parse\")
 
@@ -62,7 +63,7 @@ def _audible_start_cal(self):
     _prepare_calibration_heap(self)
     _original_start_cal(self)
 """,
-)
+    )
 text = replace_once(
     text,
     """    if was_sampling and isinstance(self.result, dict):

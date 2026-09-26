@@ -6,6 +6,7 @@ repo = root.parents[1]
 runpy.run_path(str(repo / "tools" / "apply_calibration_save_heap_fix.py"), run_name="__main__")
 code = (root / "CIRCUITPY-MODERN" / "code.py").read_text(encoding="utf-8")
 assert 'def _prepare_calibration_heap(self):' in code
+assert 'def _release_plan_heap(self, emit_cal=False):' in code
 assert 'proxy.module = None' in code
 for name in ('plan_engine_exec', 'plan_engine_human', 'plan_engine_parallel', 'plan_engine_parse'):
     assert name in code

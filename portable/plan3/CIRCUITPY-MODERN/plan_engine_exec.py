@@ -3,7 +3,8 @@ import math
 import random
 
 from plan_engine_parse import (PlanAbort, _V2_OPS, _clamp, _load_mouse_pos, _save_mouse_pos, parse_plan, rand_range)
-from plan_engine_human import (PausePlanner, _DEFAULT_CFG, plan_move, plan_typing)
+from plan_engine_human import (PausePlanner, _DEFAULT_CFG, plan_move, plan_typing,
+                               relative_mouse_events)
 
 class _LightStateChanged(Exception):
     def __init__(self, state_id):
@@ -380,6 +381,23 @@ def _exec_rmouse(prm, ctx, pauses, pos, target=None):
         pos[0], pos[1] = tx, ty
         if not relative:
             _save_mouse_pos(ctx, pos)
+        return
+    if relative:
+        # Parsing leaves many short-lived strings behind. Collect before the
+        # first move, then use the bounded streaming path instead of allocating
+        # the normal dense point, segment and weight lists.
+        gc.collect()
+        ctx.log("rmouse-rel-stream -> (%+d,%+d) <=32 pts" %
+                (tx - pos[0], ty - pos[1]))
+        for event in relative_mouse_events(pos, tx, ty, c, pauses):
+            if event[0] == "wait":
+                if event[1] and not ctx.sleep_ms(event[1]):
+                    raise PlanAbort()
+            else:
+                if event[2] or event[3]:
+                    ctx.mmove_relative(event[2], event[3])
+                if event[1] and not ctx.sleep_ms(event[1]):
+                    raise PlanAbort()
         return
     plan = plan_move(pos[0], pos[1], tx, ty, c, pauses, ctx.screen_w, ctx.screen_h)
     if relative:

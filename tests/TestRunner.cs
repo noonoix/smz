@@ -4143,6 +4143,11 @@ class TestRunner
                    && modernExec.Contains("ctx.mmove_relative(dx, dy)")
                    && File.ReadAllText(Path.Combine(modernTmp, "code.py")).Contains("relative-native-before-route"),
                 "modern AutoCycle export uses hostless relative mouse without a cursor bridge");
+            var modernCode = File.ReadAllText(Path.Combine(modernTmp, "code.py"));
+            Assert(modernCode.Contains("\"RAW\"}")
+                   && modernCode.Contains("elif command == \"RAW\":")
+                   && modernCode.Contains("ctx.raw(args)"),
+                "hand-sampled RAW/MMOVE routes stay on the low-memory light-route executor");
 
             var current = new PipelineWorkspace();
             foreach (var tab in current.Tabs) tab.Steps.Clear();

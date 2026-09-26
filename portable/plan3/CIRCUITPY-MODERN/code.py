@@ -567,7 +567,7 @@ def _diagnostic_beep(ctx, frequency, duration):
 runtime.PlanContext.setres = _diagnostic_setres
 runtime.PlanContext.beep = _diagnostic_beep
 
-_LIGHT_ROUTE_COMMANDS = {"PLAN", "SCREEN", "SPEED", "BEEP", "DELAY", "KEY", "KDOWN", "KUP"}
+_LIGHT_ROUTE_COMMANDS = {"PLAN", "SCREEN", "SPEED", "BEEP", "DELAY", "KEY", "KDOWN", "KUP", "RAW"}
 
 def _light_route_lines(text):
     commands = []
@@ -623,6 +623,12 @@ def _run_light_route(ctx, commands):
             ctx.kdown(int(args))
         elif command == "KUP":
             ctx.kup(int(args))
+        elif command == "RAW":
+            # Hand-sampled mouse paths are already portable Arm commands
+            # (MMOVE|dx,dy,rel,2). Forward them directly so a route containing
+            # only RAW + DELAY never imports the large plan_engine modules.
+            if not args or ctx.raw(args) is None:
+                raise RuntimeError("RAW route command aborted")
         elif command == "BEEP":
             fields = args.replace(",", " ").split()
             if len(fields) != 2:

@@ -4133,7 +4133,10 @@ class TestRunner
                    && File.Exists(Path.Combine(modernTmp, "plan_engine_exec.py"))
                    && File.ReadAllText(Path.Combine(modernTmp, "SHA256SUMS.txt")).Split('\n', StringSplitOptions.RemoveEmptyEntries).Length == 24,
                 "modern AutoCycle export writes the split-memory bundle and manifest");
-            Assert(File.ReadAllText(Path.Combine(modernTmp, "code.py")).Length < 40000
+            // Windows checkout expands LF to CRLF and the packaging workflow applies the
+            // verified calibration-heap overlay. Keep a bounded deferred entrypoint without
+            // pinning the old pre-overlay byte count.
+            Assert(File.ReadAllText(Path.Combine(modernTmp, "code.py")).Length < 45000
                    && File.ReadAllText(Path.Combine(modernTmp, "code.py")).Contains("DeferredPlanEngine"),
                 "modern AutoCycle export uses the small deferred-loading entrypoint");
             var modernRuntime = File.ReadAllText(Path.Combine(modernTmp, "combined_guard_runtime.py"));
@@ -4144,7 +4147,8 @@ class TestRunner
                    && File.ReadAllText(Path.Combine(modernTmp, "code.py")).Contains("relative-native-before-route"),
                 "modern AutoCycle export uses hostless relative mouse without a cursor bridge");
             var modernCode = File.ReadAllText(Path.Combine(modernTmp, "code.py"));
-            Assert(modernCode.Contains("\"RAW\"}")
+            Assert(modernCode.Contains("_LIGHT_ROUTE_COMMANDS")
+                   && modernCode.Contains("\"RAW\"")
                    && modernCode.Contains("\"LOOPTIME\"")
                    && modernCode.Contains("\"ENDLOOP\"")
                    && modernCode.Contains("elif command == \"RAW\":")

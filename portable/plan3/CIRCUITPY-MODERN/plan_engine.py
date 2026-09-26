@@ -1,11 +1,15 @@
 # Compatibility facade for the memory-split experimental bundle.
-# Public plan_engine.parse_plan/run_plan names remain unchanged.
+# Parsing is needed before execution, but importing the human/parallel/exec
+# modules at the same time creates the highest transient heap peak on RP2040.
+# Keep parse_plan/PlanAbort eager and defer the executor until the route source
+# has been parsed, deleted, and collected by code.py.
+import gc
 from plan_engine_parse import (PlanAbort, _below, parse_plan)
-from plan_engine_human import (PausePlanner, plan_move, plan_typing, windmouse)
-import plan_engine_exec as _exec
+gc.collect()
 
-# The executor's Random Package shuffle uses the shared C#-compatible helper.
-# Bind it explicitly at the split-module boundary so facade consumers cannot
-# hit a late NameError when the first shuffled package starts.
-_exec._below = _below
-run_plan = _exec.run_plan
+def run_plan(plan, ctx):
+    gc.collect()
+    import plan_engine_exec as executor
+    # Random Package shuffle uses the shared C#-compatible helper.
+    executor._below = _below
+    return executor.run_plan(plan, ctx)

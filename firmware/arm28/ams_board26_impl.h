@@ -55,7 +55,7 @@
 //   Now the tracker boots at centre and every button/wheel report carries the TRACKED
 //   position (cursor_sync). Bonus: rel-MMOVE and MDRAG moved by AXIS units (+-127 of
 //   32767 ~ 7 px!) instead of pixels - both go through mouse_move_abs now.
-#define FW_VER   "2.8.0"
+#define FW_VER   "2.8.1"
 // 0 = disabled. If > 0, an idle secure session is dropped after this many ms
 // (releases mouse buttons and allows a fresh HELLO). Keep 0 for long scripts.
 #define SESSION_IDLE_MS 0UL
@@ -265,10 +265,32 @@ static void mouse_report(int32_t x, int32_t y, signed char wheel = 0) {
   g_reportX = x; g_reportY = y;
 }
 
+// Emit a DDA path without accumulating rounding error. A one-millisecond pace
+// lets USB transmit every report separately instead of collapsing a fast burst.
+static void mouse_move_steps(int32_t x, int32_t y, uint16_t steps, uint8_t paceMs) {
+  if (steps < 1) {
+    mouse_report(x, y);
+    g_curX = x; g_curY = y;
+    return;
+  }
+  int32_t sx = g_curX, sy = g_curY;
+  int32_t dx = x - sx, dy = y - sy;
+  for (uint16_t i = 1; i <= steps; i++) {
+    int32_t px = sx + (int32_t)((dx * (int32_t)i) / (int32_t)steps);
+    int32_t py = sy + (int32_t)((dy * (int32_t)i) / (int32_t)steps);
+    mouse_report(px, py);
+    if (i < steps && paceMs) delay(paceMs);
+  }
+  g_curX = x; g_curY = y;
+}
+
 static void mouse_move_relative_native(int32_t dx, int32_t dy) {
-  mouse_delta_report(dx, dy, 0);
-  g_reportX += dx; g_reportY += dy;
-  g_curX += dx; g_curY += dy;
+  // Target two pixels of path per DDA interval. Integer endpoint rounding can
+  // make a report slightly longer than the target, but exhaustive -127..127
+  // verification keeps the actual Euclidean HID report at <= sqrt(8) < 3 px.
+  uint32_t dist = (uint32_t)sqrt((float)(dx * dx + dy * dy));
+  uint16_t steps = (uint16_t)((dist + 1U) / 2U);  // ceil(dist/2)
+  mouse_move_steps(g_curX + dx, g_curY + dy, steps, 1);
 }
 
 static void mouse_move_abs(int32_t x, int32_t y, bool human) {
@@ -320,14 +342,7 @@ static void mouse_move_stream(int32_t x, int32_t y) {
   }
   uint8_t paceMs = (uint8_t)(totalMs / steps);
   if (paceMs < 2) paceMs = 2;
-  int32_t sx = g_curX, sy = g_curY;
-  for (uint8_t i = 1; i <= steps; i++) {
-    int32_t px = sx + (int32_t)((dx * (int32_t)i) / (int32_t)steps);
-    int32_t py = sy + (int32_t)((dy * (int32_t)i) / (int32_t)steps);
-    mouse_report(px, py);
-    if (i < steps) delay(paceMs);
-  }
-  g_curX = x; g_curY = y;
+  mouse_move_steps(x, y, steps, paceMs);
 }
 
 // fw 1.8: make the next button/wheel report carry the TRACKED cursor position.

@@ -8,12 +8,14 @@ namespace Ams.UI.Services;
 public static class HandMovementSample
 {
     public const int CaptureDurationMs = 10_000;
-    public const int CaptureIntervalMs = 16;
-    // Ten seconds at the 16 ms capture interval is at most about 625 samples.
+    // 8 ms stays below the safe ~125-command/s UART replay budget while retaining
+    // the small 1-5 px motion seen in the user's high-rate reference recordings.
+    public const int CaptureIntervalMs = 8;
+    // Ten seconds at the 8 ms capture interval is at most about 1250 samples.
     // Keep those samples instead of merging them into 48 large cursor jumps.
     // The Pico exporter stores the path as one compact HANDPATH command, so this
     // no longer creates hundreds of parsed route-command objects on RP2040.
-    public const int ReplaySegmentLimit = 640;
+    public const int ReplaySegmentLimit = 1280;
     public readonly record struct Segment(int DelayMs, int Dx, int Dy);
     public sealed record Sample(int DurationMs, Point Start, Point End, IReadOnlyList<Segment> Segments);
 

@@ -3712,6 +3712,9 @@ class TestRunner
                    && decodedHand.Segments.Count == 3 && decodedHand.End.X == 130
                    && HandMovementSample.Displacement(decodedHand) == new System.Drawing.Point(30, 6),
                 "v0.9.68: ten-second hand sample codec round-trips without keyboard/text data");
+            Assert(HandMovementSample.CaptureIntervalMs == 8
+                   && HandMovementSample.ReplaySegmentLimit == 1280,
+                "v0.9.69: hand capture retains 8ms detail without exceeding the safe UART replay rate");
             Assert(StepDefinitions.Get("mouseMove").Label == "Mouse Movement"
                    && StepDefinitions.Get("mouseMove").Fields.Any(f => f.Key == "moveMode")
                    && StepDefinitions.Get("mouseMove").Fields.Any(f => f.Key == "handSample"),

@@ -716,7 +716,7 @@ public static class PlanExporter
         var stack = new List<(string Kind, bool ElseSeen, int Line)>();
         var labels = new HashSet<string>(StringComparer.Ordinal);
         var gotos = new List<string>();
-        var known = new HashSet<string>{"PLAN","SCREEN","SPEED","DELAY","LOOP","LOOPTIME","ENDLOOP","RMOUSE","MOVETO","CLICK","TYPE","WLIGHT","WSND","TRGSND","IFSND","IFLUX","ELSE","ENDIF","KEY","KDOWN","KUP","WHEEL","LABEL","GOTO","RAW","RPKG","PKGITEM","ENDPKG","PGROUP","PARITEM","ENDPAR","INCLUDE","BEEP"};
+        var known = new HashSet<string>{"PLAN","SCREEN","SPEED","DELAY","LOOP","LOOPTIME","ENDLOOP","RMOUSE","MOVETO","CLICK","TYPE","WLIGHT","WSND","TRGSND","IFSND","IFLUX","ELSE","ENDIF","KEY","KDOWN","KUP","WHEEL","LABEL","GOTO","RAW","HANDPATH","RPKG","PKGITEM","ENDPKG","PGROUP","PARITEM","ENDPAR","INCLUDE","BEEP"};
         bool first = true;
         string previousOp = "";
         var lines = text.Split('\n');
@@ -781,6 +781,22 @@ public static class PlanExporter
             }
             if (op == "INCLUDE" && (!HasKv(fields, "file", out var file) || file.Length == 0 ||
                 file.Any(ch => ch < 32 || ch > 126 || "/\\:|%".Contains(ch)))) Bad("unsafe INCLUDE filename");
+            if (op == "HANDPATH")
+            {
+                if (fields.Length != 2 || fields[1].Length == 0) Bad("HANDPATH needs samples");
+                var samples = fields[1].Split(';', StringSplitOptions.RemoveEmptyEntries);
+                if (samples.Length is < 1 or > 2000) Bad("HANDPATH sample count out of range");
+                foreach (var sample in samples)
+                {
+                    var values = sample.Split(',');
+                    if (values.Length != 3 || !values.All(IsInt)) Bad("HANDPATH needs delay,dx,dy samples");
+                    int delay = int.Parse(values[0], CultureInfo.InvariantCulture);
+                    int dx = int.Parse(values[1], CultureInfo.InvariantCulture);
+                    int dy = int.Parse(values[2], CultureInfo.InvariantCulture);
+                    if (delay is < 1 or > 60_000 || Math.Abs((long)dx) > 8192 || Math.Abs((long)dy) > 8192)
+                        Bad("HANDPATH sample out of range");
+                }
+            }
             first = false;
             previousOp = op;
         }

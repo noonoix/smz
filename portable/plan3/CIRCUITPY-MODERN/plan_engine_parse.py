@@ -104,6 +104,30 @@ def _clamp(v, lo, hi):
     return lo if v < lo else hi if v > hi else v
 
 
+def handpath_events(raw, timing=None):
+    """Scale a recorded path to one freshly selected total without allocating a list."""
+    total = 0
+    start = 0
+    while start < len(raw):
+        end = raw.find(";", start)
+        if end < 0:
+            end = len(raw)
+        total += int(raw[start:end].split(",", 1)[0])
+        start = end + 1
+    target = rand_range(*(timing or (total, total)))
+    source_elapsed = target_elapsed = start = 0
+    while start < len(raw):
+        end = raw.find(";", start)
+        if end < 0:
+            end = len(raw)
+        delay, dx, dy = (int(v) for v in raw[start:end].split(",", 2))
+        source_elapsed += delay
+        due = (source_elapsed * target + total // 2) // max(1, total)
+        yield max(0, due - target_elapsed), dx, dy
+        target_elapsed = due
+        start = end + 1
+
+
 # ── %-codec for TYPE text (|, %, newline are structural in plan.txt) ─────────────────────
 
 def pct_dec(s):

@@ -328,6 +328,71 @@ def run_plan(ops, ctx, _pos=None, _pauses=None, _inc=()):
         i += 1
 
 
+def _exec_relative_rmouse_stream(ctx, pauses, pos, c, tx, ty):
+    """Run a bounded relative curve without building the dense desktop plan.
+
+    ARM 2.8.1 expands every relative delta into <=3 px HID micro-steps. Keeping
+    only the current control point on the Pico preserves the physical smoothness
+    while avoiding the dense spine/resample/delay lists that can exhaust the
+    fragmented heap immediately after a complex Login route is parsed.
+    """
+    sx, sy = pos[0], pos[1]
+    dx, dy = tx - sx, ty - sy
+    span = max(abs(dx), abs(dy))
+    segments = max(8, min(32, (span + 11) // 12))
+    curve_min, curve_max = c["curve_min"], c["curve_max"]
+    if curve_max < curve_min:
+        curve_min, curve_max = curve_max, curve_min
+    curve_pct = rand_range(int(curve_min), int(curve_max))
+    curve_sign = -1 if random.randint(0, 1) == 0 else 1
+    curve_amp = curve_sign * min(span // 3, (span * curve_pct) // 100)
+    denom = max(1, span)
+    perp_x = (-dy * curve_amp) // denom
+    perp_y = (dx * curve_amp) // denom
+    if c["mt_max"] > 0:
+        total_ms = rand_range(c["mt_min"], c["mt_max"])
+    elif c["speed_max"] > 0:
+        speed_lo = max(1, c["speed_min"])
+        speed_hi = max(speed_lo, c["speed_max"])
+        speed = rand_range(speed_lo, speed_hi)
+        path_px = max(abs(dx), abs(dy)) + min(abs(dx), abs(dy)) // 2
+        total_ms = max(0, (path_px * 1000) // max(1, speed) - path_px)
+    else:
+        total_ms = 0
+    base_delay = total_ms // segments if total_ms > 0 else 0
+    delay_extra = total_ms % segments if total_ms > 0 else 0
+    mid_delay = pauses.mid_pause(c)
+    mid_at = 1 + random.randint(0, max(1, segments - 1) - 1)
+    if c["before_max"] > 0 and not ctx.sleep_ms(
+            rand_range(c["before_min"], c["before_max"])):
+        raise PlanAbort()
+    px, py = sx, sy
+    scale = 1024
+    for step in range(1, segments + 1):
+        t = (step * scale) // segments
+        ease = (t * t * (3 * scale - 2 * t)) // (scale * scale)
+        bow = (4 * t * (scale - t)) // scale
+        nx = sx + (dx * ease) // scale + (perp_x * bow) // scale
+        ny = sy + (dy * ease) // scale + (perp_y * bow) // scale
+        if step == segments:
+            nx, ny = tx, ty
+        delay = base_delay + (1 if step <= delay_extra else 0)
+        if mid_delay and step == mid_at:
+            delay += mid_delay
+        if nx != px or ny != py:
+            ctx.mmove_relative(nx - px, ny - py)
+        px, py = nx, ny
+        pos[0], pos[1] = px, py
+        if delay and not ctx.sleep_ms(delay):
+            raise PlanAbort()
+    if c["after_max"] > 0 and not ctx.sleep_ms(
+            rand_range(c["after_min"], c["after_max"])):
+        raise PlanAbort()
+    long_pause = pauses.roll_long(c)
+    if long_pause and not ctx.sleep_ms(long_pause):
+        raise PlanAbort()
+
+
 def _exec_rmouse(prm, ctx, pauses, pos, target=None):
     rx, ry, rw, rh = prm.get("region", (0, 0, ctx.screen_w, ctx.screen_h))   # v2: MOVETO has no region
     relative = target is None and getattr(ctx, "mouse_mode", "") == "relative"
@@ -380,6 +445,15 @@ def _exec_rmouse(prm, ctx, pauses, pos, target=None):
         pos[0], pos[1] = tx, ty
         if not relative:
             _save_mouse_pos(ctx, pos)
+        return
+    if relative:
+        # Parsing leaves many short-lived strings behind. Collect before the
+        # first move, then use the bounded streaming path instead of allocating
+        # the normal dense point, segment and weight lists.
+        gc.collect()
+        ctx.log("rmouse-rel-stream -> (%+d,%+d) <=32 pts" %
+                (tx - pos[0], ty - pos[1]))
+        _exec_relative_rmouse_stream(ctx, pauses, pos, c, tx, ty)
         return
     plan = plan_move(pos[0], pos[1], tx, ty, c, pauses, ctx.screen_w, ctx.screen_h)
     if relative:

@@ -824,6 +824,11 @@ def _diagnostic_route(self, decision):
             except MemoryError:
                 self.emit("EVT|DEBUG|ROUTE|stage=plan-parse-memoryerror")
                 raise
+            # The parser creates many short-lived strings and containers. The
+            # source text is no longer needed once route_plan exists; reclaim
+            # both before the first RMOUSE needs working heap.
+            del text
+            gc.collect()
             self.emit("EVT|DEBUG|ROUTE|stage=after-plan-parse|free=%d" % gc.mem_free())
             route_ctx = runtime.PlanContext(self)
             if getattr(route_ctx, "mouse_mode", "") == "relative":

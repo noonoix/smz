@@ -87,6 +87,10 @@ public static class StepDefinitions
                 new("y", "Y", FieldKind.Int, "497"),
                 new("moveMode", "Movement source", FieldKind.Combo, "fixed", new[] { "fixed", "handSample" }),
                 new("handSample", "Recorded hand movement", FieldKind.Text, ""),
+                new("handReplayTimeMin", "Hand Sample replay duration — min (ms)", FieldKind.Int, "9000",
+                    HideWhenKey: "moveMode", HideUnlessValue: "handSample"),
+                new("handReplayTimeMax", "Hand Sample replay duration — max (ms)", FieldKind.Int, "11000",
+                    HideWhenKey: "moveMode", HideUnlessValue: "handSample"),
                 new("human", "Humanized movement (app-side WindMouse path + pauses — off = instant firmware move)", FieldKind.Check, "true"),
                 new("pauseBeforeMin", "Pause BEFORE move — min (ms)", FieldKind.Int, "60", HideWhenKey: "human", HideWhenValue: "false"),
                 new("pauseBeforeMax", "Pause BEFORE move — max (ms)", FieldKind.Int, "220", HideWhenKey: "human", HideWhenValue: "false"),
@@ -108,7 +112,11 @@ public static class StepDefinitions
                     if (HandMovementSample.TryDecode(PropEx.GetString(s.Props, "handSample"), out var sample))
                     {
                         var delta = HandMovementSample.Displacement(sample);
-                        return $"Replay Relative Hand Gesture Δ({delta.X}, {delta.Y})";
+                        var (mn, mx) = HandMovementSample.NormalizeReplayRange(
+                            sample,
+                            PropEx.GetInt(s.Props, "handReplayTimeMin", sample.DurationMs * 9 / 10),
+                            PropEx.GetInt(s.Props, "handReplayTimeMax", sample.DurationMs * 11 / 10));
+                        return $"Replay Relative Hand Gesture Δ({delta.X}, {delta.Y}) · {mn}–{mx}ms";
                     }
                     return "Replay Relative Hand Gesture · sample required";
                 }

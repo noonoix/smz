@@ -332,6 +332,10 @@ public static class PlanExporter
                 if (!HandMovementSample.TryDecode(PropEx.GetString(n.Props, "handSample"), out var sample))
                 { Error(n, "handSample mode needs a valid ten-second mouse sample"); return; }
                 var path = HandMovementSample.Compact(sample.Segments, HandMovementSample.ReplaySegmentLimit);
+                var (replayMin, replayMax) = HandMovementSample.NormalizeReplayRange(
+                    sample,
+                    PropEx.GetInt(n.Props, "handReplayTimeMin", sample.DurationMs * 9 / 10),
+                    PropEx.GetInt(n.Props, "handReplayTimeMax", sample.DurationMs * 11 / 10));
                 // DelayMs is the time BEFORE this captured cursor change. Keep
                 // all samples in one light-runtime command: this preserves the
                 // gesture without allocating one Pico command tuple per point.
@@ -339,7 +343,7 @@ public static class PlanExporter
                     seg.DelayMs.ToString(CultureInfo.InvariantCulture) + "," +
                     seg.Dx.ToString(CultureInfo.InvariantCulture) + "," +
                     seg.Dy.ToString(CultureInfo.InvariantCulture)));
-                Emit(n, new[] { "HANDPATH|" + payload }, "HANDPATH");
+                Emit(n, new[] { "HANDPATH|mt=" + replayMin + "," + replayMax + "|" + payload }, "HANDPATH");
                 return;
             }
             if(!PropEx.GetBool(n.Props,"human",true)){Emit(n,new[]{"MOVETO|x="+x+"|y="+y+"|human=0"},"MOVETO");return;}
@@ -798,8 +802,19 @@ public static class PlanExporter
                 file.Any(ch => ch < 32 || ch > 126 || "/\\:|%".Contains(ch)))) Bad("unsafe INCLUDE filename");
             if (op == "HANDPATH")
             {
-                if (fields.Length != 2 || fields[1].Length == 0) Bad("HANDPATH needs samples");
-                var samples = fields[1].Split(';', StringSplitOptions.RemoveEmptyEntries);
+                var sampleField = 1;
+                if (fields.Length == 3 && fields[1].StartsWith("mt=", StringComparison.Ordinal))
+                {
+                    var timing = fields[1][3..].Split(',');
+                    if (timing.Length != 2 || !timing.All(IsInt)) Bad("HANDPATH mt needs min,max");
+                    var t0 = int.Parse(timing[0], CultureInfo.InvariantCulture);
+                    var t1 = int.Parse(timing[1], CultureInfo.InvariantCulture);
+                    if (t0 < 1 || t1 < t0 || t1 > 60_000) Bad("HANDPATH mt out of range");
+                    sampleField = 2;
+                }
+                else if (fields.Length != 2) Bad("HANDPATH needs optional mt and samples");
+                if (fields[sampleField].Length == 0) Bad("HANDPATH needs samples");
+                var samples = fields[sampleField].Split(';', StringSplitOptions.RemoveEmptyEntries);
                 if (samples.Length is < 1 or > 2000) Bad("HANDPATH sample count out of range");
                 foreach (var sample in samples)
                 {

@@ -12,6 +12,7 @@
 
 | Build | نتیجهٔ سخت‌افزاری | مسئله/تغییر اصلی | وضعیت |
 | --- | --- | --- | --- |
+| {{BUILD_NUMBER}} | در انتظار تست سخت‌افزاری | بازهٔ تصادفی زمان بازپخش Hand Sample | CI candidate |
 | 50 | A و B کامل؛ Record تست C تحلیل شد | Changelog اجباری؛ همان Runtime Build 49 | C انسانی‌ترین؛ B نرم‌ترین |
 | 49 | Route تست A کامل شد | Runner سبک RMOUSE بدون Executor کامل | Functional pass؛ کیفیت حرکت در حال تیون |
 | 48 | Import و Parse موفق؛ اجرا شکست خورد | Lazy import Parser/Executor | Superseded by 49 |
@@ -24,7 +25,40 @@
 | 39 | Facade صحیح در Export پروژهٔ جاری | Export ordering | Verified foundation |
 | 38 | Split executor اولیه | کاهش فشار Import | Superseded by 39 |
 
-## Build {{BUILD_NUMBER}} — ثبت نتایج سخت‌افزاری B و C
+## Build {{BUILD_NUMBER}} — بازهٔ زمان بازپخش Hand Sample
+
+**Previous build:** 50  
+**Status:** CI candidate; hardware test pending  
+**Commit:** `{{COMMIT_SHA}}`
+
+### Problem observed
+
+در حالت `handSample` فیلدهای عمومی Human Mouse مخفی بودند و دو مقدار صفرِ پایین Dialog فقط Delay بعد از Step را کنترل می‌کردند. خود مسیر ده‌ثانیه‌ای همیشه با Timing ثابت Payload بازپخش می‌شد؛ بنابراین تکرار آن داخل Loop یا Random Package می‌توانست ریتم قابل‌تشخیص ایجاد کند.
+
+### Root cause
+
+قرارداد `HANDPATH` فقط `delay,dx,dy` داشت و هیچ بازهٔ Min/Max برای مدت کل بازپخش تعریف نمی‌کرد. رابط نیز کنترل اختصاصی این بازه را نمایش نمی‌داد.
+
+### Change
+
+- دو فیلد اختصاصی «حداقل/حداکثر زمان بازپخش نمونه» فقط در حالت `handSample` نمایش داده می‌شوند.
+- پس از نمونه‌گیری ۱۰ثانیه‌ای، پیش‌فرض ۹۰۰۰ تا ۱۱۰۰۰ms تنظیم می‌شود.
+- Exporter قرارداد سازگار `HANDPATH|mt=min,max|...` تولید می‌کند.
+- Desktop، ScriptGenerator، Executor عادی Pico و Parallel Scheduler در هر اجرا یک مدت تازه انتخاب و Delayهای ثبت‌شده را متناسب Scale می‌کنند؛ Deltaها و شکل مسیر تغییر نمی‌کنند.
+- پروژه‌ها و Planهای قدیمی بدون `mt` همچنان Timing اصلی Payload را اجرا می‌کنند.
+
+### Validation
+
+- Codec و Deltaهای نمونه دست‌نخورده باقی ماندند.
+- Validator بازهٔ ۱ تا ۶۰ ثانیه و ترتیب Min/Max را کنترل می‌کند.
+- Scaling تجمعی، مجموع Delayها را دقیقاً به مدت تصادفی انتخاب‌شده می‌رساند و خطای گردکردن بین Segmentها جمع نمی‌شود.
+- تست قرارداد Export، نمایش فیلدهای اختصاصی و مسیر Desktop به‌روزرسانی شد.
+
+### Next test
+
+یک Hand Sample ده‌ثانیه‌ای را چند بار داخل Random Package اجرا کنید. زمان هر اجرا باید بین ۹ تا ۱۱ ثانیه تغییر کند، پایان Relative Delta ثابت بماند و حرکت روی Pico بدون `MemoryError` یا وقفهٔ مصنوعی کامل شود.
+
+## Build 50 — ثبت نتایج سخت‌افزاری B و C
 
 **Previous build:** 50  
 **Status:** CI candidate; Build 50 tuning results B/C recorded  

@@ -278,6 +278,13 @@ def _parse_v3(op, fields, prm, line_no, ctab):
             raise ValueError("line %d: BEEP out of range (30..20000 Hz)" % line_no)
         return
     if op == "HANDPATH":
+        if len(fields) == 3 and fields[1].startswith("mt="):
+            prm["mt"] = _pair(fields[1][3:], "HANDPATH mt", line_no)
+            if prm["mt"][0] < 1 or prm["mt"][1] > 60000:
+                raise ValueError("line %d: HANDPATH mt out of range" % line_no)
+            body = fields[2]
+        elif len(fields) != 2:
+            raise ValueError("line %d: HANDPATH needs optional mt and samples" % line_no)
         if not body:
             raise ValueError("line %d: HANDPATH needs samples" % line_no)
         count = 1

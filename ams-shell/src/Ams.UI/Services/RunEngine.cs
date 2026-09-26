@@ -478,7 +478,11 @@ public sealed class RunEngine
                     if (PropEx.GetString(s.Props, "moveMode", "fixed") == "handSample"
                         && HandMovementSample.TryDecode(PropEx.GetString(s.Props, "handSample"), out var handSample))
                     {
-                        await ReplayHandMovementAsync(handSample, ct);
+                        await ReplayHandMovementAsync(
+                            handSample,
+                            PropEx.GetInt(s.Props, "handReplayTimeMin", handSample.DurationMs * 9 / 10),
+                            PropEx.GetInt(s.Props, "handReplayTimeMax", handSample.DurationMs * 11 / 10),
+                            ct);
                     }
                     else if (PropEx.GetBool(s.Props, "human", true))
                     {
@@ -1035,18 +1039,27 @@ public sealed class RunEngine
         }
     }
 
-    private async Task ReplayHandMovementAsync(HandMovementSample.Sample sample, CancellationToken ct)
+    private async Task ReplayHandMovementAsync(HandMovementSample.Sample sample, int replayMin, int replayMax, CancellationToken ct)
     {
         var path = HandMovementSample.Compact(sample.Segments, HandMovementSample.ReplaySegmentLimit);
         var delta = HandMovementSample.Displacement(sample);
-        _log($"mouse: relative 10s hand gesture Δ({delta.X},{delta.Y}) · {path.Count} segments");
+        (replayMin, replayMax) = HandMovementSample.NormalizeReplayRange(sample, replayMin, replayMax);
+        int targetMs;
+        lock (_rngLock) targetMs = replayMin == replayMax ? replayMin : Rng.Next(replayMin, replayMax + 1);
+        int sourceMs = Math.Max(1, path.Sum(segment => segment.DelayMs));
+        int sourceElapsed = 0, targetElapsed = 0;
+        _log($"mouse: relative hand gesture Δ({delta.X},{delta.Y}) · {path.Count} segments · {targetMs}ms");
         foreach (var segment in path)
         {
             ct.ThrowIfCancellationRequested();
             if (_pauseCheck is not null) await _pauseCheck(ct);
             // DelayMs was measured from the previous captured position to this
             // one, so it belongs before the corresponding relative report.
-            if (segment.DelayMs > 0) await PausableDelay(segment.DelayMs, ct);
+            sourceElapsed += segment.DelayMs;
+            int targetDue = (int)Math.Round(sourceElapsed * (double)targetMs / sourceMs);
+            int scaledDelay = Math.Max(0, targetDue - targetElapsed);
+            targetElapsed = targetDue;
+            if (scaledDelay > 0) await PausableDelay(scaledDelay, ct);
             if (segment.Dx != 0 || segment.Dy != 0)
                 await Send($"MMOVE|{segment.Dx},{segment.Dy},rel,2", ct, quiet: true);
         }

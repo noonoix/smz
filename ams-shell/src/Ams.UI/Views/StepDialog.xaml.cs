@@ -232,6 +232,9 @@ public partial class StepDialog : Window
                 return;
             }
             if (_controls.TryGetValue("handSample", out var payload) && payload is Wpf.Ui.Controls.TextBox hidden) hidden.Text = encoded;
+            var defaultSpread = Math.Max(250, sample.DurationMs / 10);
+            SetIntText("handReplayTimeMin", Math.Max(1, sample.DurationMs - defaultSpread));
+            SetIntText("handReplayTimeMax", Math.Min(60_000, sample.DurationMs + defaultSpread));
             if (_stepType == "mouseMove"
                 && _controls.TryGetValue("moveMode", out var mode)
                 && mode is System.Windows.Controls.ComboBox cb) cb.SelectedItem = "handSample";
@@ -349,7 +352,7 @@ public partial class StepDialog : Window
         if (_stepType == "randomMousePosition"
             && HandMovementSample.TryGetSpeedRange(sample, out var speedMin, out var speedMax))
             return $"نمونه آماده: {sample.Segments.Count} بخش · سرعت شخصی {speedMin} تا {speedMax} پیکسل/ثانیه؛ مقصد و هندسه همچنان تصادفی‌اند.";
-        return $"نمونه آماده: {sample.Segments.Count} بخش · جابه‌جایی نسبی Δ({delta.X},{delta.Y}) از موقعیت فعلی";
+        return $"نمونه آماده: {sample.Segments.Count} بخش · جابه‌جایی نسبی Δ({delta.X},{delta.Y}) از موقعیت فعلی · زمان پایه {sample.DurationMs}ms";
     }
 
     private static readonly HashSet<string> HandSampleTuningKeys = new(StringComparer.Ordinal)

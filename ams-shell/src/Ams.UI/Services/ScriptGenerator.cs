@@ -179,9 +179,21 @@ public static class ScriptGenerator
                 if (PropEx.GetString(n.Props, "moveMode", "fixed") == "handSample"
                     && HandMovementSample.TryDecode(PropEx.GetString(n.Props, "handSample"), out var sample))
                 {
-                    foreach (var seg in HandMovementSample.Compact(sample.Segments, HandMovementSample.ReplaySegmentLimit))
+                    var path = HandMovementSample.Compact(sample.Segments, HandMovementSample.ReplaySegmentLimit);
+                    var (replayMin, replayMax) = HandMovementSample.NormalizeReplayRange(
+                        sample,
+                        PropEx.GetInt(n.Props, "handReplayTimeMin", sample.DurationMs * 9 / 10),
+                        PropEx.GetInt(n.Props, "handReplayTimeMax", sample.DurationMs * 11 / 10));
+                    int sourceMs = Math.Max(1, path.Sum(seg => seg.DelayMs));
+                    int sourceElapsed = 0;
+                    sb.AppendLine($"{pad}$handTargetMs = $script:rng.Next({replayMin}, {replayMax + 1})");
+                    sb.AppendLine($"{pad}$handElapsed = 0");
+                    foreach (var seg in path)
                     {
-                        sb.AppendLine($"{pad}Step-Delay {seg.DelayMs}");
+                        sourceElapsed += seg.DelayMs;
+                        sb.AppendLine($"{pad}$handDue = [int][math]::Round($handTargetMs * {sourceElapsed} / {sourceMs})");
+                        sb.AppendLine($"{pad}Step-Delay ([math]::Max(0, $handDue - $handElapsed))");
+                        sb.AppendLine($"{pad}$handElapsed = $handDue");
                         if (seg.Dx != 0 || seg.Dy != 0) sb.AppendLine($"{pad}Send-Cmd \"MMOVE|{seg.Dx},{seg.Dy},rel,2\"");
                     }
                 }

@@ -181,13 +181,28 @@ def run_plan(ops, ctx, _pos=None, _pauses=None, _inc=()):
                     ctx.kcombo(cmd[1])
         elif op == "HANDPATH":
             raw = prm["path"]
+            source_total = 0
+            scan = 0
+            while scan < len(raw):
+                stop = raw.find(";", scan)
+                if stop < 0:
+                    stop = len(raw)
+                source_total += int(raw[scan:stop].split(",", 1)[0])
+                scan = stop + 1
+            target_total = rand_range(*prm.get("mt", (source_total, source_total)))
+            source_elapsed = 0
+            target_elapsed = 0
             start = 0
             while start < len(raw):
                 end = raw.find(";", start)
                 if end < 0:
                     end = len(raw)
                 delay, dx, dy = (int(v) for v in raw[start:end].split(",", 2))
-                if not ctx.sleep_ms(delay):
+                source_elapsed += delay
+                target_due = (source_elapsed * target_total + source_total // 2) // max(1, source_total)
+                scaled_delay = max(0, target_due - target_elapsed)
+                target_elapsed = target_due
+                if not ctx.sleep_ms(scaled_delay):
                     raise PlanAbort()
                 if dx or dy:
                     ctx.mmove_relative(dx, dy)

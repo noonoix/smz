@@ -129,7 +129,7 @@ _OPS = ("PLAN", "SCREEN", "SPEED", "RMOUSE", "CLICK", "TYPE",
         # v2 - Classroom Studio portable parity (sound, keys, flow, includes)
         "MOVETO", "KEY", "KDOWN", "KUP", "WHEEL", "RAW",
         "WSND", "TRGSND", "IFSND", "IFLUX", "ELSE", "ENDIF",
-        "LABEL", "GOTO", "INCLUDE",
+        "LABEL", "GOTO", "INCLUDE", "HANDPATH",
         # v3 - full Classroom Studio parity: packages, parallel groups, buzzer
         "RPKG", "PKGITEM", "ENDPKG", "PGROUP", "PARITEM", "ENDPAR", "RETRY", "ENDRETRY", "BEEP")
 
@@ -195,9 +195,13 @@ def _link_blocks(ops):
 
 # -- v3 containers: randomPackage / parallelGroup -----------------------------
 
-# Inside a parallel group only short, immediate commands keep the "parallel" meaning:
-# a long board-side hold would own the serial channel and serialize the whole group.
-_PAR_OK = ("MOVETO", "CLICK", "KEY", "KDOWN", "KUP", "WHEEL", "TYPE", "DELAY", "RAW", "BEEP")
+# Parallel branches are interpreted by the cooperative scheduler. LOOP/LOOPTIME
+# and RPKG remain structural; HANDPATH, TYPE, RMOUSE and WSND yield between
+# individual timed events. TRGSND deliberately stays out: the Arm-side click is
+# an indivisible legacy transaction and cannot share the sound monitor.
+_PAR_OK = ("RMOUSE", "MOVETO", "CLICK", "KEY", "KDOWN", "KUP", "WHEEL",
+           "TYPE", "DELAY", "RAW", "BEEP", "HANDPATH", "WSND",
+           "LOOP", "LOOPTIME", "ENDLOOP", "RPKG")
 _PKG_MODES = ("pick", "all", "seq")
 
 
@@ -273,6 +277,33 @@ def _parse_v3(op, fields, prm, line_no, ctab):
         if not 30 <= prm["v"][0] <= 20000 or prm["v"][1] < 0:
             raise ValueError("line %d: BEEP out of range (30..20000 Hz)" % line_no)
         return
+    if op == "HANDPATH":
+        if not body:
+            raise ValueError("line %d: HANDPATH needs samples" % line_no)
+        count = 1
+        start = 0
+        size = len(body)
+        while start < size:
+            end = body.find(";", start)
+            if end < 0:
+                end = size
+            token = body[start:end]
+            values = token.split(",", 2)
+            if len(values) != 3:
+                raise ValueError("line %d: HANDPATH needs delay,dx,dy samples" % line_no)
+            try:
+                delay, dx, dy = int(values[0]), int(values[1]), int(values[2])
+            except Exception:
+                raise ValueError("line %d: bad HANDPATH sample" % line_no)
+            if delay < 1 or delay > 60000 or abs(dx) > 8192 or abs(dy) > 8192:
+                raise ValueError("line %d: HANDPATH sample out of range" % line_no)
+            if end < size:
+                count += 1
+            if count > 2000:
+                raise ValueError("line %d: HANDPATH has too many samples" % line_no)
+            start = end + 1
+        prm["path"] = body
+        return
     parts = body.split(",")
     if not parts[-1].startswith("#"):
         raise ValueError("line %d: %s must open a block body" % (line_no, op))
@@ -338,7 +369,7 @@ def parse_plan(text):
             raise ValueError("line %d: unknown op '%s'" % (line_no, fields[0]))
         prm = {}
         prm["_chain"] = tuple(b[2] for b in loop_stack)   # v2: enclosing blocks (GOTO visibility)
-        if op in ("RPKG", "PGROUP", "RETRY", "BEEP", "PKGITEM", "ENDPKG", "PARITEM", "ENDPAR", "ENDRETRY"):
+        if op in ("RPKG", "PGROUP", "RETRY", "BEEP", "HANDPATH", "PKGITEM", "ENDPKG", "PARITEM", "ENDPAR", "ENDRETRY"):
             _parse_v3(op, fields, prm, line_no, _ctab)    # v3
             ops.append((op, prm))
             continue

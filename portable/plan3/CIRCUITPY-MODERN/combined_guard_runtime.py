@@ -276,7 +276,7 @@ class Controls:
 class PlanContext:
     plan_api = 3; screen_w = 1920; screen_h = 1080; speed_min = 0; speed_max = 2000
     mouse_mode = "relative"
-    def __init__(self, runtime): self.r = runtime
+    def __init__(self, runtime): self.r = runtime; self._parallel_sound = None
     def get_mouse_pos(self):
         value = getattr(self.r, "mouse_pos", None)
         if value is None or len(value) < 2:
@@ -292,6 +292,12 @@ class PlanContext:
     def mmove_relative(self, dx, dy): self.r.arm.move_relative(dx, dy)
     def mclick(self, button, count, hmin, hmax): self.r.arm.send("MCLICK|%s,%d,%d,%d" % (button, count, hmin, hmax), 8)
     def ktext(self, hmin, hmax, text): self.r.type_text(text, hmin, hmax, self)
+    def type_char(self, ch):
+        value = ord(ch)
+        ascii_alnum = (48 <= value <= 57 or 65 <= value <= 90 or 97 <= value <= 122)
+        code = self.r.key(ord(ch.upper())) if ascii_alnum else self.r.key(32 if ch == " " else 13)
+        self.r.keyboard.press(code)
+        self.r.keyboard.release(code)
     def kcombo(self, value): self.key_combo([value], 0, 0)
     def key(self, vk, hold): self.key_combo([vk], hold, hold)
     def key_combo(self, vks, hmin, hmax):
@@ -307,6 +313,39 @@ class PlanContext:
     def wait_sound(self, threshold, minimum, timeout):
         reply = self.r.arm.send("WSND|%d,%d,%d" % (threshold, minimum, timeout), timeout / 1000 + 3)
         return True if "DETECTED" in reply else False if "TIMEOUT" in reply else None
+    def sound_start(self, threshold, minimum, timeout):
+        self._parallel_sound = {
+            "threshold": int(threshold), "minimum": max(10, int(minimum)),
+            "deadline": time.monotonic() + max(1, int(timeout)) / 1000,
+            "sustained": 0}
+    def sound_poll(self):
+        state = self._parallel_sound
+        if state is None:
+            return False
+        if time.monotonic() >= state["deadline"]:
+            self._parallel_sound = None
+            return False
+        # ARM 2.8.1 already exposes a short, HALT-abortable sound calibration
+        # window. Reusing 10 ms SCAL slices avoids adding bytes to the nearly
+        # full Leonardo firmware and returns the UART to MMOVE between polls.
+        reply = self.r.arm.send("SCAL|10", 2)
+        peak = None
+        for field in reply.split("|"):
+            if field.startswith("max="):
+                peak = int(field[4:])
+                break
+        if peak is None:
+            raise RuntimeError("ARM SCAL reply has no peak")
+        if peak >= state["threshold"]:
+            state["sustained"] += 10
+            if state["sustained"] >= state["minimum"]:
+                self._parallel_sound = None
+                return True
+        else:
+            state["sustained"] = 0
+        return None
+    def sound_cancel(self):
+        self._parallel_sound = None
     def trg_sound(self, threshold, minimum, timeout, action, rmin, rmax, hmin, hmax):
         return self.r.arm.send("TRGSND|%d,%d,%d,%d,%d,%d,%d,%d" % (threshold, minimum, timeout, action, rmin, rmax, hmin, hmax), timeout / 1000 + 3).startswith("OK|")
     def beep(self, frequency, duration):

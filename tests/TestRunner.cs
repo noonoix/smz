@@ -3731,6 +3731,22 @@ class TestRunner
             Assert(pexHand.Text.Contains("HANDPATH|mt=9000,11000|100,10,2;120,12,3;140,8,1\n")
                    && !pexHand.Text.Contains("RAW|MMOVE|") && !pexHand.Text.Contains("MOVETO|"),
                 "sampled hand motion exports with a randomized replay-duration range");
+            var longHand = new HandMovementSample.Sample(10_000, new System.Drawing.Point(0, 0),
+                new System.Drawing.Point(240, 0),
+                Enumerable.Range(0, 240).Select(_ => new HandMovementSample.Segment(40, 1, 0)).ToArray());
+            var pexLongHand = PlanExporter.Compile(new List<StepNode>
+            {
+                PexStep("mouseMove", new Dictionary<string, object?>
+                {
+                    ["moveMode"] = "handSample",
+                    ["handSample"] = HandMovementSample.Encode(longHand),
+                    ["handReplayTimeMin"] = 9000,
+                    ["handReplayTimeMax"] = 11000,
+                }),
+            }, pexSettings, 1920, 1080, "f", "T");
+            var handLines = pexLongHand.Text.Split('\n').Where(line => line.StartsWith("HANDPATH|")).ToArray();
+            Assert(handLines.Length == 3 && handLines.All(line => line.Length < 1024),
+                "long Hand Sample is split into bounded Pico route lines");
             var handNode = PexStep("mouseMove", new Dictionary<string, object?>
                 { ["x"] = 999, ["y"] = 777, ["moveMode"] = "handSample", ["handSample"] = encodedHand });
             Assert(StepDefinitions.Get("mouseMove").Summarize(handNode).Contains("Δ(30, 6)")

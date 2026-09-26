@@ -724,18 +724,45 @@ def _run_light_route(ctx, commands):
             elif not args or ctx.raw(args) is None:
                 raise RuntimeError("RAW route command aborted")
         elif command == "HANDPATH":
-            # Compact streaming replay for a ten-second hand sample.
-            # Format: HANDPATH|delayMs,dx,dy;delayMs,dx,dy;...
-            # Do not split the entire payload: hundreds of list/string objects
-            # would recreate the RP2040 heap pressure this command avoids.
+            # Bounded chunks keep splitlines() memory-safe. Each chunk receives
+            # a proportional duration range and is scaled without a segment list.
+            payload = args
+            timing = None
+            if args.startswith("mt="):
+                split_at = args.find("|")
+                if split_at < 0:
+                    raise ValueError("HANDPATH mt needs payload")
+                pair = args[3:split_at].split(",", 1)
+                if len(pair) != 2:
+                    raise ValueError("HANDPATH mt needs min,max")
+                timing = (int(pair[0]), int(pair[1]))
+                if timing[1] < timing[0]:
+                    timing = (timing[1], timing[0])
+                if timing[0] < 1 or timing[1] > 60000:
+                    raise ValueError("HANDPATH mt out of range")
+                payload = args[split_at + 1:]
+            source_total = 0
+            scan = 0
+            while scan < len(payload):
+                stop = payload.find(";", scan)
+                if stop < 0:
+                    stop = len(payload)
+                comma = payload.find(",", scan, stop)
+                if comma < 0:
+                    raise ValueError("HANDPATH needs delay,dx,dy segments")
+                source_total += int(payload[scan:comma])
+                scan = stop + 1
+            target_total = runtime.random.randint(timing[0], timing[1]) if timing else source_total
+            source_elapsed = 0
+            target_elapsed = 0
             start = 0
             count = 0
-            size = len(args)
+            size = len(payload)
             while start < size:
-                end = args.find(";", start)
+                end = payload.find(";", start)
                 if end < 0:
                     end = size
-                token = args[start:end]
+                token = payload[start:end]
                 fields = token.split(",", 2)
                 if len(fields) != 3:
                     raise ValueError("HANDPATH needs delay,dx,dy segments")
@@ -744,7 +771,11 @@ def _run_light_route(ctx, commands):
                 dy = int(fields[2])
                 if delay_ms < 1 or delay_ms > 60000 or abs(dx) > 8192 or abs(dy) > 8192:
                     raise ValueError("HANDPATH segment out of range")
-                if not ctx.sleep_ms(delay_ms):
+                source_elapsed += delay_ms
+                target_due = (source_elapsed * target_total + source_total // 2) // max(1, source_total)
+                scaled_delay = max(0, target_due - target_elapsed)
+                target_elapsed = target_due
+                if not ctx.sleep_ms(scaled_delay):
                     raise RuntimeError("route aborted")
                 if dx or dy:
                     ctx.mmove_relative(dx, dy)
@@ -808,6 +839,10 @@ def _diagnostic_route(self, decision):
     commands = _light_route_lines(text)
     try:
         if commands is not None:
+            # Commands contain bounded line payloads; release the full route
+            # copy before replay so dense samples do not consume heap twice.
+            del text
+            gc.collect()
             self.emit("EVT|DEBUG|ROUTE|stage=light-route|free=%d" % gc.mem_free())
             # Keep simple Pico-only routes off the large plan_engine import.
             _run_light_route(runtime.PlanContext(self), commands)

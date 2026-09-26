@@ -625,9 +625,15 @@ def _run_light_route(ctx, commands):
             ctx.kup(int(args))
         elif command == "RAW":
             # Hand-sampled mouse paths are already portable Arm commands
-            # (MMOVE|dx,dy,rel,2). Forward them directly so a route containing
-            # only RAW + DELAY never imports the large plan_engine modules.
-            if not args or ctx.raw(args) is None:
+            # (MMOVE|dx,dy,rel,2). They must use the asynchronous move ledger:
+            # Arm.send() cannot wait for MMOVE because Arm.pump() deliberately
+            # consumes OK|MMOVE to decrement pending back-pressure.
+            if args.startswith("MMOVE|"):
+                fields = args[6:].split(",")
+                if len(fields) != 4 or fields[2].strip().lower() != "rel":
+                    raise ValueError("light RAW MMOVE needs dx,dy,rel,human")
+                ctx.mmove_relative(int(fields[0]), int(fields[1]))
+            elif not args or ctx.raw(args) is None:
                 raise RuntimeError("RAW route command aborted")
         elif command == "BEEP":
             fields = args.replace(",", " ").split()

@@ -29,6 +29,9 @@ class Ctx:
         events.append(("raw", line))
         return "OK|RAW"
 
+    def mmove_relative(self, dx, dy):
+        events.append(("relative", dx, dy))
+
     def sleep_ms(self, milliseconds):
         events.append(("delay", milliseconds))
         return True
@@ -58,9 +61,9 @@ assert [command for command, _ in commands].count("RAW") == 2
 ctx = Ctx()
 namespace["_run_light_route"](ctx, commands)
 assert events == [
-    ("raw", "MMOVE|94,-11,rel,2"),
+    ("relative", 94, -11),
     ("delay", 304),
-    ("raw", "MMOVE|-82,148,rel,2"),
+    ("relative", -82, 148),
     ("delay", 185),
 ], events
 print("hand-sample light route: 5 passed, 0 failed")

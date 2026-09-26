@@ -4146,7 +4146,7 @@ class TestRunner
             var modernCode = File.ReadAllText(Path.Combine(modernTmp, "code.py"));
             Assert(modernCode.Contains("\"RAW\"}")
                    && modernCode.Contains("elif command == \"RAW\":")
-                   && modernCode.Contains("ctx.raw(args)"),
+                   && modernCode.Contains("ctx.mmove_relative(int(fields[0]), int(fields[1]))"),
                 "hand-sampled RAW/MMOVE routes stay on the low-memory light-route executor");
 
             var current = new PipelineWorkspace();

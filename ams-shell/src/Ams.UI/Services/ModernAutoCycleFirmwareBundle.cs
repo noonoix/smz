@@ -82,6 +82,17 @@ public static class ModernAutoCycleFirmwareBundle
 
         PipelinePlanBundle.Export(Path.Combine(stagingDir, "plan.txt"), workspace, settings,
             screenW, screenH, sourceName, machine);
+
+        // PipelinePlanBundle intentionally uses the legacy PlanExporter, which also writes
+        // its generated monolithic plan_engine.py next to the plans. That file must never
+        // replace the modern split-memory facade copied by Export(): doing so imports a
+        // ~30 KB source module on Pico and defeats the deferred parse/human/exec modules.
+        // Restore the small facade after all authorable routes have been generated.
+        File.Copy(
+            Path.Combine(AppContext.BaseDirectory, "portable-modern-runtime", "plan_engine.py"),
+            Path.Combine(stagingDir, "plan_engine.py"),
+            true);
+
         File.WriteAllText(Path.Combine(stagingDir, "autocycle.amsj"),
             PipelineWorkspaceSerializer.Serialize(workspace), new UTF8Encoding(false));
 

@@ -4203,16 +4203,28 @@ class TestRunner
                 1920, 1080, "test mous.amsj", "CURRENT-PROJECT-REGRESSION");
             var currentDesktop = File.ReadAllText(Path.Combine(modernTmp, "desktop_steps.txt"));
             var currentSnapshot = File.ReadAllText(Path.Combine(modernTmp, "autocycle.amsj"));
+            var currentEngine = File.ReadAllText(Path.Combine(modernTmp, "plan_engine.py"));
             Assert(currentDesktop.Contains("CURRENT-MOUSE-TEST-ONLY")
                    && currentSnapshot.Contains("CURRENT-MOUSE-TEST-ONLY")
                    && !currentDesktop.Contains("Win+2", StringComparison.OrdinalIgnoreCase),
                 "modern one-click export replaces template routes and snapshot with the open project");
+            Assert(currentEngine.Length < 2000
+                   && currentEngine.Contains("from plan_engine_parse import")
+                   && currentEngine.Contains("import plan_engine_exec as _exec")
+                   && !currentEngine.Contains("Generated memory-fit core"),
+                "modern current-project export preserves the split-engine facade after legacy plan generation");
             var manifestDesktop = File.ReadLines(Path.Combine(modernTmp, "SHA256SUMS.txt"))
                 .Single(line => line.EndsWith("  desktop_steps.txt", StringComparison.Ordinal));
             var desktopHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
                 File.ReadAllBytes(Path.Combine(modernTmp, "desktop_steps.txt")))).ToLowerInvariant();
             Assert(manifestDesktop == desktopHash + "  desktop_steps.txt",
                 "modern one-click export rebuilds SHA256SUMS after current routes are generated");
+            var manifestEngine = File.ReadLines(Path.Combine(modernTmp, "SHA256SUMS.txt"))
+                .Single(line => line.EndsWith("  plan_engine.py", StringComparison.Ordinal));
+            var engineHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                File.ReadAllBytes(Path.Combine(modernTmp, "plan_engine.py")))).ToLowerInvariant();
+            Assert(manifestEngine == engineHash + "  plan_engine.py",
+                "modern one-click export hashes the restored split-engine facade");
         }
         finally { if (Directory.Exists(modernTmp)) Directory.Delete(modernTmp, true); }
 

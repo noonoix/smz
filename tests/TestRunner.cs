@@ -4143,6 +4143,29 @@ class TestRunner
                    && modernExec.Contains("ctx.mmove_relative(dx, dy)")
                    && File.ReadAllText(Path.Combine(modernTmp, "code.py")).Contains("relative-native-before-route"),
                 "modern AutoCycle export uses hostless relative mouse without a cursor bridge");
+
+            var current = new PipelineWorkspace();
+            foreach (var tab in current.Tabs) tab.Steps.Clear();
+            current[PipelineKind.Desktop].Steps.Add(new StepNode
+            {
+                Type = "comment",
+                Props = new Dictionary<string, object?> { ["text"] = "CURRENT-MOUSE-TEST-ONLY" },
+            });
+            ModernAutoCycleFirmwareBundle.ExportCurrentProject(
+                Path.Combine(modernTmp, "code.py"), current, new AppSettings(),
+                1920, 1080, "test mous.amsj", "CURRENT-PROJECT-REGRESSION");
+            var currentDesktop = File.ReadAllText(Path.Combine(modernTmp, "desktop_steps.txt"));
+            var currentSnapshot = File.ReadAllText(Path.Combine(modernTmp, "autocycle.amsj"));
+            Assert(currentDesktop.Contains("CURRENT-MOUSE-TEST-ONLY")
+                   && currentSnapshot.Contains("CURRENT-MOUSE-TEST-ONLY")
+                   && !currentDesktop.Contains("Win+2", StringComparison.OrdinalIgnoreCase),
+                "modern one-click export replaces template routes and snapshot with the open project");
+            var manifestDesktop = File.ReadLines(Path.Combine(modernTmp, "SHA256SUMS.txt"))
+                .Single(line => line.EndsWith("  desktop_steps.txt", StringComparison.Ordinal));
+            var desktopHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                File.ReadAllBytes(Path.Combine(modernTmp, "desktop_steps.txt")))).ToLowerInvariant();
+            Assert(manifestDesktop == desktopHash + "  desktop_steps.txt",
+                "modern one-click export rebuilds SHA256SUMS after current routes are generated");
         }
         finally { if (Directory.Exists(modernTmp)) Directory.Delete(modernTmp, true); }
 

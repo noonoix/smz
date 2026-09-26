@@ -1,4 +1,6 @@
 using System.Security.Cryptography;
+using System.Text;
+using Ams.UI.Models;
 
 namespace Ams.UI.Services;
 
@@ -32,13 +34,7 @@ public static class ModernAutoCycleFirmwareBundle
         var sourceManifest = Path.Combine(runtimeDir, "SHA256SUMS.txt");
         if (!File.Exists(sourceManifest))
             throw new IOException("Manifest Bundle مدرن پیدا نشد.");
-        var manifestNames = File.ReadAllLines(sourceManifest)
-            .Where(line => !string.IsNullOrWhiteSpace(line))
-            .Select(line => line.Split(new[] { "  " }, StringSplitOptions.None))
-            .Where(parts => parts.Length == 2)
-            .Select(parts => parts[1].Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        var manifestNames = ReadManifestNames(sourceManifest);
         if (manifestNames.Length != 24)
             throw new IOException("تعداد فایل‌های Manifest Bundle مدرن نامعتبر است.");
         foreach (var name in Files.Concat(manifestNames).Distinct(StringComparer.OrdinalIgnoreCase))
@@ -67,10 +63,48 @@ public static class ModernAutoCycleFirmwareBundle
         foreach (var name in Files)
             File.Copy(Path.Combine(runtimeDir, name), Path.Combine(stagingDir, name), true);
 
-        // Rebuild the manifest from the bytes actually copied. Windows checkout
-        // may normalize README/text line endings, so the source manifest cannot
-        // be trusted byte-for-byte after a Windows build.
-        var rebuiltManifest = new List<string>(manifestNames.Length);
+        RebuildManifest(stagingDir, manifestNames);
+        return Files.Select(name => Path.Combine(stagingDir, name)).ToArray();
+    }
+
+    /// <summary>
+    /// Builds the executable modern runtime, then replaces every authorable plan/route and
+    /// the embedded project snapshot with the workspace currently open in Classroom Studio.
+    /// Runtime templates are never allowed to leak their sample project into a user export.
+    /// </summary>
+    public static IReadOnlyList<string> ExportCurrentProject(
+        string codePyPath, PipelineWorkspace workspace, AppSettings settings,
+        int screenW, int screenH, string sourceName, string machine)
+    {
+        var files = Export(codePyPath);
+        var stagingDir = Path.GetDirectoryName(Path.GetFullPath(codePyPath))
+            ?? throw new IOException("مسیر خروجی firmware نامعتبر است.");
+
+        PipelinePlanBundle.Export(Path.Combine(stagingDir, "plan.txt"), workspace, settings,
+            screenW, screenH, sourceName, machine);
+        File.WriteAllText(Path.Combine(stagingDir, "autocycle.amsj"),
+            PipelineWorkspaceSerializer.Serialize(workspace), new UTF8Encoding(false));
+
+        var manifestNames = ReadManifestNames(
+            Path.Combine(AppContext.BaseDirectory, "portable-modern-runtime", "SHA256SUMS.txt"));
+        RebuildManifest(stagingDir, manifestNames);
+        return files;
+    }
+
+    private static string[] ReadManifestNames(string sourceManifest)
+        => File.ReadAllLines(sourceManifest)
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .Select(line => line.Split(new[] { "  " }, StringSplitOptions.None))
+            .Where(parts => parts.Length == 2)
+            .Select(parts => parts[1].Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+    private static void RebuildManifest(string stagingDir, IReadOnlyList<string> manifestNames)
+    {
+        // Rebuild from the final bytes after the current project has replaced template routes.
+        // Windows checkout may also normalize README/text line endings.
+        var rebuiltManifest = new List<string>(manifestNames.Count);
         foreach (var name in manifestNames)
         {
             var path = Path.Combine(stagingDir, name);
@@ -80,7 +114,5 @@ public static class ModernAutoCycleFirmwareBundle
         }
         File.WriteAllText(Path.Combine(stagingDir, "SHA256SUMS.txt"),
             string.Join(Environment.NewLine, rebuiltManifest) + Environment.NewLine);
-
-        return Files.Select(name => Path.Combine(stagingDir, name)).ToArray();
     }
 }

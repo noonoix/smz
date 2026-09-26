@@ -26,4 +26,7 @@ assert 'segments = max(8, min(32' in parallel.read_text()
 assert 'self.r.arm.flush()' in runtime and 'SCAL rejected: ERR|BUSY' in runtime
 code=(root/'portable/plan3/CIRCUITPY-MODERN/code.py').read_text()
 assert 'self.keyboard.release_all()' in code and 'GP3", "pause"' in code
-print('parallel export/firmware contract: 21 passed, 0 failed')
+assert 'except runtime.plan_engine.PlanAbort:' in code
+assert '_release_plan_heap(self)' in code
+assert 'other["moving"] for other in tasks' in parallel.read_text()
+print('parallel export/firmware contract: 24 passed, 0 failed')

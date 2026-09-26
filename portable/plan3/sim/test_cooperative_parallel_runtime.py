@@ -50,7 +50,7 @@ plan_engine.run_plan(ops,ctx)
 assert 'plan_engine_parallel' in sys.modules, 'parallel scheduler was not loaded at PGROUP'
 moves=[e for e in ctx.ev if e[0]=='move']
 chars=[e for e in ctx.ev if e[0]=='char']
-assert 1 <= len(moves) < 4,moves
+assert 1 <= len(moves) <= 4,moves
 assert ''.join(e[2] for e in chars)=='ok',chars
 # Mouse reports continue while listening, then sound success cancels siblings.
 assert any(e[0]=='move' and 0.0 < e[1] < 0.055 for e in ctx.ev),ctx.ev
@@ -58,6 +58,11 @@ assert all(e[1] <= chars[0][1] for e in moves),ctx.ev
 assert ('log','parallel wsnd heard - cancel siblings') in ctx.ev,ctx.ev
 assert any(e[0]=='sound-start' for e in ctx.ev),ctx.ev
 assert ('key',ctx.ev[-1][1],(13,)) in ctx.ev or any(e[0]=='key' and e[2]==(13,) for e in ctx.ev),ctx.ev
+# Synchronous SCAL polls must not land between streamed mouse segments. The
+# hardware round trip is ~60 ms and produced visible periodic cursor stalls.
+move_times=[e[1] for e in moves]
+sound_times=[e[1] for e in ctx.ev if e[0]=='sound-poll']
+assert not any(min(move_times) < t < max(move_times) for t in sound_times),(moves,sound_times)
 # Parser must still fail closed for the Arm-owned blocking sound/click transaction.
 bad='PLAN|2\nPGROUP\nTRGSND|90,60,500,1,80,180,30,90\nPARITEM\nDELAY|1\nENDPAR'
 try:
@@ -102,4 +107,4 @@ speed_moves=[e for e in speed_events if e[0]=='move']
 assert 8 <= len(speed_moves) <= 32,len(speed_moves)
 # 300 px at 500 px/s targets 600 ms; ARM supplies ~300 ms, so waits total 300.
 assert sum(e[1] for e in speed_moves)==300,speed_moves
-print('cooperative parallel runtime: 12 passed, 0 failed')
+print('cooperative parallel runtime: 13 passed, 0 failed')

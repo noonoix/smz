@@ -213,7 +213,8 @@ def run_parallel(prm, ctx, pos, pauses, inc):
     """Deadline scheduler for Pico keyboard plus Pro Micro mouse/sound."""
     now = int(ctx.now() * 1000)
     tasks = [{"it": _parallel_events(prog, ctx, pos, pauses, inc),
-              "due": now, "pending": None, "sound": False, "poll": now}
+              "due": now, "pending": None, "moving": False,
+              "sound": False, "poll": now}
              for prog in prm["progs"]]
     sound_owner = None
     start_sound = getattr(ctx, "sound_start", None)
@@ -230,6 +231,14 @@ def run_parallel(prm, ctx, pos, pauses, inc):
                     continue
                 if task["sound"]:
                     if now < task["poll"]:
+                        continue
+                    # SCAL is a synchronous ARM transaction and its UART
+                    # round-trip is ~60 ms on hardware. Never insert that gap
+                    # between streamed mouse segments: sample during the
+                    # before/after/package waits instead, when the cursor is
+                    # intentionally stationary.
+                    if any(other is not task and other["moving"] for other in tasks):
+                        task["poll"] = now + 10
                         continue
                     result = poll_sound()
                     task["poll"] = now + 10
@@ -265,8 +274,10 @@ def run_parallel(prm, ctx, pos, pauses, inc):
                     continue
                 kind = event[0]
                 if kind == "wait":
+                    task["moving"] = False
                     task["due"] = now + max(0, event[1])
                 elif kind == "move":
+                    task["moving"] = True
                     task["due"] = now + max(0, event[1])
                     task["pending"] = event
                 elif kind == "char":

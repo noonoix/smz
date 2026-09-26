@@ -438,12 +438,11 @@ _original_yellow_action = runtime.Combined.yellow_action
 
 _PLAN_MODULES = ("plan_engine_exec", "plan_engine_human", "plan_engine_parallel", "plan_engine_parse")
 
-def _prepare_calibration_heap(self):
+def _release_plan_heap(self, emit_cal=False):
     # Complex routes lazily import the split plan engine. CircuitPython keeps
-    # those modules cached after Stop/PlanAbort, leaving a fragmented heap that
-    # can fail the 2–3 KB atomic calibration JSON write. Calibration never runs
-    # concurrently with a route, so return the deferred proxy to its cold state
-    # and release all split-engine modules before sampling or saving.
+    # those modules cached after Stop/PlanAbort. Return the deferred proxy to
+    # its cold state after every complex route so a second Start cannot retain
+    # the prior parsed Game tree and enter the next parse with ~1 KB free.
     proxy = runtime.plan_engine
     try:
         if hasattr(proxy, "module"):
@@ -454,10 +453,15 @@ def _prepare_calibration_heap(self):
         sys.modules.pop(name, None)
     sys.modules["plan_engine"] = proxy
     gc.collect()
-    try:
-        self.emit("EVT|DEBUG|CAL|heap-ready|free=%d" % gc.mem_free())
-    except Exception:
-        pass
+    if emit_cal:
+        try:
+            self.emit("EVT|DEBUG|CAL|heap-ready|free=%d" % gc.mem_free())
+        except Exception:
+            pass
+
+def _prepare_calibration_heap(self):
+    # Calibration also needs a contiguous block for its atomic JSON write.
+    _release_plan_heap(self, True)
 
 def _audible_start_cal(self):
     _prepare_calibration_heap(self)
@@ -830,10 +834,18 @@ def _diagnostic_route(self, decision):
                     self.emit("EVT|DEBUG|CURSOR|plan-origin=unknown")
                 else:
                     self.emit("EVT|DEBUG|CURSOR|plan-origin=%d,%d" % (origin[0], origin[1]))
+            aborted = False
             try:
                 runtime.plan_engine.run_plan(route_plan, route_ctx)
+            except runtime.plan_engine.PlanAbort:
+                # GP4 Stop is normal control flow, not a Guard failure. Catch
+                # it here so no traceback retains the full parsed Game tree.
+                aborted = True
             finally:
                 del route_plan
+                del route_ctx
+            if aborted:
+                return False
         self.arm.flush()
         return True
     finally:
@@ -843,6 +855,8 @@ def _diagnostic_route(self, decision):
             self.arm.release(False)
         except Exception as cleanup:
             _debug_event(self, "CLEANUP", "mouse " + type(cleanup).__name__)
+        if commands is None:
+            _release_plan_heap(self)
         try:
             self.arm.flush()
         except Exception as cleanup:

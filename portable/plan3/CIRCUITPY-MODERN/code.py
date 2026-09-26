@@ -529,6 +529,14 @@ def _repeatable_yellow_action(self):
         was_paused = self.controls.paused
         _original_yellow_action(self)
         if self.controls.running and self.controls.paused != was_paused:
+            if self.controls.paused:
+                # Pause can be requested from inside Controls.sleep() while a
+                # KEY/COMBO hold is active. Release immediately instead of
+                # leaving Windows to auto-repeat the held key until Resume.
+                try:
+                    self.keyboard.release_all()
+                except Exception:
+                    pass
             self.guard_pause_tone() if self.controls.paused else self.guard_resume_tone()
             _debug_event(self, "GP3", "pause" if self.controls.paused else "resume", persist=True)
         return

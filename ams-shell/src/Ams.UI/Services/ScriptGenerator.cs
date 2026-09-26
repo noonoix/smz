@@ -239,8 +239,10 @@ public static class ScriptGenerator
     private static string CfgHash(System.Collections.Generic.IReadOnlyDictionary<string, object?> p, int speedMin, int speedMax)
     {
         int G(string k, int d) => PropEx.GetInt(p, k, d);
-        if (HandMovementSample.TryDecode(PropEx.GetString(p, "handSample"), out var sample)
-            && HandMovementSample.TryGetSpeedRange(sample, out var sampledMin, out var sampledMax))
+        int sampledMin = 0, sampledMax = 0;
+        bool hasSampledCadence = HandMovementSample.TryDecode(PropEx.GetString(p, "handSample"), out var sample)
+            && HandMovementSample.TryGetSpeedRange(sample, out sampledMin, out sampledMax);
+        if (hasSampledCadence)
             (speedMin, speedMax) = (sampledMin, sampledMax);
         int legacy = Math.Clamp(G("curvePct", 30), 0, 200);
         int curveMin = p.ContainsKey("curveMinPct") ? Math.Clamp(G("curveMinPct", 15), 0, 200) : Math.Max(0, legacy - 15);
@@ -249,6 +251,7 @@ public static class ScriptGenerator
         int mtMin = Math.Max(0, G("moveTimeMin", 0));
         int mtMax = Math.Max(0, G("moveTimeMax", 0));
         if (mtMax < mtMin) (mtMin, mtMax) = (mtMax, mtMin);
+        if (hasSampledCadence) mtMin = mtMax = 0;
         return $"pbMin={G("pauseBeforeMin", 120)}; pbMax={G("pauseBeforeMax", 450)}; paMin={G("pauseAfterMin", 150)}; paMax={G("pauseAfterMax", 600)}; " +
                $"midPct={Math.Clamp(G("midPauseChance", 12), 0, 100)}; midMin={G("midPauseMin", 100)}; midMax={G("midPauseMax", 400)}; " +
                $"idleMin={G("idleEveryMin", 5)}; idleMax={G("idleEveryMax", 12)}; idlePMin={G("idlePauseMin", 1000)}; idlePMax={G("idlePauseMax", 5000)}; " +

@@ -3761,12 +3761,33 @@ class TestRunner
             }, pexSettings, 1920, 1080, "f", "T");
             Assert(sampledRandom.Text.Contains("|speed=500,800|"),
                 "sampled Random Mouse exports the user's measured speed band");
+            var sampledRandomWithLegacyDuration = PlanExporter.Compile(new List<StepNode>
+            {
+                PexStep("randomMousePosition", new Dictionary<string, object?>
+                {
+                    ["x"] = 10, ["y"] = 20, ["w"] = 300, ["h"] = 200,
+                    ["handSample"] = encodedCadence,
+                    ["moveTimeMin"] = 16, ["moveTimeMax"] = 159,
+                }),
+            }, pexSettings, 1920, 1080, "f", "T");
+            Assert(sampledRandomWithLegacyDuration.Text.Contains("|speed=500,800|")
+                   && !sampledRandomWithLegacyDuration.Text.Contains("|mt="),
+                "fresh Random Mouse hand sample overrides stale explicit duration fields");
+            var sampledCfg = HumanMouse.Config.FromProps(new Dictionary<string, object?>
+            {
+                ["handSample"] = encodedCadence,
+                ["moveTimeMin"] = 16, ["moveTimeMax"] = 159,
+            }, 300, 2000);
+            Assert(sampledCfg.SpeedMinPxPerSec == 500 && sampledCfg.SpeedMaxPxPerSec == 800
+                   && sampledCfg.MoveTimeMinMs == 0 && sampledCfg.MoveTimeMaxMs == 0,
+                "desktop Random Mouse uses sampled cadence as its single timing source");
             var stepDialogSource = V27ReadSrc(Path.Combine("Views", "StepDialog.xaml.cs"));
             var mainVmMouseSource = V27ReadSrc(Path.Combine("ViewModels", "MainViewModel.cs"));
             Assert(stepDialogSource.Contains("randomMousePosition\" && f.Key == \"h\"")
                    && stepDialogSource.Contains("انتخاب مختصات روی صفحه")
                    && mainVmMouseSource.Contains("PickPointOnScreen")
-                   && V27ReadSrc(Path.Combine("Views", "PointPickerWindow.xaml")).Contains("PointPickerWindow"),
+                   && V27ReadSrc(Path.Combine("Views", "PointPickerWindow.xaml")).Contains("PointPickerWindow")
+                   && stepDialogSource.Contains("مقصد و هندسه همچنان تصادفی‌اند"),
                 "Random Mouse has sampling UI and Move to Position has a one-click point picker");
 
             // CLICK with swapped hold bounds

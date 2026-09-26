@@ -22,5 +22,8 @@ assert executor.stat().st_size < 20000, executor.stat().st_size
 assert 'from plan_engine_parallel import run_parallel' in executor.read_text()
 assert 'plan_engine_parallel.py' in bundle and 'manifestNames.Length != 25' in bundle
 assert 'def _parallel_relative_mouse_events' in parallel.read_text()
-assert 'segments = max(6, min(24' in parallel.read_text()
-print('parallel export/firmware contract: 18 passed, 0 failed')
+assert 'segments = max(8, min(32' in parallel.read_text()
+assert 'self.r.arm.flush()' in runtime and 'SCAL rejected: ERR|BUSY' in runtime
+code=(root/'portable/plan3/CIRCUITPY-MODERN/code.py').read_text()
+assert 'self.keyboard.release_all()' in code and 'GP3", "pause"' in code
+print('parallel export/firmware contract: 21 passed, 0 failed')

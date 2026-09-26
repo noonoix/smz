@@ -292,11 +292,14 @@ public static class PlanExporter
             var (m0, m1) = Pair(PropEx.GetInt(p, "midPauseMin", 80), PropEx.GetInt(p, "midPauseMax", 250));
             parts.Add("mid=" + mch + ":" + m0 + "," + m1);
             parts.Add("over=" + Math.Max(0, Math.Min(100, PropEx.GetInt(p, "overshootChance", 12))));
-            var (t0, t1) = Pair(PropEx.GetInt(p, "moveTimeMin", 0), PropEx.GetInt(p, "moveTimeMax", 0));
-            if (t1 > 0) parts.Add("mt=" + t0 + "," + t1);
-            if (n.Type == "randomMousePosition"
+            var sampledMin = 0;
+            var sampledMax = 0;
+            var hasSampledCadence = n.Type == "randomMousePosition"
                 && HandMovementSample.TryDecode(PropEx.GetString(p, "handSample"), out var sample)
-                && HandMovementSample.TryGetSpeedRange(sample, out var sampledMin, out var sampledMax))
+                && HandMovementSample.TryGetSpeedRange(sample, out sampledMin, out sampledMax);
+            var (t0, t1) = Pair(PropEx.GetInt(p, "moveTimeMin", 0), PropEx.GetInt(p, "moveTimeMax", 0));
+            if (!hasSampledCadence && t1 > 0) parts.Add("mt=" + t0 + "," + t1);
+            if (hasSampledCadence)
                 parts.Add("speed=" + sampledMin + "," + sampledMax);
             parts.Add("idle=" + idle.i0 + "," + idle.i1 + ":" + idle.p0 + "," + idle.p1);
             return "|" + string.Join("|", parts);

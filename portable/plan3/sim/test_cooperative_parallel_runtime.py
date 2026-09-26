@@ -89,4 +89,17 @@ assert 6 <= len(stream_moves) <= 24,len(stream_moves)
 assert sum(e[2] for e in stream_moves)==pos[0]-960
 assert sum(e[3] for e in stream_moves)==pos[1]-540
 assert all(e[4] is True for e in stream_moves)
+
+# A sampled speed band is authoritative when mt is absent. Account for ARM's
+# own micro-step time so the Pico does not pay the recorded cadence twice.
+random.seed(12)
+speed_events=list(parallel._parallel_relative_mouse_events(
+    {},Ctx(),plan_engine.PausePlanner(),[960,540],
+    dict(parallel._DEFAULT_CFG, speed_min=500, speed_max=500, mt_min=0, mt_max=0,
+         before_min=0,before_max=0,after_min=0,after_max=0,
+         mid_chance=0,idle_pause_max=0),1260,540))
+speed_moves=[e for e in speed_events if e[0]=='move']
+assert 8 <= len(speed_moves) <= 32,len(speed_moves)
+# 300 px at 500 px/s targets 600 ms; ARM supplies ~300 ms, so waits total 300.
+assert sum(e[1] for e in speed_moves)==300,speed_moves
 print('cooperative parallel runtime: 12 passed, 0 failed')

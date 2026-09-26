@@ -343,9 +343,12 @@ public partial class StepDialog : Window
         => _controls.TryGetValue("moveMode", out var mode) && mode is System.Windows.Controls.ComboBox cb
            && (cb.SelectedItem as string) == "handSample";
 
-    private static string SampleStatus(HandMovementSample.Sample sample)
+    private string SampleStatus(HandMovementSample.Sample sample)
     {
         var delta = HandMovementSample.Displacement(sample);
+        if (_stepType == "randomMousePosition"
+            && HandMovementSample.TryGetSpeedRange(sample, out var speedMin, out var speedMax))
+            return $"نمونه آماده: {sample.Segments.Count} بخش · سرعت شخصی {speedMin} تا {speedMax} پیکسل/ثانیه؛ مقصد و هندسه همچنان تصادفی‌اند.";
         return $"نمونه آماده: {sample.Segments.Count} بخش · جابه‌جایی نسبی Δ({delta.X},{delta.Y}) از موقعیت فعلی";
     }
 

@@ -11,14 +11,14 @@ def _parallel_relative_mouse_events(prm, ctx, pauses, pos, c, tx, ty):
     The normal mouse planner intentionally keeps 2–3 px points in RAM. A
     long-running PGROUP also owns parsed branches plus the sound listener, so
     repeatedly allocating that dense list fragments the RP2040 heap. Here the
-    Pico emits at most 24 coarse curve points; ARM 2.8.1 still splits every
+    Pico emits at most 32 coarse curve points; ARM 2.8.1 still splits every
     relative delta into <=3 px HID reports, preserving the smooth physical
     path while keeping the Pico scheduler and UART responsive.
     """
     sx, sy = pos[0], pos[1]
     dx, dy = tx - sx, ty - sy
     span = max(abs(dx), abs(dy))
-    segments = max(6, min(24, (span + 15) // 16))
+    segments = max(8, min(32, (span + 11) // 12))
     curve_min, curve_max = c["curve_min"], c["curve_max"]
     if curve_max < curve_min:
         curve_min, curve_max = curve_max, curve_min
@@ -28,7 +28,22 @@ def _parallel_relative_mouse_events(prm, ctx, pauses, pos, c, tx, ty):
     denom = max(1, span)
     perp_x = (-dy * curve_amp) // denom
     perp_y = (dx * curve_amp) // denom
-    total_ms = rand_range(c["mt_min"], c["mt_max"]) if c["mt_max"] > 0 else 0
+    if c["mt_max"] > 0:
+        total_ms = rand_range(c["mt_min"], c["mt_max"])
+    elif c["speed_max"] > 0:
+        speed_lo = max(1, c["speed_min"])
+        speed_hi = max(speed_lo, c["speed_max"])
+        speed = rand_range(speed_lo, speed_hi)
+        # Approximate curved Euclidean length without float allocation.
+        path_px = max(abs(dx), abs(dy)) + min(abs(dx), abs(dy)) // 2
+        total_ms = (path_px * 1000) // max(1, speed)
+        # ARM 2.8.1 already spends about 1 ms per travelled pixel while
+        # splitting each command into <=3 px HID reports. Only schedule the
+        # remaining budget here; otherwise sampled cadence is effectively
+        # paid twice and replay looks much slower than the recording.
+        total_ms = max(0, total_ms - path_px)
+    else:
+        total_ms = 0
     base_delay = total_ms // segments if total_ms > 0 else 0
     delay_extra = total_ms % segments if total_ms > 0 else 0
     mid_delay = pauses.mid_pause(c)

@@ -328,7 +328,22 @@ class PlanContext:
         # ARM 2.8.1 already exposes a short, HALT-abortable sound calibration
         # window. Reusing 10 ms SCAL slices avoids adding bytes to the nearly
         # full Leonardo firmware and returns the UART to MMOVE between polls.
-        reply = self.r.arm.send("SCAL|10", 2)
+        # MMOVE is pipelined (two outstanding frames). Starting SCAL before
+        # those acknowledgements arrive makes ARM correctly answer ERR|BUSY.
+        # Drain the move queue first and retry only that transient rejection.
+        reply = None
+        for attempt in range(3):
+            self.r.arm.flush()
+            try:
+                reply = self.r.arm.send("SCAL|10", 2)
+                break
+            except RuntimeError as exc:
+                if "SCAL rejected: ERR|BUSY" not in str(exc) or attempt >= 2:
+                    raise
+                self.r.arm.pump()
+                time.sleep(.02)
+        if reply is None:
+            raise RuntimeError("ARM SCAL unavailable")
         peak = None
         marker = reply.find("max=")
         if marker >= 0:

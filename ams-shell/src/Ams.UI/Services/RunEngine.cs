@@ -472,14 +472,13 @@ public sealed class RunEngine
 
                 case "mouseMove":
                 {
-                    // handSample replays the user's ten-second cursor trace, rotated/scaled so
-                    // its final point lands on this step's configured destination. Old projects
-                    // have no moveMode and therefore retain the fixed/WindMouse behavior.
+                    // handSample is a relative gesture from the cursor's current position.
+                    // There is deliberately no absolute destination: a bare HID device cannot
+                    // know the host cursor origin without a Windows-side bridge.
                     if (PropEx.GetString(s.Props, "moveMode", "fixed") == "handSample"
                         && HandMovementSample.TryDecode(PropEx.GetString(s.Props, "handSample"), out var handSample))
                     {
-                        await ReplayHandMovementAsync(handSample, PropEx.GetInt(s.Props, "x", 600),
-                                                      PropEx.GetInt(s.Props, "y", 497), ct);
+                        await ReplayHandMovementAsync(handSample, ct);
                     }
                     else if (PropEx.GetBool(s.Props, "human", true))
                     {
@@ -1036,36 +1035,22 @@ public sealed class RunEngine
         }
     }
 
-    private async Task ReplayHandMovementAsync(HandMovementSample.Sample sample, int targetX, int targetY, CancellationToken ct)
+    private async Task ReplayHandMovementAsync(HandMovementSample.Sample sample, CancellationToken ct)
     {
-        var start = _mouseAnchor ?? System.Windows.Forms.Cursor.Position;
-        double sx = sample.End.X - sample.Start.X, sy = sample.End.Y - sample.Start.Y;
-        double tx = targetX - start.X, ty = targetY - start.Y;
-        double sourceLen = Math.Sqrt(sx * sx + sy * sy), targetLen = Math.Sqrt(tx * tx + ty * ty);
-        if (sourceLen < 1 || targetLen < 1) return;
-        double scale = targetLen / sourceLen;
-        double cos = (sx * tx + sy * ty) / (sourceLen * targetLen);
-        double sin = (sx * ty - sy * tx) / (sourceLen * targetLen);
-        int srcX = 0, srcY = 0;
-        var path = new List<(int x, int y, int delayMs)>(sample.Segments.Count);
-        foreach (var segment in sample.Segments)
+        var path = HandMovementSample.Compact(sample.Segments, HandMovementSample.ReplaySegmentLimit);
+        var delta = HandMovementSample.Displacement(sample);
+        _log($"mouse: relative 10s hand gesture Δ({delta.X},{delta.Y}) · {path.Count} segments");
+        foreach (var segment in path)
         {
-            srcX += segment.Dx; srcY += segment.Dy;
-            int x = start.X + (int)Math.Round(scale * (srcX * cos - srcY * sin));
-            int y = start.Y + (int)Math.Round(scale * (srcX * sin + srcY * cos));
-            path.Add((Math.Clamp(x, 0, _screenW - 1), Math.Clamp(y, 0, _screenH - 1), segment.DelayMs));
+            ct.ThrowIfCancellationRequested();
+            if (_pauseCheck is not null) await _pauseCheck(ct);
+            if (segment.Dx != 0 || segment.Dy != 0)
+                await Send($"MMOVE|{segment.Dx},{segment.Dy},rel,2", ct, quiet: true);
+            if (segment.DelayMs > 0) await PausableDelay(segment.DelayMs, ct);
         }
-        path[^1] = (Math.Clamp(targetX, 0, _screenW - 1), Math.Clamp(targetY, 0, _screenH - 1), path[^1].delayMs);
-        _log($"mouse: 10s hand sample → ({targetX},{targetY}) · {path.Count} segments");
-        if (_parallelDepth == 0)
-            await _bridge.SendPathAsync(path, ct);
-        else
-            foreach (var point in path)
-            {
-                await Send($"MMOVE|{point.x},{point.y},abs,0", ct, quiet: true);
-                if (point.delayMs > 0) await PausableDelay(point.delayMs, ct);
-            }
-        _mouseAnchor = new System.Drawing.Point(targetX, targetY);
+        // Windows can report the real post-HID position. Do not invent it by adding raw HID
+        // deltas: pointer acceleration means a report delta is not guaranteed to equal pixels.
+        _mouseAnchor = System.Windows.Forms.Cursor.Position;
     }
 
     /// <summary>v0.9.0 — a delay that respects Pause: time spent paused does NOT count down the

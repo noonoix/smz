@@ -3709,12 +3709,13 @@ class TestRunner
                 });
             var encodedHand = HandMovementSample.Encode(hand);
             Assert(HandMovementSample.TryDecode(encodedHand, out var decodedHand)
-                   && decodedHand.Segments.Count == 3 && decodedHand.End.X == 130,
+                   && decodedHand.Segments.Count == 3 && decodedHand.End.X == 130
+                   && HandMovementSample.Displacement(decodedHand) == new System.Drawing.Point(30, 6),
                 "v0.9.68: ten-second hand sample codec round-trips without keyboard/text data");
-            Assert(StepDefinitions.Get("mouseMove").Label == "Move to Position"
+            Assert(StepDefinitions.Get("mouseMove").Label == "Mouse Movement"
                    && StepDefinitions.Get("mouseMove").Fields.Any(f => f.Key == "moveMode")
                    && StepDefinitions.Get("mouseMove").Fields.Any(f => f.Key == "handSample"),
-                "v0.9.68: Mouse Position is repurposed as Move to Position with sample mode");
+                "v0.9.69: mouse movement exposes fixed and relative hand-gesture modes");
             var pexHand = PlanExporter.Compile(new List<StepNode>
             {
                 PexStep("mouseMove", new Dictionary<string, object?>
@@ -3722,7 +3723,16 @@ class TestRunner
             }, pexSettings, 1920, 1080, "f", "T");
             Assert(pexHand.Text.Contains("RAW|MMOVE|10,2,rel,2\n")
                    && pexHand.Text.Contains("DELAY|100\n") && !pexHand.Text.Contains("MOVETO|"),
-                "v0.9.68: sampled hand motion exports as native relative HID commands");
+                "v0.9.69: sampled hand motion exports as native relative HID commands");
+            var handNode = PexStep("mouseMove", new Dictionary<string, object?>
+                { ["x"] = 999, ["y"] = 777, ["moveMode"] = "handSample", ["handSample"] = encodedHand });
+            Assert(StepDefinitions.Get("mouseMove").Summarize(handNode).Contains("Δ(30, 6)")
+                   && !StepDefinitions.Get("mouseMove").Summarize(handNode).Contains("999"),
+                "v0.9.69: hand gesture summary reports relative displacement, never an absolute destination");
+            var runEngineSource = V27ReadSrc(Path.Combine("Services", "RunEngine.cs"));
+            Assert(runEngineSource.Contains("MMOVE|{segment.Dx},{segment.Dy},rel,2")
+                   && !runEngineSource.Contains("ReplayHandMovementAsync(handSample, PropEx.GetInt"),
+                "v0.9.69: desktop replay uses the same relative HID contract as portable export");
 
             // CLICK with swapped hold bounds
             var pexClick = PlanExporter.Compile(new List<StepNode>

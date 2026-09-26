@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Ams.UI.Services;
 
 namespace Ams.UI.Models;
 
@@ -79,7 +80,7 @@ public static class StepDefinitions
         },
         ["mouseMove"] = new StepDefinition
         {
-            Label = "Move to Position", ColorResourceKey = "StepMouseBrush", DefaultDelay = 1000,
+            Label = "Mouse Movement", ColorResourceKey = "StepMouseBrush", DefaultDelay = 1000,
             Fields = new FieldDef[]
             {
                 new("x", "X", FieldKind.Int, "600"),
@@ -100,8 +101,19 @@ public static class StepDefinitions
                 new("moveTimeMin", "Move duration — min (ms) · 0/0 = speed-based (Options)", FieldKind.Int, "0", HideWhenKey: "human", HideWhenValue: "false"),
                 new("moveTimeMax", "Move duration — max (ms)", FieldKind.Int, "0", HideWhenKey: "human", HideWhenValue: "false"),
             },
-            Summarize = s => $"Move to Position ({PropEx.GetInt(s.Props, "x")}, {PropEx.GetInt(s.Props, "y")})" +
-                (PropEx.GetString(s.Props, "moveMode", "fixed") == "handSample" ? " · 10s hand sample" : ""),
+            Summarize = s =>
+            {
+                if (PropEx.GetString(s.Props, "moveMode", "fixed") == "handSample")
+                {
+                    if (HandMovementSample.TryDecode(PropEx.GetString(s.Props, "handSample"), out var sample))
+                    {
+                        var delta = HandMovementSample.Displacement(sample);
+                        return $"Replay Relative Hand Gesture Δ({delta.X}, {delta.Y})";
+                    }
+                    return "Replay Relative Hand Gesture · sample required";
+                }
+                return $"Move to Position ({PropEx.GetInt(s.Props, "x")}, {PropEx.GetInt(s.Props, "y")})";
+            },
             Commands = s => new[] { $"MMOVE|{PropEx.GetInt(s.Props, "x")},{PropEx.GetInt(s.Props, "y")},abs,{(PropEx.GetBool(s.Props, "human", true) ? 1 : 0)}" },
         },
         ["mouseScroll"] = new StepDefinition

@@ -145,7 +145,7 @@ public partial class StepDialog : Window
                 {
                     Text = current is not null && current.TryGetValue("handSample", out var stored)
                            && HandMovementSample.TryDecode(PropAsString(stored), out var ready)
-                        ? $"نمونه آماده: {ready.Segments.Count} بخش · مقصد ({ready.End.X},{ready.End.Y})"
+                        ? SampleStatus(ready)
                         : "هنوز نمونه‌ای ثبت نشده است.",
                     Foreground = (System.Windows.Media.Brush)System.Windows.Application.Current.Resources["TextSecondaryBrush"],
                     Margin = new Thickness(0, 4, 0, 2), TextWrapping = TextWrapping.Wrap,
@@ -206,9 +206,8 @@ public partial class StepDialog : Window
                 return;
             }
             if (_controls.TryGetValue("handSample", out var payload) && payload is Wpf.Ui.Controls.TextBox hidden) hidden.Text = encoded;
-            SetIntText("x", sample.End.X); SetIntText("y", sample.End.Y);
             if (_controls.TryGetValue("moveMode", out var mode) && mode is System.Windows.Controls.ComboBox cb) cb.SelectedItem = "handSample";
-            if (_sampleStatus is not null) _sampleStatus.Text = $"نمونه آماده: {sample.Segments.Count} بخش · مقصد ({sample.End.X},{sample.End.Y})";
+            if (_sampleStatus is not null) _sampleStatus.Text = SampleStatus(sample);
         }
         finally { btn.IsEnabled = true; btn.Content = "نمونه‌گیری از حرکت دست — ۱۰ ثانیه…"; }
     }
@@ -303,9 +302,15 @@ public partial class StepDialog : Window
         => _controls.TryGetValue("moveMode", out var mode) && mode is System.Windows.Controls.ComboBox cb
            && (cb.SelectedItem as string) == "handSample";
 
+    private static string SampleStatus(HandMovementSample.Sample sample)
+    {
+        var delta = HandMovementSample.Displacement(sample);
+        return $"نمونه آماده: {sample.Segments.Count} بخش · جابه‌جایی نسبی Δ({delta.X},{delta.Y}) از موقعیت فعلی";
+    }
+
     private static readonly HashSet<string> HandSampleTuningKeys = new(StringComparer.Ordinal)
     {
-        "human", "pauseBeforeMin", "pauseBeforeMax", "pauseAfterMin", "pauseAfterMax",
+        "x", "y", "human", "pauseBeforeMin", "pauseBeforeMax", "pauseAfterMin", "pauseAfterMax",
         "midPauseChance", "midPauseMin", "midPauseMax", "overshootChance", "curveMinPct",
         "curveMaxPct", "moveTimeMin", "moveTimeMax"
     };

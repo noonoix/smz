@@ -325,7 +325,7 @@ public static class PlanExporter
                 if (!HandMovementSample.TryDecode(PropEx.GetString(n.Props, "handSample"), out var sample))
                 { Error(n, "handSample mode needs a valid ten-second mouse sample"); return; }
                 var lines = new List<string>();
-                foreach (var seg in HandMovementSample.Compact(sample.Segments, 48))
+                foreach (var seg in HandMovementSample.Compact(sample.Segments, HandMovementSample.ReplaySegmentLimit))
                 {
                     if (seg.Dx != 0 || seg.Dy != 0) lines.Add("RAW|MMOVE|"+seg.Dx+","+seg.Dy+",rel,2");
                     lines.Add("DELAY|"+seg.DelayMs);

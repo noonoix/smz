@@ -179,7 +179,7 @@ public static class ScriptGenerator
                 if (PropEx.GetString(n.Props, "moveMode", "fixed") == "handSample"
                     && HandMovementSample.TryDecode(PropEx.GetString(n.Props, "handSample"), out var sample))
                 {
-                    foreach (var seg in HandMovementSample.Compact(sample.Segments, 48))
+                    foreach (var seg in HandMovementSample.Compact(sample.Segments, HandMovementSample.ReplaySegmentLimit))
                     {
                         if (seg.Dx != 0 || seg.Dy != 0) sb.AppendLine($"{pad}Send-Cmd \"MMOVE|{seg.Dx},{seg.Dy},rel,2\"");
                         sb.AppendLine($"{pad}Step-Delay {seg.DelayMs}");

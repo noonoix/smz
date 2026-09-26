@@ -9,6 +9,9 @@ public static class HandMovementSample
 {
     public const int CaptureDurationMs = 10_000;
     public const int CaptureIntervalMs = 16;
+    // One shared replay budget keeps desktop, generated scripts, and bare-Pico plans identical.
+    // More points materially increase the Pico parser heap without adding useful hand detail.
+    public const int ReplaySegmentLimit = 48;
     public readonly record struct Segment(int DelayMs, int Dx, int Dy);
     public sealed record Sample(int DurationMs, Point Start, Point End, IReadOnlyList<Segment> Segments);
 
@@ -80,6 +83,17 @@ public static class HandMovementSample
             result.Add(new Segment(Math.Max(1, dt), dx, dy));
         }
         return result;
+    }
+
+    /// <summary>
+    /// The recorded deltas are the authoritative payload. Start/End are capture metadata only;
+    /// using their difference would let a malformed legacy payload describe a different move.
+    /// </summary>
+    public static Point Displacement(Sample sample)
+    {
+        int x = 0, y = 0;
+        foreach (var segment in sample.Segments) { x += segment.Dx; y += segment.Dy; }
+        return new Point(x, y);
     }
 
     private static bool TryPoint(string text, out Point point)

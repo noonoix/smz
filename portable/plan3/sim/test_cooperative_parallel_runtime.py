@@ -66,4 +66,27 @@ except ValueError as exc:
     assert 'not allowed inside PGROUP' in str(exc),exc
 else:
     raise AssertionError('TRGSND unexpectedly accepted')
-print('cooperative parallel runtime: 8 passed, 0 failed')
+
+# A large portable RMOUSE inside PGROUP must use the bounded streaming curve,
+# not allocate the dense 2–3 px plan that exhausted the Pico after ~100 seconds.
+import plan_engine_parallel as parallel
+original_plan_move=parallel.plan_move
+def forbidden_dense_plan(*args,**kwargs):
+    raise AssertionError('relative PGROUP RMOUSE called dense plan_move')
+parallel.plan_move=forbidden_dense_plan
+try:
+    random.seed(11)
+    pos=[960,540]
+    events=list(parallel._parallel_mouse_events({
+        'region':(1301,0,378,1049),'before':(20,85),'after':(20,103),
+        'curve':(0,3),'mid':(36,(144,375)),'over':2,'mt':(16,159),
+        'idle':((5,12),(800,3000))
+    },Ctx(),plan_engine.PausePlanner(),pos))
+finally:
+    parallel.plan_move=original_plan_move
+stream_moves=[e for e in events if e[0]=='move']
+assert 6 <= len(stream_moves) <= 24,len(stream_moves)
+assert sum(e[2] for e in stream_moves)==pos[0]-960
+assert sum(e[3] for e in stream_moves)==pos[1]-540
+assert all(e[4] is True for e in stream_moves)
+print('cooperative parallel runtime: 12 passed, 0 failed')

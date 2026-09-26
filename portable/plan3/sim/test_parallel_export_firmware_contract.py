@@ -15,8 +15,12 @@ assert '#define FW_VER   "2.8.1"' in arm
 assert 'if (!strcmp(cmd, "SCAL"))' in arm
 for token in ('def sound_start','def sound_poll','def sound_cancel','def type_char','SCAL|10'):
     assert token in runtime, token
+assert '"polls": 0' in runtime and 'state["polls"] >= 32' in runtime
+assert 'for field in reply.split("|")' not in runtime
 assert parallel.exists() and parallel.stat().st_size > 8000
 assert executor.stat().st_size < 20000, executor.stat().st_size
 assert 'from plan_engine_parallel import run_parallel' in executor.read_text()
 assert 'plan_engine_parallel.py' in bundle and 'manifestNames.Length != 25' in bundle
-print('parallel export/firmware contract: 14 passed, 0 failed')
+assert 'def _parallel_relative_mouse_events' in parallel.read_text()
+assert 'segments = max(6, min(24' in parallel.read_text()
+print('parallel export/firmware contract: 18 passed, 0 failed')

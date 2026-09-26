@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "revision": "guard-2fbd7fd4fffc3e00",
+  "revision": "guard-1e57d529699b3492",
   "profiles": {
     "desktop": {
       "center": 52.2,
@@ -14,7 +14,7 @@
     },
     "character-dashboard": {
       "center": 14.2,
-      "tolerance": 5.0,
+      "tolerance": 3.8,
       "stable_ms": 750
     },
     "entering-game-loading": {
@@ -23,8 +23,8 @@
       "stable_ms": 750
     },
     "game": {
-      "center": 23.3,
-      "tolerance": 3.8,
+      "center": 22.5,
+      "tolerance": 3.7,
       "stable_ms": 750
     },
     "targeted": {

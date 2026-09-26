@@ -1,8 +1,64 @@
 # Cooperative PGROUP scheduler. Imported only when a route reaches PGROUP so
 # ordinary Desktop/Login routes keep the low-memory split executor footprint.
+import gc
 import random
 from plan_engine_parse import PlanAbort, _below, rand_range
 from plan_engine_human import _DEFAULT_CFG, plan_move, plan_typing
+
+def _parallel_relative_mouse_events(prm, ctx, pauses, pos, c, tx, ty):
+    """Stream a bounded eased curve without materializing a dense point list.
+
+    The normal mouse planner intentionally keeps 2–3 px points in RAM. A
+    long-running PGROUP also owns parsed branches plus the sound listener, so
+    repeatedly allocating that dense list fragments the RP2040 heap. Here the
+    Pico emits at most 24 coarse curve points; ARM 2.8.1 still splits every
+    relative delta into <=3 px HID reports, preserving the smooth physical
+    path while keeping the Pico scheduler and UART responsive.
+    """
+    sx, sy = pos[0], pos[1]
+    dx, dy = tx - sx, ty - sy
+    span = max(abs(dx), abs(dy))
+    segments = max(6, min(24, (span + 15) // 16))
+    curve_min, curve_max = c["curve_min"], c["curve_max"]
+    if curve_max < curve_min:
+        curve_min, curve_max = curve_max, curve_min
+    curve_pct = rand_range(int(curve_min), int(curve_max))
+    curve_sign = -1 if _below(2) == 0 else 1
+    curve_amp = curve_sign * min(span // 3, (span * curve_pct) // 100)
+    denom = max(1, span)
+    perp_x = (-dy * curve_amp) // denom
+    perp_y = (dx * curve_amp) // denom
+    total_ms = rand_range(c["mt_min"], c["mt_max"]) if c["mt_max"] > 0 else 0
+    base_delay = total_ms // segments if total_ms > 0 else 0
+    delay_extra = total_ms % segments if total_ms > 0 else 0
+    mid_delay = pauses.mid_pause(c)
+    mid_at = 1 + _below(max(1, segments - 1))
+    if c["before_max"] > 0:
+        yield ("wait", rand_range(c["before_min"], c["before_max"]))
+    px, py = sx, sy
+    scale = 1024
+    for step in range(1, segments + 1):
+        t = (step * scale) // segments
+        # Smoothstep gives zero velocity at both ends. 4t(1-t) adds one
+        # perpendicular bow and returns exactly to the target endpoint.
+        ease = (t * t * (3 * scale - 2 * t)) // (scale * scale)
+        bow = (4 * t * (scale - t)) // scale
+        nx = sx + (dx * ease) // scale + (perp_x * bow) // scale
+        ny = sy + (dy * ease) // scale + (perp_y * bow) // scale
+        if step == segments:
+            nx, ny = tx, ty
+        delay = base_delay + (1 if step <= delay_extra else 0)
+        if mid_delay and step == mid_at:
+            delay += mid_delay
+        yield ("move", delay, nx - px, ny - py, True)
+        px, py = nx, ny
+        pos[0], pos[1] = px, py
+    if c["after_max"] > 0:
+        yield ("wait", rand_range(c["after_min"], c["after_max"]))
+    long_pause = pauses.roll_long(c)
+    if long_pause:
+        yield ("wait", long_pause)
+
 
 def _parallel_mouse_events(prm, ctx, pauses, pos, target=None):
     """Yield one mouse report at a time instead of owning the executor."""
@@ -42,6 +98,10 @@ def _parallel_mouse_events(prm, ctx, pauses, pos, target=None):
     if prm.get("human", 1) == 0:
         yield ("move", 0, tx - pos[0], ty - pos[1], relative)
         pos[0], pos[1] = tx, ty
+        return
+    if relative:
+        for event in _parallel_relative_mouse_events(prm, ctx, pauses, pos, c, tx, ty):
+            yield event
         return
     plan = plan_move(pos[0], pos[1], tx, ty, c, pauses, ctx.screen_w, ctx.screen_h)
     if plan["before"]:
@@ -121,6 +181,9 @@ def _parallel_events(ops, ctx, pos, pauses, inc):
                 else:
                     yield ("combo", cmd[1])
         elif op in ("RMOUSE", "MOVETO"):
+            # Reclaim the prior streamed move and SCAL reply garbage before
+            # planning the next random pass in an unbounded fishing loop.
+            gc.collect()
             target = (prm["x"], prm["y"]) if op == "MOVETO" else None
             for event in _parallel_mouse_events(prm, ctx, pauses, pos, target):
                 yield event

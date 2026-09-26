@@ -8,12 +8,12 @@ from guard_calibration_protocol import find_profile_overlap
 profiles = {
     "desktop": {"center": 52.2, "tolerance": 15},
     "login-or-dc": {"center": 5, "tolerance": 3.8},
-    "character-dashboard": {"center": 14.2, "tolerance": 5},
+    "character-dashboard": {"center": 14.2, "tolerance": 3.8},
     "entering-game-loading": {"center": 35.8, "tolerance": .5},
-    "game": {"center": 23.3, "tolerance": 3.8},
+    "game": {"center": 22.5, "tolerance": 3.7},
     "targeted": {"center": 5.8, "tolerance": .5},
 }
-assert find_profile_overlap(profiles, "character-dashboard", {"center": 14.2, "tolerance": 5}) is None
+assert find_profile_overlap(profiles, "character-dashboard", {"center": 14.2, "tolerance": 3.8}) is None
 hit = find_profile_overlap(profiles, "character-dashboard", {"center": 20, "tolerance": 4})
 assert hit and hit["with"] == "game" and hit["width"] > 0
 # Existing login/targeted overlap remains valid when unchanged, but cannot be worsened.

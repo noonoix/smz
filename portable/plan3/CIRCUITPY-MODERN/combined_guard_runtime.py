@@ -317,7 +317,7 @@ class PlanContext:
         self._parallel_sound = {
             "threshold": int(threshold), "minimum": max(10, int(minimum)),
             "deadline": time.monotonic() + max(1, int(timeout)) / 1000,
-            "sustained": 0}
+            "sustained": 0, "polls": 0}
     def sound_poll(self):
         state = self._parallel_sound
         if state is None:
@@ -330,12 +330,26 @@ class PlanContext:
         # full Leonardo firmware and returns the UART to MMOVE between polls.
         reply = self.r.arm.send("SCAL|10", 2)
         peak = None
-        for field in reply.split("|"):
-            if field.startswith("max="):
-                peak = int(field[4:])
-                break
+        marker = reply.find("max=")
+        if marker >= 0:
+            marker += 4
+            value = 0
+            digits = 0
+            while marker < len(reply):
+                code = ord(reply[marker])
+                if code < 48 or code > 57:
+                    break
+                value = value * 10 + code - 48
+                digits += 1
+                marker += 1
+            if digits:
+                peak = value
         if peak is None:
             raise RuntimeError("ARM SCAL reply has no peak")
+        state["polls"] += 1
+        if state["polls"] >= 32:
+            state["polls"] = 0
+            gc.collect()
         if peak >= state["threshold"]:
             state["sustained"] += 10
             if state["sustained"] >= state["minimum"]:

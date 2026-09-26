@@ -4162,11 +4162,12 @@ class TestRunner
         try
         {
             var modernWritten = ModernAutoCycleFirmwareBundle.Export(Path.Combine(modernTmp, "code.py"));
-            Assert(modernWritten.Count == 28
+            Assert(modernWritten.Count == 29
                    && File.Exists(Path.Combine(modernTmp, "plan_engine_parse.py"))
                    && File.Exists(Path.Combine(modernTmp, "plan_engine_human.py"))
                    && File.Exists(Path.Combine(modernTmp, "plan_engine_exec.py"))
-                   && File.ReadAllText(Path.Combine(modernTmp, "SHA256SUMS.txt")).Split('\n', StringSplitOptions.RemoveEmptyEntries).Length == 24,
+                   && File.Exists(Path.Combine(modernTmp, "plan_engine_parallel.py"))
+                   && File.ReadAllText(Path.Combine(modernTmp, "SHA256SUMS.txt")).Split('\n', StringSplitOptions.RemoveEmptyEntries).Length == 25,
                 "modern AutoCycle export writes the split-memory bundle and manifest");
             // Windows checkout expands LF to CRLF and the packaging workflow applies the
             // verified calibration-heap overlay. Keep a bounded deferred entrypoint without

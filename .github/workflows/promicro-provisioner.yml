@@ -1,0 +1,52 @@
+name: Build Pro Micro Provisioner
+on:
+  push:
+    branches: [feature/promicro-provisioner]
+    paths: ['ams-shell/src/ProMicroProvisioner/**','ams-shell/promicro-provisioner/**','.github/workflows/promicro-provisioner.yml']
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: {dotnet-version: '8.0.x'}
+      - name: Download Arduino CLI
+        shell: pwsh
+        run: |
+          $r=Invoke-RestMethod https://api.github.com/repos/arduino/arduino-cli/releases/latest
+          $a=$r.assets|Where-Object {$_.name -match 'Windows_64bit.zip$'}|Select-Object -First 1
+          New-Item -ItemType Directory -Force package/tools/arduino-cli | Out-Null
+          Invoke-WebRequest $a.browser_download_url -OutFile cli.zip
+          Expand-Archive cli.zip package/tools/arduino-cli
+          $cli=(Resolve-Path package/tools/arduino-cli/arduino-cli.exe)
+          $root=(Resolve-Path package/tools/arduino-cli).Path.Replace('\\','/')
+          @("directories:", "  data: '$root/data'", "  downloads: '$root/downloads'", "  user: '$root/user'") | Set-Content -Encoding utf8 package/tools/arduino-cli/arduino-cli.yaml
+          & $cli core update-index --config-file package/tools/arduino-cli/arduino-cli.yaml
+          & $cli core install arduino:avr@1.8.6 --config-file package/tools/arduino-cli/arduino-cli.yaml
+      - name: Publish self-contained x64
+        run: dotnet publish ams-shell/src/ProMicroProvisioner/ProMicroProvisioner.csproj -c Release -r win-x64 --self-contained true -o ams-shell/promicro-provisioner/publish
+      - name: Assemble portable package
+        shell: pwsh
+        run: |
+          Copy-Item package/tools ams-shell/promicro-provisioner/publish -Recurse -Force
+          Compress-Archive ams-shell/promicro-provisioner/publish/* ProMicroProvisioner-Portable-x64.zip
+      - name: Build installer
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' ams-shell/promicro-provisioner/installer/ProMicroProvisioner.iss
+          Copy-Item ams-shell/promicro-provisioner/installer/Output/*.exe .
+      - name: Checksums
+        shell: pwsh
+        run: |
+          Get-FileHash ProMicroProvisioner-Portable-x64.zip,ProMicroProvisioner-Setup-x64.exe -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $([IO.Path]::GetFileName($_.Path))" } | Set-Content -Encoding ascii SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ProMicroProvisioner-Windows-x64
+          path: |
+            ProMicroProvisioner-Portable-x64.zip
+            ProMicroProvisioner-Setup-x64.exe
+            SHA256SUMS.txt
+          retention-days: 30

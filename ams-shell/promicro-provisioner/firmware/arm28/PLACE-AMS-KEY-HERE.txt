@@ -1,0 +1,5 @@
+Place your private file here after extracting the Portable package:
+
+firmware\arm28\ams_key.h
+
+The application detects it automatically at startup. Keep ams_key.example.h as a format reference only.

@@ -1,0 +1,3 @@
+ARM 2.8.1 source from classroom-current-50.
+Keep your private ams_key.h; do not replace it with ams_key.example.h.
+Compile/upload using the Arduino Leonardo board target.

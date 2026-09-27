@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><AssemblyName>ProMicroProvisioner</AssemblyName><Version>1.0.0</Version><RuntimeIdentifier>win-x64</RuntimeIdentifier><SelfContained>true</SelfContained><PublishSingleFile>false</PublishSingleFile></PropertyGroup>
+  <ItemGroup><PackageReference Include="System.IO.Ports" Version="8.0.0" /></ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Ams.UI\Services\BoardHexService.cs" Link="Services\BoardHexService.cs" />
+    <Content Include="..\..\caterina\Caterina.hex" Link="caterina\Caterina.hex" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\promicro-provisioner\firmware\arm28\**" Link="firmware\arm28\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\promicro-provisioner\ArduinoISP.ino" Link="programmer\ArduinoISP.ino" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\promicro-provisioner\PUT-KEY-HERE\**" Link="PUT-KEY-HERE\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

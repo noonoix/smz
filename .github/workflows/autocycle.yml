@@ -144,6 +144,9 @@ jobs:
             -DABVM_PROGRAM="$RUNNER_TEMP/program.abp"
           cmake --build "$RUNNER_TEMP/abvm-pico" --parallel
           test -s "$RUNNER_TEMP/abvm-pico/ams_abvm_pico.uf2"
+          test -s "$RUNNER_TEMP/abvm-pico/ams_usb_smoke.uf2"
+          test -s "$RUNNER_TEMP/abvm-pico/ams_usb_composite_smoke.uf2"
+          test -s "$RUNNER_TEMP/abvm-pico/ams_full_runtime_safe_usb.uf2"
           arm-none-eabi-size "$RUNNER_TEMP/abvm-pico/ams_abvm_pico.elf"
       - name: Build and flatten 30 patchable identity templates
         shell: bash
@@ -187,6 +190,12 @@ jobs:
           name: ams-abvm-pico-bringup
           path: |
             ${{ runner.temp }}/abvm-pico/ams_abvm_pico.uf2
+            ${{ runner.temp }}/abvm-pico/ams_usb_smoke.uf2
+            ${{ runner.temp }}/abvm-pico/ams_usb_smoke.elf
+            ${{ runner.temp }}/abvm-pico/ams_usb_composite_smoke.uf2
+            ${{ runner.temp }}/abvm-pico/ams_usb_composite_smoke.elf
+            ${{ runner.temp }}/abvm-pico/ams_full_runtime_safe_usb.uf2
+            ${{ runner.temp }}/abvm-pico/ams_full_runtime_safe_usb.elf
             ${{ runner.temp }}/abvm-pico/ams_abvm_pico.elf
             ${{ runner.temp }}/program.abp
             ${{ runner.temp }}/native-runtime/**
@@ -326,3 +335,60 @@ jobs:
             TEST-GUIDE-FA.md
             staged/windows-tests.log
             staged/light-telemetry-tests.log
+
+
+  usb-smoke-release:
+    name: diagnostics / publish USB smoke UF2
+    if: github.event_name == 'pull_request' && github.head_ref == 'fix/native-usb-smoke'
+    needs: [abvm-pico]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ams-abvm-pico-bringup
+          path: staged
+      - name: Stage and hash recovery UF2
+        shell: bash
+        run: |
+          set -euo pipefail
+          source="$(find staged -type f -name ams_usb_smoke.uf2 -print -quit)"
+          test -n "$source"
+          cp "$source" AMS-Native-USB-Recovery.uf2
+          composite="$(find staged -type f -name ams_usb_composite_smoke.uf2 -print -quit)"
+          test -n "$composite"
+          cp "$composite" AMS-Native-USB-Composite-Test.uf2
+          full="$(find staged -type f -name ams_full_runtime_safe_usb.uf2 -print -quit)"
+          test -n "$full"
+          cp "$full" AMS-Native-Full-Runtime-Safe-USB.uf2
+          sha256sum AMS-Native-USB-Recovery.uf2 | awk '{print toupper($1)}' > AMS-Native-USB-Recovery.sha256.txt
+          sha256sum AMS-Native-USB-Composite-Test.uf2 | awk '{print toupper($1)}' > AMS-Native-USB-Composite-Test.sha256.txt
+          sha256sum AMS-Native-Full-Runtime-Safe-USB.uf2 | awk '{print toupper($1)}' > AMS-Native-Full-Runtime-Safe-USB.sha256.txt
+          {
+            echo '# Native USB Recovery smoke test'
+            echo
+            echo 'Diagnostic CDC-only UF2. HID, ABVM, Guard, sensors and actors are disabled.'
+            echo
+            echo "Source commit: ${{ github.event.pull_request.head.sha }}"
+            echo
+            echo "CDC-only SHA-256: $(cat AMS-Native-USB-Recovery.sha256.txt)"
+            echo
+            echo "CDC+HID SHA-256: $(cat AMS-Native-USB-Composite-Test.sha256.txt)"
+            echo
+            echo "Full-runtime safe-USB SHA-256: $(cat AMS-Native-Full-Runtime-Safe-USB.sha256.txt)"
+          } > usb-smoke-release.md
+      - name: Publish direct-download prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: native-usb-smoke-${{ github.run_number }}
+          target_commitish: ${{ github.event.pull_request.head.sha }}
+          name: "Native USB Recovery #${{ github.run_number }}"
+          prerelease: true
+          body_path: usb-smoke-release.md
+          files: |
+            AMS-Native-USB-Recovery.uf2
+            AMS-Native-USB-Recovery.sha256.txt
+            AMS-Native-USB-Composite-Test.uf2
+            AMS-Native-USB-Composite-Test.sha256.txt
+            AMS-Native-Full-Runtime-Safe-USB.uf2
+            AMS-Native-Full-Runtime-Safe-USB.sha256.txt

@@ -57,3 +57,37 @@ target_link_libraries(ams_abvm_pico pico_stdlib pico_unique_id hardware_uart har
 pico_enable_stdio_usb(ams_abvm_pico 0)
 pico_enable_stdio_uart(ams_abvm_pico 0)
 pico_add_extra_outputs(ams_abvm_pico)
+
+# Diagnostic-only USB enumeration probe. It deliberately excludes ABVM, Guard,
+# sensors and actors so Windows enumeration can be tested in isolation.
+add_executable(ams_usb_smoke usb_smoke.c usb_smoke_descriptors.c)
+target_include_directories(ams_usb_smoke PRIVATE "${CMAKE_CURRENT_LIST_DIR}")
+target_compile_options(ams_usb_smoke PRIVATE -Wall -Wextra -Werror)
+target_compile_definitions(ams_usb_smoke PRIVATE CFG_TUSB_OS=OPT_OS_PICO)
+target_link_libraries(ams_usb_smoke pico_stdlib pico_unique_id tinyusb_device tinyusb_board)
+pico_enable_stdio_usb(ams_usb_smoke 0)
+pico_enable_stdio_uart(ams_usb_smoke 0)
+pico_add_extra_outputs(ams_usb_smoke)
+
+# Stage-2 diagnostic: standards-based CDC + keyboard HID composite, still with
+# no ABVM, Guard, sensor or UART actor initialization.
+add_executable(ams_usb_composite_smoke usb_composite_smoke.c usb_composite_smoke_descriptors.c)
+target_include_directories(ams_usb_composite_smoke PRIVATE "${CMAKE_CURRENT_LIST_DIR}")
+target_compile_options(ams_usb_composite_smoke PRIVATE -Wall -Wextra -Werror)
+target_compile_definitions(ams_usb_composite_smoke PRIVATE CFG_TUSB_OS=OPT_OS_PICO)
+target_link_libraries(ams_usb_composite_smoke pico_stdlib pico_unique_id tinyusb_device tinyusb_board)
+pico_enable_stdio_usb(ams_usb_composite_smoke 0)
+pico_enable_stdio_uart(ams_usb_composite_smoke 0)
+pico_add_extra_outputs(ams_usb_composite_smoke)
+
+# Stage-3 diagnostic: the complete ABVM/Guard/actor runtime with the already
+# proven fixed CAFE:4005 composite descriptor. This isolates runtime startup
+# from pico1's generated USB identity values.
+add_executable(ams_full_runtime_safe_usb main.c hid_keyboard.c arm_uart_mouse.c light_sensor.c guard_runtime.c usb_composite_smoke_descriptors.c "${ABVM_ROOT}/src/abvm_vm.c" "${GENERATED_PROGRAM}" "${GENERATED_PICO1_HEADER}")
+target_include_directories(ams_full_runtime_safe_usb PRIVATE "${CMAKE_CURRENT_LIST_DIR}" "${ABVM_ROOT}/include" "${PICO1_OUT}")
+target_compile_options(ams_full_runtime_safe_usb PRIVATE -Wall -Wextra -Werror)
+target_compile_definitions(ams_full_runtime_safe_usb PRIVATE CFG_TUSB_OS=OPT_OS_PICO)
+target_link_libraries(ams_full_runtime_safe_usb pico_stdlib pico_unique_id hardware_uart hardware_i2c tinyusb_device tinyusb_board)
+pico_enable_stdio_usb(ams_full_runtime_safe_usb 0)
+pico_enable_stdio_uart(ams_full_runtime_safe_usb 0)
+pico_add_extra_outputs(ams_full_runtime_safe_usb)

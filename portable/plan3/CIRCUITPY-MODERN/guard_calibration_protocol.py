@@ -106,7 +106,11 @@ def find_profile_overlap(profiles, profile_id, candidate, margin=CAL_OVERLAP_MAR
 
 
 def calibrated_profile(values, profiles, profile_id, stable_ms=750):
-    """Build an asymmetric-safe profile and cap it at the nearest saved range."""
+    """Build an asymmetric-safe requested profile.
+
+    The publish boundary performs the atomic one/two-sided neighbour fit so
+    physical calibration and CALSET share one policy and one telemetry path.
+    """
     if profile_id not in PROFILE_IDS or not isinstance(profiles, dict):
         raise ValueError("profile")
     clean = sorted(_number(value, "sample") for value in values)
@@ -122,17 +126,11 @@ def calibrated_profile(values, profiles, profile_id, stable_ms=750):
     low = clean[int((count - 1) * 0.05)]
     high = clean[int((count - 1) * 0.95)]
     deviation = max(center - low, high - center)
-    tolerance = max(1.0, deviation + 0.5)
-    cap = None
-    for other_id in PROFILE_IDS:
-        if other_id == profile_id or other_id not in profiles:
-            continue
-        other = profiles[other_id]
-        distance = abs(center - float(other["center"])) - float(other["tolerance"])
-        if distance > 0 and (cap is None or distance < cap):
-            cap = distance
-    if cap is not None:
-        tolerance = min(tolerance, cap)
+    # Keep one lux of post-sample drift headroom. Hardware showed a Dashboard
+    # envelope ending at 15.8 lux later settling at 16.7; the old 0.5 margin
+    # missed that state by 0.4 lux even though adjacent profiles still left
+    # ample room. The atomic publish fit remains authoritative.
+    tolerance = max(1.0, deviation + 1.0)
     return {
         "center": center,
         "tolerance": max(0.25, tolerance),

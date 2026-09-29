@@ -26,7 +26,7 @@ public sealed class LightStateProfile
 
 public static class LightStateDefaults
 {
-    /// <summary>Phase-four seed values. They are intentionally editable hypotheses, not calibrated truth.</summary>
+    /// <summary>Phase-four emergency fallback values; the packaged JSON is the hardware source.</summary>
     public static List<LightStateProfile> CreateInitialProfiles() => new()
     {
         Profile("desktop", "دسکتاپ", 0),

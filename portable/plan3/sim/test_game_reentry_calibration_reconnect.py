@@ -9,6 +9,7 @@ FW = ROOT / "portable/plan3/CIRCUITPY-MODERN"
 sys.path.insert(0, str(FW))
 
 from guard_calibration_protocol import calibrated_profile, find_profile_overlap
+from calibration_nvm import fit_profiles as fit_calibration_profiles
 
 
 def load(name, path):
@@ -68,9 +69,47 @@ assert find_profile_overlap(profiles, "game", game) is None
 dashboard_samples = [13.3] * 18 + [15.8] * 2
 dashboard = calibrated_profile(dashboard_samples, profiles, "character-dashboard")
 assert dashboard["center"] == 13.3
-assert dashboard["tolerance"] >= 3.0
-assert dashboard["center"] + dashboard["tolerance"] >= 15.8
+assert dashboard["tolerance"] >= 3.5
+assert dashboard["center"] + dashboard["tolerance"] >= 16.7
 assert find_profile_overlap(profiles, "character-dashboard", dashboard) is None
+
+# Ordinary overlap: shrink only the new candidate and keep a 0.25 lux gap.
+requested = {"center": 22.5, "tolerance": 5.0, "stable_ms": 750}
+fitted, events, blocked_by = fit_calibration_profiles(profiles, "game", requested)
+assert events and fitted is not None and blocked_by is None
+assert abs(fitted["game"]["tolerance"] - 1.25) < 0.000001
+assert fitted["targeted"]["tolerance"] == 1.0
+assert abs((fitted["game"]["center"] - fitted["game"]["tolerance"])
+           - (fitted["targeted"]["center"] + fitted["targeted"]["tolerance"])
+           - 0.25) < 0.000001
+
+# Centre-inside regression: after the candidate reaches its 0.5 minimum,
+# retreat the existing neighbour just enough instead of rejecting immediately.
+pair_profiles = {
+    "game": {"center": 25.0, "tolerance": 2.0, "stable_ms": 750},
+    "character-dashboard": {
+        "center": 20.0, "tolerance": 3.0, "stable_ms": 750},
+}
+inside = {"center": 22.0, "tolerance": 2.0, "stable_ms": 750}
+paired, pair_events, blocked_by = fit_calibration_profiles(
+    pair_profiles, "game", inside)
+assert paired is not None and pair_events and blocked_by is None
+assert paired["game"]["tolerance"] == 0.5
+assert paired["character-dashboard"]["tolerance"] == 1.25
+assert "adjusted=character-dashboard" in pair_events[0]
+
+# If the centres cannot hold two minimum ranges plus the safety gap, fitting
+# both sides is mathematically impossible and remains fail-closed.
+too_close = {
+    "game": {"center": 20.6, "tolerance": 2.0, "stable_ms": 750},
+    "targeted": {"center": 20.0, "tolerance": 1.0, "stable_ms": 750},
+}
+blocked, events, blocked_by = fit_calibration_profiles(
+    too_close, "game",
+    {"center": 20.6, "tolerance": 2.0, "stable_ms": 750})
+assert blocked is None
+assert "reason=centers-too-close" in events[0]
+assert blocked_by == "targeted"
 
 bridge = (ROOT / "ams-shell/bridge/bridge.py").read_text(encoding="utf-8")
 assert 'stale = state["link"]' in bridge

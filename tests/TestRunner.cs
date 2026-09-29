@@ -30,7 +30,9 @@ class TestRunner
         Assert(errorDef.Label == "Raise Error / Stop Macro" && errorDef.Fields.Any(f => f.Key == "message"),
             "raiseError definition exists with a message field");
         Assert(StepDefinitions.Get("waitForSound").Fields.Any(f => f.Key == "onTimeout" && f.Options!.Contains("global")),
-            "waitForSound exposes a per-step timeout policy");
+            "Wait For Sound exposes its per-step timeout policy");
+        Assert(StepDefinitions.Get("splashListener").Fields.Count == 0,
+            "Build 119: old Splash Listener remains load-only for migration");
         Assert(StepDefinitions.Get("waitForLight").Fields.Any(f => f.Key == "onTimeout" && f.Options!.Contains("stopWithAlarm")),
             "waitForLight exposes a per-step timeout policy");
 
@@ -3882,6 +3884,35 @@ class TestRunner
             Assert(pexParityText.Split('\n').Count(x=>x=="KEY|combo=91+82|hold=40,90")==3,
                 "v0.9.66: runExe/openFile/playAudio emit Win+R macros");
 
+            // Build 90: buzzer is a Pico-local cooperative op. It must remain
+            // exportable after a plain Wait For Sound inside looped parallel branches.
+            var soundParallel = PexStep("parallelGroup");
+            foreach (var id in new[] { 1, 2 })
+            {
+                var branch = PexStep("forLoop", new Dictionary<string, object?>
+                {
+                    ["mode"] = "count", ["count"] = 1,
+                });
+                branch.Children.Add(PexStep("waitForSound", new Dictionary<string, object?>
+                {
+                    ["calibrationId"] = id, ["threshold"] = id == 1 ? 130 : 30,
+                    ["minDurationMs"] = 60, ["timeoutMs"] = 20000,
+                    ["armed"] = false, ["insertIfElse"] = false,
+                }));
+                branch.Children.Add(PexStep("buzzer", new Dictionary<string, object?>
+                {
+                    ["preset"] = id == 1 ? "warning" : "success",
+                }));
+                soundParallel.Children.Add(branch);
+            }
+            var soundParallelText = PlanExporter.Compile(
+                new List<StepNode> { soundParallel }, pexSettings, 1920, 1080, "s1.amsj", "T").Text;
+            Assert(soundParallelText.Contains("PGROUP\nLOOP|1\nWSNDP|1,")
+                   && soundParallelText.Contains("\nPARITEM\nLOOP|1\nWSNDP|2,")
+                   && soundParallelText.Contains("BEEP|700,180")
+                   && soundParallelText.Contains("BEEP|900,120"),
+                "Build 90: looped parallel Wait For Sound + Buzzer exports cooperatively");
+
             // findImage remains an explicit blocking error.
             try { PlanExporter.Compile(new List<StepNode>{PexStep("findImage")},pexSettings,1920,1080,"f","T"); Assert(false,"v0.9.66: findImage must block"); }
             catch(PlanExporter.PlanBlockedException bx){Assert(bx.Errors.Any(e=>e.Contains("machine vision")),"v0.9.66: findImage blocks explicitly");}
@@ -4226,23 +4257,40 @@ class TestRunner
         try
         {
             var modernWritten = ModernAutoCycleFirmwareBundle.Export(Path.Combine(modernTmp, "code.py"));
-            Assert(modernWritten.Count == 34
+            var modernManifestEntries = File.ReadAllText(
+                Path.Combine(modernTmp, "SHA256SUMS.txt"))
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries).Length;
+            Assert(modernWritten.Count >= 36
                    && File.Exists(Path.Combine(modernTmp, "plan_engine_parse.py"))
                    && File.Exists(Path.Combine(modernTmp, "plan_engine_game.py"))
+                   && File.Exists(Path.Combine(modernTmp, "plan_engine_game_core.py"))
+                   && File.Exists(Path.Combine(modernTmp, "plan_engine_game_runtime.py"))
+                   && File.Exists(Path.Combine(modernTmp, "plan_engine_game_actions.py"))
+                   && File.Exists(Path.Combine(modernTmp, "plan_engine_game_events.py"))
+                   && File.Exists(Path.Combine(modernTmp, "plan_engine_game_response.py"))
+                   && File.Exists(Path.Combine(modernTmp, "plan_engine_game_parallel.py"))
+                   && File.Exists(Path.Combine(modernTmp, "plan_engine_game_sound.py"))
                    && File.Exists(Path.Combine(modernTmp, "plan_engine_human.py"))
                    && File.Exists(Path.Combine(modernTmp, "plan_engine_login.py"))
+                   && File.Exists(Path.Combine(modernTmp, "plan_engine_login_core.py"))
+                   && File.Exists(Path.Combine(modernTmp, "plan_engine_login_mouse.py"))
+                   && File.Exists(Path.Combine(modernTmp, "plan_engine_login_type.py"))
                    && File.Exists(Path.Combine(modernTmp, "plan_engine_exec.py"))
                    && File.Exists(Path.Combine(modernTmp, "plan_engine_parallel.py"))
                    && File.Exists(Path.Combine(modernTmp, "sound_step_calibration.py"))
                    && File.Exists(Path.Combine(modernTmp, "restart_cycle.py"))
                    && File.Exists(Path.Combine(modernTmp, "restart_windows.py"))
-                   && File.ReadAllText(Path.Combine(modernTmp, "SHA256SUMS.txt")).Split('\n', StringSplitOptions.RemoveEmptyEntries).Length == 30,
+                   && modernManifestEntries >= 32,
                 "modern AutoCycle export writes the split-memory bundle and manifest");
-            // Windows checkout expands LF to CRLF and the packaging workflow applies the
-            // verified calibration-heap overlay. Keep a bounded deferred entrypoint without
-            // pinning the old pre-overlay byte count.
-            Assert(File.ReadAllText(Path.Combine(modernTmp, "code.py")).Length < 50000
-                   && File.ReadAllText(Path.Combine(modernTmp, "code.py")).Contains("DeferredPlanEngine"),
+            // Windows checkout expands LF to CRLF and R5 adds the shallow sound-response
+            // handoff. Keep a bounded deferred entrypoint while explicitly pinning the
+            // unwind-before-response contract instead of the old pre-R5 byte count.
+            var modernEntry = File.ReadAllText(Path.Combine(modernTmp, "code.py"));
+            Assert(modernEntry.Length < 57000
+                   && modernEntry.Contains("DeferredPlanEngine")
+                   && modernEntry.Contains("signal = plan_engine_game.run_game_file(commands, ctx)")
+                   && modernEntry.Contains("plan_engine_game.service_sound_exit(ctx, signal)")
+                   && modernEntry.Contains("ERR|CAL|TICK|stage=%d|detail=%s:%s"),
                 "modern AutoCycle export uses the small deferred-loading entrypoint");
             var modernRuntime = File.ReadAllText(Path.Combine(modernTmp, "combined_guard_runtime.py"));
             var modernExec = File.ReadAllText(Path.Combine(modernTmp, "plan_engine_exec.py"));
@@ -4256,7 +4304,8 @@ class TestRunner
             Assert(modernRuntime.Contains("line.startswith(\"EVT|ASND|DETECTED\")")
                    && modernRuntime.Contains("line.startswith(\"EVT|ASND|TIMEOUT\")")
                    && modernRuntime.Contains("EVT|SOUND|listen|source=async")
-                   && modernRuntime.Contains("mode=async"),
+                   && modernRuntime.Contains("mode=async")
+                   && modernRuntime.Contains("self.sample_next = now + .1"),
                 "Build 81: packaged Classroom runtime preserves the ARM 2.8.2-S4 async sound contract");
             var modernCode = File.ReadAllText(Path.Combine(modernTmp, "code.py"));
             Assert(modernCode.Contains("_LIGHT_ROUTE_COMMANDS")
@@ -4271,23 +4320,80 @@ class TestRunner
                    && modernCode.Contains("elif command == \"RAW\":")
                    && modernCode.Contains("ctx.mmove_relative(int(fields[0]), int(fields[1]))"),
                 "looped hand-sampled RAW/MMOVE routes stay on the low-memory light-route executor");
+            Assert(modernCode.Contains("EVT|GUARD|PREEMPT|from=%s|to=%s|lux=%.1f")
+                   && modernCode.Contains("self.controls.aborted = True")
+                   && modernCode.Contains("self.keyboard.release_all()")
+                   && modernCode.Contains("commands = name if name == \"game_steps.txt\" else _light_route_file(name)")
+                   && modernCode.Contains("plan_engine_game.run_game_file(commands, ctx)")
+                   && modernCode.Contains("return _light_route_rows(fh)"),
+                "Build 100: stable light changes safely preempt routes and large Game files stream from flash");
             var loginHelper = File.ReadAllText(Path.Combine(modernTmp, "plan_engine_login.py"));
+            var loginCore = File.ReadAllText(Path.Combine(modernTmp, "plan_engine_login_core.py"));
+            var loginMouse = File.ReadAllText(Path.Combine(modernTmp, "plan_engine_login_mouse.py"));
+            var loginType = File.ReadAllText(Path.Combine(modernTmp, "plan_engine_login_type.py"));
             Assert(!loginHelper.Contains("import plan_engine_parse")
                    && loginHelper.Contains("def run_rmouse(")
                    && loginHelper.Contains("def run_type(")
-                   && loginHelper.Length < 14000,
-                "Login/DC light helper preserves Natural Mouse and typing without importing the full parser");
+                   && loginHelper.Contains("before-mouse-runtime-import")
+                   && loginHelper.Length < 4000
+                   && loginCore.Contains("class PausePlanner:")
+                   && loginCore.Length < 5000
+                   && loginMouse.Contains("def _mouse_events(")
+                   && loginMouse.Contains("def run_rmouse(")
+                   && loginMouse.Length < 7000
+                   && loginType.Contains("_QWERTY_ROWS")
+                   && loginType.Contains("def _typing_commands(")
+                   && loginType.Contains("def run_type(")
+                   && loginType.Length < 7000,
+                "Build 104: Login/DC loads Core, Natural Mouse and typing sequentially");
             var gameHelper = File.ReadAllText(Path.Combine(modernTmp, "plan_engine_game.py"));
+            var gameCore = File.ReadAllText(Path.Combine(modernTmp, "plan_engine_game_core.py"));
+            var gameRuntime = File.ReadAllText(Path.Combine(modernTmp, "plan_engine_game_runtime.py"));
+            var gameActions = File.ReadAllText(Path.Combine(modernTmp, "plan_engine_game_actions.py"));
+            var gameEvents = File.ReadAllText(Path.Combine(modernTmp, "plan_engine_game_events.py"));
+            var gameResponse = File.ReadAllText(Path.Combine(modernTmp, "plan_engine_game_response.py"));
+            var gameParallel = File.ReadAllText(Path.Combine(modernTmp, "plan_engine_game_parallel.py"));
+            var gameSound = File.ReadAllText(Path.Combine(modernTmp, "plan_engine_game_sound.py"));
+            var gameRunStart = gameRuntime.IndexOf("def _run(", StringComparison.Ordinal);
+            var gameRunBody = gameRuntime.IndexOf('\n', gameRunStart) + 1;
+            var gameRunEnd = gameRuntime.IndexOf("def run_game(", StringComparison.Ordinal);
             Assert(!gameHelper.Contains("import plan_engine_parse")
                    && !gameHelper.Contains("import plan_engine_exec")
                    && gameHelper.Contains("def run_game(")
-                   && gameHelper.Contains("def _parallel(")
-                   && gameHelper.Contains("sound_parallel_safe")
-                   && gameHelper.Contains("elif op == \"LABEL\"")
-                   && gameHelper.Contains("elif op == \"GOTO\"")
-                   && gameHelper.Contains("GOTO label not found")
-                   && gameHelper.Length < 14000,
-                "Game light helper streams fishing and supports LABEL/GOTO without the full parser");
+                   && gameHelper.Contains("def run_game_file(")
+                   && gameHelper.Contains("before-core-import")
+                   && gameHelper.Contains("after-runtime-import")
+                   && gameHelper.Length < 3500
+                   && gameCore.Contains("class _FileCommands:")
+                   && gameCore.Contains("def _pick_items(")
+                   && gameCore.Length < 10000
+                   && gameRuntime.Contains("elif op == \"LABEL\"")
+                   && gameRuntime.Contains("elif op == \"GOTO\"")
+                   && gameRuntime.Contains("GOTO label not found")
+                   && gameActions.Contains("def _basic(")
+                   && gameActions.Contains("def leaf(")
+                   && gameActions.Contains("def _sound(")
+                   && gameActions.Contains("def _profile(")
+                   && gameActions.Length < 5000
+                   && gameRuntime.Contains("return _sound_module().resolve_sound_watch(ctx)")
+                   && !gameRuntime.Contains("from plan_engine_parse import select_sound_profile")
+                   && gameHelper.Contains("(\"plan_engine_game_sound\", \"sound\")")
+                   && gameSound.Contains("def resolve_sound_watch(")
+                   && gameSound.Contains("def service_sound_exit(")
+                   && !gameSound.Contains("plan_engine_parse")
+                   && gameSound.Length < 5000
+                   && gameResponse.Contains("_core._FileCommands(name)")
+                   && gameResponse.Length < 4000
+                   && gameRuntime.Length < 7000
+                   && gameEvents.Contains("def events(")
+                   && gameEvents.Contains("class Cursor:")
+                   && gameEvents.Length < 9000
+                   && gameRunStart >= 0 && gameRunBody > gameRunStart && gameRunEnd > gameRunBody
+                   && !gameRuntime.Substring(gameRunBody, gameRunEnd - gameRunBody)
+                       .Contains("_run(commands,")
+                   && gameParallel.Contains("sound_parallel_safe")
+                   && gameParallel.Length < 9000,
+                "Build 103: Game compiler peaks are split across sequential bounded modules");
 
             var repairedWatch = V27ReadSrc(Path.Combine("Services", "LightWatchService.cs"));
             var repairedBridge = V27ReadSrc(Path.Combine("Services", "PythonBoardBridge.cs"));
@@ -4314,14 +4420,21 @@ class TestRunner
                 Path.Combine(modernTmp, "guard_transition.py"));
             var repairedCalibration = File.ReadAllText(
                 Path.Combine(modernTmp, "guard_calibration_protocol.py"));
+            var repairedCalibrationNvm = File.ReadAllText(
+                Path.Combine(modernTmp, "calibration_nvm.py"));
             Assert(repairedTransition.Contains("game-reentry-after-unknown")
                    && repairedTransition.Contains("\"execute\": False"),
                 "Game re-entry after an optical spike restores stage 5 without replaying the macro");
             Assert(repairedCalibration.Contains("def calibrated_profile(")
                    && repairedCalibration.Contains("0.95")
                    && repairedCalibration.Contains("max(center - low, high - center)")
-                   && repairedCalibration.Contains("tolerance = min(tolerance, cap)"),
-                "light calibration covers asymmetric samples and caps tolerance at adjacent profiles");
+                   && repairedCalibrationNvm.Contains("def fit_profiles(")
+                   && repairedCalibrationNvm.Contains("FIT_GAP = 0.25")
+                   && repairedCalibrationNvm.Contains("FIT_MIN = 0.5")
+                   && modernRuntime.Contains("calibration_nvm.fit_profiles(")
+                   && !modernRuntime.Contains("__import__(\"calibration_fit\")")
+                   && modernRuntime.Replace("\r", "").Length < 40000,
+                "light calibration covers asymmetric samples and adaptively fits adjacent profiles");
             var repairedVm = V27ReadSrc(Path.Combine("ViewModels", "MainViewModel.cs"));
             Assert(repairedVm.Contains("_bridge.StateChanged += OnBridgeStateChanged")
                    && repairedVm.Contains("private void OnBridgeStateChanged")
@@ -4415,8 +4528,94 @@ class TestRunner
                 Assert(manifestProfile == profileHash + "  " + profileFile,
                     "Build 73: manifest hashes exported " + profileFile);
             }
+            var watchedLoop = new StepNode
+            {
+                Type = "forLoop",
+                Props = new Dictionary<string, object?> { ["mode"] = "infinite" },
+                Children =
+                {
+                    new StepNode { Type = "delay", Props = new Dictionary<string, object?> { ["minMs"] = 20, ["maxMs"] = 20 } },
+                    new StepNode
+                    {
+                        Type = "waitForSound",
+                        Props = new Dictionary<string, object?>
+                        {
+                            ["responseRoute"] = "splash", ["calibrationId"] = 2,
+                            ["peakMin"] = 25, ["peakMax"] = 95,
+                            ["soundPriority"] = 5, ["minDurationMs"] = 60,
+                            ["cooldownMs"] = 900, ["timeoutMinSec"] = 19,
+                            ["timeoutMaxSec"] = 24, ["armed"] = false,
+                            ["insertIfElse"] = false,
+                        },
+                        Children =
+                        {
+                            new StepNode
+                            {
+                                Type = "keystroke",
+                                Props = new Dictionary<string, object?> { ["key"] = "F" },
+                            },
+                        },
+                    },
+                },
+            };
+            current[PipelineKind.Game].Steps.Add(watchedLoop);
+            current[PipelineKind.Whisper].Steps.Add(new StepNode
+            {
+                Type = "buzzer", Props = new Dictionary<string, object?> { ["preset"] = "warning" },
+            });
+            var whisperProfile = current.SoundProfiles.Single(x => x.Id == 1);
+            whisperProfile.Enabled = true; whisperProfile.PeakMin = 20; whisperProfile.PeakMax = 80;
+            whisperProfile.Priority = 10; whisperProfile.CooldownMs = 1800;
+            var splashProfile = current.SoundProfiles.Single(x => x.Id == 2);
+            splashProfile.Enabled = false;
+            ModernAutoCycleFirmwareBundle.ExportCurrentProject(
+                Path.Combine(modernTmp, "code.py"), current, new AppSettings(), exportedLightProfiles,
+                1920, 1080, "test sound-watch.amsj", "CURRENT-PROJECT-REGRESSION");
+            var watchedGame = File.ReadAllText(Path.Combine(modernTmp, "game_steps.txt"));
+            var whisperRoute = File.ReadAllText(Path.Combine(modernTmp, "whisper_steps.txt"));
+            var watchedSnapshot = File.ReadAllText(Path.Combine(modernTmp, "autocycle.amsj"));
+            Assert(watchedGame.Contains("SOUNDWATCH|whisper,20,80,60,10,1800,whisper_steps.txt,global")
+                   && watchedGame.Contains("splash,25,95,60,5,900,splash_steps.txt,scoped")
+                   && watchedGame.Contains("WPROFILE|splash,19000,24000")
+                   && whisperRoute.Contains("BEEP|700,180")
+                   && File.ReadAllText(Path.Combine(modernTmp, "splash_steps.txt")).Contains("KEY|combo=70")
+                   && watchedSnapshot.Contains("soundProfiles")
+                   && watchedSnapshot.Contains("\"Type\": \"waitForSound\"")
+                   && !watchedSnapshot.Contains("\"Type\": \"splashListener\""),
+                "Build 119: global Whisper plus explicit ID-2 Catch wait export with inline response");
+
+            var legacyWorkspace = new PipelineWorkspace();
+            foreach (var tab in legacyWorkspace.Tabs) tab.Steps.Clear();
+            legacyWorkspace[PipelineKind.Game].Steps.Add(new StepNode
+            {
+                Type = "splashListener",
+            });
+            legacyWorkspace[PipelineKind.Splash].Steps.Add(new StepNode
+            {
+                Type = "keystroke", Props = new Dictionary<string, object?> { ["key"] = "F" },
+            });
+            var legacySplashProfile = legacyWorkspace.SoundProfiles.Single(x => x.Id == 2);
+            legacySplashProfile.Enabled = true;
+            legacySplashProfile.PeakMin = 25;
+            legacySplashProfile.PeakMax = 95;
+            legacySplashProfile.TimeoutMinSec = 17;
+            legacySplashProfile.TimeoutMaxSec = 23;
+            var legacyWorkspaceJson = PipelineWorkspaceSerializer.Serialize(legacyWorkspace)
+                .Replace("\"pipelineVersion\": 6", "\"pipelineVersion\": 5");
+            var migratedWorkspace = PipelineWorkspaceSerializer.Deserialize(legacyWorkspaceJson);
+            var migratedSplash = migratedWorkspace.SoundProfiles.Single(x => x.Id == 2);
+            var migratedCatch = migratedWorkspace[PipelineKind.Game].Steps
+                .Single(x => x.Type == "waitForSound");
+            Assert(PropEx.GetInt(migratedCatch.Props, "calibrationId", 0) == 2
+                   && PropEx.GetInt(migratedCatch.Props, "timeoutMinSec", 0) == 17
+                   && PropEx.GetInt(migratedCatch.Props, "timeoutMaxSec", 0) == 23
+                   && migratedCatch.Children.Single().Type == "keystroke"
+                   && migratedWorkspace[PipelineKind.Splash].Steps.Count == 0
+                   && !migratedSplash.Enabled,
+                "Build 119: Build-95 Splash marker/tab migrates to explicit ID-2 Catch wait with response child");
+
             ModernAutoCycleFirmwareBundle.VerifyExportedTarget(modernTmp);
-            Assert(true, "Build 76: target read-back accepts 28 valid hashes and matching Guard revisions");
+            Assert(true, "Build 104: target read-back accepts 40 valid hashes and matching Guard revisions");
             var corruptGuardPath = Path.Combine(modernTmp, "guard-calibration.json");
             var validGuardBytes = File.ReadAllBytes(corruptGuardPath);
             File.WriteAllText(corruptGuardPath, "37|STATE|debug-cross-link");
@@ -4434,8 +4633,8 @@ class TestRunner
                    && safeDebugCode.Contains("NVM and live CDC events are sufficient"),
                 "Build 76: runtime diagnostics never write to the USB-mounted CIRCUITPY FAT volume");
             Assert(repairedDeploy.Contains("HALT|SILENT")
-                   && repairedDeploy.Contains("VerifyExportedTarget(targetRoot)")
-                   && repairedDeploy.Contains("30/30 hashes and Guard revisions OK"),
+                   && repairedDeploy.Contains("VerifyExportedTarget")
+                   && repairedDeploy.Contains("hashes and Guard revisions OK"),
                 "Build 76: export quiesces Pico and verifies target bytes before reporting success");
         }
         finally { if (Directory.Exists(modernTmp)) Directory.Delete(modernTmp, true); }

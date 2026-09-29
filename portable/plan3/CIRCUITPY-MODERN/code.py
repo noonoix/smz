@@ -105,16 +105,30 @@ runtime.load_guard_bundle = _guard_bundle.load_guard_bundle
 runtime.build_calibration_get = build_calibration_get
 runtime.parse_calibration_set = parse_calibration_set
 
-# Classroom Studio's complete hashed export hashes every payload except the
-# hash manifest itself. Extend the verifier inventory before loading the bundle.
 for _name in ("pico-calibration.json", "README-FLASH.md", "plan_engine_parse.py",
-              "plan_engine_game.py", "plan_engine_human.py", "plan_engine_login.py",
+              "plan_engine_game.py", "plan_engine_game_core.py",
+              "plan_engine_game_runtime.py", "plan_engine_game_events.py",
+              "plan_engine_game_response.py", "plan_engine_game_parallel.py",
+              "plan_engine_game_sound.py", "plan_engine_game_actions.py",
+              "plan_engine_human.py", "plan_engine_login.py",
               "plan_engine_exec.py", "plan_engine_parallel.py",
-              "sound_step_calibration.py", "restart_cycle.py", "restart_windows.py"):
+              "sound_step_calibration.py", "restart_cycle.py", "restart_windows.py",
+              "startup_steps.txt", "whisper_steps.txt", "splash_steps.txt",
+              "calibration_nvm.py"):
     if _name not in _guard_bundle.HASHED_BUNDLE_FILES:
         _guard_bundle.HASHED_BUNDLE_FILES += (_name,)
 runtime.HASHED_BUNDLE_FILES = _guard_bundle.HASHED_BUNDLE_FILES
 _BOOT_BUNDLE = _guard_bundle.load_guard_bundle("/")
+import calibration_nvm as _calibration_nvm
+_CALIBRATION_BASE_REVISION = _BOOT_BUNDLE["revision"]
+_calibration_profiles = _calibration_nvm.load(
+    getattr(_microcontroller, "nvm", None), _CALIBRATION_BASE_REVISION)
+if _calibration_profiles is not None:
+    _calibration_nvm.apply(_BOOT_BUNDLE, _calibration_profiles)
+runtime.CALIBRATION_NVM_PROFILE_COUNT = len(_calibration_profiles or {})
+runtime.calibration_nvm = _calibration_nvm
+runtime.CALIBRATION_BASE_REVISION = _CALIBRATION_BASE_REVISION
+del _calibration_profiles
 del _name, _guard_bundle
 # The runtime is already imported; only the verified boot bundle remains live.
 gc.collect()
@@ -236,6 +250,8 @@ def _memory_safe_init(self):
     # Route waits must continue polling GP3/GP4; otherwise Pause/Resume only
     # works between steps and feels unresponsive during long delays or TYPE.
     self.controls.tick = self.controls_tick
+    self.route_active_profile = None
+    self.route_light_last = 0
     self.mouse_pos = None
     self.sensor = runtime.BH1750()
     self.routes = {}
@@ -258,12 +274,22 @@ def _memory_safe_init(self):
     self.blue_start_consumed = False
     self.blue_start_pending = False
     self.last_cal_error = None
-    self.debug_last_state = None
+    # Force the first sensor sample to emit STATE/unknown + lux instead of
+    # silently comparing None == None.
+    self.debug_last_state = "__boot__"
     self.debug_last_denied = None
+    self.calibration_source = (
+        "nvm" if getattr(runtime, "CALIBRATION_NVM_PROFILE_COUNT", 0) else "file")
     import restart_cycle
     self.cycle = restart_cycle.Controller.from_root(
         self, getattr(_microcontroller, "nvm", None))
-    _debug_event(self, "BOOT", "bundle=valid profiles=%d" % len(runtime.PROFILES), persist=True)
+    _debug_event(self, "BOOT", "bundle=valid profiles=%d cal=%s" %
+                 (len(runtime.PROFILES), self.calibration_source), persist=True)
+    self.emit("EVT|CALSTATUS|source=%s|count=%d" %
+              (self.calibration_source, len(runtime.PROFILES)))
+    if self.calibration_source == "nvm":
+        self.emit("EVT|CAL|storage=nvm|loaded=%d" %
+                  runtime.CALIBRATION_NVM_PROFILE_COUNT)
 
 _CAL_NOTES = (262, 294, 330, 349, 392, 440)
 _GUARD_START_PATTERN = ((784, 160), (988, 160), (1175, 200), (0, 80), (1175, 280))
@@ -316,9 +342,13 @@ def _cal_stage_complete_tone(self):
     self._cal_beep(note, 190)
 
 def _cal_save_success_tone(self):
-    self._cal_beep(880, 90)
-    runtime.time.sleep(.05)
-    self._cal_beep(1320, 180)
+    # A longer, unmistakable rising confirmation. The previous 270 ms pair
+    # was easy to miss next to the stage-position cue on the passive piezo.
+    self._cal_beep(880, 160)
+    runtime.time.sleep(.06)
+    self._cal_beep(1175, 220)
+    runtime.time.sleep(.06)
+    self._cal_beep(1568, 360)
 
 def _cal_save_error_tone(self):
     self._guard_pattern(_CAL_SAVE_ERROR_PATTERN)
@@ -422,14 +452,15 @@ _original_cal_tick = runtime.Combined.cal_tick
 _original_save_cal = runtime.Combined.save_cal
 _original_yellow_action = runtime.Combined.yellow_action
 
-_PLAN_MODULES = ("plan_engine_exec", "plan_engine_game", "plan_engine_human",
-                 "plan_engine_login", "plan_engine_parallel", "plan_engine_parse")
+_PLAN_MODULES = ("plan_engine_exec", "plan_engine_game", "plan_engine_game_core",
+                 "plan_engine_game_runtime", "plan_engine_game_events",
+                 "plan_engine_game_response", "plan_engine_game_parallel",
+                 "plan_engine_game_sound", "plan_engine_game_actions",
+                 "plan_engine_human", "plan_engine_login", "plan_engine_login_core",
+                 "plan_engine_login_mouse", "plan_engine_login_type",
+                 "plan_engine_parallel", "plan_engine_parse")
 
 def _release_plan_heap(self, emit_cal=False):
-    # Complex routes lazily import the split plan engine. CircuitPython keeps
-    # those modules cached after Stop/PlanAbort. Return the deferred proxy to
-    # its cold state after every complex route so a second Start cannot retain
-    # the prior parsed Game tree and enter the next parse with ~1 KB free.
     proxy = runtime.plan_engine
     try:
         if hasattr(proxy, "module"):
@@ -445,6 +476,19 @@ def _release_plan_heap(self, emit_cal=False):
             self.emit("EVT|DEBUG|CAL|heap-ready|free=%d" % gc.mem_free())
         except Exception:
             pass
+
+def _prepare_fresh_run(self):
+    _release_plan_heap(self)
+    try:
+        self.keyboard.release_all()
+    except Exception:
+        pass
+    try:
+        self.arm.release(False)
+    except Exception:
+        pass
+    self.arm.sound_result = None; self.arm.sound_detail = None
+    if self.cycle.phase == "idle": self.cycle.previous_running = False
 
 def _prepare_calibration_heap(self):
     # Calibration also needs a contiguous block for its atomic JSON write.
@@ -488,22 +532,48 @@ def _audible_next_cal(self):
 
 def _audible_cal_tick(self):
     was_sampling = self.result == "sampling"
-    _original_cal_tick(self)
+    try:
+        _original_cal_tick(self)
+    except Exception as exc:
+        # Calibration must never terminate the firmware loop silently. Clear
+        # the bounded sample buffer first so even MemoryError reporting has
+        # contiguous headroom.
+        self.samples = []
+        self.result = None
+        gc.collect()
+        self.emit("ERR|CAL|TICK|stage=%d|detail=%s:%s" %
+            (self.stage + 1, type(exc).__name__, str(exc)[:48]))
+        self.cal_save_error_tone()
+        _debug_event(self, "CAL", "tick-failed stage=%d id=%s error=%s" %
+            (self.stage + 1, runtime.PROFILES[self.stage],
+             type(exc).__name__), persist=True)
+        return
     if was_sampling and isinstance(self.result, dict):
         self.samples = []
         _prepare_calibration_heap(self)
         self.save_cal()
+    elif was_sampling and self.result is None:
+        # UNSTABLE used to fail silently on the physical interface: the event
+        # was emitted over CDC, but the user heard neither save nor error.
+        self.cal_save_error_tone()
+        _debug_event(self, "CAL", "sample-failed stage=%d id=%s" %
+            (self.stage + 1, runtime.PROFILES[self.stage]), persist=True)
 
 def _audible_save_cal(self):
     profile_was_saved = runtime.PROFILES[self.stage] in self.saved_ids
     had_pending_result = isinstance(self.result, dict) and not self.saved
     _original_save_cal(self)
     if had_pending_result and self.saved:
+        _debug_event(self, "CAL", "save-ok stage=%d id=%s source=nvm" %
+            (self.stage + 1, runtime.PROFILES[self.stage]), persist=True)
         if not profile_was_saved and len(self.saved_ids) == len(runtime.PROFILES):
             self.cal_complete_melody()
         else:
             self.cal_save_success_tone()
     elif had_pending_result and not self.saved and self.last_cal_error:
+        _debug_event(self, "CAL", "save-failed stage=%d id=%s error=%s" %
+            (self.stage + 1, runtime.PROFILES[self.stage],
+             self.last_cal_error), persist=True)
         self.cal_save_error_tone()
 
 def _repeatable_yellow_action(self):
@@ -524,11 +594,15 @@ def _repeatable_yellow_action(self):
         return
     if self.result == "sampling":
         _original_yellow_action(self)
+        self.cal_save_error_tone()
+        _debug_event(self, "GP3", "calibration-busy stage=%d" %
+            (self.stage + 1), persist=True)
         return
     if isinstance(self.result, dict) and not self.saved:
         if (self.last_cal_error or "").startswith("OVERLAP:"):
             self.samples = []
             self.sample_started = runtime.time.monotonic()
+            self.sample_next = self.sample_started
             self.result = "sampling"
             self.last_cal_error = None
             self.emit("EVT|CAL|mode=started|stage=%d|id=%s|seconds=5|saved=%d|retry=1" %
@@ -540,9 +614,12 @@ def _repeatable_yellow_action(self):
     retry = 1 if self.saved and isinstance(self.result, dict) else 0
     self.samples = []
     self.sample_started = runtime.time.monotonic()
+    self.sample_next = self.sample_started
     self.result = "sampling"
     self.emit("EVT|CAL|mode=started|stage=%d|id=%s|seconds=5|saved=%d|retry=%d" %
         (self.stage + 1, runtime.PROFILES[self.stage], len(self.saved_ids), retry))
+    _debug_event(self, "GP3", "calibration-start stage=%d id=%s wait=5s" %
+        (self.stage + 1, runtime.PROFILES[self.stage]), persist=True)
     self.cal_record_start_tone()
 
 def _audible_buttons(self):
@@ -588,7 +665,23 @@ def _audible_buttons(self):
             # Short GP4 press: start and play the Start cue on release only.
             # Long GP4 press was consumed by the calibration branch above.
             if not stop_consumed and not self.blue.long:
+                _prepare_fresh_run(self)
                 self.guard.reset()
+                self.guard.last_decision = None
+                # A physical Start is a fresh observation boundary, exactly
+                # like GUARD|ON. Without this reset, unknown -> unknown was
+                # measured but suppressed until the Pico reconnected.
+                self.debug_last_state = "__start__"
+                self.debug_last_denied = None
+                profiles = self.bundle.get("calibration", {}).get("profiles", {})
+                dashboard = profiles.get("character-dashboard", {})
+                center = float(dashboard.get("center", 0))
+                tolerance = float(dashboard.get("tolerance", 0))
+                self.emit(
+                    "EVT|CALSTATUS|source=%s|id=character-dashboard|"
+                    "center=%.1f|tolerance=%.1f|range=%.1f,%.1f" %
+                    (getattr(self, "calibration_source", "file"),
+                     center, tolerance, center - tolerance, center + tolerance))
                 self.controls.start()
                 self.guard_start_tone()
                 _debug_event(self, "GP4", "short-start running=1", persist=True)
@@ -601,11 +694,32 @@ def _audible_buttons(self):
 
 
 def _cycle_controls_tick(self):
-    # Long route delays must still observe both physical Stop/Pause and the
-    # RUNFOR deadline. Expiry aborts the active route; the outer loop then
-    # performs the restart sequence on a clean stack.
+    # Route waits cooperatively poll controls, the cycle deadline, and Guard.
+    # A newly stable optical state aborts the old route without stopping the
+    # overall run; the outer loop consumes Guard.last_decision next.
     self.buttons()
     self.cycle.route_tick()
+    profile = getattr(self, "route_active_profile", None)
+    now = runtime.time.monotonic()
+    if (not profile or self.controls.aborted or
+            now - getattr(self, "route_light_last", 0) < .10):
+        return
+    self.route_light_last = now
+    lux = self.sensor.lux()
+    self.guard.update(lux, int(now * 1000))
+    decision = self.guard.last_decision
+    stable = getattr(getattr(self.guard, "transition", None), "last_stable", None)
+    if decision is None or stable is None or stable == profile:
+        return
+    _debug_event(self, "STATE", "preempt from=%s to=%s lux=%.1f" %
+                 (profile, stable, lux), persist=True)
+    self.emit("EVT|GUARD|PREEMPT|from=%s|to=%s|lux=%.1f" %
+              (profile, stable, lux))
+    self.controls.aborted = True
+    try: self.keyboard.release_all()
+    except Exception: pass
+    try: self.arm.abort()
+    except Exception: pass
 
 
 def _plan_context(self):
@@ -630,39 +744,65 @@ _LIGHT_ROUTE_COMMANDS = {
     "PLAN", "SCREEN", "SPEED", "BEEP", "DELAY", "KEY", "KDOWN", "KUP", "RAW",
     "HANDPATH", "RMOUSE", "TYPE", "LABEL", "GOTO", "RPKG",
     "PKGITEM", "ENDPKG", "PGROUP", "PARITEM", "ENDPAR", "WSND", "WSNDP",
+    "SOUNDWATCH", "WPROFILE",
     "LOOP", "LOOPTIME", "ENDLOOP",
 }
 
-def _light_route_lines(text):
-    commands = []
-    loop_depth = 0
-    for raw in text.splitlines():
+def _light_route_rows(rows):
+    commands = []; loop_depth = 0
+    for raw in rows:
         line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        parts = line.split("|", 1)
-        command = parts[0].upper()
+        if not line or line.startswith("#"): continue
+        parts = line.split("|", 1); command = parts[0].upper()
         args = parts[1].strip() if len(parts) == 2 else ""
-        if command not in _LIGHT_ROUTE_COMMANDS:
-            return None
+        if command not in _LIGHT_ROUTE_COMMANDS: return None
         if command in ("LOOP", "LOOPTIME"):
-            if not args:
-                return None
+            if not args: return None
             loop_depth += 1
         elif command == "ENDLOOP":
-            if args or loop_depth <= 0:
-                return None
+            if args or loop_depth <= 0: return None
             loop_depth -= 1
         elif command in ("PKGITEM", "ENDPKG", "PGROUP", "PARITEM", "ENDPAR"):
-            if args:
-                return None
-        elif len(parts) != 2:
-            return None
+            if args: return None
+        elif len(parts) != 2: return None
         commands.append((command, args))
     return commands if loop_depth == 0 else None
 
+
+def _light_route_lines(text):
+    return _light_route_rows(text.splitlines())
+
+
+def _light_route_file(name):
+    with open("/" + name, "r") as fh:
+        return _light_route_rows(fh)
+
+def _game_heap(ctx, stage):
+    ctx.r.emit("EVT|DEBUG|GAME|stage=%s|free=%d" % (stage, gc.mem_free()))
+
+
 def _run_light_route(ctx, commands):
-    if any(item[0] == "PGROUP" for item in commands):
+    if isinstance(commands, str):
+        gc.collect(); _game_heap(ctx, "before-engine-import"); gc.collect()
+        try:
+            import plan_engine_game
+        except MemoryError:
+            _game_heap(ctx, "engine-import-memoryerror")
+            raise
+        gc.collect(); _game_heap(ctx, "after-engine-import")
+        resume = None
+        while True:
+            if resume is None:
+                signal = plan_engine_game.run_game_file(commands, ctx)
+            else:
+                signal = plan_engine_game.resume_game_file(commands, ctx, resume)
+            if signal is None:
+                return None
+            if not plan_engine_game.service_sound_exit(ctx, signal):
+                return None
+            ctx.r.emit("EVT|SOUNDWATCH|next-cast|mode=resume")
+            resume = signal
+    if any(item[0] in ("PGROUP", "SOUNDWATCH", "WPROFILE") for item in commands):
         gc.collect()
         import plan_engine_game
         plan_engine_game.run_game(commands, ctx)
@@ -824,7 +964,8 @@ def _diagnostic_route(self, decision):
     if not decision.get("execute"):
         return False
     name = decision.get("route")
-    if name not in self.bundle["manifest"]["routes"].values():
+    if (name not in self.bundle["manifest"]["routes"].values()
+            and name not in ("restart_steps.txt", "startup_steps.txt")):
         raise GuardBundleError("unvalidated route")
     # A parsed plan is consumable: loop/random bookkeeping and the step cursor
     # must never be reused by the next invocation of the same Route. Re-read
@@ -832,26 +973,38 @@ def _diagnostic_route(self, decision):
     # emit their RMOUSE steps again.
     # Route-stage diagnostic only: do not change route semantics.
     self.emit("EVT|DEBUG|ROUTE|stage=before-route-read|free=%d" % gc.mem_free())
-    with open("/" + name, "r") as fh:
-        text = fh.read()
+    # Game can contain hundreds of package items. Keep both source rows and
+    # command tuples on Flash; plan_engine_game indexes it with a bytearray.
+    commands = name if name == "game_steps.txt" else _light_route_file(name)
+    text = None
+    if commands is None:
+        with open("/" + name, "r") as fh:
+            text = fh.read()
     self.emit("EVT|DEBUG|ROUTE|stage=after-route-read|free=%d" % gc.mem_free())
-    commands = _light_route_lines(text)
+    self.route_active_profile = decision.get("profile")
+    self.route_light_last = 0
     try:
         if commands is not None:
-            # The Login helper is intentionally independent from the full
-            # parser. Reclaim the source route before its lazy import so the
-            # fragmented RP2040 heap never needs the old 29 KB parser module.
-            del text
             gc.collect()
             self.emit("EVT|DEBUG|ROUTE|stage=light-route|free=%d" % gc.mem_free())
             # Keep simple Pico-only routes off the large plan_engine import.
+            route_ctx = runtime.PlanContext(self)
             try:
-                _run_light_route(runtime.PlanContext(self), commands)
+                while True:
+                    signal = _run_light_route(route_ctx, commands)
+                    if signal is None:
+                        break
+                    route_ctx.close()
+                    del route_ctx
+                    gc.collect()
+                    route_ctx = runtime.PlanContext(self)
             except RuntimeError as exc:
                 if str(exc) == "route aborted":
                     self.emit("EVT|DEBUG|ROUTE/aborted " + name)
                     return False
                 raise
+            finally:
+                route_ctx.close()
         else:
             self.emit("EVT|DEBUG|ROUTE|stage=before-plan-engine-import|free=%d" % gc.mem_free())
             try:
@@ -888,6 +1041,7 @@ def _diagnostic_route(self, decision):
                 # it here so no traceback retains the full parsed Game tree.
                 aborted = True
             finally:
+                route_ctx.close()
                 del route_plan
                 del route_ctx
             if aborted:
@@ -895,6 +1049,7 @@ def _diagnostic_route(self, decision):
         self.arm.flush()
         return True
     finally:
+        self.route_active_profile = None
         # Cleanup must be idempotent and must not manufacture a click. Arm
         # releases only buttons explicitly tracked as held by MDOWN.
         try:
@@ -933,6 +1088,10 @@ def _audible_loop(self):
                 # the route so the same Desktop macro is not replayed every poll.
                 self.guard.last_decision = None
                 if decision is not None:
+                    # A Guard preemption aborts only the previous route. Manual
+                    # Stop sets running=False and must never be revived here.
+                    if self.controls.running:
+                        self.controls.aborted = False
                     if decision.get("execute"):
                         route_name = decision.get("route")
                         _debug_event(self, "ROUTE", "start %s lux=%.1f" % (route_name, lux), persist=True)
@@ -948,6 +1107,7 @@ def _audible_loop(self):
                             _debug_event(self, "ROUTE", "aborted %s" % route_name, persist=True)
                         else:
                             _debug_event(self, "ROUTE", "complete %s" % route_name, persist=True)
+                            self.cycle.route_complete(route_name)
                     else:
                         denied = (active, decision.get("reason"))
                         if denied != self.debug_last_denied:
@@ -1052,10 +1212,14 @@ def _live_host_poll(self):
                 # A host Start is a new run request. Reset the one-shot light
                 # transition gate so the same stable desktop state can execute
                 # again without power-cycling the Pico.
+                _prepare_fresh_run(self)
                 self.guard.reset()
                 self.guard.last_decision = None
-                self.debug_last_state = None
+                self.debug_last_state = "__start__"
                 self.debug_last_denied = None
+                self.emit("EVT|CALSTATUS|source=%s|count=%d" %
+                          (getattr(self, "calibration_source", "file"),
+                           len(self.bundle.get("calibration", {}).get("profiles", {}))))
                 _apply_pending_cursor(self, force=True)
                 self.controls.start()
                 self.guard_start_tone()

@@ -12,6 +12,7 @@ import pwmio
 import usb_cdc
 import usb_hid
 import storage
+import microcontroller
 
 class Keyboard:
     """Small boot-keyboard driver; avoids an undeclared adafruit_hid dependency."""
@@ -74,8 +75,7 @@ class Keyboard:
 
 import plan_engine
 from guard_calibration_protocol import (
-    build_calibration_get, parse_calibration_set, find_profile_overlap,
-    calibrated_profile,
+    build_calibration_get, parse_calibration_set, calibrated_profile,
 )
 from live_light_guard import (
     HASHED_BUNDLE_FILES,
@@ -297,7 +297,10 @@ class Controls:
 class PlanContext:
     plan_api = 3; screen_w = 1920; screen_h = 1080; speed_min = 0; speed_max = 2000
     mouse_mode = "relative"
-    def __init__(self, runtime): self.r = runtime; self._parallel_sound = None
+    def __init__(self, runtime):
+        self.r = runtime; self._parallel_sound = None
+        self._sound_watch = None; self._sound_watch_pending = None
+        self._sound_watch_servicing = False
     def get_mouse_pos(self):
         value = getattr(self.r, "mouse_pos", None)
         if value is None or len(value) < 2:
@@ -307,7 +310,17 @@ class PlanContext:
         self.r.mouse_pos = (int(x), int(y))
     def now(self): return time.monotonic()
     def gate(self): return self.r.controls.gate()
-    def sleep_ms(self, ms): return self.r.controls.sleep(ms)
+    def sleep_ms(self, ms):
+        if self._sound_watch is None or self._sound_watch_servicing:
+            return self.r.controls.sleep(ms)
+        end = time.monotonic() + max(0, ms) / 1000
+        while time.monotonic() < end:
+            remaining = int(max(1, (end - time.monotonic()) * 1000))
+            if not self.r.controls.sleep(min(10, remaining)):
+                return False
+            if self.r.arm.sound_result is not None:
+                break
+        return True
     def log(self, text): print("plan:", text)
     def mmove(self, x, y): self.r.arm.move(x, y)
     def mmove_relative(self, dx, dy): self.r.arm.move_relative(dx, dy)
@@ -425,11 +438,131 @@ class PlanContext:
         else:
             state["sustained"] = 0
         return None
+    def sound_peak(self):
+        detail = self.r.arm.sound_detail or ""
+        marker = detail.find("peak=")
+        if marker < 0:
+            marker = detail.find("max=")
+        if marker < 0:
+            return None
+        marker += 5 if detail[marker:marker + 5] == "peak=" else 4
+        value = 0
+        digits = 0
+        while marker < len(detail):
+            code = ord(detail[marker])
+            if code < 48 or code > 57:
+                break
+            value = value * 10 + code - 48
+            digits += 1
+            marker += 1
+        return value if digits else None
     def sound_cancel(self):
         if self._parallel_sound == "async":
             self.r.arm.flush()
             self.r.arm.send("ASNDCANCEL", 2)
         self._parallel_sound = None
+    def _active_watch_profiles(self):
+        state = self._sound_watch
+        if state is None:
+            return []
+        scope = state.get("scope")
+        return [item for item in state["profiles"]
+                if item["mode"] == "global" or item["id"] == scope]
+    def _arm_sound_watch(self):
+        state = self._sound_watch
+        if (state is None or self._sound_watch_servicing
+                or self._parallel_sound is not None
+                or time.monotonic() < state["cooldown_until"]):
+            return
+        profiles = self._active_watch_profiles()
+        if not profiles:
+            state["armed"] = None
+            return
+        state["armed"] = profiles
+        threshold = min(item["peak_min"] for item in profiles)
+        minimum = min(item["minimum"] for item in profiles)
+        self.sound_start(threshold, minimum, 30000)
+        if self._parallel_sound != "async":
+            self.sound_cancel()
+            raise ValueError("SOUNDWATCH requires asynchronous ASND firmware")
+        self.r.emit("EVT|SOUNDWATCH|armed|profiles=%d|threshold=%d" %
+                    (len(profiles), threshold))
+    def install_sound_watch(self, profiles):
+        self.close_sound_watch()
+        self._sound_watch = {"profiles": profiles, "scope": None,
+                             "scope_result": None, "cooldown_until": 0.0,
+                             "armed": None}
+        self._sound_watch_pending = None
+        self._arm_sound_watch()
+    def poll_sound_watch(self):
+        state = self._sound_watch
+        if (state is None or self._sound_watch_servicing
+                or self._sound_watch_pending is not None):
+            return None
+        if time.monotonic() < state["cooldown_until"]:
+            return None
+        if self._parallel_sound is None:
+            self._arm_sound_watch()
+        if self._parallel_sound is None:
+            return None
+        result = self.sound_poll()
+        if result is None:
+            return None
+        if not result:
+            self._arm_sound_watch(); return None
+        self._sound_watch_pending = True
+        return None
+    def take_sound_watch(self):
+        pending = self._sound_watch_pending
+        self._sound_watch_pending = None
+        return pending
+    def begin_profile_wait(self, profile_id):
+        state = self._sound_watch
+        if state is None:
+            raise ValueError("WPROFILE requires SOUNDWATCH")
+        found = [item for item in state["profiles"]
+                 if item["id"] == profile_id and item["mode"] == "scoped"]
+        if not found:
+            raise ValueError("WPROFILE profile is not enabled")
+        if self._parallel_sound is not None:
+            self.sound_cancel()
+        state["scope"] = profile_id; state["scope_result"] = None
+        self._arm_sound_watch()
+    def poll_profile_wait(self, profile_id):
+        state = self._sound_watch
+        if state is None or state.get("scope") != profile_id:
+            return None
+        # Do not service the global callback from inside the scoped waiter.
+        # The Game scheduler reaches sleep_ms() on every cooperative deadline,
+        # and sleep_ms() is the single owner of callback polling.  Calling the
+        # callback here as well nests Game -> WPROFILE -> callback -> Game while
+        # several RPKG/LOOP generators are already live.  CircuitPython's small
+        # pystack can exhaust even though the heap still has tens of KB free.
+        return state.get("scope_result")
+    def end_profile_wait(self):
+        state = self._sound_watch
+        if state is None:
+            return
+        if self._parallel_sound is not None:
+            self.sound_cancel()
+        state["scope"] = None; state["scope_result"] = None
+        self._arm_sound_watch()
+    def suspend_sound_watch(self):
+        self._sound_watch_servicing = True
+        if self._parallel_sound is not None:
+            self.sound_cancel()
+    def resume_sound_watch(self, cooldown):
+        state = self._sound_watch
+        if state is not None:
+            state["cooldown_until"] = time.monotonic() + max(0, cooldown) / 1000
+        self._sound_watch_servicing = False
+    def close_sound_watch(self):
+        if self._parallel_sound is not None:
+            self.sound_cancel()
+        self._sound_watch = None; self._sound_watch_pending = None
+        self._sound_watch_servicing = False
+    def close(self):
+        self.close_sound_watch()
     def sound_parallel_safe(self):
         return self.r.arm.async_sound is True
     def trg_sound(self, threshold, minimum, timeout, action, rmin, rmax, hmin, hmax):
@@ -457,7 +590,7 @@ class Combined:
         self.arm = Arm(); self.keyboard = Keyboard(usb_hid.devices); self.controls = Controls(self.arm, self.keyboard); self.sensor = BH1750()
         self.bundle = load_guard_bundle("/"); self.guard = LightStateGuard.from_bundle("/"); self.routes = {}
         self.blue = Button(board.GP4); self.yellow = Button(board.GP3); self.usb = usb_cdc.data or usb_cdc.console; self.host = bytearray()
-        self.calibrating = False; self.stage = 0; self.samples = []; self.sample_started = 0; self.result = None; self.saved = False; self.saved_ids = set(); self.last_cal_error = None
+        self.calibrating = False; self.stage = 0; self.samples = []; self.sample_started = 0; self.sample_next = 0; self.result = None; self.saved = False; self.saved_ids = set(); self.last_cal_error = None
     def key(self, vk):
         # Convert Windows virtual-key values directly to USB HID usages.
         # Keep this branch-only mapping allocation-free on CircuitPython's small heap.
@@ -531,47 +664,26 @@ class Combined:
         lines = ["%s  %s" % (_file_sha256("/", name), name) for name in sorted(HASHED_BUNDLE_FILES)]
         return "\n".join(lines) + "\n"
     def _publish_calibration(self, revision, profile_id, profile):
-        existing_profiles = self.bundle.get("calibration", {}).get("profiles", {})
-        overlap = find_profile_overlap(existing_profiles, profile_id, profile)
-        if overlap is not None:
-            raise CalibrationOverlapError(overlap["with"], overlap["width"])
-        manifest = json.loads(json.dumps(self.bundle["manifest"]))
-        calibration = json.loads(json.dumps(self.bundle["calibration"]))
-        manifest["calibrationRevision"] = revision
-        found = False
-        for item in manifest.get("profiles", []):
-            if item.get("id") == profile_id:
-                item["center"] = profile["center"]; item["tolerance"] = profile["tolerance"]; item["stableMs"] = profile["stable_ms"]; found = True
-        if not found: raise GuardBundleError("profile missing from Guard manifest")
-        calibration["revision"] = revision
-        calibration.setdefault("profiles", {})[profile_id] = {
-            "center": profile["center"], "tolerance": profile["tolerance"], "stable_ms": profile["stable_ms"]}
-        self._ensure_calibration_storage_writable()
-        old_manifest = self._read_text("/guard-transition.json")
-        old_calibration = self._read_text("/guard-calibration.json")
-        old_hashes = self._read_text("/SHA256SUMS.txt")
+        profiles, events, blocked = calibration_nvm.fit_profiles(
+            self.bundle.get("calibration", {}).get("profiles", {}),
+            profile_id, profile)
+        for event in events: self.emit(event)
+        if profiles is None:
+            raise CalibrationOverlapError(blocked, 0)
         try:
-            self._replace_json("/guard-transition.json", json.dumps(manifest))
-            self._replace_json("/guard-calibration.json", json.dumps(calibration))
-            self._replace_text("/SHA256SUMS.txt", self._hash_manifest())
-            new_bundle = load_guard_bundle("/")
-            new_guard = LightStateGuard.from_bundle("/")
+            calibration_nvm.save(microcontroller.nvm, CALIBRATION_BASE_REVISION, profiles)
+            calibration_nvm.apply(self.bundle, profiles)
+            self.guard = LightStateGuard(
+                self.bundle["states"], self.bundle["stable_ms"],
+                self.bundle["hysteresis"], self.bundle["sensor_timeout_ms"])
+            self.guard.bundle = self.bundle
         except Exception as exc:
             self.last_cal_error = type(exc).__name__ + ":" + str(exc)[:80]
             self.emit("ERR|CAL|SAVE|" + self.last_cal_error)
-            rollback_error = None
-            for path, text in (
-                ("/guard-transition.json", old_manifest),
-                ("/guard-calibration.json", old_calibration),
-                ("/SHA256SUMS.txt", old_hashes),
-            ):
-                try:
-                    self._replace_text(path, text)
-                except Exception as exc:
-                    if rollback_error is None: rollback_error = exc
-            if rollback_error is not None: raise RuntimeError("calibration rollback failed") from rollback_error
             raise
-        self.bundle = new_bundle; self.guard = new_guard; self.last_cal_error = None
+        self.last_cal_error = None
+        self.calibration_source = "nvm"
+        self.emit("EVT|CAL|storage=nvm|id=" + profile_id)
     def calibration_count(self):
         return len(self.bundle.get("calibration", {}).get("profiles", {}))
     def calget(self):
@@ -587,8 +699,10 @@ class Combined:
                 float(item.get("tolerance", 0)),
                 int(item.get("stable_ms", 750))))
         error = (self.last_cal_error or "none").replace("|", "/").replace("\n", " ")[:80]
-        return "OK|CALSTATUS|revision=%s|count=%d|profiles=%s|last_error=%s" % (
-            self.bundle.get("revision", "unknown"), len(profiles), ";".join(parts), error)
+        return "OK|CALSTATUS|revision=%s|source=%s|count=%d|profiles=%s|last_error=%s" % (
+            self.bundle.get("revision", "unknown"),
+            getattr(self, "calibration_source", "file"),
+            len(profiles), ";".join(parts), error)
     def calset(self, line):
         if self.controls.running or self.calibrating: return "ERR|CALSET|BUSY"
         payload, error = parse_calibration_set(line)
@@ -632,11 +746,19 @@ class Combined:
         if not self.calibrating: self.controls.paused = not self.controls.paused; return
         if self.result == "sampling": self.emit("ERR|CAL|BUSY|stage=%d" % (self.stage + 1)); return
         if self.result is not None: self.save_cal(); return
-        self.samples = []; self.sample_started = time.monotonic(); self.result = "sampling"; self.emit("EVT|CAL|mode=started|stage=%d|id=%s|seconds=5|saved=%d" % (self.stage+1, PROFILES[self.stage], len(self.saved_ids)))
+        self.samples = []; self.sample_started = time.monotonic(); self.sample_next = self.sample_started; self.result = "sampling"; self.emit("EVT|CAL|mode=started|stage=%d|id=%s|seconds=5|saved=%d" % (self.stage+1, PROFILES[self.stage], len(self.saved_ids)))
     def cal_tick(self):
         if not self.calibrating or self.result != "sampling": return
+        now = time.monotonic()
+        # The main loop runs every 10 ms. Appending a float on every pass built
+        # ~500 Python objects, then sorted() needed a second pointer array and
+        # could stop code.py with MemoryError exactly at the five-second mark.
+        # Ten samples/second is ample for a slowly changing lux sensor and
+        # caps both the live list and the final median/sort compiler pressure.
+        if now < self.sample_next: return
+        self.sample_next = now + .1
         self.samples.append(self.sensor.lux())
-        if time.monotonic() - self.sample_started < 5: return
+        if now - self.sample_started < 5: return
         values = sorted(self.samples); center = values[len(values)//2]; spread = max(values)-min(values)
         if len(values) < 5 or spread > 5: self.result = None; self.emit("ERR|CAL|UNSTABLE|stage=%d|spread=%.1f" % (self.stage+1, spread)); return
         self.result = calibrated_profile(

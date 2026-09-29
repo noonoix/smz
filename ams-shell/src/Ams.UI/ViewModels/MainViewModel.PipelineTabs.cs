@@ -14,7 +14,10 @@ public partial class MainViewModel
     private bool _pipelineLoadInProgress;
     private bool _pipelineSyncAttached;
 
-    public ObservableCollection<PipelineTabDocument> PipelineTabs => _pipelineWorkspace.Tabs;
+    // Splash is a legacy storage route only. Catch actions now live visibly
+    // under the explicit Wait For Sound step in Game.
+    public IReadOnlyList<PipelineTabDocument> PipelineTabs
+        => _pipelineWorkspace.Tabs.Where(x => x.Kind != PipelineKind.Splash).ToList();
     public PipelineTabDocument? ActivePipelineTab => _activePipelineTab;
     public string ActivePipelineTitle => _activePipelineTab?.Title ?? "Desktop";
     public bool IsLaunchPipeline => _activePipelineTab?.Kind == PipelineKind.Launch;
@@ -117,11 +120,7 @@ public partial class MainViewModel
     {
         if (!ConfirmDiscard()) return;
         InitializePipelineTabs();
-        foreach (var tab in _pipelineWorkspace.Tabs)
-        {
-            tab.Steps.Clear();
-            tab.IsDirty = false;
-        }
+        _pipelineWorkspace = new PipelineWorkspace();
         _pipelineWorkspace.EnsureDcDefaults();
         _activePipelineTab = _pipelineWorkspace[PipelineKind.Main];
         _currentFile = null;
@@ -132,6 +131,7 @@ public partial class MainViewModel
         OnPropertyChanged(nameof(ActivePipelineTitle));
         OnPropertyChanged(nameof(IsLaunchPipeline));
         OnPropertyChanged(nameof(IsMainPipeline));
+        NotifySoundProfilesChanged();
         UpdateFileText();
         Log("new pipeline workspace: " + PipelineCounts());
     }
@@ -162,6 +162,7 @@ public partial class MainViewModel
             OnPropertyChanged(nameof(ActivePipelineTitle));
             OnPropertyChanged(nameof(IsLaunchPipeline));
         OnPropertyChanged(nameof(IsMainPipeline));
+            NotifySoundProfilesChanged();
             UpdateFileText();
             Log("pipeline workspace opened in " + targetKind + ": " + dialog.FileName + " — " + PipelineCounts());
         }

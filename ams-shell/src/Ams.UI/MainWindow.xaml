@@ -152,7 +152,7 @@
                 <MenuItem Header="Run in Parallel (grou_p) — children start together; next step waits for the longest" Command="{Binding AddStepCommand}" CommandParameter="parallelGroup" />
                 <Separator />
                 <MenuItem Header="_Find Image On Screen" Command="{Binding AddStepCommand}" CommandParameter="findImage" />
-                <MenuItem Header="_Wait For Sound" Command="{Binding AddStepCommand}" CommandParameter="waitForSound" />
+                <MenuItem Header="Wait For _Sound" Command="{Binding AddStepCommand}" CommandParameter="waitForSound" />
                 <MenuItem Header="Wait For _Light (BH1750)" Command="{Binding AddStepCommand}" CommandParameter="waitForLight" />
                 <MenuItem Header="⛔ Raise Error / Stop Macro" Command="{Binding AddStepCommand}" CommandParameter="raiseError" />
                 <Separator />
@@ -243,7 +243,7 @@
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource RailButton}" Command="{Binding AddStepCommand}" CommandParameter="waitForSound"
-                                ToolTip="انتظار صدا — سنسور روی A0 (دکمه‌ی کالیبره در داخل)">
+                                ToolTip="انتظار صریح برای صدا — ID، Threshold و Timeout داخل خود استپ">
                             <StackPanel>
                                 <TextBlock Text="🔊" FontSize="15" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center" Foreground="{StaticResource WarnBrush}" />
                                 <TextBlock Text="Sound" FontSize="8" HorizontalAlignment="Center" Foreground="#FFFFFF" Margin="0,1,0,0" />

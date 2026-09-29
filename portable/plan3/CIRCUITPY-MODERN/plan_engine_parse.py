@@ -43,6 +43,21 @@ class PlanAbort(Exception):
     """Raised inside a step when the host took over or the keypad stopped the run."""
 
 
+def select_sound_profile(profiles, peak):
+    # Keep the hot SoundWatch path allocation-free.  A list comprehension
+    # creates both a temporary list and another Python frame on CircuitPython;
+    # that is unsafe immediately after ASND completes inside a scheduler sleep.
+    winner = None
+    for item in profiles:
+        if not (item["peak_min"] <= peak <= item["peak_max"]):
+            continue
+        if (winner is None or item["priority"] > winner["priority"]
+                or (item["priority"] == winner["priority"]
+                    and item["peak_min"] > winner["peak_min"])):
+            winner = item
+    return winner
+
+
 # code64: optional persistent cursor contract. The Pico context owns the saved
 # coordinate so Start/Stop does not reset every new run_plan() call to screen centre.
 def _load_mouse_pos(ctx, ops):
@@ -129,7 +144,7 @@ _OPS = ("PLAN", "SCREEN", "SPEED", "RMOUSE", "CLICK", "TYPE",
         "DELAY", "LOOP", "LOOPTIME", "ENDLOOP", "WLIGHT", "STATELOOP",
         # v2 - Classroom Studio portable parity (sound, keys, flow, includes)
         "MOVETO", "KEY", "KDOWN", "KUP", "WHEEL", "RAW",
-        "WSND", "WSNDP", "TRGSND", "IFSND", "IFLUX", "ELSE", "ENDIF",
+        "WSND", "WSNDP", "SOUNDWATCH", "WPROFILE", "TRGSND", "IFSND", "IFLUX", "ELSE", "ENDIF",
         "LABEL", "GOTO", "INCLUDE", "HANDPATH",
         # v3 - full Classroom Studio parity: packages, parallel groups, buzzer
         "RPKG", "PKGITEM", "ENDPKG", "PGROUP", "PARITEM", "ENDPAR", "RETRY", "ENDRETRY", "BEEP")
@@ -201,7 +216,7 @@ def _link_blocks(ops):
 # individual timed events. TRGSND deliberately stays out: the Arm-side click is
 # an indivisible legacy transaction and cannot share the sound monitor.
 _PAR_OK = ("RMOUSE", "MOVETO", "CLICK", "KEY", "KDOWN", "KUP", "WHEEL",
-           "TYPE", "DELAY", "RAW", "BEEP", "HANDPATH", "WSND", "WSNDP",
+           "TYPE", "DELAY", "RAW", "BEEP", "HANDPATH", "WSND", "WSNDP", "WPROFILE",
            "LOOP", "LOOPTIME", "ENDLOOP", "RPKG")
 _PKG_MODES = ("pick", "all", "seq")
 
@@ -452,18 +467,71 @@ def parse_plan(text):
                 raise ValueError("line %d: STATELOOP fallback must be STOP or FIRST" % line_no)
         elif op == "WSNDP":
             pa = fields[1].split(",") if len(fields) > 1 else []
-            if len(pa) != 5:
-                raise ValueError("line %d: WSNDP needs id,binding,threshold,min,timeout" % line_no)
+            if len(pa) not in (5, 8, 10):
+                raise ValueError("line %d: WSNDP needs 5, 8, or 10 fields" % line_no)
             try:
                 profile_id = int(pa[0])
                 threshold, minimum, timeout = int(pa[2]), int(pa[3]), int(pa[4])
+                peak_min = int(pa[5]) if len(pa) >= 8 else threshold
+                peak_max = int(pa[6]) if len(pa) >= 8 else 65535
+                priority = int(pa[7]) if len(pa) >= 8 else 0
+                cooldown = int(pa[9]) if len(pa) == 10 else 0
             except Exception:
                 raise ValueError("line %d: bad WSNDP numbers" % line_no)
             binding = pa[1].strip()
-            if profile_id not in (1, 2) or not binding or len(binding) > 32:
+            response = pa[8].strip() if len(pa) == 10 else ""
+            if (profile_id not in (1, 2) or not binding or len(binding) > 32
+                    or peak_min < 0 or peak_max < max(1, peak_min)
+                    or priority < -100 or priority > 100 or cooldown < 0
+                    or (response and (not response.endswith(".txt") or "/" in response or "\\" in response))):
                 raise ValueError("line %d: bad WSNDP profile" % line_no)
             prm.update({"profile_id": profile_id, "binding": binding,
-                        "threshold": threshold, "minimum": minimum, "timeout": timeout})
+                        "threshold": threshold, "minimum": minimum, "timeout": timeout,
+                        "peak_min": peak_min, "peak_max": peak_max, "priority": priority,
+                        "response": response, "cooldown": cooldown})
+        elif op == "SOUNDWATCH":
+            raw_profiles = fields[1].split(";") if len(fields) > 1 else []
+            profiles = []
+            seen = set()
+            for raw_profile in raw_profiles:
+                pa = raw_profile.split(",")
+                if len(pa) != 8:
+                    raise ValueError("line %d: SOUNDWATCH profile needs id,min,max,duration,priority,cooldown,file,mode" % line_no)
+                profile_id, route_file, mode = pa[0].strip(), pa[6].strip(), pa[7].strip()
+                try:
+                    peak_min, peak_max, minimum, priority, cooldown = (
+                        int(pa[1]), int(pa[2]), int(pa[3]), int(pa[4]), int(pa[5]))
+                except Exception:
+                    raise ValueError("line %d: bad SOUNDWATCH numbers" % line_no)
+                if (profile_id not in ("splash", "whisper") or profile_id in seen
+                        or mode not in ("global", "scoped")
+                        or peak_min < 0 or peak_max < max(1, peak_min) or peak_max > 65535
+                        or minimum < 10 or minimum > 10000
+                        or priority < -1000 or priority > 1000
+                        or cooldown < 0 or cooldown > 600000
+                        or not route_file.endswith("_steps.txt")
+                        or any(c in route_file for c in "/\\:|%")):
+                    raise ValueError("line %d: bad SOUNDWATCH profile" % line_no)
+                seen.add(profile_id)
+                profiles.append({"id": profile_id, "peak_min": peak_min,
+                                 "peak_max": peak_max, "minimum": minimum,
+                                 "priority": priority, "cooldown": cooldown,
+                                 "file": route_file, "mode": mode})
+            if not profiles:
+                raise ValueError("line %d: SOUNDWATCH needs profiles" % line_no)
+            prm["profiles"] = profiles
+        elif op == "WPROFILE":
+            pa = fields[1].split(",") if len(fields) > 1 else []
+            if len(pa) != 3 or pa[0] != "splash":
+                raise ValueError("line %d: WPROFILE needs splash,min,max" % line_no)
+            try:
+                timeout_min, timeout_max = int(pa[1]), int(pa[2])
+            except Exception:
+                raise ValueError("line %d: bad WPROFILE timeout" % line_no)
+            if timeout_min < 1000 or timeout_max < timeout_min or timeout_max > 300000:
+                raise ValueError("line %d: bad WPROFILE timeout range" % line_no)
+            prm.update({"profile_id": "splash", "timeout_min": timeout_min,
+                        "timeout_max": timeout_max})
         elif op in ("WSND", "TRGSND", "IFSND", "IFLUX"):
             pa = fields[1].split(",") if len(fields) > 1 else []
             need = {"WSND": 3, "IFSND": 3, "IFLUX": 5, "TRGSND": 8}[op]

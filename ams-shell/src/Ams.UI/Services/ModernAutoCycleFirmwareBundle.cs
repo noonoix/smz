@@ -23,11 +23,17 @@ public static class ModernAutoCycleFirmwareBundle
         "guard_calibration_protocol.py", "guard_transition.py",
         "live_light_guard.py", "login_or_dc_steps.txt", "pico-calibration.json",
         "plan.txt", "plan_engine.py", "plan_engine_exec.py", "plan_engine_game.py",
-        "plan_engine_human.py", "plan_engine_login.py", "plan_engine_parallel.py",
+        "plan_engine_game_core.py", "plan_engine_game_runtime.py",
+        "plan_engine_game_actions.py",
+        "plan_engine_game_events.py", "plan_engine_game_response.py",
+        "plan_engine_game_parallel.py", "plan_engine_game_sound.py",
+        "plan_engine_human.py", "plan_engine_login.py",
+        "plan_engine_login_core.py", "plan_engine_login_mouse.py",
+        "plan_engine_login_type.py", "plan_engine_parallel.py",
         "plan_engine_parse.py", "restart_cycle.py", "restart_windows.py",
-        "restart_steps.txt",
+        "restart_steps.txt", "startup_steps.txt", "calibration_nvm.py",
         "resumable_steps.txt", "settings.toml", "sound_step_calibration.py",
-        "targeted_steps.txt",
+        "targeted_steps.txt", "whisper_steps.txt", "splash_steps.txt",
     };
 
     public static IReadOnlyList<string> Export(string codePyPath)
@@ -40,7 +46,7 @@ public static class ModernAutoCycleFirmwareBundle
         if (!File.Exists(sourceManifest))
             throw new IOException("Manifest Bundle مدرن پیدا نشد.");
         var manifestNames = ReadManifestNames(sourceManifest);
-        if (manifestNames.Length != 30)
+        if (manifestNames.Length != 44)
             throw new IOException("تعداد فایل‌های Manifest Bundle مدرن نامعتبر است.");
         foreach (var name in Files.Concat(manifestNames).Distinct(StringComparer.OrdinalIgnoreCase))
         {
@@ -55,7 +61,7 @@ public static class ModernAutoCycleFirmwareBundle
             "guard_main.py", "guard_validate.py", ".guard_verified_v3",
             "plan_cycle.py", "cycle_runtime.py", "restart_windows.py",
             "auto_resume_boot.py", "resume_essentials_runtime.py",
-            "recovery_runtime.py",
+            "recovery_runtime.py", "calibration_fit.py",
         };
         foreach (var name in stale)
         {
@@ -127,7 +133,7 @@ public static class ModernAutoCycleFirmwareBundle
             .Where(line => !string.IsNullOrWhiteSpace(line))
             .Select(line => line.Split(new[] { "  " }, StringSplitOptions.None))
             .ToArray();
-        if (entries.Length != 30 || entries.Any(parts => parts.Length != 2))
+        if (entries.Length != 44 || entries.Any(parts => parts.Length != 2))
             throw new IOException("Manifest خوانده‌شده از CIRCUITPY نامعتبر است.");
 
         foreach (var parts in entries)

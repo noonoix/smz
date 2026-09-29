@@ -2,8 +2,182 @@
 
 این سند مرجع سریع وضعیت شاخهٔ پایدار `stable/natural-mouse-v1` است. ترتیب ورودی‌ها معکوس زمانی است؛ جدیدترین Build همیشه بالاتر قرار می‌گیرد.
 
+## Build 119 R17 — بازگشت کنترل‌شدهٔ Catch Wait و شروع مجدد تمیز
+
+**Previous build:** 118 R15 / Classroom release 221
+**Status:** selective UX fallback; restart-A preserved; hardware retest required
+
+### Problem observed
+
+نسخهٔ سبک از MemoryError عبور کرد، اما Route بازی بدون مسلح‌شدن صدای Catch بلافاصله Complete می‌شد و پس از Stop/Start نیز اجرای قابل‌مشاهده‌ای نداشت. Classroom گاهی تا قطع و وصل کابل، PING پیکو را دریافت نمی‌کرد. همچنین انتزاع Build 95 محل واقعی انتظار برای صدای چلپ و تنظیمات ID 2 را از پروژه پنهان کرده بود.
+
+### Root cause
+
+`Splash Listener` فقط یک Marker بدون تنظیم بود و پاسخ Catch در تب جداگانه نگه‌داری می‌شد؛ در نتیجه ساختار پروژه از مدل واقعی «پس از رهاکردن قلاب، همین‌جا منتظر صدای ID 2 بمان» فاصله گرفت. شروع مجدد دستی نیز Heap/نتیجهٔ Async Sound را صریح پاک نمی‌کرد و Bridge فقط یک PING اولیه می‌فرستاد.
+
+### Change
+
+- استپ صریح `Wait For Sound` با ID، Peak، Min duration، Cooldown و Timeout به منو برگشت؛ Catch فقط با ID 2 و فقط در همان محل Cast فعال می‌شود.
+- پاسخ Catch به Child همان استپ منتقل می‌شود؛ تب Splash از UI حذف و فقط برای مهاجرت فایل‌های Build 95–118 نگه‌داری می‌شود.
+- ID 1/Whisper تنها شنوندهٔ سراسری Game باقی ماند و پس از واکنش همان Cursor و Deadline را ادامه می‌دهد.
+- فایل‌های قدیمی `splashListener` هنگام بازشدن به Wait For Sound صریح تبدیل و اکشن‌های تب Splash، از جمله F، به Child آن کپی می‌شوند.
+- Stop → Start ماژول‌های Route، کلیدها و نتیجهٔ Async Sound را پاک می‌کند تا هر اجرا بدون قطع کابل از محیط تازه آغاز شود.
+- Bridge روی همان COM تا چهار PING بی‌خطر می‌فرستد و برای بازیابی اتصال به Cable cycle نیاز ندارد.
+- منطق موفق Restart-A و قاعدهٔ «After فقط با Deadline چرخه» از R11 بدون تغییر حفظ شد.
+
+### Validation
+
+- پروژهٔ واقعی ارسالی تأیید شد: ID 2 برابر Splash با Peak `76..511` است، Marker در شاخهٔ Game قرار دارد و پاسخ تب قدیمی کلید F است.
+- قراردادهای Explicit Catch، Scoped Runtime، Whisper resume، Stop/Start و Restart-A سبز هستند.
+- تست Bridge تأیید می‌کند PING دوم روی همان COM31 بدون Close/Reopen متصل می‌شود.
+- Python compile و بررسی whitespace سبز است؛ TestRunner دات‌نت در CI ویندوز اجرا خواهد شد.
+
+### Next test
+
+پس از Export پروژهٔ مهاجرت‌یافته، لاگ باید در هر Cast شامل `SOUNDWATCH|armed` و سپس `detected` یا `timeout` باشد؛ با تشخیص ID 2 کلید F اجرا و Cast بعدی با همان Deadline ادامه یابد. سپس Stop/Start و اتصال مجدد Classroom را بدون قطع کابل چند بار تکرار کنید.
+
+## Build 118 R15 — شکستن واحد کامپایل Runtime
+
+**Previous build:** 118 R14 / Classroom release 221
+**Status:** compiler-sharding candidate; 55 portable contracts green; hardware retest required
+
+### Problem observed
+
+Bundle 710 با وجود R14 و `free=20992` دوباره دقیقاً در `runtime-import` با خطای تخصیص پیوستهٔ ۱۳۳۶ بایت متوقف شد. بنابراین کاهش ۱۶۵ بایتی فایل Runtime برای پایین‌آوردن Peak کامپایل CircuitPython کافی نبود.
+
+### Root cause
+
+مسئله کمبود مجموع Heap نیست؛ Runtime یک واحد کامپایل ۶۴۲۵ بایتی بود که پس از Preload شدن Sound، Parallel، Events، Response و Core باید یک‌جا کامپایل می‌شد. Heap آزاد کافی بود، اما بلوک پیوستهٔ موقت موردنیاز Compiler در Heap قطعه‌قطعه‌شده وجود نداشت.
+
+### Change
+
+- عملیات ترتیبی Game شامل `DELAY/KEY/RMOUSE/SOUNDWATCH/WPROFILE/WSND` به Shard مستقل `plan_engine_game_actions.py` منتقل شد.
+- اندازهٔ واحد Runtime از ۶۴۲۵ به ۳۴۹۱ بایت کاهش یافت؛ Shard عملیات نیز فقط ۳۷۶۷ بایت است.
+- Actions پیش از Core/Runtime روی Heap تازه‌تر Preload می‌شود؛ در زمان اجرا فقط Bind سبک Callbackها انجام می‌گیرد.
+- Cursor، Deadline، Scoped Winner، Response فایل‌محور، Random Package، ARM و Cadence بدون تغییر معنایی حفظ شدند.
+- موجودی Bundle و Manifest از ۴۳ به ۴۴ فایل افزایش یافت و Export/Verify/Calibration cleanup با آن همگام شد.
+
+### Validation
+
+- هر ۵۵ قرارداد Portable و Python compile سبز است.
+- قراردادهای File-backed Game، Scoped Splash، SoundWatch، Export و Calibration Heap سبز هستند.
+- شبیه‌ساز داخلی: ۳ Cast، ۲ Catch و Deadline ثابت، بدون Restart یا `KeyError`.
+- TestRunner محلی اجرا نشد چون SDK دات‌نت در محیط عامل موجود نبود؛ Gate رسمی Windows روی PR اجرا خواهد شد.
+
+### Next test
+
+روی Pico، Bundle جدید باید `after-actions-preload` و سپس `after-runtime-import` را ثبت کند. بعد از آن صدا و Response باید اجرا شوند و حداقل دو Cast متوالی بدون `MemoryError`، `KeyError('_game_cursor')` یا Restart کامل Game ادامه یابند.
+
+## Build 118 R14 — کاهش Peak کامپایل Runtime
+
+**Previous build:** 118 R13 / Classroom release 220
+**Status:** compiler-memory hotfix candidate; local simulation green; hardware retest required
+
+### Problem observed
+
+Bundle 700 پیش از اجرای Game و پیش از رسیدن به Random Package در مرحلهٔ `runtime-import` با `free=20656` و خطای تخصیص ۱۳۳۶ بایت متوقف شد.
+
+### Root cause
+
+اصلاح معنایی R13 درست بود، اما ساخت Signal خروجی و نگهداری Cursor در واحد کامپایل Runtime، Peak حافظهٔ کامپایل CircuitPython را از حد تخصیص پیوسته عبور داد. بستهٔ ۱۷۶ حرکتی علت مستقیم نیست؛ فقط بعد از بارگذاری می‌تواند فشار اجرایی را بیشتر کند.
+
+### Change
+
+- ساخت Exit Signal به ماژول ازپیش‌بارگذاری‌شدهٔ Events منتقل شد.
+- Runtime فقط Cursor و Labelها را به Events واگذار می‌کند.
+- رفتار Scoped Winner، Resume و Response فایل‌محور R13 بدون تغییر حفظ شد.
+- Route، Random Package، ARM و Cadence دست‌نخورده باقی ماندند.
+
+### Validation
+
+- اندازهٔ Runtime از ۶۵۹۰ به ۶۴۲۵ بایت LF کاهش یافت و از Runtime موفق R12 نیز کوچک‌تر شد.
+- تست Scoped Splash/SoundWatch و کامپایل Python سبز است.
+- شبیه‌ساز داخلی: ۳ Cast، ۲ Catch و Deadline ثابت.
+- Route واقعی ۳۶۹ فرمانی Bundle 700 با مدل Pump: ۶ Cast، ۵ Catch و بدون `MemoryError` یا `KeyError`.
+
+### Next test
+
+روی Pico، Bundle جدید باید از `after-runtime-import` عبور کند، صدا را تشخیص دهد، Response را اجرا کند و حداقل دو Cast متوالی را بدون `MemoryError` یا `KeyError('_game_cursor')` کامل کند.
+
+## Build 118 R13 — حفظ Scoped Winner تا Resume
+
+**Previous build:** 118 R12 / Classroom release 216
+**Status:** hardware hotfix candidate; CI green; hardware retest required
+
+### Problem observed
+
+Bundle 670 صدای واقعی را با `peak=102` تشخیص داد و Response فایل‌محور تا `after-response-index|commands=5` پیش رفت، اما Route بلافاصله Complete شد و ورود بعدی Game با `KeyError('_game_cursor')` متوقف گردید.
+
+### Root cause
+
+روی سخت‌افزار، ASND ممکن است فقط هنگام `arm.pump()` داخل `resolve_sound_watch()` دریافت شود. در این مسیر Fast path نتیجهٔ خام را نمی‌دید، Scoped Winner داخل Scheduler مصرف می‌شد و `finally/end_profile_wait` آن را پیش از Resume پاک می‌کرد. Signal بعدی نیز بدون Cursor به Facade می‌رسید.
+
+### Change
+
+- Scoped Winner پیش از پاک‌سازی Profile در Signal خروجی ذخیره می‌شود.
+- Response فقط پس از Unwind کامل Scheduler اجرا می‌گردد.
+- تمام خروجی‌های SoundWatch، Cursor، Labelها و Game state را حمل می‌کنند.
+- شبیه‌ساز داخلی صدا را فقط از مسیر واقعی `arm.pump()` دریافت می‌کند، نه با تزریق مستقیم هنگام Sleep.
+- Package بزرگ و Route فایل‌محور بدون تغییر حفظ شده‌اند.
+
+### Validation
+
+- همهٔ Gateهای PR #75 سبز هستند: Portable، Windows TestRunner، ARM 2.8، Plan2 و Security.
+- شبیه‌ساز فشرده: ۳ Cast، ۲ Catch و یک Deadline ثابت.
+- Route واقعی ۳۶۹ فرمانی Bundle 670 با مدل Pump: ۶ Cast، ۵ Catch و Deadline ثابت `617.074s`.
+- هیچ `MemoryError`، Restart Game یا `KeyError('_game_cursor')` رخ نداد.
+
+### Next test
+
+در سخت‌افزار واقعی باید پس از `SOUNDWATCH|detected`، تله‌متری Response و اجرای F ثبت شود؛ سپس بدون `ROUTE/complete` زودهنگام، Cast بعدی با همان Deadline و بدون تکرار Buffها ادامه یابد.
+
+## Build 118 R12 — ادامهٔ همان Cursor پس از Splash
+
+- پاسخ Scoped Splash پس از Unwind امن Scheduler اجرا می‌شود و سپس همان Cursor صریح، Frameهای Loop و Deadline اصلی `LOOPTIME` روی فایل Flash بازشده Resume می‌شوند.
+- پایان Catch دیگر `game_steps.txt` را از ابتدا اجرا نمی‌کند؛ Buffها تکرار و تایمر ده‌دقیقه‌ای Reset نمی‌شوند.
+- نتیجهٔ خام ASND پیش از `ASNDCANCEL` ثبت می‌شود تا Splash هنگام خروج از `PGROUP` از دست نرود.
+- شبیه‌ساز ماهیگیری خودکار Cast با 7، حرکت موازی Mouse، Pause/Resume، Splash هشت‌ثانیه‌ای، اجرای F و Cast بعدی را کنترل می‌کند.
+- فایل واقعی ۳۶۹ فرمانی Bundle 440 در شبیه‌ساز ۶ Cast و ۵ Catch را با یک Deadline ثابت اجرا کرد.
+- Resume session بین Runtime و Events تقسیم شده است تا Runtime حتی با CRLF ویندوز زیر سقف Compiler حافظهٔ Pico باقی بماند.
+- تمام Gateها سبزند: Portable contracts، Windows TestRunner، ARM 2.8، Plan2 و Security.
+
 ## وضعیت فعلی در یک نگاه
 
+- **Candidate Build 118 — Architectural:** Patchهای Stack متوقف شدند. اجرای ترتیبی Game اکنون یک VM تکرارشونده با `Cursor` و Stack صریح برای `LOOP/LOOPTIME/RPKG` است؛ هیچ فراخوانی بازگشتی `_run` باقی نمانده است. SoundWatch بدون Callback با Poll مستقیم Context کار می‌کند و Response پس از بازگشت Scheduler روی Stack تخت اجرا می‌شود.
+- **Candidate Build 117:** Bundle 440 تمام Importها و Bind را پاس کرد، اما پس از peak=95 باز هم پیش از callback telemetry شکست خورد. حتی Queue function پایتونی در Stack عمیق `sleep_ms` یک Frame اضافی بود. Callback/Closure به‌طور کامل حذف شد: `PlanContext.sleep_ms` مستقیماً SoundWatch را Poll می‌کند، Winner را در Slot داخلی نگه می‌دارد و Scheduler پس از Unwind آن را با `take_sound_watch()` تحویل می‌گیرد.
+- **Candidate Build 116:** Bundle 420 همهٔ Preload/Importها و Bind زودهنگام Response را پاس کرد، اما پس از peak=105 هنوز پیش از `before-response-callback` شکست خورد. علت باقی‌مانده دو فراخوانی اضافی روی pystack محدود بود: `suspend_sound_watch()` هنوز داخل callback اجرا می‌شد و Scheduler برای سرویس Winner وارد Wrapper دیگری می‌شد. Callback اکنون فقط Winner را در Slot ازقبل‌موجود می‌گذارد؛ Scheduler پاسخ را Inline و مستقیماً با Runner ازپیش Bindشده اجرا می‌کند.
+- **Candidate Build 115:** Bundle 410 تمام Importها، Index ۳۶۹فرمانی، Parallel، نخستین RMOUSE و تشخیص واقعی Sound با peak=178 را پاس کرد، اما Response هنوز مستقیماً از callback تو‌در‌توی `sleep_ms` اجرا می‌شد و پیش از `before-response-file` با `MemoryError('')` شکست خورد. Callback اکنون فقط Winner را Queue می‌کند؛ ماژول Response پیش از اجرای Route یک‌بار Bind/Cache می‌شود و Runner پس از بازگشت callback در Scheduler اجرا می‌گردد. Telemetry مرزی Bind/Callback اضافه شده و Mouse/ARM/Cadence تغییر نکرده‌اند.
+- **Candidate Build 114:** افزودن Flash-backed Response در Build 113 ناخواسته Runtime را دوباره به 8.6KB رساند و Compiler peak جدید allocation=1336 پیش از اجرا ایجاد کرد. Response اکنون در `plan_engine_game_response.py` مستقل زیر 4KB قرار دارد و همراه Parallel/Events پیش از Core/Runtime Preload می‌شود؛ Runtime اصلی دوباره کوچک و bounded است.
+- **Candidate Build 113:** Build 112 تمام Importها، Index، Parallel و اولین RMOUSE را پاس کرد؛ SoundWatch نیز Splash واقعی را با peak=101 تشخیص داد. شکست فقط هنگام Response بود، چون `_response_commands` فایل Splash را کامل به متن و لیست Tuple در RAM تبدیل می‌کرد. Response اکنون با `_FileCommands` مستقیماً از Flash اجرا و پس از پایان بسته می‌شود.
+- **Candidate Build 112:** Bundle 390 هر دو ماژول Parallel/Event و Core را پاس کرد، اما Runtime کوچک‌شده همچنان دقیقاً allocation=1180 می‌خواست؛ بنابراین Peak مربوط به Code Object تابع بزرگ `_run` بود، نه اندازهٔ فایل. Dispatch اکنون به سه تابع bounded `_sound`، `_leaf` و `_run` تقسیم شده و هر Code Object زیر سقف تست‌شده است.
+- **Candidate Build 111:** Bundle 388 ترتیب Reserve → Parallel → Core را پاس کرد، اما Compile ماژول 10.9KB Runtime با allocation=1180 شکست خورد. Generator تکرارشوندهٔ Event به ماژول مستقل زیر 5KB منتقل و هر دو واحد Parallel پیش از Core/Runtime Preload می‌شوند؛ Runtime اصلی اکنون زیر 8KB است.
+- **Candidate Build 110:** Bundle 381 رزرو Index را پاس کرد، اما چون Core و Runtime پیش از Parallel بارگذاری شدند، Compile Scheduler با free=46,768 و allocation=1388 شکست خورد. ترتیب Peak اکنون Reserve → Parallel preload → Core → Runtime است؛ هیچ منطق Scheduler، Sound، Mouse یا ARM تغییر نکرده است.
+- **Candidate Build 109:** Build 108 Parallel را با موفقیت روی Heap تازه Preload کرد، اما Bundle 380 بلافاصله بعد از آن هنگام ساخت Offset index برای ۳۶۹ فرمان با allocation برابر 1336 بایت شکست خورد. Index فشرده اکنون پیش از هر Import موتور Game روی Heap تازه رزرو و سپس بدون Scan/Allocation مجدد به FileCommands منتقل می‌شود؛ Parallel، Sound و Mouse تغییر نکرده‌اند.
+- **Candidate Build 108:** Build 107 خطای pystack را حذف کرد، اما Bundle 371 پس از ۲۱ ثانیه Prelude و با وجود 45KB Heap آزاد، هنگام Compile دیرهنگام ماژول Parallel به‌دلیل Fragmentation نتوانست بلوک پیوستهٔ 1388 بایتی بگیرد. Route فایل‌محور پیش از Load اسکن می‌شود و در صورت داشتن PGROUP، همان Scheduler موجود بلافاصله پس از Game Runtime و روی Heap تازه Preload می‌شود؛ منطق Parallel، Sound، Mouse و ARM تغییر نکرده‌اند.
+- **Candidate Build 107:** Build 106 Poll تو‌در‌توی SoundWatch را حذف کرد و Listener از مرحلهٔ Arm عبور کرد، اما Bundle 355 هنگام اولین RMOUSE در ساختار `PGROUP→LOOP→RPKG` و پس از Lazy import کامل موس با `pystack exhausted` متوقف شد. Generator بازگشتی Containerهای Game با Stack تکرارشوندهٔ صریح جایگزین شد؛ تولید/ارسال موس، ARM و Cadence بدون تغییرند.
+- **Candidate Build 106:** Bundle 350 کل مسیر Desktop→Login→Dashboard→Loading→Game، Split Type و ایندکس ۳۶۹ فرمان را پاس کرد. در نخستین `WPROFILE`، Poll همان SoundWatch هم داخل scoped waiter و هم از callback تعاونی `sleep_ms` انجام می‌شد و با وجود 43KB Heap آزاد، pystack را خالی می‌کرد. scoped waiter اکنون فقط نتیجه را می‌خواند و `sleep_ms` تنها مالک Poll callback است؛ ARM، Natural Mouse و Cadence تغییر نکرده‌اند.
+- **Candidate Build 105:** Bundle 340 ثابت کرد Mouse و Type جدید با حاشیهٔ مناسب Import می‌شوند، اما اولین Typo به‌دلیل جاافتادن ثابت `_QWERTY_ROWS` از فایل Split Type با `NameError` متوقف شد. جدول QWERTY و تست اجرای واقعی Neighbor به `plan_engine_login_type.py` اضافه شدند؛ الگوریتم Typo، Natural Mouse، ARM و Sound تغییر نکرده‌اند.
+- **Candidate Build 104:** Bundle 330 تمام Importهای تقسیم‌شده Game، ایندکس ۳۶۹ فرمان، Parallel و مرحلهٔ قلاب را پاس کرد؛ آخرین شکست در Import یک‌تکهٔ 12.8KB Login/Mouse با free=42,912 رخ داد. Login به Facade، Core، Mouse و Type زیر 5.6KB تقسیم شد و هر بخش ترتیبی/تنبل با تله‌متری مستقل بارگذاری می‌شود.
+- **Candidate Build 103:** Bundle 320 ثابت کرد خود Import یک‌تکهٔ موتور 23KB Game حافظه را از 60,144 به 444 بایت می‌رساند و پیش از `file-index` برای allocation=1784 شکست می‌خورد. موتور به Facade، Core، Runtime و Parallel با Import ترتیبی/تنبل و تله‌متری هر مرز تقسیم شد؛ بزرگ‌ترین ماژول اکنون زیر 10KB است.
+- **Candidate Build 102:** شکست Bundle 310 پیش از `file-index` به Import تو‌در‌توی Game→Login محدود شد. Runner موس دیگر هنگام Compile موتور Game وارد نمی‌شود؛ پس از تثبیت Engine و ایندکس Flash، فقط با اولین `RMOUSE` و بین دو GC بارگذاری می‌شود و تله‌متری مرحله‌ای Heap محل هر شکست احتمالی را مشخص می‌کند.
+- **Candidate Build 101:** Game بزرگ دیگر به لیست Tupleهای RAM تبدیل نمی‌شود؛ خطوط روی Flash می‌مانند و فقط Offset چهار‌بایتی نگه‌داری می‌شود. Random Packageهای بزرگ نیز با Reservoir Sampling فقط همان ۱–۲ گزینهٔ لازم را نگه می‌دارند و فهرست تمام ۱۶۵ آیتم را نمی‌سازند.
+- **Candidate Build 100:** Guard اکنون در طول Route نیز نور را با Debounce کامل پایش می‌کند؛ تغییر پایدار محیط Route قبلی را با آزادسازی Keyboard/Mouse قطع و Route وضعیت جدید را اجرا می‌کند. Route بزرگ Game نیز به‌صورت خط‌به‌خط از Flash خوانده می‌شود تا تخصیص پیوستهٔ 6400 بایتی حذف شود.
+- **Candidate Build 99:** Package نور دوباره مرجع قابل‌کنترل شد: NVM فقط تا وقتی اعمال می‌شود که Revision پروفایل‌های Package تغییر نکرده باشد. Fit نیز از Import لحظهٔ Save خارج و در ماژول ازقبل‌بارگذاری‌شدهٔ NVM اجرا می‌شود تا توقف بی‌لاگ پس از نمونه‌گیری رخ ندهد.
+- **Candidate Build 98:** MemoryError بوت Bundle 303 رفع شد؛ منطق Adaptive Fit از Import اولیه خارج و فقط هنگام ذخیرهٔ کالیبراسیون Lazy-load می‌شود. اندازهٔ Runtime بوت به کمتر از Baseline Build 96 برگشت و رفتار Fit/NVM/Telemetry بدون تغییر حفظ شد.
+- **Candidate Build 97:** رد فوری هم‌پوشانی کالیبراسیون با Fit تطبیقی جایگزین شد؛ ابتدا دامنهٔ جدید و در صورت Center-inside دامنهٔ مجاور فقط از Tolerance عقب می‌روند، Centerها ثابت و ذخیرهٔ دوطرفه اتمیک است. حداقل Tolerance برابر ۰٫۵ و Gap برابر ۰٫۲۵ lux حفظ می‌شود.
+- **Candidate Build 96:** Start فیزیکی GP4 اکنون همیشه سنجش/Telemetry تازه ایجاد و منبع مؤثر کالیبراسیون NVM/File و بازهٔ Dashboard را گزارش می‌کند؛ حاشیهٔ Drift پس از نمونه‌گیری از ۰٫۵ به ۱٫۰ lux افزایش یافت و همچنان با پروفایل‌های مجاور Cap می‌شود.
+- **Candidate Build 95:** `Wait For Sound` عمومی از مسیر ساخت پروژهٔ جدید خارج شد. استپ اختصاصی `Splash Listener` فقط محل Scoped هر Cast را مشخص می‌کند و Timeout حداقل/حداکثر اکنون مستقیماً در کارت پروفایل Splash تنظیم می‌شود. فایل‌های قدیمی `responseRoute=splash` هنگام بازشدن خودکار Migration می‌شوند؛ قرارداد `WPROFILE` و Runtime/ARM/Mouse تغییر نکرده‌اند.
+- **Candidate Build 94:** خطای Boot خروجی Build 93 رفع شد؛ `splash_steps.txt` و `whisper_steps.txt` اکنون پیش از اعتبارسنجی Manifest وارد موجودی Hash Runtime می‌شوند. Routeهای نوری Guard، فریمور Pro Micro و مسیر Natural Mouse هیچ تغییری نکرده‌اند.
+- **Candidate Build 93:** Whisper فقط در تمام مدت حضور در Game شنوندهٔ سراسری است و پس از واکنش همان Iterator را ادامه می‌دهد؛ Splash فقط هنگام `Wait For Sound` هر Cast با Timeout تصادفی پیش‌فرض ۱۸–۲۲ ثانیه مسلح می‌شود و چه با شنیدن صدا و چه با Timeout، Cast جاری را تمام می‌کند و به Cast بعدی می‌رود. Deadlineهای حلقهٔ ۱۰ دقیقه‌ای و چرخهٔ ۱۱۰–۱۳۰ دقیقه‌ای حفظ می‌شوند.
+- **Candidate Build 92:** شنوندهٔ واحد صدا در تمام تب Game فعال می‌ماند؛ Peak را با بازه و Priority دسته‌بندی می‌کند، تب Whisper یا Splash را به‌صورت وقفه اجرا می‌کند و سپس همان Iterator محیط بازی را ادامه می‌دهد. تنظیم بازه‌ها و Cooldown کنار خروجی Pico قرار گرفت.
+- **Candidate Build 91:** دو Wait For Sound هم‌زمان دیگر Listener دوم روی ARM باز نمی‌کنند. Scheduler یک Listener فیزیکی با پایین‌ترین Threshold می‌سازد و با Peak گزارش‌شده، بالاترین پروفایل منطبق را برای اجرای Buzzer انتخاب می‌کند.
+- **Candidate Build 90:** پروژهٔ `s1.amsj` دیگر به‌خاطر دو Buzzer داخل شاخه‌های موازی Wait For Sound مسدود نمی‌شود؛ Buzzer اکنون به `BEEP/DELAY` قابل‌اجرای Pico تبدیل می‌شود و متن خطاهای واقعی نیز مستقیماً در پنجرهٔ Export نمایش داده می‌شود.
+- **Hardware-passed Build 89:** بستهٔ E اتصال مجدد CDC ویندوز را تشخیص داد، Pico را یک‌بار Reset کرد، `CIRCUITPY` دوباره قابل‌نوشتن شد و Startup/Mouse ادامه یافت. نوت‌های مرحله‌ای پذیرفته‌شده نیز به Runtime استاندارد منتقل شدند. کالیبراسیون صدا هنوز تست سخت‌افزاری نشده است.
+- **Hardware-passed Build 88:** بستهٔ تشخیصی A پس از Warm Restart بدون Start دستی زنده ماند و Startup را اجرا کرد. همین مسیر Marker + USB fusion اکنون مسیر استاندارد خروجی Classroom است.
+- **Candidate Build 87:** USB DOWN/UP که حین انتهای Route After رخ می‌دهد دیگر پاک نمی‌شود؛ Startup پس از بازگشت Windows ادامه می‌یابد. صدای Save کالیبراسیون نیز به یک الگوی سه‌نتی واضح‌تر ارتقا یافت و نتیجهٔ Save در NVM Debug ثبت می‌شود.
+- **Candidate Build 86:** صدای خطای کالیبراسیون برای Sample ناپایدار و فشار زرد هنگام Busy اضافه شد؛ بازهٔ کامل چرخه با پیش‌فرض ۱۱۰–۱۳۰ دقیقه به UI و Runtime برگشت؛ فایل شش‌پروفایلی به‌روز با Dashboard برابر `13.3 ± 3.0 lux` همیشه داخل بستهٔ Classroom قرار می‌گیرد.
+- **Candidate Build 85:** کالیبراسیون فیزیکی نور دیگر به Revision خروجی وابسته نیست؛ Snapshot قدیمی CAL1 بازیابی/مهاجرت می‌شود و منبع مؤثر با `CALSTATUS source=nvm` قابل مشاهده است.
+- **Candidate Build 84:** چرخهٔ زمان‌محور قدیمی حذف شد؛ پایان Game فوراً After را اجرا می‌کند، Marker پس از Restart تب Startup را یک‌بار اجرا می‌کند، Desktop رد می‌شود و مسیر از Login/DC ادامه می‌یابد. CIRCUITPY نیز دوباره در اختیار Windows است و کالیبراسیون فیزیکی در NVM کنترل‌شده ذخیره می‌شود.
 - **Candidate Build 83:** Runtime مدرن اکنون `RUNFOR/AUTORESUME/POSTLAUNCH` را اجرا می‌کند؛ Deadline مسیر جاری را متوقف، Restart ویندوز را ارسال، Marker را در NVM نگه‌داری و پس از USB Down/Up و تأخیر تنظیم‌شده برنامهٔ Pin‌شده را اجرا می‌کند.
 - **Candidate Build 82:** Tolerance کالیبراسیون نور اکنون فاصلهٔ هر سمت از Median را مستقل محاسبه می‌کند؛ نمونهٔ نامتقارن Dashboard دیگر بلافاصله پس از Save به `unknown` تبدیل نمی‌شود.
 - **Candidate Build 81:** خروجی Classroom Studio اکنون با تست صریح بسته‌بندی کنترل می‌شود تا Runtime سازگار با ARM 2.8.2-S4 شامل شروع ASND، تشخیص/Timeout و Telemetry موازی باشد؛ این Build جایگزین Release قدیمی Build 98 می‌شود.
@@ -21,6 +195,41 @@
 
 | Build | نتیجهٔ سخت‌افزاری | مسئله/تغییر اصلی | وضعیت |
 | --- | --- | --- | --- |
+| 118 | جایگزین حرفه‌ای Patchهای 115–117 | VM ترتیبی Iterative با Stack صریح + SoundWatch بدون Callback | Architectural candidate؛ hardware retest pending |
+| 117 | Bundle 440: Bind پاس؛ peak=95 سپس شکست پیش از callback telemetry | حذف کامل callback/closure؛ Poll مستقیم Context و تحویل با `take_sound_watch()` | Local candidate؛ hardware retest pending |
+| 116 | Bundle 420: Response bind پاس؛ peak=105 سپس شکست پیش از callback telemetry | Queue کاملاً بدون فراخوانی + اجرای Inline Runner مستقیم در Scheduler | Local candidate؛ hardware retest pending |
+| 115 | Bundle 410: همهٔ Importها/RMOUSE/Sound detect پاس؛ MemoryError پیش از ورود به Response | Queue-only callback + Response runner ازپیش Bind/Cache و اجرای پس از unwind | Local candidate؛ hardware retest pending |
+| 114 | Bundle 401: Runtime پس از افزودن Response با allocation=1336 شکست خورد | انتقال کامل Response به ماژول مستقل preloaded؛ موجودی ۴۲فایلی | Local candidate؛ response behavior unchanged |
+| 113 | Build 112: Engine/Index/RMOUSE/Sound detect پاس؛ MemoryError پس از peak=101 | اجرای Flash-backed فایل Splash/Whisper بدون read()/splitlines()/tuple list | Local candidate؛ response behavior unchanged |
+| 112 | Bundle 390: Parallel، Events و Core پاس؛ Runtime همچنان allocation=1180 | تقسیم تابع monolithic `_run` به Sound/Leaf/Container handlerهای bounded | Local candidate؛ behavior unchanged |
+| 111 | Bundle 388: Index، Parallel و Core پاس؛ Runtime یک‌تکه با allocation=1180 شکست خورد | Split معماری Event generator و Runtime به دو واحد bounded و Preload زودهنگام Event | Local candidate؛ behavior unchanged |
+| 110 | Bundle 381: Index رزرو شد؛ Parallel پس از Core/Runtime با allocation=1388 شکست خورد | جابه‌جایی Preload Scheduler به بلافاصله پس از Reserve و پیش از Core/Runtime | Local candidate؛ behavior unchanged |
+| 109 | Bundle 380: Parallel preload پاس؛ ساخت Index پس از Compile با allocation=1336 شکست خورد | رزرو Offset bytearray پیش از Importهای Game و تحویل بدون Allocation مجدد | Local candidate؛ runtime behavior unchanged |
+| 108 | Bundle 371: انتقال‌ها و file-index پاس؛ Compile دیرهنگام Parallel با free=45952 و allocation=1388 شکست خورد | Preload مشروط Scheduler پیش از File index و Prelude روی Heap تازه | Local candidate؛ scheduler/mouse/ARM unchanged |
+| 107 | Bundle 355: SoundWatch arm و همهٔ Lazy importها پاس؛ اولین RMOUSE داخل LOOP/RPKG با `pystack exhausted` متوقف شد | تبدیل Generator بازگشتی Containerهای Game به Stack Iterative | Local candidate؛ ARM/Mouse path unchanged |
+| 106 | Bundle 350: تمام انتقال‌ها، Login Type، Game index و Parallel import پاس؛ نخستین WPROFILE با `pystack exhausted` متوقف شد | حذف Poll تو‌در‌توی callback از scoped waiter؛ `sleep_ms` تنها مالک سرویس SoundWatch | Local candidate؛ ARM/Mouse unchanged |
+| 105 | Bundle 340: Mouse و Type import پاس؛ اولین Typo با `_QWERTY_ROWS` NameError متوقف شد | بازیابی جدول QWERTY در ماژول Split Type و تست Neighbor واقعی | Local candidate؛ Mouse/ARM unchanged |
+| 104 | Bundle 330: Game/Core/Runtime/File-index/Parallel پاس؛ اولین Mouse import با free=42912 و allocation=896 شکست خورد | تقسیم Login به Facade 2.3KB، Core 2.7KB، Mouse 4.6KB و Type 5.5KB | CI candidate؛ hardware retest pending |
+| 103 | Bundle 320: Route read پاس؛ `before-engine-import=60144` سپس import یک‌تکه با free=444 شکست خورد | Facade 1KB + Core 6.7KB + Runtime 10KB + Parallel 6.8KB با Import ترتیبی | CI candidate؛ hardware retest pending |
+| 102 | Bundle 310: Preemption و خواندن فایل پاس؛ شکست پیش از `file-index` با allocation=1386 | حذف Import تو‌در‌توی Login و Lazy-load موس در اولین RMOUSE با تله‌متری Heap | CI candidate؛ Game hardware retest pending |
+| 101 | Bundle 308: Preemption تمام انتقال‌ها را پاس کرد؛ Game پس از Parse ۳۶۹ فرمان با Heap حدود 40KB شکست خورد | فرمان‌های فایل‌محور با Offset فشرده و Reservoir Sampling برای RPKG بزرگ | CI candidate؛ Game hardware retest pending |
+| 100 | Login پس از ورود به Dashboard ادامه می‌یافت؛ Game هنگام read با allocation=6400 شکست خورد | Stable-light route preemption + streaming Game route read | CI candidate؛ hardware transition retest pending |
+| 99 | Bundle 304 فایل 15.3±3 داشت ولی NVM قدیمی 14.2±1 اعمال شد؛ Save دوم پس از complete-stage متوقف ماند | Revision-authoritative Package و Fit ازقبل‌بارگذاری‌شده بدون Import لحظه‌ای | CI candidate؛ hardware retest pending |
+| 98 | Bundle 303 در Import با تخصیص 1244 بایت شکست خورد | انتقال Fit به ماژول Lazy؛ Boot runtime زیر 40KB و Manifest 35 فایلی | CI candidate؛ hardware boot pending |
+| 97 | تست کالیبراسیون هم‌پوشان لازم است | Fit یک‌طرفه/دوطرفهٔ اتمیک با Center ثابت، Min=0.5 و Gap=0.25 | CI candidate؛ Mouse/ARM unchanged |
+| 96 | تست Dashboard و تکرار Stop/Start لازم است | رفع suppression در unknown→unknown و افزایش کنترل‌شدهٔ حاشیه Drift کالیبراسیون | CI candidate؛ Mouse/ARM unchanged |
+| 95 | تست Export و Migration پروژهٔ ماهیگیری لازم است | حذف Wait For Sound از منو، Splash Listener اختصاصی و انتقال Timeout به پروفایل Splash | Local candidate؛ Runtime/ARM/Mouse unchanged |
+| 94 | تست Boot و اجرای Game لازم است | پذیرش دو Route جدید Whisper/Splash در موجودی ۳۴فایلی Boot verifier | Local candidate؛ Mouse/ARM unchanged |
+| 93 | تست سخت‌افزاری صدا، Heap و نرمی موس لازم است | Whisper سراسری Game؛ Splash محدود به Cast با Timeout تصادفی ۱۸–۲۲ ثانیه و رفتن به Cast بعدی بدون ریست Deadlineها | CI candidate؛ Hardware pending |
+| 92 | تست سخت‌افزاری صدا لازم است | شنوندهٔ سراسری Game، بازه/اولویت، تب‌های Whisper و Splash و بازگشت به همان نقطه | CI candidate؛ Sound pending |
+| 91 | Build 143: Runtime با `only one WSND listener is allowed` متوقف شد | Listener مشترک ADC و انتخاب پروفایل با Peak | CI candidate؛ Sound pending |
+| 90 | `s1.amsj`: Export با ۲ خطا Block شد | پشتیبانی Buzzer داخل ForLoop شاخه‌های Parallel و نمایش جزئیات خطا | CI candidate؛ Sound pending |
+| 89 | بستهٔ E پاس: Startup، Mouse، نوت‌ها و نوشتن/حذف TEST.txt؛ Sound calibration تست نشده | Reset یک‌بارهٔ Pico پس از CDC reconnect برای Remount قابل‌نوشتن | Hardware pass؛ Sound pending |
+| 88 | بستهٔ A پاس: Restart، Resume خودکار و اجرای Startup بدون Start دستی | Resume با Marker معتبر حتی وقتی Windows هیچ USB DOWN گزارش نمی‌کند | Hardware pass |
+| 87 | Build 124: Restart انجام شد ولی Startup خودکار اجرا نشد؛ Tone ذخیره شنیده نشد | حفظ USB transition حین After و تقویت/ثبت Tone ذخیره | CI candidate |
+| 86 | تست سخت‌افزاری لازم است | بازخورد صوتی Fail کالیبراسیون، بازهٔ ۱۱۰–۱۳۰ دقیقه و پروفایل نور همراه بسته | CI candidate |
+| 85 | تست سخت‌افزاری لازم است | ماندگاری کالیبراسیون فیزیکی بین Exportها و Telemetry منبع NVM | CI candidate |
+| 84 | تست سخت‌افزاری لازم است | After/Startup مستقل، حذف تایمرهای قدیمی، Desktop skip و NVM calibration | CI candidate |
 | 83 | تست سخت‌افزاری لازم است | اجرای واقعی Restart Cycle، NVM Marker، HOSTUSB و Auto Resume | CI candidate |
 | 82 | Dashboard با center=13.3، spread=2.5 و live=15.8 به unknown رفت | محاسبهٔ دامنهٔ نامتقارن P5/P95 نسبت به Median | CI candidate |
 | 81 | S4 + Bundle 203 دستی Catch را پاس کرد | انتشار Classroom با Runtime داخلی سازگار با S4 | CI candidate |
@@ -49,6 +258,1295 @@
 | 40 | Retry کالیبراسیون overlap | Calibration UX | Verified |
 | 39 | Facade صحیح در Export پروژهٔ جاری | Export ordering | Verified foundation |
 | 38 | Split executor اولیه | کاهش فشار Import | Superseded by 39 |
+
+## Build 118 — VM تکرارشوندهٔ Game و حذف ریشه‌ای Stack تو‌در‌تو
+
+**Previous build:** 116 / Classroom release 215
+**Status:** architectural candidate; hardware retest required
+
+### Problem observed
+
+سه Build پیاپی محل شکست را دقیق‌تر کردند، اما Patch کردن مرز Callback کافی نبود.
+Bundle 440 پس از تمام Importها و Bind، Sound را با `peak=95` تشخیص داد و هنوز
+پیش از نخستین Response telemetry با `MemoryError('')` متوقف شد.
+
+### Root cause
+
+مسئلهٔ ریشه‌ای Callback نبود؛ مفسر ترتیبی Game برای `LOOPTIME` و `RPKG` تابع
+`_run` را بازگشتی فراخوانی می‌کرد و سپس `PGROUP → scheduler → sleep → sound`
+روی همان pystack محدود CircuitPython قرار می‌گرفت. حذف چند Frame فقط آستانه را
+جابه‌جا می‌کرد و معماری همچنان شکننده بود.
+
+### Change
+
+- پیمایش ترتیبی Route به VM تکرارشوندهٔ `Cursor` منتقل شد.
+- `LOOP`، `LOOPTIME` و `RPKG` با Stack صریح داده‌ای اجرا می‌شوند.
+- هیچ فراخوانی بازگشتی `_run(commands, ...)` باقی نمانده است.
+- Cursor قابل Resume است و PGROUP را با Range دقیق به Scheduler تحویل می‌دهد.
+- GOTO با پاک‌کردن Frameهای Container و Jump روی Root range اجرا می‌شود.
+- SoundWatch Callback/Closure ندارد؛ Context مستقیماً Poll و Winner را نگه می‌دارد.
+- Response پس از Unwind Scheduler و روی Stack تخت با Runner ازپیش Bindشده اجرا می‌شود.
+- File-backed Response، Scoped Splash، Cooldown و ادامهٔ Whisper حفظ شده‌اند.
+- Mouse، ARM، DDA، Cadence، Guard و Exporter تغییر نکرده‌اند.
+
+### Validation
+
+- قرارداد صریح عدم Recursion در `_run` و وجود `Cursor` اضافه شد.
+- Code Objectهای `Cursor.next`، `Cursor._resume` و Handlerهای Runtime زیر ۱۰۰۰ بایت قفل شدند.
+- Route واقعی شامل LOOPTIME → PGROUP → LOOP → RPKG در تست‌های Portable اجرا می‌شود.
+- همهٔ Hashها، Compile، Security و Windows TestRunner باید پیش از Merge پاس شوند.
+
+### Next test
+
+پس از Sound detection باید Response telemetry و F اجرا شوند. علاوه بر آن Route
+باید حداقل چند Cast ادامه پیدا کند تا Resume شدن Cursor، Timeout و Loop ده‌دقیقه‌ای
+بدون MemoryError یا تغییر Cadence تأیید شوند.
+
+## Build 117 — حذف کامل Callback پایتونی SoundWatch
+
+**Previous build:** 116 / Classroom release 215
+**Status:** local candidate; hardware retest required
+
+### Problem observed
+
+Bundle 440 و هر ۴۲ Hash آن سالم بودند. تمام Importها، Index، Parallel، Mouse و
+Bind زودهنگام Response پاس شدند. SoundWatch صدای واقعی را با `peak=95` تشخیص
+داد، اما همچنان پیش از `before-response-callback` با `MemoryError('')` متوقف شد.
+
+### Root cause
+
+Build 116 عملیات داخل Callback را به یک Assignment کاهش داد، اما خود فراخوانی
+Closure پایتونی از `PlanContext.sleep_ms()` هنوز یک Frame اضافی روی pystack
+فعال `LOOP/RPKG/PGROUP` می‌ساخت. شکست پیش از Telemetry ثابت کرد Response،
+File parser و Scheduler inline هنوز وارد اجرا نشده‌اند.
+
+### Change
+
+- Callback و Closure پایتونی SoundWatch به‌طور کامل حذف شدند.
+- `PlanContext.sleep_ms()` مستقیماً `poll_sound_watch()` را فراخوانی می‌کند.
+- Winner داخل Slot داخلی `_sound_watch_pending` نگه‌داری می‌شود.
+- Scheduler پس از بازگشت Sleep با `take_sound_watch()` Winner را تحویل می‌گیرد.
+- هنگام Pending شدن Winner، Sleep زودتر برمی‌گردد تا Response بدون تأخیر سرویس شود.
+- File-backed Response، Scoped Splash، Cooldown و Whisper continuation حفظ شده‌اند.
+- Mouse، ARM، DDA، Cadence، Guard و Exporter تغییر نکرده‌اند.
+
+### Validation
+
+- Bundle 440: ۴۲ از ۴۲ Hash معتبر.
+- قرارداد Runtime نبود کامل `_sound_watch_callback` و `_queue_sound_watch` را قفل می‌کند.
+- تست SoundWatch تضمین می‌کند Response داخل polling Sleep اجرا نمی‌شود.
+- همهٔ قراردادهای Portable، Hash، Compile و Security باید پیش از Merge پاس شوند.
+
+### Next test
+
+پس از تشخیص صدا باید برای نخستین بار `before-response-callback` دیده شود و سپس
+`before-response-file`، `after-response-index`، اجرای F و
+`after-response-callback` ثبت شوند. MemoryError نباید تکرار شود.
+
+## Build 116 — Callback کاملاً بدون فراخوانی و Runner مستقیم
+
+**Previous build:** 115 / Classroom release 214
+**Status:** local candidate; hardware retest required
+
+### Problem observed
+
+Bundle 420 و هر ۴۲ Hash آن سالم بودند. تمام Importها، Index، Parallel، Mouse و
+`before/after-response-bind` پاس شدند. SoundWatch صدای واقعی را با `peak=105`
+تشخیص داد، اما پیش از نخستین `before-response-callback` با `MemoryError('')`
+متوقف شد.
+
+### Root cause
+
+Build 115 اجرای کامل Response را از callback خارج کرد، ولی callback هنوز
+`suspend_sound_watch()` را فراخوانی می‌کرد و Scheduler نیز برای سرویس Winner
+وارد Wrapper جداگانه می‌شد. روی pystack محدود CircuitPython، شکست پیش از اولین
+دستور Wrapper نشان داد حتی این Call boundary باقی‌مانده در Stack فعال
+`LOOP/RPKG/PGROUP/sleep_ms` کافی است.
+
+### Change
+
+- callback فقط Slot ازقبل‌موجود `_response` را بررسی و Winner را در آن قرار می‌دهد.
+- هیچ Suspend، UART، Emit یا Response call داخل callback انجام نمی‌شود.
+- Scheduler پس از بازگشت callback، Suspend و Telemetry را Inline اجرا می‌کند.
+- Runner ازپیش Bindشده مستقیماً فراخوانی می‌شود؛ Wrapper میانی حذف شده است.
+- Scoped Splash، Cooldown، File-backed Response و رفتار ادامهٔ Whisper حفظ شده‌اند.
+- Mouse، ARM، DDA، Cadence، Guard و Exporter تغییر نکرده‌اند.
+
+### Validation
+
+- Bundle 420: ۴۲ از ۴۲ Hash معتبر و ۳۶۹ فرمان Game.
+- تست Callback تضمین می‌کند `suspend_sound_watch` داخل Queue function وجود ندارد.
+- قرارداد Scheduler فراخوانی مستقیم `response_runner(..., execute)` را قفل می‌کند.
+- همهٔ قراردادهای Portable، Hash، Compile و Security باید پیش از Merge پاس شوند.
+
+### Next test
+
+پس از تشخیص صدای واقعی باید `before-response-callback`، سپس
+`before-response-file` و `after-response-index` ثبت شوند، کلید F اجرا شود و
+`after-response-callback` دیده شود. `MemoryError` و `pystack exhausted` نباید
+تکرار شوند.
+
+## Build 114 — جداسازی کامل ماژول Flash Response
+
+**Previous build:** 113 / Classroom release 212
+**Status:** local candidate; hardware retest required
+
+### Problem observed
+
+Bundle 401 و هر ۴۱ Hash آن سالم بودند، اما اضافه‌شدن منطق Flash-backed Response
+به فایل Runtime اندازهٔ Windows آن را به حدود 8.6KB رساند. Runtime پیش از اجرا
+در `allocating 1336 bytes` شکست خورد؛ بنابراین Build 113 مسیر Sound را اصلاً
+آزمایش نکرد.
+
+### Root cause
+
+اصلاح Response درست بود، اما محل قرارگیری آن اشتباه بود. Parser و Runner پاسخ
+به همان Compiler unit حساس Runtime اضافه شدند و Code Object/constant peak تازه
+ایجاد کردند.
+
+### Change
+
+- Parser و Runner پاسخ به `plan_engine_game_response.py` مستقل منتقل شدند.
+- ماژول Response همراه Parallel و Events پیش از Core/Runtime Preload می‌شود.
+- Runtime فقط Wrapper کوچک `_run_response` را نگه می‌دارد.
+- موجودی Classroom، Manifest، Boot verifier و Heap cleanup به ۴۲ فایل رسید.
+- اجرای Flash-backed و بستن Handle در `finally` بدون تغییر حفظ شده است.
+
+### Validation
+
+- Runtime زیر 8KB و Response زیر 4KB با قرارداد Windows قفل می‌شوند.
+- ترتیب Reserve → Parallel → Events → Response → Core → Runtime تست می‌شود.
+- تست سخت‌افزار-مانند همچنان عدم فراخوانی `read_plan_file` را تضمین می‌کند.
+
+### Next test
+
+در Game باید `after-response-preload` پیش از `before-core-import` دیده شود، سپس
+`after-runtime-import` و `file-index` پاس شوند. پس از تشخیص صدا، Response باید
+مستقیم از Flash اجرا و F ارسال شود.
+
+## Build 113 — اجرای Flash-backed پاسخ Splash/Whisper
+
+**Previous build:** 112 / Classroom release 211
+**Status:** local candidate; hardware retest required
+
+### Problem observed
+
+Build 112 تمام مرزهای Compiler را پاس کرد، Index با ۳۶۹ فرمان ساخته شد،
+Parallel و Mouse اجرا شدند و SoundWatch با `peak=101` صدای واقعی Splash را
+تشخیص داد. MemoryError بدون اندازه بلافاصله هنگام شروع Response رخ داد.
+
+### Root cause
+
+`_response_commands` از `ctx.read_plan_file(name)` استفاده می‌کرد؛ در نتیجه
+فایل Response ابتدا کامل در یک String و سپس دوباره به List از Tupleها تبدیل
+می‌شد. این تخصیص هم‌زمان پس از اجرای RMOUSE/Sound روی Heap Fragmented انجام
+می‌شد، هرچند فایل Splash فقط 251 بایت بود.
+
+### Change
+
+- روی Pico، پاسخ Splash/Whisper با `_FileCommands` مستقیم از Flash اجرا می‌شود.
+- فقط Offsetهای فشرده نگه‌داری و فایل در `finally` بسته می‌شود.
+- مسیر مجازی `read_plan_file` فقط برای Host simulation باقی مانده است.
+- تله‌متری `before-response-file` و `after-response-index|commands=N` اضافه شد.
+- Keyboard response، Delay، Loop/RPKG، SoundWatch، Mouse و ARM تغییر نکرده‌اند.
+
+### Validation
+
+- تست سخت‌افزار-مانند تضمین می‌کند Response بدون `read_plan_file` اجرا و Handle
+  فایل بسته می‌شود.
+- سقف Code Objectهای Build 112 و موجودی ۴۱فایلی حفظ می‌شوند.
+
+### Next test
+
+پس از `SOUND|result=detected` باید `before-response-file`،
+`after-response-index|commands=5`، `sound response start` و
+`sound response done` ثبت شوند. کلید F باید اجرا و Cast بعدی شروع شود.
+
+## Build 112 — تقسیم Code Object تابع Dispatch Game
+
+**Previous build:** 111 / Classroom release 210
+**Status:** local candidate; hardware retest required
+
+### Problem observed
+
+Bundle 390 و هر ۴۱ Hash آن سالم بودند. Parallel، Event module و Core همگی
+Compile شدند، اما Runtime با وجود کاهش فایل به حدود 7.3KB دوباره دقیقاً در
+`allocating 1180 bytes` شکست خورد.
+
+### Root cause
+
+ثابت‌ماندن اندازهٔ allocation پس از Split فایل نشان داد بلوک 1,180 بایتی
+مربوط به Code Object تابع monolithic `_run` است. این تابع Leafها، Sound و
+Containerها را در یک Dispatch بزرگ کامپایل می‌کرد.
+
+### Change
+
+- منطق Sound به `_sound` منتقل شد.
+- فرمان‌های Leaf شامل Keyboard، Delay، RMOUSE و BEEP در `_leaf` قرار گرفتند.
+- `_run` فقط کنترل Containerهای RPKG/LOOP/PGROUP و LABEL/GOTO را نگه می‌دارد.
+- هر سه Code Object با تست اندازهٔ مستقل زیر سقف bounded قفل شده‌اند.
+- ترتیب اجرا، Random Package، Deadline، SoundWatch، Splash، Natural Mouse،
+  ARM، DDA و Cadence تغییر نکرده‌اند.
+
+### Validation
+
+- تست مستقیم اندازهٔ Bytecode برای `_sound`، `_leaf` و `_run` اضافه شد.
+- ۴۱ فایل Manifest و Split معماری Build 111 بدون تغییر حفظ شدند.
+
+### Next test
+
+پس از `after-core-import` باید `after-runtime-import` و سپس `file-index` ثبت
+شوند. بعد Prelude و اولین RMOUSE باید اجرا شوند؛ سپس Splash واقعی و Timeout
+Cast بررسی شوند.
+
+## Build 111 — Split معماری Game Runtime و Event generator
+
+**Previous build:** 110 / Classroom release 209
+**Status:** local candidate; hardware retest required
+
+### Problem observed
+
+Bundle 388 و هر ۴۰ Hash آن سالم بودند. Index رزرو شد، Parallel با موفقیت
+Preload شد و Core نیز کامل Import شد. سپس ماژول یک‌تکهٔ Runtime با اندازهٔ
+Windows حدود 11.1KB و `free=48992` در تخصیص پیوستهٔ 1,180 بایت شکست خورد.
+
+### Root cause
+
+جابه‌جایی‌های Buildهای 109 و 110 هر دو تخصیص هدف را رفع کردند، اما مجموع کد
+Generator تکرارشوندهٔ Event و Executor اصلی هنوز در یک واحد Compiler قرار داشت.
+این آخرین Compiler peak بزرگ Game بود و دیگر با تغییر ترتیب پایدار نمی‌شد.
+
+### Change
+
+- Generator تکرارشوندهٔ LOOP/LOOPTIME/RPKG/RMOUSE به
+  `plan_engine_game_events.py` مستقل منتقل شد.
+- Event module و Parallel scheduler پیش از Core/Runtime و هرکدام میان دو GC
+  Preload می‌شوند.
+- Runtime اصلی زیر 8KB و Event module زیر 6KB قفل شده‌اند.
+- Generator همچنان Iterative است؛ ترتیب Package، Deadline، Sound، Mouse و
+  پاسخ Splash بدون تغییر مانده‌اند.
+- موجودی Classroom، Manifest، Boot verifier و Heap cleanup با فایل ۴۱ام
+  همگام شدند.
+
+### Validation
+
+- قرارداد اندازهٔ Windows برای هر دو واحد جدید اعمال می‌شود.
+- تست فایل‌محور ترتیب Reserve → Parallel → Events → Core → Runtime را قفل می‌کند.
+- تست Nested LOOP/RPKG/RMOUSE همچنان نبود recursion را کنترل می‌کند.
+
+### Next test
+
+در Game باید `after-parallel-preload`، سپس `before/after-events-preload`،
+`before/after-core-import`، `after-runtime-import` و `file-index` ثبت شوند.
+پس از آن Prelude، اولین RMOUSE، Splash واقعی و Timeout Cast بررسی شوند.
+
+## Build 110 — Preload Scheduler پیش از Core/Runtime
+
+**Previous build:** 109 / Classroom release 208
+**Status:** local candidate; hardware retest required
+
+### Problem observed
+
+Bundle 381 و هر ۴۰ Hash آن سالم بودند. رزرو Index کامل شد:
+`after-file-index-reserve|commands=369|offset-bytes=1476|free=55600`.
+سپس Core و Runtime بارگذاری شدند و Heap به 46,768 بایت رسید؛ Compile
+Scheduler در همان نقطه برای بلوک پیوستهٔ 1,388 بایت شکست خورد.
+
+### Root cause
+
+Build 109 تخصیص Index را زودهنگام کرد، اما Parallel را همچنان پس از دو Compile
+دیگر بارگذاری می‌کرد. Index رزروشده مشکل مستقلی نداشت؛ ترتیب Importها آخرین
+بلوک پیوستهٔ لازم برای Compiler Parallel را پیش از Preload خرد می‌کرد.
+
+### Change
+
+- ترتیب Game اکنون Reserve Index → Parallel preload → Core → Runtime → اجرا است.
+- Parallel روی Heap با حدود 55.6KB آزاد Compile می‌شود، نه پس از افت به 46.8KB.
+- همان Bytearray رزروشده بدون Scan یا Allocation دوباره به FileCommands می‌رسد.
+- Scheduler، SoundWatch، Natural Mouse، ARM، DDA و Cadence تغییر نکرده‌اند.
+
+### Validation
+
+- تست فایل‌محور ترتیب دقیق Reserve → Parallel → Core → Runtime را قفل می‌کند.
+- قراردادهای File index، Nested LOOP/RPKG/RMOUSE و Hashهای Bundle حفظ می‌شوند.
+
+### Next test
+
+Bundle را با Release بعدی کامل بازسازی کنید. در Game باید
+`after-file-index-reserve` سپس `before/after-parallel-preload` و بعد
+`before/after-core-import` و `after-runtime-import` ثبت شوند. پس از `file-index`
+باید Prelude و اولین RMOUSE اجرا شوند؛ سپس Splash واقعی و Timeout بررسی شوند.
+
+## Build 109 — رزرو File Index پیش از Importهای Game
+
+**Previous build:** 108 / Classroom release 207
+**Status:** local candidate; index-reserve hardware retest required
+
+### Problem observed
+
+Bundle 380 تله‌متری موفق
+`before-parallel-preload=48816 → after-parallel-preload=45968` را ثبت کرد؛
+بنابراین اصلاح Build 108 پاس شد. بلافاصله بعد از Preload، ساخت Bytearray
+فشردهٔ Offsetهای ۳۶۹ فرمان به بلوک پیوستهٔ 1336 بایت نیاز داشت و با
+`MemoryError` متوقف شد.
+
+### Root cause
+
+Index فایل پس از Compile ماژول‌های Game/Core/Runtime/Parallel ساخته می‌شد.
+با وجود حافظهٔ آزاد کافی، Heap پس از Compiler بلوک پیوستهٔ لازم برای رشد
+Bytearray را نداشت.
+
+### Change
+
+- Route پیش از هر Import Game یک بار اسکن و Offset چهاربایتی هر فرمان در
+  Bytearray نهایی رزرو می‌شود.
+- همان Scan وجود `PGROUP` را نیز مشخص می‌کند.
+- Buffer آماده پس از Import و Preload مستقیماً به `_FileCommands` منتقل
+  می‌شود؛ فایل دوباره Scan و Index دوباره Allocate نمی‌شود.
+- تله‌متری `before/after-file-index-reserve` تعداد فرمان و اندازهٔ Offset را
+  ثبت می‌کند.
+- Scheduler، SoundWatch، Natural Mouse، ARM، DDA و Cadence تغییر نکرده‌اند.
+
+### Validation
+
+- تست فایل‌محور هویت همان Bytearray رزروشده را در `_FileCommands` کنترل
+  می‌کند.
+- تست PGROUP ترتیب Reserve → Engine load → Parallel preload → اجرا را پوشش
+  می‌دهد.
+
+### Next test
+
+با Build 109 Bundle را کامل بازسازی کنید. در Game باید ابتدا
+`after-file-index-reserve|commands=369|offset-bytes=1476`، سپس
+`after-runtime-import` و `after-parallel-preload` ثبت شوند. خطای allocation
+1336 نباید تکرار شود و Route باید وارد اولین RMOUSE شود. سپس Splash واقعی،
+Timeout و نرمی موس بررسی شوند.
+
+## Build 108 — پیش‌بارگذاری Parallel روی Heap تازه
+
+**Previous build:** 107 / Classroom release 206
+**Status:** local candidate; Parallel preload hardware retest required
+
+### Problem observed
+
+Bundle 371 مسیر کامل تا Game، Runtime و ایندکس ۳۶۹ فرمان را پاس کرد. پس از
+حدود ۲۱ ثانیه Prelude، مقدار `before-parallel-import=45952` بود، اما Compile
+ماژول Parallel Heap را Fragment کرد و تخصیص پیوستهٔ 1388 بایت با
+`parallel-import-memoryerror` شکست خورد.
+
+### Root cause
+
+مجموع حافظه کافی بود، ولی Scheduler درست در لحظهٔ رسیدن به PGROUP و پس از
+Delay/Packageهای متعدد برای اولین بار Compile می‌شد. تخصیص‌های موقت Compiler
+به بلوک پیوسته‌ای بزرگ‌تر از موجودی Fragment‌شده نیاز داشتند.
+
+### Change
+
+- فایل Game پیش از بارگذاری Runtime فقط برای وجود `PGROUP` اسکن می‌شود.
+- در Routeهای دارای Parallel، همان `plan_engine_game_parallel` موجود بلافاصله
+  پس از Game Runtime و پیش از File index/Prelude روی Heap تازه Compile می‌شود.
+- هنگام رسیدن واقعی به PGROUP، Import از Cache انجام می‌شود.
+- Scheduler، SoundWatch، Natural Mouse، Firmware ARM، DDA و Cadence تغییر
+  نکرده‌اند.
+- تله‌متری `before/after-parallel-preload` و تست فایل‌محور اضافه شد.
+
+### Validation
+
+- تست فایل‌محور وجود PGROUP را تشخیص می‌دهد، Preload را ثبت می‌کند و اجرای
+  Parallel را کامل می‌کند.
+- تست Nested Container/RMOUSE و همهٔ قراردادهای قبلی باید سبز بمانند.
+
+### Next test
+
+با Build 108 Bundle را کامل بازسازی کنید. در Game باید
+`before-parallel-preload` و `after-parallel-preload` پیش از `file-index`
+ثبت شوند. رسیدن بعدی به PGROUP نباید `MemoryError` بدهد؛ سپس اولین RMOUSE،
+Splash واقعی، Timeout هجده تا بیست‌ودو ثانیه‌ای و نرمی موس بررسی شوند.
+
+## Build 107 — Stack تکرارشوندهٔ Containerهای Game
+
+**Previous build:** 106 / Classroom release 205
+**Status:** local candidate; first fishing RMOUSE hardware retest required
+
+### Problem observed
+
+Bundle 355 ثابت کرد Build 106 از `SOUNDWATCH|armed` عبور می‌کند. سپس
+`plan_engine_login`, Core و Mouse Runtime نیز با موفقیت و با حدود 36KB Heap
+آزاد بارگذاری شدند، اما هنگام تولید اولین RMOUSE داخل شاخهٔ ماهیگیری با
+`RuntimeError('pystack exhausted')` متوقف شد.
+
+### Root cause
+
+مفسر رویدادهای Parallel برای هر `LOOP` و `RPKG` یک Generator `_events`
+جدید را به‌صورت بازگشتی ایجاد می‌کرد. مسیر واقعی
+`PGROUP → LOOP → RPKG → RMOUSE → mouse_events` چند Generator فعال را پیش از
+ورود Planner موس روی pystack محدود CircuitPython نگه می‌داشت. Heap و Importها
+سالم بودند.
+
+### Change
+
+- پیمایش `LOOP/LOOPTIME/RPKG` در `_events` با Frameهای کوچک روی یک Stack صریح
+  انجام می‌شود و دیگر `_events` خودش را فراخوانی نمی‌کند.
+- ترتیب Random Package، تعداد Loop، Deadline حلقهٔ زمانی و Streaming رویدادها
+  حفظ شده‌اند.
+- Planner موس، Relative HID، Firmware ARM، DDA، Cadence و Humanization تغییر
+  نکرده‌اند.
+- تست جدید دو دور `LOOP` و Package ترتیبی شامل RMOUSE را اجرا و نبود فراخوانی
+  بازگشتی `_events` را قفل می‌کند.
+
+### Validation
+
+- تست فایل‌محور Game، Reservoir Sampling و ترتیب رویدادهای Nested Container
+  باید پاس شوند.
+- مجموعهٔ کامل Portable و Manifest مدرن پس از تغییر کنترل می‌شوند.
+
+### Next test
+
+با Build 107 Bundle را کامل بازسازی و همان پروژه را اجرا کنید. بعد از
+`after-mouse-runtime-import` باید اولین RMOUSE اجرا شود و
+`pystack exhausted` رخ ندهد. سپس Timeout هجده تا بیست‌ودو ثانیه‌ای Splash،
+صدای واقعی Splash و ادامهٔ Cast بعدی بررسی شوند. نرمی موس باید بدون تغییر
+باقی بماند.
+
+## Build 106 — حذف بازگشت تو‌در‌توی SoundWatch از WPROFILE
+
+**Previous build:** 105 / Classroom release 204
+**Status:** local candidate; scoped Splash hardware retest required
+
+### Problem observed
+
+Bundle 350 مسیر کامل Desktop، Login/DC، Character Dashboard و Loading را بدون
+`MemoryError` طی کرد. Game نیز Core/Runtime/File-index و Parallel را با
+`GAME|after-parallel-import|free=43856` بارگذاری کرد، اما بلافاصله پس از
+`SOUNDWATCH|armed` با `RuntimeError('pystack exhausted')` متوقف شد.
+
+### Root cause
+
+در حالت scoped، `poll_profile_wait()` callback عمومی Game را مستقیماً اجرا
+می‌کرد؛ همان callback از `sleep_ms()` تعاونی نیز سرویس می‌شد. این مسیر درون
+`PGROUP → LOOP → RPKG → WPROFILE` فریم‌های Python را تو‌در‌تو می‌کرد. خطا از
+Python stack بود، نه Heap و نه Firmware Pro Micro.
+
+### Change
+
+- `poll_profile_wait()` فقط نتیجهٔ scoped را می‌خواند.
+- Poll کردن callback منحصراً در `sleep_ms()` باقی ماند تا در Deadlineهای
+  Scheduler به‌صورت تخت و تعاونی انجام شود.
+- تست قراردادی مانع بازگشت callback مستقیم به scoped waiter می‌شود.
+- Firmware ARM، مسیر Relative Mouse، DDA، Cadence و Humanization تغییر نکردند.
+
+### Validation
+
+- تست scoped Splash باید همچنان Whisper global، Splash response، Timeout و
+  Next-cast را پوشش دهد.
+- Manifest Runtime پس از تغییر بازسازی و کامل کنترل می‌شود.
+
+### Next test
+
+با Build 106 همان پروژه و Bundle را کامل بازسازی کنید. در Game باید پس از
+`SOUNDWATCH|armed` اجرای Parallel ادامه یابد و `pystack exhausted` رخ ندهد.
+یک Splash واقعی باید `splash_steps.txt` را اجرا کند؛ Timeout ۱۸–۲۲ ثانیه‌ای
+باید Cast جاری را تمام و Cast بعدی را آغاز کند. نرمی موس نیز باید بدون تغییر
+باقی بماند.
+
+## Build 105 — بازیابی جدول QWERTY در Human Type Split
+
+**Previous build:** 104 / Classroom release 202
+**Status:** local candidate; Login Typo hardware retest required
+
+### Problem observed
+
+Bundle 340 تقسیم حافظهٔ Build 104 را تأیید کرد:
+`LOGIN|after-mouse-runtime-import|free=53648` و
+`LOGIN|after-type-import|free=50704` ثبت شدند. بااین‌حال اولین TYPE دارای Typo با
+`NameError: name '_QWERTY_ROWS' isn't defined` متوقف شد.
+
+### Root cause
+
+تابع `_qwerty_neighbor` به فایل Split جدید `plan_engine_login_type.py` منتقل شده
+بود، اما ثابت داده‌ای `_QWERTY_ROWS` همراه آن منتقل نشده بود. تست Build 104 فقط
+Lazy import ماژول Type و وجود توابع را کنترل می‌کرد و تابع Neighbor را اجرا
+نمی‌کرد.
+
+### Change
+
+- جدول ثابت چهار ردیف QWERTY به `plan_engine_login_type.py` اضافه شد.
+- تست Lazy import اکنون `_qwerty_neighbor("q") == "w"` را واقعاً اجرا می‌کند.
+- Windows TestRunner وجود ثابت را در Bundle نهایی کنترل می‌کند.
+- Hash فایل Type در Manifest مدرن بازسازی شد.
+- الگوریتم انتخاب همسایه، تعداد/فاصلهٔ Typo، Natural Mouse، ARM و Sound تغییر نکرده‌اند.
+
+### Validation
+
+- تست اجرای واقعی QWERTY Neighbor باید سبز شود.
+- 53 قرارداد Portable، Windows TestRunner، Manifest 40/40 و Read-back باید پیش از انتشار سبز شوند.
+
+### Next test
+
+Build 105 را نصب و Bundle پروژه را کامل دوباره روی CIRCUITPY بساز. در Login/DC
+باید `after-mouse-runtime-import` و `after-type-import` ثبت شوند، TYPE دارای Typo
+بدون `_QWERTY_ROWS` NameError کامل شود و سپس مسیر تا Game و حرکت قلاب ادامه یابد.
+
+## Build 104 — تقسیم ترتیبی Login، Natural Mouse و Human Type
+
+**Previous build:** 103 / Classroom release 201
+**Status:** local candidate; Bundle 330 hardware retest required
+
+### Problem observed
+
+Bundle 330 تمام مراحل جدید Game را پاس کرد: Facade، Core، Runtime، ایندکس 369 فرمان با 1,476 بایت Offset و Parallel همگی بدون MemoryError بارگذاری شدند و ماکرو تا قلاب‌انداختن پیش رفت. شکست نهایی هنگام اولین RMOUSE بود: `before-mouse-import=42912` و Import یک‌تکهٔ فایل 12.8KB Login/Mouse برای تخصیص 896 بایت شکست خورد.
+
+### Root cause
+
+Natural Mouse یا تعداد پترن‌ها اجرا نشده بود؛ Compiler فایل ترکیبی Login/Mouse/Typing روی Heap ازقبل‌مصرف‌شدهٔ Game به بلوک پیوستهٔ کافی دسترسی نداشت.
+
+### Change
+
+- `plan_engine_login.py` به Facade حدود 2.3KB تبدیل شد.
+- `plan_engine_login_core.py` حدود 2.7KB شامل Rangeها و PausePlanner است.
+- `plan_engine_login_mouse.py` حدود 4.6KB همان الگوریتم Natural Mouse را بدون تغییر نگه می‌دارد.
+- `plan_engine_login_type.py` حدود 5.5KB فقط هنگام اولین TYPE بارگذاری می‌شود.
+- Core، Mouse و Type ترتیبی و تنبل بارگذاری می‌شوند و هر مرز before/after/failure تله‌متری دارد.
+- cleanup پس از Route و کالیبراسیون هر چهار ماژول Login را آزاد می‌کند.
+- Manifest، Exporter و Read-back از 37 به 40 فایل ارتقا یافت.
+- مسیر، سرعت، مکث‌ها، Typo، ARM، Sound، Light و Cycle تغییر نکرده‌اند.
+
+### Validation
+
+- Facade هیچ Core/Mouse/Type را زودهنگام وارد نمی‌کند.
+- PausePlanner فقط Core، اولین RMOUSE فقط Mouse و اولین TYPE فقط Type را بارگذاری می‌کند.
+- size gate ویندوز: Facade <4KB، Core <5KB، Mouse <7KB و Type <7KB.
+- تمام تست‌های Game/Parallel/Splash/Sound و قرارداد Natural Mouse حفظ شده‌اند.
+
+### Next test
+
+پس از `before-mouse-import` و `after-mouse-import` باید Stageهای `LOGIN|before-core-import`، `after-core-import`، سپس `before-mouse-runtime-import` و `after-mouse-runtime-import` دیده شوند و حرکت قلاب بدون MemoryError ادامه یابد.
+
+## Build 103 — تقسیم Compiler Peak موتور Game به Importهای ترتیبی
+
+**Previous build:** 102 / Classroom release 200
+**Status:** local candidate; Bundle 320 hardware retest required
+
+### Problem observed
+
+Bundle 320 اصلاح فایل‌محور را دوباره تأیید کرد: Heap در خواندن `game_steps.txt` فقط از 48,320 به 48,144 بایت افتاد. تله‌متری جدید محل شکست را قطعی کرد: درست پیش از Import موتور 60,144 بایت آزاد بود، اما Compile ماژول یک‌تکهٔ `plan_engine_game.py` حافظه را به 444 بایت رساند و تخصیص 1,784 بایتی شکست خورد. هیچ `file-index`، Random Package یا RMOUSE هنوز اجرا نشده بود.
+
+### Root cause
+
+Build 102 Import تو‌در‌توی Login را حذف کرد، اما خود فایل 23KB موتور Game همچنان باید در یک Compile واحد به bytecode و objectهای CircuitPython تبدیل می‌شد. Peak Compiler یک‌تکه، نه تعداد 165–176 پترن موس، علت این شکست بود.
+
+### Change
+
+- `plan_engine_game.py` به Facade حدود 1KB تبدیل شد و هیچ موتور فرعی را در سطح ماژول Import نمی‌کند.
+- `plan_engine_game_core.py` حدود 6.7KB است و File index، Range/Package و Lazy Mouse را نگه می‌دارد.
+- `plan_engine_game_runtime.py` حدود 10KB است و Interpreter اصلی را پس از آزادشدن Compiler Core بارگذاری می‌کند.
+- `plan_engine_game_parallel.py` حدود 6.8KB است و فقط هنگام اولین `PGROUP` وارد می‌شود.
+- بین تمام Importها GC کامل و Stageهای before/after/failure ثبت می‌شود.
+- cleanup کالیبراسیون و Route هر چهار ماژول Game را از cache آزاد می‌کند.
+- Manifest/Exporter/Read-back از 34 به 37 فایل ارتقا یافت.
+- Natural Mouse، ARM، SoundWatch، Splash/Whisper، Light Preemption، Cycle و پروژهٔ کاربر تغییر نکرده‌اند.
+
+### Validation
+
+- Import Facade هیچ Core/Runtime/Parallel/Login را زودهنگام بارگذاری نمی‌کند.
+- Core و Runtime ترتیبی بارگذاری می‌شوند؛ Login فقط در اولین RMOUSE و Parallel فقط در اولین PGROUP وارد می‌شود.
+- size gate ویندوز: Facade <3KB، Core <10KB، Runtime <12KB و Parallel <9KB.
+- Game فایل‌محور 165 آیتمی، LABEL/GOTO، Async Sound، Scoped Splash، Shared Listener و Parallel scheduler پاس شدند.
+- Boot verifier و Target read-back موجودی 37فایلی و تمام SHA256ها را می‌پذیرند.
+
+### Next test
+
+پس از `ROUTE/start game_steps.txt` باید به‌ترتیب `before-engine-import`، `after-engine-import`، `before-core-import`، `after-core-import`، `after-runtime-import` و `file-index` دیده شود. هنگام اولین گروه موازی نیز `before-parallel-import` و `after-parallel-import` و هنگام اولین حرکت `before-mouse-import` و `after-mouse-import` باید بدون MemoryError ثبت شوند.
+
+## Build 102 — حذف Peak واردکردن تو‌در‌توی موتور Game
+
+**Previous build:** 101 / Classroom release 199
+**Status:** local candidate; Bundle 310 Game hardware retest required
+
+### Problem observed
+
+Bundle 310 هر سه Preemption نور Login→Dashboard، Dashboard→Loading و Loading→Game را پاس کرد. اصلاح فایل‌محور Build 101 نیز موفق بود: Heap بین `before-route-read` و `after-route-read` فقط از 55,888 به 55,712 بایت افتاد. بااین‌حال، پیش از ثبت `GAME|stage=file-index`، Import موتور با `MemoryError` برای تخصیص 1,386 بایت شکست خورد.
+
+### Root cause
+
+`plan_engine_game.py` در سطح ماژول بلافاصله `plan_engine_login.py` را Import می‌کرد. در نتیجه هنگام Compile/Import فایل 23KB موتور Game، موقت‌های Compiler هنوز زنده بودند که Import و Compile فایل 12KB حرکت موس شروع می‌شد. فشار اصلی دیگر پروژهٔ 369 فرمانی یا Random Package نبود؛ Peak واردکردن تو‌در‌تو و fragmentation Heap بود.
+
+### Change
+
+- Import سطح‌بالای `plan_engine_login` از موتور Game حذف شد.
+- State بازی بدون `PausePlanner` آغاز می‌شود و Helper موس فقط هنگام اولین `RMOUSE` بارگذاری می‌شود.
+- پیش و پس از Import موس GC کامل اجرا می‌شود؛ پس از بارگذاری، همان Helper و PausePlanner برای ادامهٔ Route استفاده می‌شوند.
+- در `code.py` تله‌متری `before-engine-import`، `after-engine-import` و `engine-import-memoryerror` اضافه شد.
+- در Runner تله‌متری `before-mouse-import`، `after-mouse-import` و `mouse-import-memoryerror` اضافه شد.
+- رفتار Natural Mouse، SoundWatch، Splash/Whisper، Preemption، چرخه و فایل پروژه تغییر نکرده است.
+
+### Validation
+
+- تست رگرسیون ثابت می‌کند Import موتور Game، `plan_engine_login` را وارد نمی‌کند و اولین درخواست موس آن را Lazy-load می‌کند.
+- تست فایل‌محور 165 آیتمی، Preemption و مسیرهای Sound/Parallel پاس شدند.
+- هر 53 قرارداد رسمی Portable با overlay دقیق CI موفق شدند.
+- اندازهٔ `plan_engine_game.py` با پایان‌خط ویندوز نیز زیر سقف 24KB باقی ماند.
+
+### Next test
+
+Bundle Build 102 را روی Pico بریزید و همان پروژهٔ ماهیگیری را اجرا کنید. ترتیب مورد انتظار پس از `ROUTE/start game_steps.txt` عبارت است از `before-engine-import`، `after-engine-import`، `file-index`، سپس هنگام نخستین حرکت `before-mouse-import` و `after-mouse-import`. پس از آن Route باید بدون `MemoryError` وارد حرکت/Delay پکیج شود.
+
+## Build 101 — اجرای فایل‌محور Game و Random Package کم‌حافظه
+
+**Previous build:** 100 / Classroom release 198
+**Status:** local candidate; Bundle 308 Game hardware retest required
+
+### Problem observed
+
+Bundle 308 اصلاح Preemption را سخت‌افزاری تأیید کرد: Login→Dashboard، Dashboard→Loading و Loading→Game همگی با `GUARD|PREEMPT` مسیر قبلی را متوقف و Route جدید را فوراً اجرا کردند. اما Game با وجود حذف `fh.read()` باز هم پس از `after-route-read` و `light-route` با `MemoryError` بدون متن شکست خورد. هنگام خواندن ۳۶۹ فرمان، Heap از 52,208 به 27,296 بایت افتاد و پس از GC فقط 41,600 بایت برای Import و Scheduler باقی ماند.
+
+### Root cause
+
+- Streaming Build 100 رشتهٔ 11.5KB را حذف کرد، ولی همچنان هر خط را به Tuple `(op,args)` در یک List تبدیل می‌کرد. ۳۶۹ فرمان Bundle 308 حدود 25KB Heap موقت/ماندگار مصرف کردند.
+- هنگام رسیدن به Random Package ماهیگیری، Scheduler برای ۱۶۵ آیتم هم فهرست همهٔ Rangeها و هم فهرست کامل ترتیب Shuffle را می‌ساخت، درحالی‌که قرارداد فقط ۱ تا ۲ آیتم می‌خواست.
+
+### Change
+
+- `game_steps.txt` مستقیماً به Runner فایل‌محور تحویل داده می‌شود و دیگر در `code.py` به List فرمان تبدیل نمی‌شود.
+- Runner در یک اسکن، فقط Offset چهار‌بایتی خطوط معتبر را داخل `bytearray` ثبت می‌کند؛ متن هر فرمان فقط هنگام دسترسی از Flash خوانده می‌شود.
+- رابط فایل‌محور همان عملیات `len`، Index و Iteration موردنیاز Engine را فراهم می‌کند، بنابراین LOOP، PGROUP، LABEL/GOTO و Sound semantics تغییر نکرده‌اند.
+- حالت `RPKG|pick` با Reservoir Sampling تنها تعداد درخواستی آیتم‌ها را نگه می‌دارد؛ انتخاب یکنواخت و ترتیب تصادفی حفظ می‌شود.
+- حالت‌های `all` و `seq` برای Packageهای کوچک موجود بدون تغییر باقی مانده‌اند.
+- فایل، Offsetها و Context در تمام مسیرهای Success، Abort و Exception بسته و آزاد می‌شوند.
+- Firmware ARM، Natural Mouse، Sound، Preemption نور و محتوای پروژه تغییر نکرده‌اند.
+
+### Validation
+
+- `game_steps.txt` واقعی Bundle 308 شامل ۳۶۹ فرمان با تنها ۱٬۴۷۶ بایت Offset ایندکس شد.
+- Package اول هشت‌تایی طبق حالت `all` حفظ شد و Package ماهیگیری ۱۶۵‌تایی فقط دو Range انتخاب‌شده ساخت.
+- تست کامل فایل‌محور با ۱۶۵ آیتم اجرا شد و هیچ List سراسری از فرمان‌ها یا آیتم‌های Package ساخته نشد.
+- تست‌های Preemption، Whisper/Splash، Shared Listener، HANDPATH و Parser پاس شدند.
+- هر ۵۲ قرارداد رسمی Portable موفق شدند.
+- اندازهٔ Runner سبک Game حدود 22.2KB است و سقف CI با CRLF ویندوز روی 24KB قفل شد.
+
+### Next test
+
+Bundle را با Build 101 بازسازی و Game را اجرا کنید. بعد از `ROUTE/start game_steps.txt` باید `after-route-read` افت بسیار کوچک‌تری نسبت به Bundle 308 نشان دهد، سپس `SOUNDWATCH|armed`، حرکت/Delay پکیج و `WPROFILE` بدون MemoryError اجرا شوند. انتقال پایدار Game→Targeted نیز باید همچنان `GUARD|PREEMPT` ثبت و Route بازی را ایمن متوقف کند.
+
+## Build 100 — توقف ایمن Route با تغییر پایدار نور و خواندن Streaming بازی
+
+**Previous build:** 99 / Classroom release 197
+**Status:** local candidate; Login→Dashboard and Game hardware retest required
+
+### Problem observed
+
+لاگ Bundle 306 تأیید کرد اصلاح Revision موفق است: `CALSTATUS source=file` مقدار Dashboard برابر `15.3 ± 3.0` را گزارش کرد و Lux=16.7 Route داشبورد را اجرا کرد. اما Route طولانی Login تا فشار دستی GP4 ادامه یافت، چون Guard هنگام اجرای همگام Route دیگر نور را نمونه‌گیری نمی‌کرد. سپس Game پیش از `after-route-read` با `MemoryError` تخصیص 6400 بایت شکست خورد.
+
+### Root cause
+
+- Main Loop فقط بین Routeها `guard.update` را اجرا می‌کرد. Tick تعاونی داخل Delay/TYPE/Mouse فقط دکمه‌ها و Deadline چرخه را بررسی می‌کرد.
+- `game_steps.txt` حدود 11.5KB بود و با `fh.read()` باید به یک رشتهٔ پیوسته تبدیل می‌شد؛ Heap با وجود 49KB آزاد، بلوک پیوستهٔ 6400 بایتی نداشت.
+
+### Change
+
+- Tick تعاونی Route هر 100ms سنسور نور را نمونه‌گیری و همان Debounce/Transition رسمی Guard را اجرا می‌کند.
+- فقط پس از پایدارشدن وضعیت جدید، رویداد `EVT|GUARD|PREEMPT|from=...|to=...|lux=...` ثبت می‌شود. Spike یا Unknown کوتاه Route را قطع نمی‌کند.
+- Preemption فقط Route جاری را Abort می‌کند و Run اصلی فعال می‌ماند؛ تصمیم ذخیره‌شدهٔ Guard در دور بعد Route محیط جدید را اجرا می‌کند.
+- پیش از خروج، تمام Keyboard keyها آزاد و فرمان Abort به ARM ارسال می‌شود. Pause و Stop دستی همچنان اولویت دارند و Stop هرگز خودکار دوباره فعال نمی‌شود.
+- Routeهای Light/Game خط‌به‌خط از Flash Parse می‌شوند؛ فقط Route واقعاً ناسازگار به Parser کامل و `fh.read()` fallback می‌کند.
+- Parser مشترک نگه داشته شد تا `code.py` در Checkout ویندوز نیز زیر سقف 55KB باقی بماند.
+- ARM Firmware، Natural Mouse، Sound و محتوای Routeهای کاربر تغییر نکرده‌اند.
+
+### Validation
+
+- شبیه‌سازی Login→Dashboard ثابت کرد قبل از 300ms Route ادامه دارد و پس از پایداری، Run روشن می‌ماند ولی Route Abort، Keyboard آزاد، ARM متوقف و تصمیم Dashboard آماده می‌شود.
+- Route مصنوعی بیش از 360 فرمان بدون رشتهٔ بزرگ به‌صورت Streaming Parse شد.
+- 51 قرارداد رسمی Portable موفق شدند و هر 34 Hash Manifest معتبر است.
+- Windows contract وجود Preemption، آزادسازی منابع و Streaming read را قفل می‌کند.
+
+### Next test
+
+1. Login Route را شروع کنید و وارد Dashboard شوید؛ باید حداکثر حدود 0.8–1.0 ثانیه بعد `GUARD|PREEMPT|from=login-or-dc|to=character-dashboard` و `ROUTE/aborted login_or_dc_steps.txt` دیده شود.
+2. بلافاصله باید `ROUTE/start character_dashboard_steps.txt` ثبت شود و هیچ Step دیگری از Login اجرا نشود.
+3. مسیر Loading→Game را ادامه دهید؛ `after-route-read` و `light-route` باید ثبت شوند و MemoryError تخصیص 6400 بایت نباید تکرار شود.
+4. Pause، Resume و GP4 Stop را جداگانه بررسی کنید؛ Stop نباید Route بعدی را خودکار فعال کند.
+
+## Build 99 — مرجع‌شدن Revision پروفایل Package و ذخیره بدون Import لحظه‌ای
+
+**Previous build:** 98 / Classroom release 196
+**Status:** local candidate; Dashboard detection and physical-save hardware retest required
+
+### Problem observed
+
+Bundle 304 و هر 35 Hash سالم بود و فایل‌ها Dashboard را `15.3 ± 3.0` داشتند، اما `CALSTATUS` نشان داد Guard هنوز NVM قدیمی `14.2 ± 1.0` را اعمال می‌کند. در نتیجه نور `16.7` ناشناخته ماند. در تلاش بعدی، نمونه‌گیری در `complete-stage` و `heap-ready` تمام شد اما هیچ `saved-stage` یا خطای ذخیره‌ای ثبت نشد و Heartbeat ادامه یافت.
+
+### Root cause
+
+- CAL2 عمداً Revision فایل را نادیده می‌گرفت؛ بنابراین تغییر پروفایل در Package هیچ‌وقت NVM قدیمی را کنار نمی‌زد.
+- Build 98 ماژول `calibration_fit.py` را هنگام Save روی Heap تکه‌تکه Import/Compile می‌کرد. MemoryError همان Import می‌توانست حتی ساخت Telemetry خطا را نیز ناکام کند، در حالی که Main Loop و Heartbeat زنده می‌ماندند.
+- Diagnostic برای `nearest` از فایل Bundle استفاده می‌کرد، ولی Guard از NVM استفاده می‌کرد؛ به همین دلیل `nearest=12.3..18.3` در کنار `CALSTATUS source=nvm range=13.2..15.2` دیده شد.
+
+### Change
+
+- NVM اکنون `base_revision` پروفایل نور را همراه Snapshot ذخیره می‌کند و فقط برای همان Revision بارگذاری می‌شود.
+- تغییر Center/Tolerance در Classroom یک Revision جدید می‌سازد؛ Package جدید خودکار مرجع می‌شود و NVM قدیمی اعمال نمی‌شود.
+- Export مجدد Routeها با پروفایل نور یکسان همان Revision را نگه می‌دارد و کالیبراسیون فیزیکی NVM حفظ می‌شود.
+- Snapshotهای قدیمی CAL1/CAL2 بدون Revision منطبق Stale هستند و یک‌بار به فایل Package برمی‌گردند.
+- «ذخیره پروفایل‌ها» هیچ فرمانی به برد و NVM ارسال نمی‌کند؛ فقط Package خروجی را تنظیم می‌کند.
+- Fit به `calibration_nvm.py` منتقل شد؛ این ماژول در Boot از قبل بارگذاری می‌شود و Save دیگر Import/Compile لحظه‌ای ندارد.
+- Manifest دوباره 34 فایلی است و فایل موقت Build 98 هنگام Export از درایوهای قدیمی پاک می‌شود.
+- ARM، Mouse، Sound و Routeهای کاربر تغییر نکرده‌اند.
+
+### Validation
+
+- 50 قرارداد رسمی Portable موفق شدند.
+- تست NVM تأیید می‌کند Revision برابر Snapshot را نگه می‌دارد و Revision جدید Package، NVM قدیمی را رد می‌کند.
+- تست‌های Fit عادی، Center-inside و centers-too-close بدون Import لحظه‌ای موفق شدند.
+- هر 34 Hash Manifest با بایت نهایی تطبیق دارد.
+
+### Next test
+
+1. با همان پروفایل Dashboard برابر `15.3 ± 3.0` Bundle را کامل بسازید؛ Export باید `34/34 hashes and Guard revisions OK` بدهد.
+2. پس از Soft Reboot، Start باید `CALSTATUS source=file` و Dashboard مؤثر نزدیک `12.3..18.3` را نشان دهد و Lux=16.7 را بشناسد.
+3. یک کالیبراسیون فیزیکی Dashboard انجام دهید؛ پس از `complete-stage` باید `CAL|FIT` در صورت نیاز، سپس `storage=nvm` و `saved-stage` دیده شود.
+4. یک Soft Reboot دیگر بدون تغییر پروفایل انجام دهید؛ این بار `CALSTATUS source=nvm` باید همان Snapshot تازه را بارگذاری کند.
+
+## Build 98 — رفع MemoryError بوت پس از Adaptive Fit
+
+**Previous build:** 97 / Classroom release 195
+**Status:** local candidate; Bundle boot hardware retest required
+
+### Problem observed
+
+Bundle 303 در Soft Reboot پیش از ساخت Runtime و در خط `import combined_guard_runtime` با `MemoryError` هنگام تخصیص 1244 بایت متوقف شد.
+
+### Root cause
+
+Bundle و هر 34 Hash سالم بودند. Build 97 حدود 3.6KB به `guard_calibration_protocol.py` و حدود 2.2KB به `combined_guard_runtime.py` افزوده بود. CircuitPython مجبور بود منطق Fit را در Boot Parse/Import کند، هرچند Fit فقط هنگام ذخیرهٔ کالیبراسیون لازم است؛ اوج Heap تکه‌تکه از ظرفیت تخصیص پیوسته عبور کرد.
+
+### Change
+
+- Adaptive Fit به ماژول مستقل `calibration_fit.py` منتقل شد و فقط داخل `_publish_calibration` Lazy-load می‌شود.
+- ماژول Fit پیش از نوشتن NVM از `sys.modules` خارج و Garbage Collection اجرا می‌شود.
+- `combined_guard_runtime.py` از 41,449 به 39,241 بایت و `guard_calibration_protocol.py` از 8,853 به 4,933 بایت کاهش یافت؛ هر دو از اندازهٔ Boot نسخهٔ قبل از Build 97 کوچک‌ترند.
+- Center ثابت، حداقل Tolerance برابر 0.5، Gap برابر 0.25، Fit یک‌طرفه/دوطرفه، ذخیرهٔ اتمیک و Fail-Closed بدون تغییر حفظ شدند.
+- Manifest و Exporter به موجودی 35 فایلی ارتقا یافتند و Read-back روی CIRCUITPY اکنون `35/35 hashes and Guard revisions OK` را الزام می‌کند.
+- ARM، Mouse، Sound، Route و پروژهٔ کاربر تغییر نکرده‌اند.
+
+### Validation
+
+- 50 قرارداد رسمی Portable موفق شدند.
+- تست‌های Fit عادی، Center-inside و centers-too-close موفق شدند.
+- قرارداد Boot الزام می‌کند Runtime با نرمال‌سازی LF/CRLF کمتر از 40KB، Protocol کمتر از 5.5KB و Import Fit فقط Lazy باشد.
+- قرارداد Windows برای Checkoutهای CRLF اصلاح شد تا فقط بایت‌های معنایی Runtime را بسنجد، نه افزایش مصنوعی یک بایت در هر خط.
+- هر 35 Hash Manifest با بایت نهایی تطبیق دارد.
+
+### Next test
+
+1. Bundle را با Build جدید کامل بازسازی و روی CIRCUITPY جایگزین کنید؛ Soft Reboot باید بدون MemoryError وارد PONG شود.
+2. یک کالیبراسیون هم‌پوشان انجام دهید؛ `CAL|FIT` یا `CAL|FIT-PAIR` و سپس `saved-stage` باید ثبت شود.
+3. پیام Export باید `35/35 hashes and Guard revisions OK` باشد.
+
+## Build 97 — Fit تطبیقی یک‌طرفه و دوطرفهٔ کالیبراسیون
+
+**Previous build:** 96 / Classroom release 194
+**Status:** CI candidate; overlapping calibration hardware retest required
+
+### Problem observed
+
+وقتی Tolerance پیشنهادی وارد دامنهٔ دیگری می‌شد، Save فوراً با `CAL|OVERLAP` رد می‌شد. حتی در حالتی که با کاهش کنترل‌شدهٔ دامنهٔ جدید یا عقب‌بردن محدود دامنهٔ مجاور می‌شد دو پروفایل امن ساخت، کاربر مجبور به نمونه‌گیری دوباره بود.
+
+### Root cause
+
+Publish فقط یک Guard دودویی داشت: Candidate بدون تغییر پذیرفته یا رد می‌شد. Cap اولیه نیز فقط دامنهٔ جدید را در حالتی که Center بیرون دامنهٔ دیگر بود محدود می‌کرد و Center-inside را حل نمی‌کرد.
+
+### Change
+
+- قبل از ذخیره، Fit اتمیک روی مجموعهٔ کامل پروفایل‌ها اجرا می‌شود.
+- ابتدا Tolerance دامنهٔ جدید تا حداقل `0.5 lux` کاهش می‌یابد.
+- اگر هنوز هم‌پوشانی باقی باشد، Tolerance دامنهٔ مجاور فقط به‌اندازهٔ لازم عقب می‌رود؛ هیچ Centerای جابه‌جا نمی‌شود.
+- بین دو دامنه Gap ثابت `0.25 lux` حفظ می‌شود و پروفایل‌های قدیمی باریک هرگز بزرگ نمی‌شوند.
+- تغییرات با `CAL|FIT` یا `CAL|FIT-PAIR` شامل مقدار درخواستی/اعمال‌شده و دامنهٔ مجاور ثبت می‌شوند.
+- اگر فاصلهٔ Centerها برای دو دامنهٔ حداقلی به‌علاوهٔ Gap کافی نباشد، ذخیره همچنان با `CAL|FIT|reason=centers-too-close` Fail-Closed می‌شود.
+- همهٔ تغییرات یک‌بار در NVM ذخیره و سپس هم‌زمان روی Guard فعال اعمال می‌شوند.
+- Firmware Pro Micro، ARM، Mouse، Sound و Routeها تغییر نکرده‌اند.
+
+### Validation
+
+- سناریوی هم‌پوشانی عادی فقط Candidate را تا مرز امن عقب می‌برد.
+- سناریوی Center-inside، Candidate و همسایه را با Min/Gap ثابت Fit می‌کند.
+- سناریوی Centerهای بسیار نزدیک بدون نوشتن NVM رد می‌شود.
+- قرارداد ترتیب Fit پیش از `calibration_nvm.save` و Telemetry یک‌طرفه/دوطرفه تست می‌شود.
+- قرارداد Windows TestRunner از Cap قدیمی داخل `calibrated_profile` به Fit تطبیقی مرحلهٔ Publish به‌روزرسانی شد؛ Min/Gap و وجود Helper جدید را قفل می‌کند.
+
+### Next test
+
+1. یک Stage با Tolerance هم‌پوشان ذخیره کنید؛ به‌جای `OVERLAP` باید `CAL|FIT` یا `CAL|FIT-PAIR` و سپس `saved-stage` دیده شود.
+2. `CALSTATUS` را بررسی کنید؛ Centerها باید ثابت و فقط Toleranceهای گزارش‌شده کاهش یافته باشند.
+3. هر دو محیط در دو Start جدا باید State صحیح خود را بگیرند و بین Rangeهای گزارش‌شده حداقل ۰٫۲۵ lux فاصله باشد.
+
+## Build 96 — سنجش تازه در Start فیزیکی و حاشیهٔ Drift کالیبراسیون
+
+**Previous build:** 95 / Classroom release 193
+**Status:** local candidate; Dashboard hardware retest required
+
+### Problem observed
+
+در Bundle 301 مقدار Dashboard برابر `13.3 ± 3.0` بود، اما نور زندهٔ `16.7` فقط ۰٫۴ lux بیرون بازه قرار گرفت و `unknown` شد. پس از Stop/Start فیزیکی نیز خط جدید State دیده نمی‌شد و فقط reconnect کابل آن را ظاهر می‌کرد.
+
+### Root cause
+
+حاشیهٔ پس از Envelope نمونه‌گیری فقط ۰٫۵ lux بود و Drift کوتاه پس از کالیبراسیون را کامل پوشش نمی‌داد. همچنین Start فیزیکی Guard را Reset می‌کرد، اما برخلاف `GUARD|ON`، مقادیر `debug_last_state` و `debug_last_denied` را Reset نمی‌کرد؛ بنابراین سنجش `unknown → unknown` انجام ولی در Telemetry حذف می‌شد.
+
+### Change
+
+- Start کوتاه GP4 علاوه بر Guard، `last_decision` و Debug State/Denied را نیز Reset می‌کند.
+- Boot و هر Start مقدار دقیق `EVT|CALSTATUS|source=nvm|file` را ثبت می‌کنند؛ Start فیزیکی Center/Tolerance/Range واقعی Dashboard را نیز همراه آن می‌فرستد.
+- حاشیهٔ Drift در فرمول کالیبراسیون از `deviation + 0.5` به `deviation + 1.0` افزایش یافت.
+- Cap نزدیک‌ترین پروفایل و کنترل Overlap بدون تغییر و همچنان Fail-Closed باقی مانده‌اند.
+- Runtime موس، ARM، Cadence، Sound و مسیرهای پروژه تغییر نکرده‌اند.
+
+### Validation
+
+- Regression واقعی `13.3/15.8 → live 16.7` اکنون Tolerance حداقل ۳٫۵ می‌سازد و بدون Overlap پذیرفته می‌شود.
+- تست اختصاصی Start فیزیکی Reset کامل Telemetry و گزارش منبع کالیبراسیون را قفل می‌کند.
+- Manifest Runtime پس از تغییر فایل‌های Hash‌شده بازسازی و کامل بررسی می‌شود.
+
+### Next test
+
+1. Stage Dashboard را یک‌بار در نور پایدار Save کنید؛ در Start بعدی باید `active-source=nvm` و بازهٔ مؤثر ثبت شود.
+2. در Dashboard، Stop و دوباره Start کنید؛ بدون قطع کابل باید فوراً `STATE/character-dashboard` یا `STATE/unknown lux=...` تازه دیده شود.
+3. اگر مقدار زنده داخل Range گزارش‌شده بود، Route Dashboard باید اجرا شود؛ اگر بیرون بود، همان مقدار برای تیون بعدی ارسال شود.
+
+## Build 95 — بازنشستگی UI قدیمی Wait For Sound برای Splash
+
+**Previous build:** 94 / Classroom release 192
+**Status:** local candidate; Export and old-project migration test required
+
+### Problem observed
+
+معماری جدید Splash از پروفایل مستقل و Route واکنش اختصاصی استفاده می‌کرد، اما
+Timeout هر Cast هنوز داخل دیالوگ عمومی `Wait For Sound` پنهان بود. این رابط با
+مدل جدید تناقض داشت و کاربر به‌درستی انتظار داشت Wait For Sound منسوخ شده باشد.
+
+### Root cause
+
+برای حفظ قرارداد `WPROFILE`، پیاده‌سازی Build 93 همان نود قدیمی
+`waitForSound` را با `responseRoute=splash` دوباره استفاده کرده بود. Runtime
+جدید بود، اما مدل و ورودی رابط قدیمی باقی مانده بود.
+
+### Change
+
+- استپ جدید و صریح `Splash Listener (Scoped)` به منو، Rail و منوی راست‌کلیک اضافه شد.
+- `Wait For Sound` از تمام مسیرهای درج پروژهٔ جدید حذف و فقط به‌عنوان Legacy loader نگه‌داری شد.
+- Timeout حداقل/حداکثر هر Cast به کارت پروفایل Splash کنار خروجی Pico منتقل شد.
+- Exporter مقدارهای پروفایل را روی فرمان `WPROFILE|splash,min,max` اعمال می‌کند.
+- فایل‌های Format 1–4 که `waitForSound + responseRoute=splash` دارند، هنگام Load
+  به `splashListener` و پروفایل Timeout جدید Migration می‌شوند.
+- Listener خارج از تب Game و بازهٔ Timeout نامعتبر به‌صورت Fail-Closed رد می‌شوند.
+- Firmware Pro Micro، ARM، DDA/Cadence، Natural Mouse و Runtime Pico تغییر نکرده‌اند.
+
+### Validation
+
+- قرارداد منبع جدید، حذف Wait For Sound از سه مسیر درج UI، وجود Migration،
+  انتقال Timeout و Fail-Closed خارج Game را کنترل می‌کند.
+- Rail contract با مدل جدید همگام شد: `splashListener` باید قابل درج باشد و `waitForSound` فقط Legacy/load-only باقی می‌ماند.
+- مجموعهٔ کامل Portable و Windows TestRunner باید پیش از انتشار سبز شود.
+
+### Next test
+
+1. Build جدید را در پوشه‌ای تازه باز و پروژهٔ ماهیگیری قدیمی را Load کنید؛ `Wait For Sound + responseRoute=splash` باید خودکار به `Splash Listener` تبدیل شود.
+2. در کارت Splash بازهٔ Timeout را تغییر دهید و Export کنید؛ `game_steps.txt` باید همان بازه را در `WPROFILE|splash,min,max` داشته باشد.
+3. در Game، Detection باید Route تب Splash را اجرا و Timeout باید بدون F به Cast بعدی برود؛ نرمی موس و Whisper سراسری نباید تغییر کنند.
+
+## Build 94 — رفع رد شدن Manifest در Boot
+
+**Previous build:** 93 / Classroom release 190
+**Status:** local candidate; Boot and Game hardware test required
+
+### Problem observed
+
+Bundle 300 با وجود ۳۴ Hash صحیح، هنگام Boot با
+`GuardBundleError: unexpected or duplicate SHA256SUMS file: splash_steps.txt`
+متوقف شد.
+
+### Root cause
+
+Exporter دو Route جدید `splash_steps.txt` و `whisper_steps.txt` را درست تولید و
+Hash می‌کرد، اما موجودی Boot Runtime پیش از `load_guard_bundle("/")` هنوز این
+دو فایل را نمی‌شناخت. این دو فایل Route نوری Guard نیستند و نباید به
+`guard-transition.json` افزوده شوند.
+
+### Change
+
+- هر دو Route واکنش صوتی پیش از بارگذاری Bundle به موجودی Hash Runtime افزوده شدند.
+- تست رگرسیون جدید برابری دقیق موجودی ۳۴فایلی Manifest و Boot verifier را کنترل می‌کند.
+- Guard transition، فریمور Pro Micro، DDA/Cadence و Natural Mouse بدون تغییر مانده‌اند.
+
+### Validation
+
+- تمام ۴۷ تست Portable روی نسخهٔ دقیق Remote Branch پاس شدند.
+- Windows TestRunner، Portable contracts، ARM 2.8 compile، Plan2، Golden، Hashes و Sensitive Guard همگی سبز شدند.
+- `code.py` Remote با نسخهٔ محلی بایت‌به‌بایت برابر و SHA256 آن `e06891815631e9588f27b80a442a012f12d5c4221fb057557f373d9433f1b013` است.
+
+### Next test
+
+خروجی پروژهٔ Build 94 باید بدون خطای Manifest Boot شود؛ سپس Game باید Whisper
+سراسری و Splash محدود به Cast را اجرا کند.
+
+## Build 93 — Whisper سراسری و Splash محدود به هر Cast
+
+**Previous build:** 92 / Classroom release 177
+**Status:** CI candidate; physical sound, heap and mouse-smoothness test required
+**Commit:** `{{COMMIT_SHA}}`
+
+### Problem observed
+
+در Build 92 هر دو پروفایل Whisper و Splash به‌صورت وقفهٔ سراسری Game مدل شده بودند. این رفتار برای Whisper درست است، اما Splash باید فقط از داخل مرحلهٔ انتظار صدای همان Cast فعال باشد؛ همچنین Timeout معمول ماهیگیری باید حدود ۲۰ ثانیه بماند تا اگر صدایی نیامد، برنامه دوباره قلاب بیندازد.
+
+### Root cause
+
+قرارداد سراسری قبلی محل و عمر Listener منطقی Splash را از ساختار Cast جدا کرده بود. بنابراین Splash می‌توانست بیرون از Wait For Sound فعال شود و مسیر Detection/Timeout معنای «پایان Cast جاری و رفتن به Cast بعدی» را به‌صورت مستقل حمل نمی‌کرد.
+
+### Change
+
+- Whisper با حالت `global` فقط در طول اجرای روت Game فعال است؛ روت‌های Targeted، Restart، خروج اضطراری و سایر موقعیت‌ها شنونده ندارند.
+- Splash با حالت `scoped` فقط هنگام رسیدن Cast به Wait For Sound مسلح می‌شود.
+- Wait For Sound گزینهٔ واکنش `inline` یا `splash` و بازهٔ Timeout تصادفی مستقل دارد؛ پیش‌فرض Splash برابر ۱۸ تا ۲۲ ثانیه است.
+- در Detection، تب Splash اجرا می‌شود و سپس Cast جاری پایان می‌یابد؛ در Timeout تب Splash اجرا نمی‌شود و Cast جاری باز هم پایان می‌یابد. هر دو مسیر به Cast بعدی می‌روند.
+- یک Listener فیزیکی ADC هر دو سیاست را سرویس می‌دهد. هنگام Wait For Sound، Peak بین Whisper سراسری و Splash موقت با Range/Priority دسته‌بندی می‌شود.
+- وقفهٔ Whisper دقیقاً همان Iterator را ادامه می‌دهد؛ Splash یا Timeout فقط شاخه‌های موازی Cast جاری را لغو می‌کند.
+- زمان‌بندی حلقهٔ بیرونی و AutoCycle مبتنی بر ساعت دیواری باقی می‌ماند؛ واکنش، Cooldown و Timeout هیچ Deadline ده‌دقیقه‌ای یا ۱۱۰–۱۳۰ دقیقه‌ای را از نو شروع نمی‌کنند.
+- هنگام خروج از Game، Listener صدا صریحاً بسته می‌شود تا هیچ واکنشی در وضعیت‌های دیگر باقی نماند.
+
+### Validation
+
+- شبیه‌ساز اختصاصی تأیید کرد Whisper حین Wait For Sound اجرا می‌شود و پس از آن انتظار Splash همان Cast ادامه می‌یابد.
+- Detection پروفایل Splash، روت Splash شامل کلید F را اجرا و سپس به فرمان Cast بعدی می‌رود.
+- Timeout تصادفی بدون اجرای F، Cast جاری را خاتمه و فرمان Cast بعدی را اجرا می‌کند.
+- قرارداد Export شامل `SOUNDWATCH` با Whisper سراسری، Splash محدود و `WPROFILE|splash,18000,22000` است.
+- تست‌های Parser، Shared Listener، Parallel runtime، USB FAT و Calibration heap در شبیه‌سازی پاس شدند.
+- اندازهٔ Runner سبک Game به حدود ۱۹٫۳KB رسیده است؛ تست واقعی Heap، صدا و نرمی موس هنوز لازم است.
+
+### Next test
+
+روی سخت‌افزار، داخل Game یک Cast واقعی اجرا شود: Whisper باید در هر نقطه فقط تب Whisper را اجرا و همان حرکت را ادامه دهد؛ Splash باید فقط در بازهٔ Wait For Sound باعث F و Cast بعدی شود؛ نبود صدا باید پس از یک مقدار تصادفی ۱۸–۲۲ ثانیه بدون F به Cast بعدی برود. هم‌زمان باید Heap telemetry، نرمی موس و حفظ Deadlineهای ۱۰ دقیقه و ۱۱۰–۱۳۰ دقیقه بررسی شوند.
+
+## Build 92 — وقفهٔ صوتی سراسری و قابل‌بازگشت در Game
+
+**Previous build:** 91 / Classroom release 147
+**Status:** CI candidate; physical sound and mouse-smoothness test required
+**Commit:** `{{COMMIT_SHA}}`
+
+### Problem observed
+
+پروفایل‌های صدای ویسپر و چلپ فقط داخل شاخه‌های Wait For Sound قابل‌اجرا بودند؛ واکنش ویسپر می‌توانست شاخهٔ ماهیگیری را لغو کند و ادامهٔ دقیق Game حفظ نمی‌شد. تنظیم بازه و اقدام واکنش نیز در یک محل مخلوط بود.
+
+### Root cause
+
+Scheduler قبلی Detection را پایان یک Race می‌دانست و همهٔ Iteratorهای غیر‌برنده را حذف می‌کرد. قرارداد WSNDP نیز فقط Threshold داشت و مسیر واکنش، بازهٔ دوطرفه، Priority و Cooldown را حمل نمی‌کرد.
+
+### Change
+
+- دو تب ثابت `Whisper` و `Splash` برای تعریف نوت، Buzzer و اقدام واکنش اضافه شد.
+- کارت «شنوندهٔ سراسری صدا در محیط بازی» کنار دکمهٔ ساخت و کپی Pico قرار گرفت و برای هر پروفایل Peak Min/Max، Priority و Cooldown مستقل دارد.
+- خروجی Game به‌طور خودکار با یک Parallel listener کم‌حافظه بسته‌بندی می‌شود؛ فقط یک ADC Listener فیزیکی برای هر دو پروفایل باز می‌ماند.
+- در هم‌پوشانی بازه‌ها Priority بزرگ‌تر برنده است؛ در تساوی، Threshold بالاتر انتخاب می‌شود.
+- واکنش صوتی یک Interrupt است: Scheduler همهٔ Iteratorها را در جای خود نگه می‌دارد، روت واکنش را اجرا می‌کند، در Cooldown شنود را خاموش نگه می‌دارد و سپس Game را از همان نقطه ادامه می‌دهد.
+- Buzzer پاسخ نمی‌تواند خودش را دوباره Trigger کند، چون Listener پیش از اجرای روت بسته و پس از پایان Cooldown دوباره فعال می‌شود.
+- قرارداد پروژه به نسخهٔ ۴ و Manifest مدرن به ۳۴ فایل ارتقا یافت؛ دو روت واکنش نیز Hash و Read-back می‌شوند.
+- WSNDP پنج‌فیلدی قدیمی همچنان سازگار است؛ قراردادهای ۸‌فیلدی بازه و ۱۰‌فیلدی روت واکنش نیز پذیرفته می‌شوند.
+
+### Validation
+
+- شبیه‌سازی Peak=75 در بازهٔ هم‌پوشان، Whisper با Priority=10 را به‌جای Splash با Priority=5 انتخاب کرد.
+- Buzzer ویسپر بین دو حرکت/کلید Game اجرا شد و پس از آن Iterator اصلی ادامه یافت.
+- تست‌های Shared Listener، Timeout، Mouse streaming، Sound calibration، USB FAT read-back و Restart cycle پاس شدند.
+- تست سخت‌افزاری نهایی صدا و بررسی چشمی نرمی موس هنوز لازم است.
+
+### Next test
+
+روی سخت‌افزار، هم‌زمانی حرکت طولانی و نرم موس با Peakهای واقعی Whisper/Splash تست شود؛ باید فقط تب با Priority درست اجرا شود، Buzzer خودتحریک ایجاد نکند و پس از Cooldown حرکت Game بدون پرش از همان نقطه ادامه یابد.
+
+- مجموعهٔ نهایی ۳۴ فایل Bundle و ۲۸ فایل تغییر‌یافته پس از انتشار با نسخهٔ تست‌شده تطبیق داده شد؛ سقف قرارداد Runner سبک Game نیز با اندازهٔ جدید ۱۵٫۸KB و تبدیل CRLF ویندوز همگام شد.
+
+## Build 91 — Listener مشترک برای Parallel Sound
+
+**Previous build:** 90 / Classroom release 143
+**Status:** CI candidate; two-profile physical sound test required
+**Commit:** `{{COMMIT_SHA}}`
+
+### Problem observed
+
+Build 143 پروژهٔ `s1.amsj` را با موفقیت Export کرد، اما در اجرای Desktop هر دو شاخهٔ Parallel تقریباً هم‌زمان به Wait For Sound رسیدند. Listener اول با Threshold 130 فعال شد و Listener دوم باعث `ValueError('only one WSND listener is allowed')` و توقف Guard شد.
+
+### Root cause
+
+Pro Micro فقط یک ADC و یک State ماشین `ASND` دارد. Scheduler هر Wait For Sound منطقی را به‌عنوان Listener فیزیکی مستقل اجرا می‌کرد؛ بنابراین ساختار معتبر دو پروفایلی پروژه با محدودیت سخت‌افزار برخورد می‌کرد.
+
+### Change
+
+- همهٔ Wait For Soundهای هم‌زمان یک Parallel Group در یک Listener فیزیکی ادغام می‌شوند.
+- Listener مشترک با پایین‌ترین Threshold، کوتاه‌ترین Minimum و نزدیک‌ترین Timeout شروع می‌شود.
+- اگر Listener دوم در همان دور Scheduler برسد، Listener اولیه Cancel و فوراً با قرارداد مشترک Restart می‌شود.
+- پس از Detection، Peak واقعی ARM خوانده می‌شود و بالاترین Threshold منطبق بر Peak برنده می‌شود.
+- فقط شاخهٔ برنده ادامه پیدا می‌کند و Buzzer مربوط به همان پروفایل اجرا می‌شود.
+- اگر بیش از یک پروفایل وجود داشته باشد ولی Firmware Peak telemetry ندهد، مسیر Fail-closed باقی می‌ماند.
+
+### Validation
+
+- تست Peak برابر ۱۴۰ تأیید کرد شاخهٔ Threshold 130 و Buzzer هشدار اجرا می‌شود.
+- تست Peak برابر ۸۰ تأیید کرد شاخهٔ Threshold 30 و Buzzer موفقیت اجرا می‌شود.
+- تست Listener تکی، Mouse هم‌زمان، Timeout، Cancel و ARM Async Sound همچنان پاس شد.
+- خطای قدیمی `only one WSND listener may be active` از Scheduler حذف شد.
+- کالیبراسیون صدای فیزیکی هنوز تست نشده و Hardware pass آن ادعا نمی‌شود.
+
+### Next test
+
+پس از کالیبراسیون IDهای ۱ و ۲، پروژهٔ `s1.amsj` را اجرا کنید. صدای با Peak بالاتر از پروفایل ۱ باید فقط Tone هشدار و صدای بین Thresholdهای ۲ و ۱ باید فقط Tone موفقیت را اجرا کند؛ Guard نباید متوقف شود.
+
+## Build 90 — Buzzer داخل Parallel Sound
+
+**Previous build:** 89 / Classroom release 139
+**Status:** CI candidate; s1 export and physical sound calibration retest required
+**Commit:** `{{COMMIT_SHA}}`
+
+### Problem observed
+
+خروجی استاندارد پروژهٔ `s1.amsj` با پیام `plan export blocked: 2 problem(s)` متوقف شد. پروژه شامل دو شاخهٔ ForLoop در Parallel Group بود؛ هر شاخه یک Wait For Sound ساده و یک Buzzer داشت.
+
+### Root cause
+
+Scheduler پیکو از `BEEP` در Parallel پشتیبانی می‌کرد، اما `PlanExporter` نوع `buzzer` را نه در فهرست Cooperative leafها پذیرفته بود و نه به فرمان‌های `BEEP/DELAY` تبدیل می‌کرد. بنابراین هر یک از دو شاخه یک خطای سازگاری ایجاد می‌کرد. پنجرهٔ Current project export نیز فقط تعداد خطاها را نشان می‌داد و جزئیات را در Log پنهان می‌کرد.
+
+### Change
+
+- `buzzer` به مجموعهٔ Stepهای مجاز داخل Parallel Group اضافه شد.
+- Preset یا Pattern سفارشی Buzzer با همان Validation موجود به `BEEP|frequency,duration` تبدیل می‌شود.
+- Pause میان نت‌ها به `DELAY|min,max` قابل‌اجرای Plan تبدیل می‌شود.
+- تست دقیق ساختار پروژهٔ s1 دو شاخهٔ `ForLoop → Wait For Sound → Buzzer` را پوشش می‌دهد.
+- پنجرهٔ Current project Pico export تا شش خطای واقعی را مستقیماً نمایش می‌دهد.
+
+### Validation
+
+- قرارداد Python برای سازگاری Parallel/Buzzer پاس شد.
+- Runtime موازی `BEEP` را از مسیر عمومی Executor اجرا می‌کند و Wait For Sound ساده همچنان Cooperative است.
+- دو ID کالیبراسیون ۱ و ۲ در پروژه یکتا و معتبرند؛ خطا از Calibration ID نبود.
+- کالیبراسیون صدای فیزیکی همچنان تست نشده و Hardware pass آن ادعا نمی‌شود.
+
+### Next test
+
+پروژهٔ `s1.amsj` را در Build جدید باز و Current project Pico export کنید. پس از خروجی موفق، Sound Calibration برای IDهای ۱ و ۲ را انجام دهید و اجرای هم‌زمان دو شاخه، Tone هشدار/موفقیت و Timeout را روی سخت‌افزار بررسی کنید.
+
+## Build 89 — Remount قابل‌نوشتن پس از Restart
+
+**Previous build:** 88 / Classroom release 136
+**Status:** Hardware passed with diagnostic package E; sound calibration remains untested
+**Commit:** `{{COMMIT_SHA}}`
+
+### Problem observed
+
+بستهٔ A چرخه را پس از Restart زنده نگه داشت، اما `CIRCUITPY` پس از بازگشت Windows همچنان Write-protected بود. بستهٔ D با Reset زمان‌محور نیز نه Startup/Mouse را اجرا کرد و نه Read-only را رفع کرد.
+
+### Root cause
+
+روی RP2040 روشن‌شده از USB پایدار، Restart میزبان الزاماً Pico را Reset نمی‌کند. CircuitPython ممکن است Mass Storage را هنگام بازگشت میزبان به‌صورت Read-only معرفی کند. Reset باید بعد از بازگشت واقعی Windows انجام شود؛ تایمر ثابت به‌تنهایی با زمان بوت میزبان هم‌تراز نیست.
+
+### Change
+
+- Controller پس از After منتظر قطع و اتصال مجدد CDC می‌ماند.
+- پنج ثانیه پس از CDC reconnect، Marker را با `RESET_DONE` علامت می‌زند و Pico را یک‌بار Reset می‌کند.
+- اگر CDC reconnect تشخیص داده نشود، Fallback پس از ۱۲۰ ثانیه Reset را انجام می‌دهد.
+- Boot بعدی Marker را بازیابی، از حلقهٔ Reset جلوگیری و مسیر استاندارد Startup را اجرا می‌کند.
+- نوت‌های پذیرفته‌شدهٔ تست E در خروجی استاندارد حفظ شدند: یک نت بم هنگام مسلح‌شدن Watcher، دو نت پیش از Reset، سه نت پس از بازیابی Marker و ملودی صعودی پس از تکمیل Startup.
+- فشار دستی Start در فاز انتظار، چرخهٔ Pending را لغو و یک Run تازه آغاز می‌کند.
+
+### Validation
+
+- بستهٔ E روی سخت‌افزار پاس شد: تمام نوت‌های مرحله‌ای، Startup و حرکت Mouse اجرا شدند و `TEST.txt` روی `CIRCUITPY` ساخته و حذف شد.
+- Regression مسیر `CDC DOWN → UP → stable 5s → one-shot reset → boot marker → Startup` پاس شد.
+- Fallback صدوبیست‌ثانیه‌ای، Manual override، USB stale، Deadline، Desktop skip و Marker reserved region پوشش داده شدند.
+- Manifest مدرن ۳۲/۳۲ صحیح و تست‌های FAT isolation، NVM calibration و بازخورد صوتی کالیبراسیون پاس شدند.
+- **کالیبراسیون صدای فیزیکی هنوز توسط کاربر تست نشده و Hardware pass آن ادعا نمی‌شود.**
+
+### Next test
+
+خروجی استاندارد **Current project Pico export** را با چرخهٔ کوتاه تست کنید و سپس کالیبراسیون صدای فیزیکی را جداگانه کامل کنید: ورود به Sound Calibration، انتخاب هر Profile، Sample/Save، خروج و اجرای یک Step صوتی واقعی. نتیجهٔ Sound calibration باید جداگانه ثبت شود.
+
+## Build 88 — حذف وابستگی Resume به USB DOWN
+
+**Previous build:** 87 / Classroom release 128
+**Status:** Hardware passed with diagnostic package A; promoted to standard export
+**Commit:** `{{COMMIT_SHA}}`
+
+### Problem observed
+
+در تست Build 128، کالیبراسیون و Tone جدید پاس شد؛ اما پس از Restart و بالا آمدن Windows، Startup خودکار اجرا نشد و فشار دستی Start چرخه را از نو آغاز کرد. Bundle 225 همان Runtime منتشرشدهٔ Build 87 را داشت و ۳۲/۳۲ Hash آن صحیح بود.
+
+### Root cause
+
+روی این سخت‌افزار Warm Restart برق USB و وضعیت Configured پیکو را قطع نمی‌کند. در نتیجه نه `supervisor.runtime.usb_connected` و نه Pro Micro الزاماً لبهٔ `DOWN` تولید نمی‌کنند. Build 87 لبه‌های سریع DOWN/UP را حفظ می‌کرد، اما همچنان اجرای Startup را مشروط به مشاهدهٔ DOWN کرده بود؛ بنابراین با USB دائماً `UP`، Controller برای همیشه در `wait-usb` می‌ماند.
+
+### Change
+
+- تکمیل موفق Route After و Marker مسلح NVM اکنون مجوز معتبر Resume است، حتی اگر USB هیچ DOWN گزارش نکند.
+- اگر Pro Micro روی `DOWN` قدیمی مانده باشد، Marker مسلح همراه `Pico UP` آن State منقضی را کنار می‌زند.
+- در حالت USB پایدار `UP`، Controller دو ثانیه پایداری را کنترل می‌کند و سپس Route Startup را آغاز می‌کند.
+- Route Startup همچنان Delay داخلی ۳۰–۶۰ ثانیه دارد؛ بنابراین آغاز Controller به معنی ارسال فوری Win+1 هنگام خاموش‌شدن Windows نیست.
+- Telemetry این مسیر را با `source=marker-no-down` از مسیر دارای لبهٔ واقعی USB متمایز می‌کند.
+- مسیر معمول DOWN/UP و بازیابی پس از Reset واقعی Pico بدون تغییر باقی مانده است.
+
+### Validation
+
+- Regression جدید سناریوی «After کامل، Marker مسلح، USB همیشه UP» را اجرا می‌کند و تأیید می‌کند Startup بدون Start دستی اجرا و Marker پاک می‌شود.
+- سناریوی DOWN/UP حین After، Boot با Marker، Deadline، پایان طبیعی Game و Desktop skip همچنان پاس می‌شوند.
+- Bundle 225 ارسالی مستقل بررسی شد: ۳۲/۳۲ Hash صحیح و محتوای Runtime با Build 87 یکسان بود.
+- تست سخت‌افزاری بستهٔ A پاس شد: چرخه پس از Restart بدون فشار مجدد Start زنده ماند. نسخه‌های تشخیصی B و C لازم نشدند.
+
+### Next test
+
+خروجی عادی **Current project Pico export** از این Build به بعد همان منطق پذیرفته‌شدهٔ بستهٔ A را در `restart_cycle.py` و `SHA256SUMS.txt` قرار می‌دهد. فایل‌های تشخیصی، حرکت موس ۲۰ثانیه‌ای و Tone آزمایشی وارد خروجی استاندارد نشده‌اند؛ Route واقعی Startup پروژه بدون تغییر صادر می‌شود. تست بعدی باید با خروجی استاندارد پروژه و بازهٔ واقعی ۱۱۰–۱۳۰ دقیقه انجام شود.
+
+## Build 87 — حفظ USB Transition و تأیید واضح Save
+
+**Previous build:** 86 / Classroom release 124
+**Status:** CI candidate; restart-resume and physical calibration retest required
+**Commit:** `{{COMMIT_SHA}}`
+
+### Problem observed
+
+در تست Build 124، Windows Restart شد اما پس از بازگشت، Route `startup_steps.txt` خودکار اجرا نشد و چرخه فقط با فشار دستی Start دوباره فعال شد. در کالیبراسیون Dashboard نیز پس از فشار زرد، صدای ذخیره به‌اندازهٔ کافی قابل‌تشخیص نبود.
+
+### Root cause
+
+USB می‌توانست در همان چند ثانیهٔ پایانی Route After از DOWN به UP برگردد. `route_tick()` در فاز After این تغییر را ثبت نمی‌کرد و `_perform_after()` نیز هنگام ورود به `wait-usb` متغیرهای `down_seen/up_since` را پاک می‌کرد؛ بنابراین Controller منتظر DOWN دیگری می‌ماند که دیگر رخ نمی‌داد. علاوه‌براین وضعیت `HOSTUSB|DOWN` در Pro Micro می‌توانست پس از بازگشت Windows stale بماند و سیگنال UP خود Pico را بپوشاند. Tone موفق قبلی فقط دو نت کوتاه ۲۷۰ms بود.
+
+### Change
+
+- USB DOWN/UP در طول Delayهای Route After اکنون Poll و ثبت می‌شود.
+- Evidence ثبت‌شده هنگام ورود به `wait-usb` حفظ می‌شود و در `after-complete` مقدار `down-seen` گزارش می‌شود.
+- اگر Pro Micro روی DOWN قدیمی بماند، USB خود Pico پس از مشاهدهٔ DOWN واقعی یا Boot با Marker معتبر می‌تواند State را به UP ارتقا دهد.
+- الگوی Save موفق به سه نت صعودی و واضح‌تر با مجموع حدود ۸۰۰ms تغییر کرد.
+- `CAL|save-ok` و `CAL|save-failed` همراه Stage، Profile ID و منبع NVM در Debug پایدار ثبت می‌شوند.
+- فشار کوتاه زرد نیز `calibration-start ... wait=5s` را ثبت می‌کند تا مشخص باشد Sample واقعاً آغاز شده است.
+
+### Validation
+
+- تست Regression سناریوی `DOWN → UP` حین After و اجرای Startup پس از دو ثانیه پاس شد.
+- تست Boot با Marker، Deadline، پایان طبیعی Game و Desktop skip حفظ شد.
+- Bundle 220 ارسالی ۳۲/۳۲ Hash صحیح و Dashboard برابر `13.3 ± 3.0 lux` داشت.
+- `boot.py` عمداً `readonly=True` نگه داشته شد: این تنظیم CircuitPython را Read-only و مالکیت نوشتن FAT را به Windows می‌دهد؛ برگرداندن آن Host را Read-only می‌کند.
+
+### Next test
+
+1. بازه را ۳ تا ۶ دقیقه نگه دارید و چرخه را Start کنید.
+2. پس از After باید `CYCLE|usb|state=DOWN|during=after` یا DOWN معمولی، سپس `state=UP` و `startup-in=2` دیده شود.
+3. پس از بازگشت Windows، بدون فشار Start باید Route Startup اجرا و بعد `startup-complete|next=login-or-dc|desktop=skip` ثبت شود.
+4. در Calibration Stage 3 زرد را کوتاه بزنید و پنج ثانیه صبر کنید؛ Success باید سه نت صعودی واضح بدهد. سپس آبی کوتاه باید Stage بعد و آبی بلند باید خروج را اعلام کند.
+
+## Build 86 — بازخورد کالیبراسیون، Deadline چرخه و پروفایل همراه
+
+**Previous build:** 85 / Classroom release 107
+**Status:** CI candidate; calibration and timed-cycle hardware retest required
+**Commit:** `{{COMMIT_SHA}}`
+
+### Problem observed
+
+در کالیبراسیون فیزیکی Dashboard، اگر Sample ناپایدار می‌شد فقط رخداد CDC ثبت می‌شد و کاربر هیچ صدای خطایی نمی‌شنید؛ فشار دوبارهٔ زرد هنگام Sampling نیز از نظر صوتی ساکت بود. هم‌زمان حذف زمان‌بندی‌های قدیمی، بازهٔ لازم چرخهٔ ۱۱۰ تا ۱۳۰ دقیقه را نیز از UI و Runtime حذف کرده بود. فایل `light-state-profiles.json` ارسالی هم Dashboard قدیمی `15.8 ± 1.0` را داشت و همیشه داخل ZIP برنامه نبود.
+
+### Root cause
+
+Wrapper صوتی فقط مسیر موفق `result=dict` را پوشش می‌داد و انتقال `sampling → None` را نادیده می‌گرفت. در معماری Build 84 همهٔ Headerهای چرخه، از جمله `RUNFOR`، با Resume/PostLaunch قدیمی یکجا Strip شدند. پروفایل‌های پیش‌فرض نیز فقط در کد بودند و فایل قابل‌ویرایش پروفایل به Output پروژه اضافه نشده بود.
+
+### Change
+
+- Sample ناپایدار و فشار زرد هنگام Busy اکنون Tone خطا و Telemetry پایدار تولید می‌کنند؛ Save موفق همچنان Tone صعودی قبلی را دارد.
+- کنترل بازهٔ چرخه به Play Options برگشت و پیش‌فرض آن ۱۱۰ تا ۱۳۰ دقیقه است.
+- فقط `RUNFOR|min,max` در `plan.txt` مدرن حفظ می‌شود؛ `AUTORESUME` و `POSTLAUNCH` قدیمی همچنان حذف می‌شوند.
+- Runtime در Start یک Deadline تصادفی از بازه انتخاب می‌کند؛ در انقضا Route را تمیز Abort می‌کند و پس از آزادشدن Parser، تب After را اجرا می‌کند.
+- پایان طبیعی Game نیز همچنان بلافاصله After را اجرا می‌کند.
+- فایل شش‌پروفایلی داخل همهٔ بسته‌های Classroom قرار می‌گیرد. Dashboard به مقدار سخت‌افزاری `13.3 ± 3.0 lux` به‌روزرسانی شد؛ سایر بازه‌ها حفظ شدند.
+
+### Validation
+
+- تست Deadline در کران ۱۱۰ دقیقه، پایان طبیعی Game، Marker، Startup و Desktop skip پاس شد.
+- تست Tone و Telemetry برای Sample ناپایدار، Overlap retry، CAL2 و NVM migration پاس شد.
+- Hashهای Bundle 220 مستقل بررسی شدند: هر ۳۲ فایل سالم بود؛ پروفایل قدیمی Dashboard در آن تأیید شد.
+- تست قرارداد UI/Exporter تأیید کرد که RUNFOR حفظ و Headerهای بازنشسته حذف می‌شوند.
+- قرارداد Windows برای موجودی Bundle به‌جای قفل‌شدن روی شمارش ثابت، حداقل ۳۶ فایل و حداقل ۳۲ Hash معتبر را کنترل می‌کند؛ قرارداد پروفایل نیز مقادیر پیش‌فرض سخت‌افزاری را مستقل از مسیر Output پروژهٔ تست می‌سنجد.
+- پروفایل سخت‌افزاری جدید فقط در فایل همراه `light-state-profiles.json` نگه‌داری می‌شود؛ Seedهای داخلی Phase-four به‌عنوان Fallback اضطراری و برای حفظ قرارداد Classifier دست‌نخورده باقی ماندند.
+
+### Next test
+
+1. Build تازه را Extract کنید و وجود `light-state-profiles.json` با Dashboard برابر `13.3 ± 3.0` را بررسی کنید.
+2. برای تست سریع، بازهٔ چرخه را موقتاً ۵ تا ۶ دقیقه تنظیم و Export کنید؛ `plan.txt` باید `RUNFOR|300,360` داشته باشد و پس از Deadline تب After اجرا شود.
+3. در کالیبراسیون Stage 3، زرد را بزنید: Save موفق باید Tone صعودی بدهد؛ Sample ناپایدار یا فشار زرد هنگام Busy باید Tone خطا بدهد؛ آبی بلند باید با Tone خروج از Calibration خارج شود.
+
+## Build 85 — ماندگاری کالیبراسیون فیزیکی بین Exportها
+
+**Previous build:** 84 / Classroom release 104
+**Status:** CI candidate; Dashboard hardware retest required
+**Commit:** `{{COMMIT_SHA}}`
+
+### Problem observed
+
+کالیبراسیون فیزیکی Dashboard با موفقیت Save می‌شد، اما پس از Export عادی پروژه، Runtime دوباره بازهٔ فایل (`14.8..16.8`) را استفاده می‌کرد و نور واقعی نزدیک `13.3` به `unknown` می‌رفت. مانیتور نیز فقط فایل JSON را نشان می‌داد و مشخص نبود منبع مؤثر File است یا NVM.
+
+### Root cause
+
+فرمت CAL1 Snapshot را به Revision دقیق Bundle متصل کرده بود. هر Export Revision را عوض می‌کرد و Loader، Snapshot سالم همان برد و همان Profile IDها را رد می‌کرد. همچنین مقدار اولیهٔ Debug برای State ناشناخته `None` بود و اولین `unknown` همیشه ثبت نمی‌شد.
+
+### Change
+
+- فرمت CAL2 کالیبراسیون را به برد و Profile IDها متصل نگه می‌دارد، نه Revision موقت Export.
+- Snapshotهای CAL1 قدیمی بدون نیاز به کالیبراسیون مجدد خوانده و در Save بعدی به CAL2 مهاجرت می‌شوند.
+- `CALSTATUS` اکنون `source=nvm|file` را گزارش می‌کند و Boot تعداد Profileهای بازیابی‌شده از NVM را ثبت می‌کند.
+- اولین State ناشناخته بعد از Boot، Start و Startup Resume حتماً Telemetry می‌دهد.
+- تغییر کاربر از Shuffle All به Random Subset مستقل از این Patch حفظ شده است.
+
+### Validation
+
+- تست استقلال Revision، مهاجرت CAL1، Checksum خراب و مرزهای رزروشدهٔ NVM پاس شد.
+- قراردادهای Restart Cycle، Export، FAT isolation، Guard Start و Sound/Mouse پاس شدند؛ Windows TestRunner نیز رشد کنترل‌شدهٔ Entry Point را در سقف ۵۵KB تأیید می‌کند.
+- Manifest همهٔ فایل‌های Runtime تغییرکرده را با SHA-256 جدید پوشش می‌دهد.
+
+### Next test
+
+1. Build را بدون پاک‌کردن NVM روی برد Export کنید؛ کالیبراسیون مجدد نباید لازم باشد.
+2. در Boot باید `CAL|storage=nvm|loaded=...` و در `CALSTATUS` مقدار `source=nvm` دیده شود.
+3. Start در Dashboard باید `STATE/character-dashboard` و Route مربوط را ثبت کند؛ اگر `source=file` بود، یک‌بار Stage 3 را Save کنید.
+
+## Build 84 — چرخهٔ Route-driven After/Startup و مالکیت امن CIRCUITPY
+
+**Previous build:** 83 / Classroom release 102
+**Status:** CI candidate; feature-branch packaging enabled; staged hardware test required
+**Commit:** `{{COMMIT_SHA}}`
+
+### Problem observed
+
+چرخهٔ Build 83 یک Deadline مستقل `RUNFOR` داشت و پس از پایان آن مستقیماً توالی داخلی Restart را اجرا می‌کرد. در نتیجه مدت Game از استپ‌های خود Game جدا شده بود، تب Restart پروژه عملاً منبع After نبود و پس از بالا آمدن Windows نیز Resume با تأخیرهای قدیمی اجرا می‌شد. همچنین `boot.py` مالکیت نوشتن FAT را به CircuitPython داده بود و Windows درایو را Read-only می‌دید.
+
+### Root cause
+
+چرخهٔ مدرن هنوز مدل قدیمیِ زمان‌محور را منبع حقیقت می‌دانست و پایان واقعی Route بازی را به مرحلهٔ After متصل نمی‌کرد. Resume نیز به‌جای یک Route مستقل Startup، از تأخیرها و Launch قدیمی استفاده می‌کرد. سیاست `boot.py` نیز برای ذخیرهٔ JSON کالیبراسیون، مالکیت FAT را از Windows گرفته بود.
+
+### Change
+
+- زمان اجرا فقط داخل `game_steps.txt` و استپ‌هایی مانند `LOOPTIME` تعریف می‌شود؛ هیچ تایمر سراسری پیش از Restart وجود ندارد.
+- با پایان موفق Game، `restart_steps.txt` با عنوان **After** فوراً اجرا می‌شود و Marker قبل از آن در NVM ثبت می‌گردد.
+- تب و فایل مستقل `startup_steps.txt` اضافه شد؛ پس از Restart و USB پایدار دقیقاً یک‌بار اجرا می‌شود.
+- پس از Startup، Stage روی Login تنظیم می‌شود؛ Desktop اجرا نمی‌شود و جریان از Login/DC ادامه می‌یابد.
+- Resume Essentials، RUNFOR، AUTORESUME و POSTLAUNCH از UI و خروجی مدرن حذف شدند؛ تنظیم‌های قدیمی فقط برای سازگاری فایل تنظیمات باقی مانده‌اند.
+- CIRCUITPY به Windows واگذار شد. کالیبراسیون نور در ناحیهٔ میانی NVM با Magic، طول، Checksum و اتصال به Revision پروژه ذخیره می‌شود؛ Debug در ۰..۱۵۳۵ و Marker در ۱۶ بایت انتهایی دست‌نخورده‌اند.
+- ساختار After برای روش‌های بعدی Restart آماده است؛ فعلاً محتوای تب After اجرا می‌شود و روش Alt+F4 با Hold تصادفی ۸۸–۱۸۸ms در صف توسعه باقی می‌ماند.
+
+### Validation
+
+- تست چرخه پایان Game → After → USB Down/Up → Startup → Login و Desktop skip پاس شد.
+- تست NVM شامل Checksum، Revision binding و عدم تداخل با Debug/Restart Marker پاس شد.
+- Manifest مدرن ۳۲ فایل دارد و Startup/NVM module در Hash verification قرار گرفته‌اند.
+- تست‌های UI، Export، FAT isolation، Guard transitions و Runtime sound/mouse contract پاس شدند.
+
+### Next test
+
+1. Game با `LOOPTIME` کوتاه تمام شود و لاگ بلافاصله `CYCLE|after-start` را نشان دهد.
+2. پس از Restart، لاگ `CYCLE|usb|state=UP|startup-in=2`، سپس `startup-start` و `startup-complete|next=login-or-dc|desktop=skip` را نشان دهد.
+3. در Windows، CIRCUITPY قابل‌نوشتن باشد و ذخیرهٔ کالیبراسیون رویداد `CAL|storage=nvm` ایجاد کند.
 
 ## Build 83 — Restart Cycle و Auto Resume واقعی در Runtime مدرن
 

@@ -44,3 +44,18 @@ checksum and `sound-step-calibration.bak`. These two user files are intentionall
 outside `SHA256SUMS.txt`, so rebuilding the application bundle does not overwrite
 the on-device calibration. A saved value is used only when its binding matches
 the exact exported `Wait For Sound` step.
+
+## Route-driven cycle
+
+- Root `RUNFOR|min,max` bounds the complete active cycle (default 110–130 minutes).
+- `restart_steps.txt` is the **After** route and starts when Game completes or the cycle deadline expires.
+- `startup_steps.txt` runs once after the Windows restart and stable USB reconnect.
+- Desktop is skipped after Startup; the optical sequence continues at Login/DC.
+- Legacy AUTORESUME, POSTLAUNCH and Resume Essentials scheduling is not used.
+- Physical light calibration is stored in checksummed board NVM and survives normal Classroom exports; legacy CAL1 snapshots are migrated automatically. Use `CALSTATUS` to confirm `source=nvm`.
+
+## Game-wide sound reactions
+
+One physical ADC listener serves two distinct policies. `whisper_steps.txt` is a global Game interrupt and resumes the exact interrupted iterator. `splash_steps.txt` is armed only by `WPROFILE` during a fishing cast: each cast samples a fresh timeout from its configured range (default 18–22 seconds); detection runs the Splash response and timeout runs no response, then both paths advance to the next cast without resetting the enclosing 10-minute or 110–130-minute deadlines.
+
+Large Game routes stay on Flash. The runner keeps only four-byte line offsets in RAM and reservoir-samples the requested Random Package items, so a package with hundreds of movement/delay choices is not expanded into heap-resident command and range lists.

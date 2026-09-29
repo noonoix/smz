@@ -26,6 +26,7 @@ PROFILE_IDS = (
 ROUTE_FILES = {
     "Desktop": "desktop_steps.txt",
     "Restart": "restart_steps.txt",
+    "Startup": "startup_steps.txt",
     "LoginOrDc": "login_or_dc_steps.txt",
     "CharacterDashboard": "character_dashboard_steps.txt",
     "EnteringGameLoading": "entering_game_loading_steps.txt",
@@ -43,6 +44,9 @@ REQUIRED_BUNDLE_FILES = (
     "guard_calibration_protocol.py",
     "error_policy.py",
     "combined_guard_runtime.py",
+    "plan_engine_login_core.py",
+    "plan_engine_login_mouse.py",
+    "plan_engine_login_type.py",
     "SHA256SUMS.txt",
 )
 HASHED_BUNDLE_FILES = tuple(

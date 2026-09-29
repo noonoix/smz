@@ -14,7 +14,7 @@ assert 'plan_engine_parallel' not in sys.modules, 'parallel scheduler imported b
 class Ctx:
     plan_api=3; screen_w=1920; screen_h=1080; speed_min=300; speed_max=2000; mouse_mode='relative'
     def __init__(self):
-        self.t=0.0; self.ev=[]; self.sound=False
+        self.t=0.0; self.ev=[]; self.sound=False; self.peak=140
     def now(self): return self.t
     def gate(self): return True
     def sleep_ms(self,ms): self.t+=ms/1000.0; self.ev.append(('sleep',ms)); return True
@@ -25,11 +25,15 @@ class Ctx:
     def ktext(self,a,z,s): self.ev.append(('text',round(self.t,3),s))
     def kcombo(self,v): self.ev.append(('combo',round(self.t,3),v))
     def key_combo(self,v,a,z): self.ev.append(('key',round(self.t,3),tuple(v)))
-    def sound_start(self,thr,minimum,timeout): self.sound=True; self.ev.append(('sound-start',round(self.t,3)))
+    def sound_start(self,thr,minimum,timeout): self.sound=True; self.ev.append(('sound-start',round(self.t,3),thr,minimum,timeout))
     def sound_poll(self):
         self.ev.append(('sound-poll',round(self.t,3)))
         return True if self.t>=0.055 else None
     def sound_cancel(self): self.sound=False; self.ev.append(('sound-cancel',round(self.t,3)))
+    def sound_peak(self): return self.peak
+    def sound_profile(self,profile_id,binding,threshold,minimum): return threshold,minimum
+    def read_plan_file(self,name): return getattr(self,'files',{}).get(name,'PLAN|2\n')
+    def beep(self,frequency,duration): self.ev.append(('beep',frequency,duration))
 
 plan='''PLAN|2
 PGROUP
@@ -59,6 +63,29 @@ assert all(e[1] <= chars[0][1] for e in moves),ctx.ev
 assert ('log','parallel wsnd heard - cancel siblings') in ctx.ev,ctx.ev
 assert any(e[0]=='sound-start' for e in ctx.ev),ctx.ev
 assert ('key',ctx.ev[-1][1],(13,)) in ctx.ev or any(e[0]=='key' and e[2]==(13,) for e in ctx.ev),ctx.ev
+
+# Two calibrated WSND branches share one ARM ADC listener. The scheduler
+# listens at the lowest threshold, then selects the highest threshold matched
+# by the reported peak instead of opening a second listener and crashing.
+dual='''PLAN|2
+PGROUP
+WSND|130,60,500
+BEEP|700,100
+PARITEM
+WSND|30,60,500
+BEEP|900,100
+ENDPAR'''
+high_ctx=Ctx()
+plan_engine.run_plan(plan_engine.parse_plan(dual),high_ctx)
+assert ('sound-start',0.0,130,60,500) in high_ctx.ev,high_ctx.ev
+assert ('sound-start',0.0,30,60,500) in high_ctx.ev,high_ctx.ev
+assert ('beep',700,100) in high_ctx.ev and ('beep',900,100) not in high_ctx.ev,high_ctx.ev
+assert ('log','parallel wsnd profile range=130..65535 priority=0 peak=140') in high_ctx.ev,high_ctx.ev
+
+low_ctx=Ctx(); low_ctx.peak=80
+plan_engine.run_plan(plan_engine.parse_plan(dual),low_ctx)
+assert ('beep',900,100) in low_ctx.ev and ('beep',700,100) not in low_ctx.ev,low_ctx.ev
+assert ('log','parallel wsnd profile range=30..65535 priority=0 peak=80') in low_ctx.ev,low_ctx.ev
 # Synchronous SCAL polls must not land between streamed mouse segments. The
 # hardware round trip is ~60 ms and produced visible periodic cursor stalls.
 move_times=[e[1] for e in moves]
@@ -131,4 +158,37 @@ plan_engine.run_plan(plan_engine.parse_plan(timeout_plan),timeout_ctx)
 assert not any(e[0]=='key' and e[2]==(70,) for e in timeout_ctx.ev),timeout_ctx.ev
 assert ('log','parallel wsnd timeout - cancel group') in timeout_ctx.ev,timeout_ctx.ev
 assert timeout_ctx.t < 1.0,timeout_ctx.t
-print('cooperative parallel runtime: 17 passed, 0 failed')
+
+
+# Build 92: the lightweight Game scheduler owns one physical listener for the
+# entire Game route. A matching profile runs its response route, honors
+# priority in an overlap, and resumes the exact Game iterator afterwards.
+import plan_engine_game as game_runner
+class WatchCtx(Ctx):
+    def __init__(self):
+        super().__init__(); self.peak=75
+        self.files={'whisper_steps.txt':'PLAN|2\nBEEP|700,90\n',
+                    'splash_steps.txt':'PLAN|2\nBEEP|900,90\n'}
+    def gate(self): return self.t < .26
+
+watch_commands=[
+    ('PLAN','2'),('PGROUP',''),
+    ('LOOP','0'),('KEY','combo=70'),('DELAY','20,20'),('ENDLOOP',''),
+    ('PARITEM',''),('LOOP','0'),
+    ('WSNDP','1,aaaaaaaaaaaa,20,60,1000,20,80,10,whisper_steps.txt,100'),
+    ('ENDLOOP',''),('PARITEM',''),('LOOP','0'),
+    ('WSNDP','2,bbbbbbbbbbbb,20,60,1000,70,200,5,splash_steps.txt,100'),
+    ('ENDLOOP',''),('ENDPAR','')]
+watch_ctx=WatchCtx()
+try:
+    game_runner.run_game(watch_commands,watch_ctx)
+except game_runner.GameAbort:
+    pass
+assert ('beep',700,90) in watch_ctx.ev and ('beep',900,90) not in watch_ctx.ev,watch_ctx.ev
+keys=[e for e in watch_ctx.ev if e[0]=='key' and e[2]==(70,)]
+assert len(keys)>=2,watch_ctx.ev
+beep_index=watch_ctx.ev.index(('beep',700,90))
+assert any(i<beep_index for i,e in enumerate(watch_ctx.ev) if e[0]=='key'),watch_ctx.ev
+assert any(i>beep_index for i,e in enumerate(watch_ctx.ev) if e[0]=='key'),watch_ctx.ev
+
+print('cooperative parallel runtime: shared listener + resumable response passed')

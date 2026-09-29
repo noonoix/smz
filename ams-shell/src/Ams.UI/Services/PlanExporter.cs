@@ -254,6 +254,8 @@ public static class PlanExporter
                 case "mouseClick":EmitMouseClick(n);return; case "mouseScroll":EmitMouseScroll(n);return;
                 case "keystroke":EmitKeystroke(n);return; case "keyDown":EmitKeyState(n,true);return; case "keyUp":EmitKeyState(n,false);return;
                 case "typeText":EmitTypeText(n);return; case "forLoop":EmitForLoop(n);return;
+                case "buzzer":EmitBuzzer(n);return;
+                case "splashListener":EmitSplashListener(n);return;
                 case "waitForSound":EmitWaitForSound(n);return; case "waitForLight":EmitWaitForLight(n);return;
                 case "label":EmitLabel(n);return; case "gotoLabel":EmitGoto(n);return; case "rawCommand":EmitRaw(n);return;
                 case "randomPackage":EmitRandomPackage(n);return; case "parallelGroup":EmitParallelGroup(n);return;
@@ -273,6 +275,29 @@ public static class PlanExporter
         {
             var (lo, hi) = Pair(PropEx.GetInt(n.Props, "minMs", 0), PropEx.GetInt(n.Props, "maxMs", 333));
             Emit(n, new[] { hi > lo ? "DELAY|" + lo + "," + hi : "DELAY|" + lo }, "DELAY");
+        }
+
+        private void EmitBuzzer(StepNode n)
+        {
+            IReadOnlyList<string> commands;
+            try { commands = StepDefinitions.BuildBuzzerCommands(n.Props); }
+            catch (FormatException ex) { Error(n, ex.Message); return; }
+            foreach (var command in commands)
+            {
+                if (command.StartsWith("BEEP|", StringComparison.Ordinal))
+                {
+                    Lines.Add(command);
+                    Count("BEEP");
+                }
+                else if (command.StartsWith("DLY|", StringComparison.Ordinal)
+                         && int.TryParse(command[4..], NumberStyles.Integer,
+                             CultureInfo.InvariantCulture, out var pause))
+                {
+                    Lines.Add("DELAY|" + pause + "," + pause);
+                    Count("DELAY");
+                }
+            }
+            EmitDelay(n);
         }
 
         /// <summary>The humanized-move layers; PLAN|2 forces EVERY key explicit (its built-in defaults
@@ -425,22 +450,37 @@ public static class PlanExporter
         private void EmitWaitForSound(StepNode n)
         {
             var p=n.Props;int t=PropEx.GetInt(p,"threshold",90),m=PropEx.GetInt(p,"minDurationMs",60),to=PropEx.GetInt(p,"timeoutMs",20000);
+            if(PropEx.GetString(p,"responseRoute","inline")=="splash")
+            {
+                int lo=PropEx.GetInt(p,"timeoutMinSec",18),hi=PropEx.GetInt(p,"timeoutMaxSec",22);
+                if(lo>hi)(lo,hi)=(hi,lo);
+                if(lo<1||hi>300){Error(n,"Splash timeout range must be between 1 and 300 seconds");return;}
+                Emit(n,new[]{"WPROFILE|splash,"+(lo*1000)+","+(hi*1000)},"WPROFILE");return;
+            }
             if(PropEx.GetBool(p,"armed")){int act=PropEx.GetString(p,"act","left")switch{"right"=>2,"middle"=>3,_=>1};var(r0,r1)=Pair(PropEx.GetInt(p,"reactMin",80),PropEx.GetInt(p,"reactMax",180));var(h0,h1)=Pair(PropEx.GetInt(p,"holdMin",30),PropEx.GetInt(p,"holdMax",90));Emit(n,new[]{"TRGSND|"+t+","+m+","+to+","+act+","+r0+","+r1+","+h0+","+h1},"TRGSND");return;}
             int id=PropEx.GetInt(p,"calibrationId",1);
             if(id is not (1 or 2)){Error(n,"sound calibration ID must be 1 or 2");return;}
             if(!_soundCalibrationIds.Add(id)){Error(n,"sound calibration ID "+id+" is already assigned to another enabled Wait For Sound step");return;}
-            Emit(n,new[]{"WSNDP|"+id+","+SoundBinding(n,id,t,m)+","+t+","+m+","+to},"WSNDP");
+            int peakMin=PropEx.GetInt(p,"peakMin",0),peakMax=PropEx.GetInt(p,"peakMax",511),priority=PropEx.GetInt(p,"soundPriority",0);
+            if(peakMin<0||peakMax<1||peakMax>511||peakMin>peakMax){Error(n,"sound Peak range must satisfy 0 <= Min <= Max <= 511");return;}
+            if(priority is < -100 or > 100){Error(n,"sound priority must be between -100 and 100");return;}
+            Emit(n,new[]{"WSNDP|"+id+","+SoundBinding(n,id,t,m)+","+t+","+m+","+to+","+peakMin+","+peakMax+","+priority},"WSNDP");
         }
+        private void EmitSplashListener(StepNode n)
+            => Emit(n,new[]{"WPROFILE|splash,18000,22000"},"WPROFILE");
         private (int lo,int hi,int stable,int timeout,int mode) LuxArgs(Dictionary<string,object?> p){int c=PropEx.GetInt(p,"luxCenter",1250),tol=Math.Max(1,PropEx.GetInt(p,"luxTolerance",50));return(Math.Max(0,c-tol),c+tol,Math.Max(0,(int)Math.Round(PropEx.GetDouble(p,"stableSec",2)*1000)),PropEx.GetInt(p,"timeoutMs",20000),PropEx.GetString(p,"sampleMode","hires")=="lowres"?1:0);}
         private void EmitLabel(StepNode n){var name=PropEx.GetString(n.Props,"label","label1").Trim();if(name.Length==0||name.Contains('=')||name.Contains('|')){Error(n,"bad label name '"+name+"'");return;}if(!_labels.Add(name)){Error(n,"duplicate label '"+name+"'");return;}Emit(n,new[]{"LABEL|"+name},"LABEL");}
         private void EmitGoto(StepNode n){var name=PropEx.GetString(n.Props,"label").Trim();if(name.Length==0){Error(n,"Go To Label with no label chosen");return;}Emit(n,new[]{"GOTO|"+name},"GOTO");}
         private void EmitRaw(StepNode n){var cmd=PropEx.GetString(n.Props,"cmd","PING").Trim();if(cmd.Length==0||cmd.Contains('\n')||cmd.Contains('\r')){Error(n,"raw command must be one non-empty line");return;}Emit(n,new[]{"RAW|"+cmd},"RAW");}
         private void EmitRandomPackage(StepNode n){var kids=n.Children.Where(c=>!c.IsDisabled&&!IsMarker(c)).ToList();if(kids.Count==0){Error(n,"random package has no enabled children");return;}if(kids.Any(c=>Conditional.Contains(c.Type)&&PropEx.GetBool(c.Props,"insertIfElse"))){Error(n,"an If/Else structure cannot live inside a Random Package");return;}var mode=PropEx.GetString(n.Props,"mode","shuffleAll");int mn=1,mx=kids.Count;string em="all";if(mode=="randomSubset"){em="pick";mn=Math.Max(0,PropEx.GetInt(n.Props,"minCount",1));mx=Math.Min(kids.Count,PropEx.GetInt(n.Props,"maxCount",10));if(mn>mx)(mn,mx)=(mx,mn);}else if(mode!="shuffleAll"){Error(n,"unknown random package mode '"+mode+"'");return;}Lines.Add("RPKG|"+em+","+mn+","+mx);Count("RPKG");for(int i=0;i<kids.Count;i++){if(i>0)Lines.Add("PKGITEM");Walk(new List<StepNode>{kids[i]});}Lines.Add("ENDPKG");EmitDelay(n);}
-        private static readonly HashSet<string> ParallelLeaf=new(){"randomMousePosition","mouseMove","mouseClick","mouseScroll","keystroke","keyDown","keyUp","typeText","delay","rawCommand","comment"};
+        private static readonly HashSet<string> ParallelLeaf=new(){"randomMousePosition","mouseMove","mouseClick","mouseScroll","keystroke","keyDown","keyUp","typeText","delay","rawCommand","comment","buzzer"};
         private bool ParallelCompatible(StepNode n)
         {
-            if(n.Type=="waitForSound")
+            if(n.Type is "waitForSound" or "splashListener")
+            {
+                if (n.Type == "splashListener") return true;
                 return !PropEx.GetBool(n.Props,"armed")&&!PropEx.GetBool(n.Props,"insertIfElse");
+            }
             if(n.Type is "forLoop" or "randomPackage")
                 return n.Children.Where(c=>!c.IsDisabled&&!IsMarker(c)).All(ParallelCompatible);
             return ParallelLeaf.Contains(n.Type);
@@ -747,7 +787,7 @@ public static class PlanExporter
         var stack = new List<(string Kind, bool ElseSeen, int Line)>();
         var labels = new HashSet<string>(StringComparer.Ordinal);
         var gotos = new List<string>();
-        var known = new HashSet<string>{"PLAN","SCREEN","SPEED","DELAY","LOOP","LOOPTIME","ENDLOOP","RMOUSE","MOVETO","CLICK","TYPE","WLIGHT","WSND","WSNDP","TRGSND","IFSND","IFLUX","ELSE","ENDIF","KEY","KDOWN","KUP","WHEEL","LABEL","GOTO","RAW","HANDPATH","RPKG","PKGITEM","ENDPKG","PGROUP","PARITEM","ENDPAR","INCLUDE","BEEP"};
+        var known = new HashSet<string>{"PLAN","SCREEN","SPEED","DELAY","LOOP","LOOPTIME","ENDLOOP","RMOUSE","MOVETO","CLICK","TYPE","WLIGHT","WSND","WSNDP","WPROFILE","TRGSND","IFSND","IFLUX","ELSE","ENDIF","KEY","KDOWN","KUP","WHEEL","LABEL","GOTO","RAW","HANDPATH","RPKG","PKGITEM","ENDPKG","PGROUP","PARITEM","ENDPAR","INCLUDE","BEEP"};
         bool first = true;
         string previousOp = "";
         var lines = text.Split('\n');
@@ -814,10 +854,20 @@ public static class PlanExporter
             {
                 if (fields.Length != 2) Bad("WSNDP needs one comma payload");
                 var values = fields[1].Split(',');
-                if (values.Length != 5 || values[0] is not ("1" or "2")
+                if (values.Length is not (5 or 8 or 10) || values[0] is not ("1" or "2")
                     || values[1].Length != 12 || values[1].Any(ch => !Uri.IsHexDigit(ch))
-                    || !IsInt(values[2]) || !IsInt(values[3]) || !IsInt(values[4]))
+                    || !values.Skip(2).Take(values.Length == 5 ? 3 : 6).All(IsInt)
+                    || (values.Length == 10 && (values[8].Length == 0
+                        || values[8].Any(ch => ch < 32 || ch > 126 || "/\\:|%".Contains(ch))
+                        || !IsInt(values[9]))))
                     Bad("bad WSNDP profile contract");
+            }
+            if (op == "WPROFILE")
+            {
+                if (fields.Length != 2) Bad("WPROFILE needs one comma payload");
+                var values = fields[1].Split(',');
+                if (values.Length != 3 || values[0] != "splash" || !IsInt(values[1]) || !IsInt(values[2]))
+                    Bad("bad WPROFILE contract");
             }
             if (op == "INCLUDE" && (!HasKv(fields, "file", out var file) || file.Length == 0 ||
                 file.Any(ch => ch < 32 || ch > 126 || "/\\:|%".Contains(ch)))) Bad("unsafe INCLUDE filename");

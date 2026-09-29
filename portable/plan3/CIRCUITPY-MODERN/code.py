@@ -106,7 +106,9 @@ runtime.build_calibration_get = build_calibration_get
 runtime.parse_calibration_set = parse_calibration_set
 
 for _name in ("pico-calibration.json", "README-FLASH.md", "plan_engine_parse.py",
+              "guard_button_cues.py",
               "plan_engine_game.py", "plan_engine_game_core.py",
+              "plan_engine_game_inventory.py",
               "plan_engine_game_runtime.py", "plan_engine_game_events.py",
               "plan_engine_game_response.py", "plan_engine_game_parallel.py",
               "plan_engine_game_sound.py", "plan_engine_game_actions.py",
@@ -273,6 +275,13 @@ def _memory_safe_init(self):
     self.blue_stop_consumed = False
     self.blue_start_consumed = False
     self.blue_start_pending = False
+    # Physical button feedback must never play a blocking melody from inside
+    # a deep Game/Parallel/Mouse stack.  The cue sequencer is advanced by the
+    # cooperative control tick and therefore adds no nested sleep/call chain.
+    self.guard_cue_name = None
+    self.guard_cue_index = 0
+    self.guard_cue_next = 0
+    self.guard_cue_tone = None
     self.last_cal_error = None
     # Force the first sensor sample to emit STATE/unknown + lux instead of
     # silently comparing None == None.
@@ -292,10 +301,6 @@ def _memory_safe_init(self):
                   runtime.CALIBRATION_NVM_PROFILE_COUNT)
 
 _CAL_NOTES = (262, 294, 330, 349, 392, 440)
-_GUARD_START_PATTERN = ((784, 160), (988, 160), (1175, 200), (0, 80), (1175, 280))
-_GUARD_STOP_PATTERN = ((392, 180), (330, 160), (262, 260), (0, 60), (196, 260))
-_GUARD_PAUSE_PATTERN = ((523, 180), (0, 100), (523, 180), (0, 100), (523, 340))
-_GUARD_RESUME_PATTERN = ((659, 150), (784, 150), (988, 150), (784, 150), (988, 300))
 _CAL_ENTER_PATTERN = ((523, 100), (659, 120), (784, 180))
 _CAL_EXIT_PATTERN = ((784, 100), (659, 120), (523, 220))
 _CAL_SAVE_ERROR_PATTERN = ((220, 140), (0, 80), (220, 260))
@@ -359,23 +364,35 @@ def _cal_complete_melody(self):
         runtime.time.sleep(.035)
 
 def _guard_pattern(self, pattern):
+    # Calibration owns GP6 exclusively. Cancel a still-playing asynchronous
+    # Guard cue before entering any blocking calibration melody.
+    _guard_cue_module().cancel(self)
     for frequency, duration_ms in pattern:
         if frequency <= 0:
             runtime.time.sleep(duration_ms / 1000)
         else:
             self._cal_beep(frequency, duration_ms)
 
+def _guard_cue_module():
+    return sys.modules.get("guard_button_cues") or __import__("guard_button_cues")
+
+def _queue_guard_cue(self, name):
+    _guard_cue_module().queue(self, name)
+
+def _guard_cue_tick(self):
+    _guard_cue_module().tick(self)
+
 def _guard_start_tone(self):
-    self._guard_pattern(_GUARD_START_PATTERN)
+    self._queue_guard_cue("start")
 
 def _guard_stop_tone(self):
-    self._guard_pattern(_GUARD_STOP_PATTERN)
+    self._queue_guard_cue("stop")
 
 def _guard_pause_tone(self):
-    self._guard_pattern(_GUARD_PAUSE_PATTERN)
+    self._queue_guard_cue("pause")
 
 def _guard_resume_tone(self):
-    self._guard_pattern(_GUARD_RESUME_PATTERN)
+    self._queue_guard_cue("resume")
 
 def _calibration_enter_tone(self):
     self._guard_pattern(_CAL_ENTER_PATTERN)
@@ -411,6 +428,7 @@ def _silent_shutdown(self):
         self.arm.abort()
     except Exception:
         pass
+    _guard_cue_module().cancel(self)
 
 def _immediate_audible_start(self):
     # Acknowledge Start on the physical press, not on release. Route execution
@@ -698,6 +716,7 @@ def _cycle_controls_tick(self):
     # A newly stable optical state aborts the old route without stopping the
     # overall run; the outer loop consumes Guard.last_decision next.
     self.buttons()
+    self.guard_cue_tick()
     self.cycle.route_tick()
     profile = getattr(self, "route_active_profile", None)
     now = runtime.time.monotonic()
@@ -1070,6 +1089,7 @@ def _audible_loop(self):
     while True:
         self.host_poll()
         self.buttons()
+        self.guard_cue_tick()
         self.arm.pump()
         self.cycle.tick()
         if (self.controls.running and not self.calibrating and not self.sound_calibrating and
@@ -1292,6 +1312,8 @@ runtime.Combined.cal_save_success_tone = _cal_save_success_tone
 runtime.Combined.cal_save_error_tone = _cal_save_error_tone
 runtime.Combined.cal_complete_melody = _cal_complete_melody
 runtime.Combined._guard_pattern = _guard_pattern
+runtime.Combined._queue_guard_cue = _queue_guard_cue
+runtime.Combined.guard_cue_tick = _guard_cue_tick
 runtime.Combined.guard_start_tone = _guard_start_tone
 runtime.Combined.guard_stop_tone = _guard_stop_tone
 runtime.Combined.guard_pause_tone = _guard_pause_tone

@@ -210,6 +210,12 @@ class PicoLink:
             if line.startswith("EVT|"):
                 self.events.append(line)   # رویداد مسلح، جایگزین پاسخ نمی‌شود
                 continue
+            # Native firmware reports an unsupported command with the complete
+            # request after "unknown=".  Its third pipe field is therefore
+            # "unknown=<head>", not <head>; return it to the caller instead of
+            # mistaking it for a stale error and waiting until disconnect.
+            if line == "ERR|COMMAND|unknown=" + cmd:
+                return line
             parts = line.split("|")
             if len(parts) >= 2 and parts[0] == "OK" and parts[1] and parts[1] != want:
                 continue                 # v0.9.60e - stale OK of an older command
@@ -464,6 +470,16 @@ def main():
                     if send is None:
                         raise BoardError("bridge: _send unavailable")
                     _drain_stale(link)         # v0.9.60e - clean pipe before streaming
+                    # UART can be healthy while the Pro Micro USB HID side is
+                    # disconnected or suspended. Never turn that into a false
+                    # OK|PATH: Windows cannot receive mouse reports then.
+                    presence = link.command("PING", timeout=2.0)
+                    if ("role=brain" in presence and "arm-usb=" in presence
+                            and "arm-usb=3" not in presence):
+                        arm_usb_state = presence.split("arm-usb=", 1)[1].split("|", 1)[0]
+                        raise BoardError(
+                            "Pro Micro USB HID is not active (arm-usb="
+                            + arm_usb_state + "; expected 3/UP)")
                     # v0.9.60f - hardware-cadence thinning (the choppy-mouse fix). The arm
                     # executes ~50 moves/sec (~20 ms each, measured 2026-09-08), but dense
                     # WindMouse trails arrive at ~4 ms/point: oversubscribed 4-5x, the

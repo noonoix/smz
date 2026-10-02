@@ -1,3 +1,4 @@
+
 using System.Collections.Generic;
 
 namespace Ams.UI.Models;
@@ -19,6 +20,9 @@ public static class StepTextsFa
         ["title"] = "عنوان مجموعه (خالی = نام پیش‌فرض)",
         // ── shared human-mouse fields (mouseMove + findImage approach + randomMousePosition) ──
         ["human"] = "حرکت انسانی (مسیر WindMouse + مکث‌ها سمت اپ — خاموش = پرش فوری برد)",
+        ["motionIntent"] = "نوع حرکت (targetRegion = رفتن به ناحیه هدف · microTwitch = ریزحرکت · mediumTwitch = حرکت متوسط)",
+        ["twitchMinPx"] = "شعاع نسبی حرکت — حداقل (px)",
+        ["twitchMaxPx"] = "شعاع نسبی حرکت — حداکثر (px)",
         ["pauseBeforeMin"] = "مکث پیش از حرکت — حداقل (ms)",
         ["pauseBeforeMax"] = "مکث پیش از حرکت — حداکثر (ms)",
         ["pauseAfterMin"] = "مکث پس از رسیدن — حداقل (ms)",
@@ -74,7 +78,7 @@ public static class StepTextsFa
         ["maxCount"] = "حداکثر استپ در هر دور (randomSubset)",
 
         // ── sound (waitForSound) ──
-        ["threshold"] = "آستانه شروع شنود (واحد سنسور — از Calibrate استفاده کن)",
+        ["threshold"] = "آستانه شروع شنود (از Calibrate استفاده کن؛ ۰ = کالیبراسیون فیزیکی ذخیره‌شده)",
         ["peakMin"] = "کف بازهٔ Peak (۰ = آستانهٔ کالیبره‌شده)",
         ["peakMax"] = "سقف بازهٔ Peak",
         ["soundPriority"] = "اولویت در بازه‌های هم‌پوشان (عدد بزرگ‌تر برنده است)",
@@ -89,6 +93,12 @@ public static class StepTextsFa
         ["act"] = "دکمه‌ی کلیک مسلح",
         ["reactMin"] = "واکنش — حداقل (ms)",
         ["reactMax"] = "واکنش — حداکثر (ms)",
+        ["armCuePreset"] = "بازخورد بازر بعد از Catch موفق (خاموش یا الگوی انتخابی)",
+        ["armCueVolume"] = "بلندی صدای بازخورد Catch (۱ تا ۱۰۰٪)",
+        ["armCueEnvelope"] = "لبهٔ صدای بازخورد Catch",
+        ["armCueTempo"] = "سرعت اجرای نوت بازخورد Catch (۲۵ تا ۴۰۰٪؛ ۱۰۰ = عادی)",
+        ["armCuePattern"] = "نوت سفارشی Catch — فرکانس:مدت،مکث؛ ...",
+        ["tempo"] = "سرعت اجرای نوت‌ها (۲۵ تا ۴۰۰٪؛ ۱۰۰ = عادی)",
 
         // ── light (waitForLight — BH1750 / GY-302 / GY-30 on the Pico) — v0.9.39 ──
         ["luxCenter"] = "مرکز روشنایی (لوکس) — همان صفحه‌ی واقعی را نشان بده و Calibrate را بزن",
@@ -155,7 +165,9 @@ public static class StepTextsFa
 
         // "path" — openFile / playAudio / runExe / playScript
         ["openFile:path"] = "مسیر فایل",
-        ["buzzer:preset"] = "نوع صدای بوق (short / double / warning / success / custom)",
+        ["buzzer:preset"] = "نوع صدا (کوتاه، دوتایی، اعلان، هشدار، موفقیت، خطا، صعودی، نزولی یا سفارشی)",
+        ["buzzer:volume"] = "شدت صدا (۱ تا ۱۰۰ درصد)",
+        ["buzzer:envelope"] = "لبه صدا (sharp = فوری · smooth = نرم · fade-in / fade-out)",
         ["buzzer:pattern"] = "الگوی سفارشی — فرکانس:مدت,مکث;... نمونه: 900:150,80;1200:250",
         ["playAudio:path"] = "فایل صوتی (wav / mp3)",
         ["playAudio:loop"] = "تکرار تا توقف دستی",

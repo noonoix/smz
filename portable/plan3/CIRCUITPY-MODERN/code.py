@@ -299,6 +299,7 @@ _GUARD_RESUME_PATTERN = ((659, 150), (784, 150), (988, 150), (784, 150), (988, 3
 _CAL_ENTER_PATTERN = ((523, 100), (659, 120), (784, 180))
 _CAL_EXIT_PATTERN = ((784, 100), (659, 120), (523, 220))
 _CAL_SAVE_ERROR_PATTERN = ((220, 140), (0, 80), (220, 260))
+_CAL_OVERLAP_ADJUSTED_PATTERN = ((740,80),(0,35),(988,80),(0,35),(740,80),(0,45),(1319,240))
 def _sound_module():
     gc.collect(); return sys.modules.get("sound_step_calibration") or __import__("sound_step_calibration")
 
@@ -349,6 +350,8 @@ def _cal_save_success_tone(self):
     self._cal_beep(1175, 220)
     runtime.time.sleep(.06)
     self._cal_beep(1568, 360)
+
+def _cal_overlap_adjusted_tone(self): self._guard_pattern(_CAL_OVERLAP_ADJUSTED_PATTERN)
 
 def _cal_save_error_tone(self):
     self._guard_pattern(_CAL_SAVE_ERROR_PATTERN)
@@ -566,7 +569,9 @@ def _audible_save_cal(self):
     if had_pending_result and self.saved:
         _debug_event(self, "CAL", "save-ok stage=%d id=%s source=nvm" %
             (self.stage + 1, runtime.PROFILES[self.stage]), persist=True)
-        if not profile_was_saved and len(self.saved_ids) == len(runtime.PROFILES):
+        if self.last_cal_fit:
+            self.cal_overlap_adjusted_tone()
+        elif not profile_was_saved and len(self.saved_ids) == len(runtime.PROFILES):
             self.cal_complete_melody()
         else:
             self.cal_save_success_tone()
@@ -1122,20 +1127,6 @@ def _audible_loop(self):
         runtime.time.sleep(.01)
 
 
-# Live Classroom Studio commands that execute entirely on the Pico must not
-# depend on an attached Pro Micro arm. SCREEN/SETRES is metadata; BEEP drives
-# the passive piezo on GP6 directly.
-def _live_host_beep(self, frequency, duration_ms):
-    tone = None
-    try:
-        tone = runtime.pwmio.PWMOut(runtime.board.GP6, duty_cycle=32768,
-            frequency=int(frequency), variable_frequency=True)
-        runtime.time.sleep(duration_ms / 1000)
-    finally:
-        if tone is not None:
-            try: tone.duty_cycle = 0; tone.deinit()
-            except Exception: pass
-
 _CURSOR_PENDING = None
 _CURSOR_LAST_APPLIED = None
 _CURSOR_SYNC_READY = False
@@ -1263,12 +1254,16 @@ def _live_host_poll(self):
                 reply = "OK|SETRES"
             elif line.startswith("BEEP|"):
                 fields = line.split("|", 1)[1].split(",")
-                if len(fields) != 2:
-                    raise ValueError("BEEP needs frequency,duration")
+                if len(fields) < 2 or len(fields) > 4:
+                    raise ValueError("BEEP needs frequency,duration[,volume,envelope]")
                 frequency, duration_ms = int(fields[0]), int(fields[1])
-                if not 30 <= frequency <= 20000 or not 0 <= duration_ms <= 60000:
+                volume = int(fields[2]) if len(fields) > 2 else 100
+                envelope = fields[3] if len(fields) > 3 else "sharp"
+                if (not 30 <= frequency <= 20000 or not 0 <= duration_ms <= 60000
+                        or not 1 <= volume <= 100
+                        or envelope not in ("sharp", "smooth", "fade-in", "fade-out")):
                     raise ValueError("BEEP range")
-                self._live_host_beep(frequency, duration_ms)
+                self.live_beep(frequency, duration_ms, volume, envelope)
                 reply = "OK|BEEP"
             else:
                 reply = "ERR|UNKNOWN|" + head
@@ -1282,13 +1277,13 @@ runtime.Combined.debug_event = _debug_event
 runtime.Combined.debug_get = _debug_get
 runtime.Combined.debug_clear = _debug_clear
 runtime.Combined.debug_emit = _debug_emit
-runtime.Combined._live_host_beep = _live_host_beep
 runtime.Combined.host_poll = _live_host_poll
 runtime.Combined._cal_beep = _cal_beep
 runtime.Combined.cal_position_tone = _cal_position_tone
 runtime.Combined.cal_record_start_tone = _cal_record_start_tone
 runtime.Combined.cal_stage_complete_tone = _cal_stage_complete_tone
 runtime.Combined.cal_save_success_tone = _cal_save_success_tone
+runtime.Combined.cal_overlap_adjusted_tone = _cal_overlap_adjusted_tone
 runtime.Combined.cal_save_error_tone = _cal_save_error_tone
 runtime.Combined.cal_complete_melody = _cal_complete_melody
 runtime.Combined._guard_pattern = _guard_pattern

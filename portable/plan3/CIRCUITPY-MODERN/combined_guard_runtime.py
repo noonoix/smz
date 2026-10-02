@@ -1,4 +1,3 @@
-# Combined Phase 7 board-owned runtime. It validates the exported bundle before routing.
 import gc
 import json
 import math
@@ -532,12 +531,6 @@ class PlanContext:
         state = self._sound_watch
         if state is None or state.get("scope") != profile_id:
             return None
-        # Do not service the global callback from inside the scoped waiter.
-        # The Game scheduler reaches sleep_ms() on every cooperative deadline,
-        # and sleep_ms() is the single owner of callback polling.  Calling the
-        # callback here as well nests Game -> WPROFILE -> callback -> Game while
-        # several RPKG/LOOP generators are already live.  CircuitPython's small
-        # pystack can exhaust even though the heap still has tens of KB free.
         return state.get("scope_result")
     def end_profile_wait(self):
         state = self._sound_watch
@@ -591,6 +584,20 @@ class Combined:
         self.bundle = load_guard_bundle("/"); self.guard = LightStateGuard.from_bundle("/"); self.routes = {}
         self.blue = Button(board.GP4); self.yellow = Button(board.GP3); self.usb = usb_cdc.data or usb_cdc.console; self.host = bytearray()
         self.calibrating = False; self.stage = 0; self.samples = []; self.sample_started = 0; self.sample_next = 0; self.result = None; self.saved = False; self.saved_ids = set(); self.last_cal_error = None
+    def live_beep(self, frequency, duration_ms, volume=100, envelope="sharp"):
+        tone = pwmio.PWMOut(board.GP6, duty_cycle=0, frequency=int(frequency), variable_frequency=True)
+        try:
+            total=duration_ms/1000; edge=min(.08,total/3); target=int(32768*volume/100); started=time.monotonic()
+            while True:
+                elapsed=time.monotonic()-started
+                if elapsed>=total: break
+                level=1.0
+                if envelope in ("smooth","fade-in") and elapsed<edge: level=elapsed/edge
+                if envelope in ("smooth","fade-out") and elapsed>total-edge: level=min(level,(total-elapsed)/edge)
+                tone.duty_cycle=max(0,min(32768,int(target*level)))
+                time.sleep(.004 if envelope!="sharp" else total)
+        finally:
+            tone.duty_cycle=0; tone.deinit()
     def key(self, vk):
         # Convert Windows virtual-key values directly to USB HID usages.
         # Keep this branch-only mapping allocation-free on CircuitPython's small heap.
@@ -664,9 +671,11 @@ class Combined:
         lines = ["%s  %s" % (_file_sha256("/", name), name) for name in sorted(HASHED_BUNDLE_FILES)]
         return "\n".join(lines) + "\n"
     def _publish_calibration(self, revision, profile_id, profile):
+        self.last_cal_fit = False
         profiles, events, blocked = calibration_nvm.fit_profiles(
             self.bundle.get("calibration", {}).get("profiles", {}),
             profile_id, profile)
+        self.last_cal_fit = profiles is not None and bool(events)
         for event in events: self.emit(event)
         if profiles is None:
             raise CalibrationOverlapError(blocked, 0)

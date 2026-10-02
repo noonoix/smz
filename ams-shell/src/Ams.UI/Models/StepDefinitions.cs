@@ -1,3 +1,4 @@
+
 using System;
 using System.Globalization;
 using System.Text.RegularExpressions;
@@ -128,6 +129,10 @@ public static class StepDefinitions
             Label = "Random Mouse Position", ColorResourceKey = "StepMouseBrush", DefaultDelay = 55,
             Fields = new FieldDef[]
             {
+                new("motionIntent", "Motion intent", FieldKind.Combo, "targetRegion",
+                    new[] { "targetRegion", "microTwitch", "mediumTwitch" }),
+                new("twitchMinPx", "Relative twitch radius MIN (px)", FieldKind.Int, "2"),
+                new("twitchMaxPx", "Relative twitch radius MAX (px)", FieldKind.Int, "12"),
                 new("x", "Region X", FieldKind.Int, "1301"),
                 new("y", "Region Y", FieldKind.Int, "0"),
                 new("w", "Region width", FieldKind.Int, "378"),
@@ -152,10 +157,15 @@ public static class StepDefinitions
                 new("moveTimeMin", "Movement duration — min (ms) · 0/0 = use global speed range (Options)", FieldKind.Int, "0"),
                 new("moveTimeMax", "Movement duration — max (ms) · fresh random target per move; floor ≈ 1ms per micro-step", FieldKind.Int, "0"),
             },
-            Summarize = s => $"Random Mouse Position in region [{PropEx.GetInt(s.Props, "x")},{PropEx.GetInt(s.Props, "y")} {PropEx.GetInt(s.Props, "w", 100)}x{PropEx.GetInt(s.Props, "h", 100)}]" +
+            Summarize = s => PropEx.GetString(s.Props, "motionIntent", "targetRegion") switch
+            {
+                "microTwitch" => $"Human Micro Twitch · {PropEx.GetInt(s.Props, "twitchMinPx", 2)}–{PropEx.GetInt(s.Props, "twitchMaxPx", 12)} px",
+                "mediumTwitch" => $"Human Medium Twitch · {PropEx.GetInt(s.Props, "twitchMinPx", 20)}–{PropEx.GetInt(s.Props, "twitchMaxPx", 80)} px",
+                _ => $"Random Mouse Position in region [{PropEx.GetInt(s.Props, "x")},{PropEx.GetInt(s.Props, "y")} {PropEx.GetInt(s.Props, "w", 100)}x{PropEx.GetInt(s.Props, "h", 100)}]" +
                 (PropEx.GetInt(s.Props, "idlePauseMax", 3000) > 0
                     ? $" · break {PropEx.GetInt(s.Props, "idlePauseMin", 800)}–{PropEx.GetInt(s.Props, "idlePauseMax", 3000)}ms / {PropEx.GetInt(s.Props, "idleEveryMin", 5)}–{PropEx.GetInt(s.Props, "idleEveryMax", 12)} moves"
                     : ""),
+            },
             // v0.9.0 — WindMouse path + full pause manager: see HumanMouse / RunEngine / ScriptGenerator
         },
         ["keystroke"] = new StepDefinition
@@ -317,7 +327,7 @@ public static class StepDefinitions
             {
                 new("title", "Group title (blank = default name)", FieldKind.Text, ""),
                 new("calibrationId", "Portable sound-step calibration ID", FieldKind.Combo, "1", new[] { "1", "2" }),
-                new("threshold", "Threshold (sensor units — use Calibrate, field default 90)", FieldKind.Int, "90"),
+                new("threshold", "Threshold (sensor units — use Calibrate; 0 = saved physical profile)", FieldKind.Int, "90"),
                 new("peakMin", "Peak range minimum (0 = calibrated threshold)", FieldKind.Int, "0"),
                 new("peakMax", "Peak range maximum", FieldKind.Int, "511"),
                 new("soundPriority", "Priority when ranges overlap", FieldKind.Int, "0"),
@@ -328,6 +338,17 @@ public static class StepDefinitions
                 new("timeoutMinSec", "Splash timeout minimum (seconds)", FieldKind.Int, "18"),
                 new("timeoutMaxSec", "Splash timeout maximum (seconds)", FieldKind.Int, "22"),
                 new("onTimeout", "On timeout", FieldKind.Combo, "global", new[] { "global", "stopWithAlarm", "stopQuiet", "continue" }),
+                new("armCuePreset", "Buzzer feedback after a successful Catch", FieldKind.Combo, "off", new[]
+                    { "off", "short", "double", "notification", "warning", "success", "error", "rising", "falling", "custom" }),
+                new("armCueVolume", "Catch feedback volume (1–100%)", FieldKind.Int, "60",
+                    HideWhenKey: "armCuePreset", HideWhenValue: "off"),
+                new("armCueEnvelope", "Catch feedback tone edge", FieldKind.Combo, "smooth",
+                    new[] { "sharp", "smooth", "fade-in", "fade-out" },
+                    HideWhenKey: "armCuePreset", HideWhenValue: "off"),
+                new("armCueTempo", "Catch feedback note speed (25–400%; 100 = normal)", FieldKind.Int, "100",
+                    HideWhenKey: "armCuePreset", HideWhenValue: "off"),
+                new("armCuePattern", "Custom Catch feedback — freq:duration,pause;...", FieldKind.Text,
+                    "880:100,40;1175:150", HideWhenKey: "armCuePreset", HideUnlessValue: "custom"),
                 new("insertIfElse", "Insert If-Else (children = Then — heard · Else — not heard; §3.3.1)", FieldKind.Check, "false"),   // v0.9.31
                 new("armed", "Armed reaction: board clicks by itself on detection (TRGSND)", FieldKind.Check, "false", HideWhenKey: "insertIfElse", HideWhenValue: "true"),
                 new("act", "Armed click button", FieldKind.Combo, "left", new[] { "left", "right", "middle" }, HideWhenKey: "insertIfElse", HideWhenValue: "true"),
@@ -482,11 +503,16 @@ public static class StepDefinitions
             Label = "Buzzer Beep", ColorResourceKey = "StepFlowBrush", DefaultDelay = 0,
             Fields = new FieldDef[]
             {
-                new("preset", "Tone pattern", FieldKind.Combo, "short", new[] { "short", "double", "warning", "success", "custom" }),
+                new("preset", "Tone pattern", FieldKind.Combo, "short", new[]
+                    { "short", "double", "notification", "warning", "success", "error", "rising", "falling", "custom" }),
+                new("volume", "Volume (1–100%)", FieldKind.Int, "80"),
+                new("envelope", "Tone edge", FieldKind.Combo, "smooth",
+                    new[] { "sharp", "smooth", "fade-in", "fade-out" }),
+                new("tempo", "Note speed (25–400%; 100 = normal)", FieldKind.Int, "100"),
                 new("pattern", "Custom sequence — freq:duration,pause;... (example 900:150,80;1200:250)", FieldKind.Text,
                     "900:150,80;1200:250", HideWhenKey: "preset", HideUnlessValue: "custom"),
             },
-            Summarize = s => "Buzzer · " + (PropEx.GetString(s.Props, "preset", "short") == "custom"
+            Summarize = s => $"Buzzer {PropEx.GetInt(s.Props, "volume", 100)}% · " + (PropEx.GetString(s.Props, "preset", "short") == "custom"
                 ? PropEx.GetString(s.Props, "pattern", "900:150")
                 : PropEx.GetString(s.Props, "preset", "short")),
             Commands = s => BuildBuzzerCommands(s.Props),
@@ -565,11 +591,22 @@ public static class StepDefinitions
         {
             "short" => "1000:180",
             "double" => "1000:140,100;1000:140",
+            "notification" => "880:110,45;1175:170",
             "warning" => "700:180,90;700:180,90;700:300",
             "success" => "900:120,70;1300:220",
+            "error" => "440:180,70;330:240",
+            "rising" => "523:90,35;659:90,35;784:160",
+            "falling" => "784:90,35;659:90,35;523:160",
             "custom" => PropEx.GetString(p, "pattern", "900:150"),
             _ => throw new FormatException("unknown buzzer preset '" + preset + "'"),
         };
+        int volume = PropEx.GetInt(p, "volume", 100);
+        if (volume is < 1 or > 100) throw new FormatException("buzzer volume must be 1..100 percent");
+        int tempo = PropEx.GetInt(p, "tempo", 100);
+        if (tempo is < 25 or > 400) throw new FormatException("buzzer note speed must be 25..400 percent");
+        string envelope = PropEx.GetString(p, "envelope", "sharp").Trim().ToLowerInvariant();
+        if (envelope is not ("sharp" or "smooth" or "fade-in" or "fade-out"))
+            throw new FormatException("unknown buzzer envelope '" + envelope + "'");
         var commands = new List<string>();
         foreach (var raw in pattern.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
@@ -582,11 +619,68 @@ public static class StepDefinitions
             int pause = timing.Length == 2 ? int.Parse(timing[1]) : 0;
             if (freq is < 30 or > 20000) throw new FormatException("buzzer frequency must be 30..20000 Hz");
             if (duration <= 0 || pause < 0) throw new FormatException("buzzer duration must be positive and pause non-negative");
-            commands.Add($"BEEP|{freq},{duration}");
+            duration = Math.Max(1, (int)Math.Round(duration * 100.0 / tempo, MidpointRounding.AwayFromZero));
+            if (pause > 0)
+                pause = Math.Max(1, (int)Math.Round(pause * 100.0 / tempo, MidpointRounding.AwayFromZero));
+            commands.Add(volume == 100 && envelope == "sharp"
+                ? $"BEEP|{freq},{duration}"
+                : $"BEEP|{freq},{duration},{volume},{envelope}");
             if (pause > 0) commands.Add($"DLY|{pause}");
         }
         if (commands.Count == 0) throw new FormatException("buzzer pattern is empty");
         return commands;
+    }
+
+    /// <summary>
+    /// Packs a validated BEEP/DLY list into one board-owned sequence.  The
+    /// board schedules every note locally, removing USB round-trip jitter
+    /// between notes during preview.
+    /// </summary>
+    public static (string Command, int TotalDurationMs) BuildBuzzerSequenceCommand(
+        IReadOnlyList<string> commands)
+    {
+        var notes = new List<(int Hz, int Duration, int Gap)>();
+        var volume = 100;
+        var envelope = "sharp";
+        foreach (var command in commands)
+        {
+            if (command.StartsWith("DLY|", StringComparison.Ordinal))
+            {
+                if (notes.Count == 0 || !int.TryParse(command[4..], out var gap) || gap < 0)
+                    throw new FormatException("invalid buzzer sequence gap");
+                var last = notes[^1];
+                notes[^1] = (last.Hz, last.Duration, gap);
+                continue;
+            }
+            if (!command.StartsWith("BEEP|", StringComparison.Ordinal))
+                throw new FormatException("invalid buzzer sequence command");
+            var parts = command[5..].Split(',', StringSplitOptions.TrimEntries);
+            if (parts.Length is < 2 or > 4
+                || !int.TryParse(parts[0], out var hz)
+                || !int.TryParse(parts[1], out var duration))
+                throw new FormatException("invalid buzzer sequence tone");
+            if (parts.Length >= 3 && !int.TryParse(parts[2], out volume))
+                throw new FormatException("invalid buzzer sequence volume");
+            if (parts.Length == 4) envelope = parts[3];
+            notes.Add((hz, duration, 0));
+        }
+        if (notes.Count is < 1 or > 8) throw new FormatException("buzzer sequence needs 1..8 notes");
+        var body = string.Join(";", notes.Select(x => $"{x.Hz},{x.Duration},{x.Gap}"));
+        return ($"BEEPSEQ|{volume},{envelope}|{body}", notes.Sum(x => x.Duration + x.Gap));
+    }
+
+    public static IReadOnlyList<string> BuildArmBuzzerCommands(IReadOnlyDictionary<string, object?> p)
+    {
+        string preset = PropEx.GetString(p, "armCuePreset", "off");
+        if (preset == "off") return Array.Empty<string>();
+        return BuildBuzzerCommands(new Dictionary<string, object?>
+        {
+            ["preset"] = preset,
+            ["volume"] = PropEx.GetInt(p, "armCueVolume", 60),
+            ["envelope"] = PropEx.GetString(p, "armCueEnvelope", "smooth"),
+            ["tempo"] = PropEx.GetInt(p, "armCueTempo", 100),
+            ["pattern"] = PropEx.GetString(p, "armCuePattern", "880:100,40;1175:150"),
+        });
     }
 
     public static StepDefinition Get(string type) => Defs[type];

@@ -40,6 +40,10 @@ class TestRunner
         Assert(compactLux.Status == LightTelemetryStatus.Ok && compactLux.Lux == 60.0
                && compactLux.Sequence is null && compactLux.Mode is null,
             "Light telemetry accepts compact Pico OK|LUX response");
+        var nativeLux = LightTelemetryParser.Parse("OK|LUX|lux=51.7|sensor=ok|age=40");
+        Assert(nativeLux.Status == LightTelemetryStatus.Ok && nativeLux.Lux == 51.7
+               && nativeLux.Sequence is null && nativeLux.Mode is null,
+            "Light telemetry accepts Native Pico response with sample age");
         var fullLux = LightTelemetryParser.Parse("OK|LUX|seq=7|lux=41.7|mode=hires|sensor=ok");
         Assert(fullLux.Status == LightTelemetryStatus.Ok && fullLux.Sequence == 7
                && fullLux.Mode == "hires" && fullLux.Lux == 41.7,
@@ -1148,7 +1152,9 @@ class TestRunner
             Props = new Dictionary<string, object?> { ["x"] = 100, ["y"] = 100, ["w"] = 500, ["h"] = 400 },
         };
         new RunEngine(fbS, _ => { }, 1920, 1080).RunAsync(new[] { rndStep2 }, CancellationToken.None).Wait();
-        Assert(fbS.PathCalls == 1 && fbS.LastPath is { Count: > 10 } && !fbS.Sent.Any(c => c.StartsWith("MMOVE|")),
+        // The sampled destination and speed are intentionally random. Shorter valid
+        // paths bottom out at eight points; assert density without a flaky distance assumption.
+        Assert(fbS.PathCalls == 1 && fbS.LastPath is { Count: >= 8 } && !fbS.Sent.Any(c => c.StartsWith("MMOVE|")),
             $"randomMousePosition streams one dense path (calls={fbS.PathCalls}, pts={fbS.LastPath?.Count})");
         var lastPt = fbS.LastPath![^1];
         Assert(lastPt.X >= 100 && lastPt.X < 600 && lastPt.Y >= 100 && lastPt.Y < 500,
@@ -1902,8 +1908,8 @@ class TestRunner
         Console.WriteLine("--- Step 32: v0.9.32 sound calibrate fallback ---");
 
         var v32vm = V27ReadSrc(Path.Combine("ViewModels", "MainViewModel.cs"));
-        Assert(v32vm.Contains("SCAL|2000"),
-            "v0.9.32: primary SCAL path kept");
+        Assert(v32vm.Contains("SCAL|1000") && !v32vm.Contains("SCAL|2000"),
+            "Build 120: primary SCAL path stays within the ARM 1000 ms protocol limit");
         Assert(v32vm.Contains("calibrate probe: WSND"),
             "v0.9.32: WSND binary-search fallback exists");
         Assert(v32vm.Contains("calibrate (WSND fallback): silence floor"),
@@ -2544,6 +2550,12 @@ class TestRunner
             "v0.9.44: a plain firmware-1.6 board lights only the Pro Micro arm LED");
         Assert(MainViewModel.ParseBoardPresence("OK|PONG|pico-light 0.9.44|role=brain|arm=missing") == (true, false),
             "v0.9.44: a brain without an arm lights only the Pico LED");
+        Assert(MainViewModel.ParseBoardPresence("OK|PONG|combined-pico-guard-executor|native=abvm|arm-ready=1|arm-ver=2.8.2-S4|role=brain") == (true, true),
+            "native ABVM identity lights both Pico and ready Pro Micro indicators");
+        Assert(MainViewModel.ParseBoardPresence("OK|PONG|combined-pico-guard-executor|native=abvm|arm-ready=1|arm-usb=3|arm-ver=2.8.2-S4|role=brain") == (true, true),
+            "native ABVM lights Pro Micro only when its USB HID host is UP");
+        Assert(MainViewModel.ParseBoardPresence("OK|PONG|combined-pico-guard-executor|native=abvm|arm-ready=1|arm-usb=1|arm-ver=2.8.2-S4|role=brain") == (true, false),
+            "native ABVM does not show false green when Pro Micro USB HID is down");
         Assert(v44mw.Contains("PicoPresent") && v44mw.Contains("ArmPresent")
                && v44vm.Contains("ParseBoardPresence") && v44vm.Contains("SendAsync(\"PING\")"),
             "v0.9.44: the status bar has Pico / Pro Micro indicators fed by the post-connect PING");
@@ -3370,6 +3382,47 @@ class TestRunner
                    && mwc55.Contains("ToolTipService.SetIsEnabled(_openRailHost, true)"),
                 "v0.9.55: the hover hint drops below the icon and switches off while its submenu is open");
 
+            Assert(mwx55.Contains("x:Name=\"StepsWorkspace\"")
+                   && mwx55.Contains("SizeChanged=\"StepsWorkspace_SizeChanged\"")
+                   && mwx55.Contains("x:Name=\"PlayOptionsScroll\"")
+                   && mwx55.Contains("ScrollViewer.VerticalScrollBarVisibility=\"Auto\"")
+                   && mwx55.Contains("<ColumnDefinition Width=\"Auto\" />")
+                   && mwc55.Contains("e.NewSize.Height * 0.45")
+                   && mwc55.Contains("PlayOptionsPanel.MaxHeight = responsiveHeight"),
+                "responsive shell: Play Options is bounded, step panes scroll, and run controls stay reserved");
+
+            var lightProfilesUi = V27ReadSrc(Path.Combine("ViewModels", "MainViewModel.LightProfiles.cs"));
+            var mainVmUi = V27ReadSrc(Path.Combine("ViewModels", "MainViewModel.cs"));
+            var cueCatalog = V27ReadSrc(Path.Combine("Models", "CalibrationCueCatalog.cs"));
+            var cueEditor = V27ReadSrc(Path.Combine("Views", "CalibrationCueEditorDialog.cs"));
+            Assert(lightProfilesUi.Contains("StepDefinitions.BuildBuzzerCommands(values)")
+                   && cueCatalog.Contains("id <= 100")
+                   && cueCatalog.Contains("Legacy defaults")
+                   && cueEditor.Contains("حداکثر ۸ نوت")
+                   && cueEditor.Contains("Minimum = 0.25, Maximum = 4.0")
+                   && cueEditor.Contains("سرعت پخش")
+                   && lightProfilesUi.Contains("BuzzerSystemCues")
+                   && lightProfilesUi.Contains("SaveBuzzerSystemCues")
+                   && mainVmUi.Contains("BuildBuzzerSequenceCommand(commands)")
+                   && mainVmUi.Contains("OK|BEEPSEQ"),
+                "calibration cue editor preserves legacy sounds, exposes 100 presets/custom notes, and previews one board-local sequence");
+            var nativeBuzzerExport = V27ReadSrc(Path.Combine("Services", "NativeUf2Exporter.cs"));
+            var systemCueStore = V27ReadSrc(Path.Combine("Services", "BuzzerSystemCueStore.cs"));
+            Assert(nativeBuzzerExport.Contains("[\"buzzerCues\"] = buzzerCues")
+                   && systemCueStore.Contains("normalized.Count != 23")
+                   && cueCatalog.Contains("دکمه فیزیکی شروع")
+                   && cueCatalog.Contains("آژیر آمبولانسی"),
+                "all formerly hard-coded physical, runtime, calibration and watchdog cues are editable and exported");
+
+            var tabsVm = V27ReadSrc(Path.Combine("ViewModels", "MainViewModel.PipelineTabs.cs"));
+            Assert(tabsVm.Contains("_collapsedPathsByTab")
+                   && tabsVm.Contains("RestoreCollapsedPathsOrApplyDefault")
+                   && tabsVm.Contains("IsAccordionContainer(node)"),
+                "accordion scopes start closed and retain per-tab session state");
+            Assert(mwx55.Contains("Padding=\"12,4,12,7\" MinHeight=\"42\"")
+                   && mwx55.Contains("Padding=\"0,0,0,3\" MinHeight=\"30\""),
+                "status footer reserves vertical space for its horizontal scrollbar");
+
             // settings hosted inside the main window
             var od55 = V27ReadSrc(Path.Combine("Views", "OptionsDialog.xaml.cs"));
             var odx55 = V27ReadSrc(Path.Combine("Views", "OptionsDialog.xaml"));
@@ -3543,6 +3596,20 @@ class TestRunner
             "custom buzzer: new action exists and legacy playAudio remains registered");
         Assert(StepDefinitions.BuildBuzzerCommands(buzCustom).SequenceEqual(new[] { "BEEP|900,150", "DLY|80", "BEEP|1200,250" }),
             "custom buzzer: custom sequence compiles to BEEP/DLY commands");
+        var buzStyled = new Dictionary<string, object?>
+        {
+            ["preset"] = "notification", ["volume"] = 42, ["envelope"] = "smooth",
+        };
+        Assert(StepDefinitions.BuildBuzzerCommands(buzStyled).SequenceEqual(
+                new[] { "BEEP|880,110,42,smooth", "DLY|45", "BEEP|1175,170,42,smooth" })
+               && buzDef.Fields.Any(f => f.Key == "volume")
+               && buzDef.Fields.Any(f => f.Key == "envelope"),
+            "custom buzzer: presets expose volume and smooth envelope on every tone");
+        var buzSequence = StepDefinitions.BuildBuzzerSequenceCommand(
+            StepDefinitions.BuildBuzzerCommands(buzStyled));
+        Assert(buzSequence.Command == "BEEPSEQ|42,smooth|880,110,45;1175,170,0"
+               && buzSequence.TotalDurationMs == 325,
+            "custom buzzer: preview packs all notes into one jitter-free board command");
         bool badBuzzer = false;
         try { StepDefinitions.BuildBuzzerCommands(new Dictionary<string, object?> { ["preset"]="custom", ["pattern"]="25000:10" }); }
         catch (FormatException) { badBuzzer = true; }
@@ -3552,6 +3619,12 @@ class TestRunner
         var buzFw = V27ReadSrc(Path.Combine("Services", "PicoFirmwareExporter.cs"));
         Assert(buzFw.Contains("PWMOut(board.GP6") && !buzFw.Contains("PWMOut(board.GP5") && !buzFw.Contains("board.D9"),
             "custom buzzer: passive PWM is Pico GP6 only");
+        var buzDialog = V27ReadSrc(Path.Combine("Views", "StepDialog.xaml.cs"));
+        var buzVm = V27ReadSrc(Path.Combine("ViewModels", "MainViewModel.cs"));
+        Assert(buzDialog.Contains("شنیدن صدای انتخاب‌شده روی بازر")
+               && buzVm.Contains("PreviewBuzzerAsync")
+               && buzFw.Contains("fade-in") && buzFw.Contains("fade-out"),
+            "custom buzzer: editor previews the selected styled tone on the connected Pico");
 
         // (c) meta guard: every version PIN in this file matches the current release.
         // Pin lines are the assertions that check the csproj Version tag, the app banner or

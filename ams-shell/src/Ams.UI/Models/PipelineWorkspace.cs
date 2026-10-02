@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Text.Json.Serialization;
 using Ams.UI.Services;
 
 namespace Ams.UI.Models;
@@ -17,6 +18,8 @@ public enum PipelineKind
     Targeted,
     Whisper,
     Splash,
+    WhisperRepeat,
+    Finish,
     // Resume is intentionally not a UI tab for now; keep the enum name only as a
     // source-compatibility alias for the old exporter.
 
@@ -73,7 +76,9 @@ public sealed class PipelineWorkspace
     // resumable_steps.txt is still emitted as an empty firmware compatibility file
     // alongside the current desktop/restart/DC route files. PipelineKind.Main is the
     // value-compatible name for Desktop in those documents.
-    public const int FormatVersion = 6;
+    public const int FormatVersion = 11;
+    public HumanMouseProfile HumanMouseProfile { get; set; } = new();
+    public DisplayProfile DisplayProfile { get; set; } = new();
     public ObservableCollection<PipelineTabDocument> Tabs { get; } = new()
     {
         new() { Kind = PipelineKind.Desktop, Title = "Desktop", FileName = "desktop_steps.txt" },
@@ -85,7 +90,9 @@ public sealed class PipelineWorkspace
         new() { Kind = PipelineKind.EnteringGameLoading, Title = "Entering Game / Loading", FileName = "entering_game_loading_steps.txt" },
         new() { Kind = PipelineKind.Game, Title = "Game", FileName = "game_steps.txt" },
         new() { Kind = PipelineKind.Targeted, Title = "Targeted", FileName = "targeted_steps.txt" },
-        new() { Kind = PipelineKind.Whisper, Title = "Whisper", FileName = "whisper_steps.txt" },
+        new() { Kind = PipelineKind.Whisper, Title = "Whisper New", FileName = "whisper_steps.txt" },
+        new() { Kind = PipelineKind.WhisperRepeat, Title = "Whisper Repeat", FileName = "whisper_repeat_steps.txt" },
+        new() { Kind = PipelineKind.Finish, Title = "پایان / Finish", FileName = "finish_steps.txt" },
         // Compatibility storage only; hidden from PipelineTabs. New catch
         // actions are children of the explicit Game Wait For Sound step.
         new() { Kind = PipelineKind.Splash, Title = "Splash (legacy)", FileName = "splash_steps.txt" },
@@ -99,6 +106,9 @@ public sealed class PipelineWorkspace
         new() { Id = 2, Name = "Splash", Enabled = false, PeakMin = 0, PeakMax = 511,
             Priority = 5, MinDurationMs = 60, ListenWindowMs = 1000, CooldownMs = 900,
             ResponseTab = PipelineKind.Splash },
+        new() { Id = 3, Name = "Whisper Repeat", Enabled = false, PeakMin = 0, PeakMax = 511,
+            Priority = 9, MinDurationMs = 60, ListenWindowMs = 1000, CooldownMs = 1800,
+            ResponseTab = PipelineKind.WhisperRepeat },
     };
 
     public PipelineTabDocument this[PipelineKind kind] => Tabs.Single(x => x.Kind == kind);
@@ -141,4 +151,49 @@ public sealed class PipelineWorkspace
         workspace.EnsureDcDefaults();
         return workspace;
     }
+}
+
+public sealed class HumanMouseProfile
+{
+    public int Version { get; set; } = 2;
+    public int DurationMs { get; set; }
+    public string EncodedSample { get; set; } = "";
+    public string CapturedAtUtc { get; set; } = "";
+    /// <summary>
+    /// Runs a separate, low-duty-cycle humanized mouse actor after a durable
+    /// non-Game route completes. It never competes with route actions,
+    /// Whisper, calibration, pause, or restart-critical work.
+    /// </summary>
+    public bool AmbientOutsideGameEnabled { get; set; }
+    /// <summary>
+    /// Bit zero represents Native Guard profile 1 (Desktop), through bit four
+    /// for profile 5 (Game). The safe default covers durable profiles 1..5;
+    /// Game continues to use its authored route while it is running.
+    /// </summary>
+    public int AmbientEnvironmentMask { get; set; } = 0x1f;
+
+    [JsonIgnore]
+    public bool IsValid => Version is 1 or 2 && DurationMs >= 30_000
+        && HandMovementSample.TryDecode(EncodedSample, out var sample)
+        && sample.DurationMs >= 30_000 && sample.Segments.Count >= 20
+        && AmbientEnvironmentMask is >= 0 and <= 0xff;
+}
+
+/// <summary>
+/// Hostless screen geometry used by Native Random Mouse.  Preset is kept for
+/// the authoring UI; Width/Height are the authoritative values embedded in
+/// ABVM so Custom works without installing Classroom Studio on the target PC.
+/// </summary>
+public sealed class DisplayProfile
+{
+    public string Preset { get; set; } = "1920x1080";
+    public int Width { get; set; } = 1920;
+    public int Height { get; set; } = 1080;
+    public bool SoftBoundaryEnabled { get; set; } = true;
+    public int SoftMarginPercent { get; set; } = 3;
+
+    [JsonIgnore]
+    public bool IsValid => Width is >= 640 and <= 7680
+        && Height is >= 480 and <= 4320
+        && SoftMarginPercent is >= 1 and <= 20;
 }

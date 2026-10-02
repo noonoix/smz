@@ -230,7 +230,6 @@ public partial class MainViewModel : ObservableObject
         var d = System.Windows.Application.Current?.Dispatcher;
 
         if (d is not null && !d.CheckAccess()) d.Invoke(() => LogLines.Add(line));
-
         else LogLines.Add(line);
 
     }
@@ -321,7 +320,12 @@ public partial class MainViewModel : ObservableObject
 
         bool pico = s.Contains("pico", StringComparison.OrdinalIgnoreCase) || s.Contains("role=brain", StringComparison.OrdinalIgnoreCase);
 
-        bool arm = s.Contains("arm=promicro", StringComparison.OrdinalIgnoreCase) || s.Contains("arm=ok", StringComparison.OrdinalIgnoreCase) || !pico;
+        bool armUsbReady = !s.Contains("arm-usb=", StringComparison.OrdinalIgnoreCase)
+            || s.Contains("arm-usb=3", StringComparison.OrdinalIgnoreCase);
+        bool arm = s.Contains("arm=promicro", StringComparison.OrdinalIgnoreCase)
+            || s.Contains("arm=ok", StringComparison.OrdinalIgnoreCase)
+            || (s.Contains("arm-ready=1", StringComparison.OrdinalIgnoreCase) && armUsbReady)
+            || !pico;
 
         return (pico, arm);
 
@@ -2197,7 +2201,7 @@ public partial class MainViewModel : ObservableObject
 
     /// <summary>
 
-    /// Calibrate button for waitForSound (§16.6.5): samples the sensor on A0 for 2s
+    /// Calibrate button for waitForSound (§16.6.5): samples the sensor on A0 for 1s
 
     /// in silence (SCAL) and suggests floor_max × 1.5 — the rule of §16.1/§17.7.
 
@@ -2230,7 +2234,7 @@ public partial class MainViewModel : ObservableObject
 
         {
 
-            var reply = await _bridge.SendAsync("SCAL|2000", 6.0);   // 2s silence window
+            var reply = await _bridge.SendAsync("SCAL|1000", 4.0);   // ARM protocol maximum is 1000 ms
 
             var m = Regex.Match(reply, @"max=(\d+)");
 
@@ -2451,7 +2455,13 @@ public partial class MainViewModel : ObservableObject
         // Build 72 — cursor origin sync runs four times per second. Successful ACKs are
         // transport housekeeping, not operator diagnostics; keep errors and all other lines.
         if (line.Contains("OK|CURSOR", StringComparison.Ordinal)) return;
-        Log("bridge: " + line);
+        // PythonBoardBridge raises LineReceived on the serial-reader thread before it parses
+        // and completes the pending reply. Never synchronously wait for WPF from this callback:
+        // a modal tool awaiting that reply would otherwise create a reader/UI deadlock.
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+            dispatcher.BeginInvoke((Action)(() => Log("bridge: " + line)));
+        else Log("bridge: " + line);
     }
 
     // Build 71 — transport state is authoritative. A sidecar/COM failure must not leave
@@ -3658,6 +3668,7 @@ public partial class MainViewModel : ObservableObject
         Func<Task<(int x, int y, int w, int h)?>>? pickRegion = null;
         Func<Task<(int x, int y)?>>? pickPoint = null;
         Func<Task<string?>>? sampleMouse = null;
+        Func<IReadOnlyDictionary<string, object?>, Task<string>>? previewBuzzer = null;
 
         if (type == "waitForSound") { calibrate = CalibrateSoundThreshold; calibrateKey = "threshold"; }
         if (type == "waitForLight") { calibrate = CalibrateLightRange; calibrateKey = "luxCenter"; }   // v0.9.39 — BH1750 range centre
@@ -3665,10 +3676,12 @@ public partial class MainViewModel : ObservableObject
         if (type is "randomMousePosition" or "findImage") pickRegion = PickRegionOnScreen;
         if (type == "mouseMove") pickPoint = PickPointOnScreen;
         if (type is "mouseMove" or "randomMousePosition") sampleMouse = SampleHandMovementAsync;
+        if (type == "buzzer") previewBuzzer = PreviewBuzzerAsync;
+        if (type == "waitForSound") previewBuzzer = PreviewArmBuzzerAsync;
 
 
 
-        var dlg = new StepDialog(title, fields, current, calibrate, calibrateKey, pickRegion, type, sampleMouse, pickPoint)
+        var dlg = new StepDialog(title, fields, current, calibrate, calibrateKey, pickRegion, type, sampleMouse, pickPoint, previewBuzzer)
 
         {
 
@@ -3678,6 +3691,33 @@ public partial class MainViewModel : ObservableObject
 
         return dlg.ShowDialog() == true ? dlg.Values : null;
 
+    }
+
+    private async Task<string> PreviewBuzzerAsync(IReadOnlyDictionary<string, object?> values)
+        => await PreviewBuzzerCommandsAsync(StepDefinitions.BuildBuzzerCommands(values));
+
+    private async Task<string> PreviewArmBuzzerAsync(IReadOnlyDictionary<string, object?> values)
+    {
+        var commands = StepDefinitions.BuildArmBuzzerCommands(values);
+        if (commands.Count == 0)
+            throw new InvalidOperationException("ابتدا صدای مسلح‌شدن را از حالت off خارج کنید.");
+        return await PreviewBuzzerCommandsAsync(commands);
+    }
+
+    private async Task<string> PreviewBuzzerCommandsAsync(IReadOnlyList<string> commands)
+    {
+        if (Connection != ConnectionState.Connected || _bridge is null
+            || _bridge.State != BridgeState.Connected)
+            throw new InvalidOperationException("ابتدا برد را Connect کنید.");
+
+        var sequence = StepDefinitions.BuildBuzzerSequenceCommand(commands);
+        string reply = await _bridge.SendAsync(sequence.Command,
+            Math.Max(3.0, sequence.TotalDurationMs / 1000.0 + 2.0));
+        if (!reply.StartsWith("OK|BEEPSEQ", StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                $"برد پیش‌شنیدن را نپذیرفت: {reply} (فرمان: {sequence.Command})");
+        Log("buzzer preview played");
+        return "پخش شد ✓";
     }
 
 

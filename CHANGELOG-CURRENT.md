@@ -1,3 +1,355 @@
+## ABVM native R30 — Classroom Light Watch accepts Native sample age
+
+- Classroom's strict light-telemetry parser now accepts the Native Pico reply
+  `OK|LUX|lux=...|sensor=ok|age=...`.
+- The optional age remains validated as a nonnegative 32-bit millisecond value;
+  malformed or unknown compact fields are still rejected.
+- Added coverage in both the Windows TestRunner and typed light-telemetry suite
+  for the exact hardware response observed during Light Watch.
+
+## ABVM native R29 — single-stage light save and adaptive overlap fit
+
+- Each five-second Native light sample is now saved immediately; calibrating
+  the other five stages or pressing Yellow a second time is no longer required.
+- Ported the approved adaptive overlap policy: profile centers remain fixed,
+  the new candidate shrinks first, then only the conflicting neighbour, with a
+  0.3-lux integer-safe gap and a 0.5-lux minimum half-width.
+- Candidate and adjusted neighbours are committed in one dual-sector,
+  CRC-verified transaction while unrelated light, sound, and cycle values are
+  preserved.
+- `CAL|mode=saved` now reports whether fitting occurred and how many neighbours
+  changed. Irreconcilably close centers return `centers-too-close` without
+  changing flash or active Guard ranges.
+
+## ABVM native R28 — expressive Buzzer step and live preview
+
+- Expanded Buzzer presets with notification, error, rising, and falling sounds.
+- Added per-step volume from 1–100% and four edge modes: sharp, smooth,
+  fade-in, and fade-out.
+- Added a preview button in the Buzzer editor. It plays the currently edited
+  pattern on the connected GP6 buzzer without saving or running the route.
+- Extended both Native ABVM and portable `BEEP` while preserving the legacy
+  two-field `BEEP|frequency,duration` command and old ABVM images.
+- Native envelopes are nonblocking and update PWM duty every 4 ms.
+
+## ABVM native R27 — generation-safe cycle boundary
+
+At natural cycle expiry, the physical keyboard and mouse release reports still
+run, but completion tokens belonging to the aborted Game VM generation are now
+discarded before the After route starts. This removes the observed
+`ERR|HID|complete|lane=0` boundary warning and prevents any stale actor
+completion from being applied to After or Startup.
+
+## ABVM native R26 — approved persistent After/Startup cycle
+
+### Source contract
+
+Ported the hardware-approved `A-marker-usb-fused-v2` cycle to Native ABVM
+without changing the authored After or Startup pipelines.
+
+### Behavior
+
+- Native UF2 export embeds the configured wall-clock Restart range, a five-cycle
+  safety limit, the After/Restart route, the Startup route, and the two-second
+  USB-stability contract.
+- A manual Guard start clears stale restart authority and chooses one cycle
+  deadline. Pause does not extend it.
+- Natural expiry releases HID/watch actors, writes a program-bound persistent
+  marker, and executes the existing humanized After route.
+- Pro Micro `HOSTUSB DOWN/SUSPEND/UP` events are consumed on the private UART.
+  Pico USB mount state remains the fallback when no ARM lifecycle event exists.
+- Only an armed marker can start Startup after USB returns. Startup runs once,
+  clears the one-shot marker, resumes Guard at stage 1, skips Desktop, and waits
+  for Login/DC before starting a fresh deadline.
+- Manual stop/override and light, ARM, Guard, ABVM, or Startup failures clear
+  the marker. The marker counter blocks more than five automatic restarts.
+
+### Persistence and compatibility
+
+The marker reuses two reserved bytes in the existing dual-sector,
+CRC-protected, program-SHA-bound calibration record. Existing light and sound
+calibration layout and values are unchanged. Current `Launch` documents retain
+their established route-ID 2 alias for the authored After tab.
+
+### Validation
+
+- Added compiler/verifier coverage for the versioned Native Cycle descriptor.
+- Added a contract test for the approved After/Startup route aliases, NVM
+  authority, USB lifecycle, five-restart limit, and stage-1 resume.
+- Recompiled the current fishing project with all ten Native routes and the
+  cycle descriptor.
+
+## ABVM native R25 — audible route cues and frame-safe text typing
+
+### Problem observed
+
+After the sound-threshold fix, Guard route changes no longer produced an audible buzzer cue, and Type Text could appear to arrive in bursts in a game/login field.
+
+### Root cause
+
+Guard started its transition sweep and the VM emitted its mandatory route-entry `RELEASE_ALL` in the same service cycle. The generic release helper silenced every buzzer pattern, so the transition tone was cancelled before it became audible. Type Text used an 8 ms press: valid for USB HID, but shorter than a typical 60 Hz game/UI input frame.
+
+### Change
+
+- Route-entry release now preserves independent Guard/calibration cues while still cancelling project/direct BEEP actions that own a suspended lane or reply.
+- USB unmount and suspend continue to silence the buzzer unconditionally.
+- Added a `BUZZER|cue=transition|profile=...|stage=...` diagnostic when a confirmed Guard transition schedules its cue.
+- Increased Type Text key hold from 8 ms to 24 ms while retaining the configured per-character humanized gap.
+
+### Validation
+
+- Added a release-boundary contract proving system cues survive while owned BEEP actions are cancelled.
+- Strengthened the native HID smoke test to require a release report between every press and at least a 20 ms key hold.
+- Audited the supplied UF2: it contains no BEEP instruction. Its Login/DC route deliberately returns to `label1`, and its password Type Text enables one synthetic typo every 7–12 eligible characters.
+
+### Next test
+
+Flash a newly exported UF2, start Guard, and confirm a later route transition emits both `BUZZER|cue=transition` and an audible short sweep. For clean password entry, set `typoEveryMin` and `typoEveryMax` to `0`; remove the final `gotoLabel label1` only if repeated login retries are not desired.
+
+## ABVM native R24 — authoritative sound threshold and Catch response audit
+
+### Problem observed
+
+The Game Catch Wait For Sound armed correctly but repeatedly timed out at `peak=5`, so its child F keystroke never ran. Classroom calibration completed, yet Native export could still retain the old 76-unit detector threshold. Direct Classroom tests also disconnected at unsupported `SETRES` before reaching WSND.
+
+### Root cause
+
+The Native compiler selected legacy `peakMin` ahead of the Classroom-calibrated `threshold`, and the Pico ARM actor then unconditionally replaced the compiled value with any saved physical calibration. The F response bytecode itself was correct: profile-2 detection advances directly from WATCH to the F instruction, while timeout jumps past it.
+
+### Change
+
+- Made the Wait For Sound `threshold` field authoritative for Native ABVM; `peakMin` remains legacy classification metadata.
+- Threshold `0` now explicitly selects the saved physical profile. Nonzero project thresholds are no longer silently overwritten by flash calibration.
+- Added effective `threshold`, `min`, and `config=project|saved` to WATCH and SOUND diagnostics.
+- Added bounded Native direct-run compatibility for `SETRES`, asynchronous `WSND`, and nonblocking `BEEP`, so Classroom sensor tests no longer disconnect before execution.
+- Updated the Persian/English threshold labels to document the zero-value saved-calibration mode.
+
+### Validation
+
+- Compiled a profile-2 test where `threshold=8` and stale `peakMin=76`; the SOUND descriptor correctly contains 8.
+- Reference-VM regression proves a profile-2 hit executes child key F and a timeout skips it.
+- Added direct-run parser/actor contracts and reran all ABVM tests.
+
+### Next test
+
+In the real Catch step press Calibrate, confirm the threshold changes from 76, save, export and flash a new UF2. The hardware log must now show the effective threshold/config on WATCH; on a splash it should emit `OK|SOUND|profile=2` followed by `HID|keyboard|accepted` for F.
+
+## ABVM native R23 — Native Buzzer step execution
+
+### Problem observed
+
+A quick Wait For Sound sensor test with Success and Warning Buzzer branches could not export a Native UF2 and stopped with `unsupported ABVM step: buzzer`.
+
+### Root cause
+
+Classroom Studio exposed and serialized the GP6 Buzzer step, and the native firmware already owned a nonblocking PWM buzzer, but ABVM ABI 1 had no Buzzer instruction or runtime actor binding.
+
+### Change
+
+- Added the bounded `BEEP` ABVM opcode with 30–20000 Hz and 1–60000 ms validation.
+- Native compilation now expands short, double, warning, success, and custom Buzzer patterns into cooperative BEEP/DELAY instructions.
+- Added a single-channel GP6 PWM resource certificate and a nonblocking Pico Buzzer actor that resumes the originating VM lane after the tone duration.
+- Pause, Stop, route cancellation, USB loss, and release boundaries cancel an in-flight custom tone safely.
+
+### Validation
+
+- Added compile/verify coverage for Success and Warning patterns and PWM resource accounting.
+- Added firmware contracts for bounded bytecode dispatch, asynchronous lane completion, and the GP6 tone actor.
+- Full Pico SDK, Windows TestRunner, portable, and packaging gates run in CI.
+
+### Next test
+
+Export the Desktop Wait For Sound test with Success/Warning Buzzer branches, flash the new UF2, and verify a sound above the calibrated threshold selects Success while timeout selects Warning.
+
+## ABVM native R22 — responsive Classroom sound calibration
+
+### Problem observed
+
+Pressing Calibrate in the Wait For Sound dialog played the calibration-exit cue, then Classroom Studio became unresponsive until it was closed.
+
+### Root cause
+
+Classroom requested `SCAL|2000`, while the ARM calibration protocol and native Pico proxy accept at most 1000 ms, so the request was rejected and entered the slower legacy-probe path. In addition, the serial reader synchronously invoked the WPF dispatcher before parsing each reply, creating a reverse wait between the modal UI and the reply reader.
+
+### Change
+
+- Request a protocol-valid one-second `SCAL|1000` sample with a bounded four-second command timeout.
+- Changed the serial `LineReceived` callback to queue its WPF log update with `Dispatcher.BeginInvoke`, so reply parsing never waits for the UI thread; other logging semantics stay unchanged.
+- Kept the restored legacy Guard and physical light/sound calibration note sets unchanged.
+
+### Validation
+
+- Updated the existing SCAL source contract to require the ARM/Pico 1000 ms protocol limit and verified that `LineReceived` queues rather than blocks before reply parsing.
+- Existing native SCAL proxy, firmware, Windows, and packaging gates remain enabled in CI.
+
+### Next test
+
+Open Wait For Sound, press Calibrate once, and confirm the dialog stays responsive, returns a threshold in about one second, and the log shows `OK|SCAL|avg=…|max=…` without WSND fallback.
+
+## ABVM native R21 — Classroom SCAL compatibility proxy
+
+### Problem observed
+
+Classroom Studio connected to the native Pico successfully, but Wait For Sound calibration logged `ERR|TIMEOUT|SCAL` and fell back to legacy WSND probing.
+
+### Root cause
+
+The native runtime supported physical two-step sound calibration internally but did not expose the existing bounded `SCAL|ms` CDC compatibility command used by the Classroom calibration dialog.
+
+### Change
+
+- Added asynchronous `SCAL|ms` validation and forwarding to the Leonardo ARM sound-calibration actor.
+- Return the legacy-compatible `OK|SCAL|avg=…|max=…` response without blocking CDC, HID, Guard, or buttons.
+- Reject malformed, overlapping, or physical-calibration-conflicting requests and bound missing replies with `ERR|TIMEOUT|SCAL`.
+
+### Validation
+
+- Added regression contracts for command parsing, bounded pending state, ARM result collection, success response, and timeout response.
+- Physical button calibration continues to consume ARM calibration results only when no Classroom SCAL request owns them.
+- Full Pico SDK and Windows gates run in CI.
+
+### Next test
+
+Open Wait For Sound, press the Classroom calibration button, and confirm the log receives `OK|SCAL|avg=…|max=…` instead of falling back to WSND probing. Then complete one physical sound-calibration run to verify both paths remain independent.
+
+## ABVM native R20 — restore legacy Guard and calibration score
+
+### Problem observed
+
+The restored generic Buzzer presets still did not match the richer audio feedback used by the previous Guard, light calibration, and two-profile sound calibration systems.
+
+### Root cause
+
+The generic `short/double/warning/success` step presets were not the same contract as the legacy physical-control score embedded in the prior combined runtime.
+
+### Change
+
+- Restored exact Guard Start, Stop, Pause, and Resume patterns.
+- Restored six light-calibration position notes, record-start, stage-complete, save-success, save-error, all-profile-complete, and enter/exit melodies.
+- Restored sound-calibration ID 1/2 notes, silence-start and target-start tones, plus shared completion/error feedback.
+- Added a distinct profile-dependent 150 ms rising sweep for confirmed Guard transitions after the initial state; only this transition cue uses the newer smooth style, while Guard controls and both calibration systems retain their exact legacy scores.
+- The initial `start-at-current-state` transition stays silent because the Guard Start melody already confirms activation.
+- Kept the GP6/S8050 wiring and nonblocking fixed-state playback.
+
+### Validation
+
+- Regression contracts assert every legacy frequency, duration, and pause.
+- Calibration events are mapped to the exact prior cue points.
+- The buzzer translation unit compiles with strict C11 warnings as errors; full Pico and Windows gates run in CI.
+
+### Next test
+
+Verify Guard Start/Stop/Pause/Resume, cycle through all six light-calibration profiles, and run both sound-calibration IDs. The audible sequences should match the previous system while CDC heartbeats continue without interruption.
+
+## ABVM native R19 — restore original GP6 buzzer presets
+
+### Problem observed
+
+Hardware build 440 produced smooth sweep cues that did not match the established buzzer sounds used by the previous system.
+
+### Root cause
+
+The new native buzzer actor introduced newly designed glides instead of preserving the existing `short`, `double`, `warning`, and `success` frequency/duration contract.
+
+### Change
+
+- Removed the new sweep/fade note set.
+- Restored the exact original presets: short `1000:180`; double `1000:140,100;1000:140`; warning `700:180,90;700:180,90;700:300`; success `900:120,70;1300:220`.
+- Retained the nonblocking fixed-state actor, GP6 PWM output, priority handling, and existing S8050 wiring.
+
+### Validation
+
+- Added exact frequency, duration, and pause assertions for all four legacy presets.
+- The buzzer translation unit compiles with `-std=c11 -Wall -Wextra -Werror`.
+- Full Pico SDK and Windows gates run in CI.
+
+### Next test
+
+Flash the next UF2 and verify that Start/Catch/Calibration use the old success notes, Resume uses double, Stage/Pause/Stop use short, and Timeout/Error use warning.
+
+## ABVM native R18 — bounded Sound/Mouse backpressure and GP6 buzzer
+
+### Problem observed
+
+On real hardware, Route 8 cast once and then stopped with `ERR|ARM|submit|lane=0|reason=2` immediately after the parallel sound watch armed.
+
+### Root cause
+
+The UART actor had a one-command deferred mouse queue, but an early `state != ARM_IDLE` guard rejected the exact Sound-arm/Mouse overlap that the queue was intended to serialize.
+
+### Change
+
+- Admit one bounded deferred mouse command behind an in-flight Move or Sound-arm frame while still rejecting Probe, calibration, Halt, fault, and queue overflow.
+- Add an allocation-free, nonblocking passive-piezo driver on GP6 using hardware PWM, continuous frequency sweeps, and attack/release envelopes.
+- Add prioritized smooth and patterned cues for Start/Stop, Pause/Resume, Guard stages 1–6, accepted Splash/catch, timeout, calibration success, and faults.
+- Keep the buzzer fail-independent: no delay or sleep is introduced into USB, HID, UART, sensor, or VM service paths.
+
+### Validation
+
+- Added a regression contract that rejects the old unreachable deferred-queue guard.
+- Added buzzer contracts for GP6, PWM, bounded priority preemption, and the absence of sleeping/blocking calls.
+- The buzzer translation unit compiles locally with `-std=c11 -Wall -Wextra -Werror`; full Pico SDK and Windows gates run in CI.
+
+### Next test
+
+Flash the next UF2, start Guard in Game, and allow at least three fishing casts. Each Splash should produce the catch cue and continue the loop without `ERR|ARM|submit|reason=2`; stage, Pause/Resume, timeout, and Stop cues should remain responsive while COM telemetry continues.
+
+## ABVM phase 1 R5 — Pico SDK bring-up UF2
+
+- Added a Pico SDK target that embeds one verified `program.abp` directly in
+  flash and boots without CIRCUITPY, FAT, Python, or a connected PC.
+- Added USB CDC commands for PING, status, start, Pause/Resume, Stop, Whisper,
+  and diagnostic sound detection.
+- Added debounced GP3 Pause/Resume and GP4 Start/Stop control.
+- Connected the native VM to the RP2040 millisecond clock and nonblocking
+  board loop.
+- Kept HID, Type, Mouse, and release-all as explicitly logged safe stubs; this
+  UF2 cannot emit user input.
+- Added a CI Pico SDK/ARM build and uploaded UF2/ELF/program artifacts.
+
+## ABVM phase 1 R4 — native fixed-state loader and scheduler
+
+- Added a dependency-free C11 ABVM core with no runtime heap allocation.
+- Added native CRC32/SHA-256, canonical section, resource, route, opcode,
+  constant, Loop, Random Package, Scope, and Watch verification.
+- Added fixed arrays for lanes/frames plus one suspended interrupt context.
+- Added nonblocking action events as the future HID/UART actor boundary.
+- Added native Pause/Resume/Stop and Whisper interrupt/resume scheduling.
+- Added a host smoke test that executes the real Game/Whisper ABP and rejects
+  a corrupted image; the Portable CI now compiles and runs this native core.
+
+## ABVM phase 0 R3 — deterministic control semantics
+
+- Added explicit `WALL` and `ACTIVE` route clock policies.
+- Added fixed-state Pause/Resume: HID is released, opcode dispatch stops, and
+  the same PCs and frame state resume without recursion or callback work.
+- Added terminal Stop semantics that cancel current and suspended lanes and
+  always release HID.
+- Added one-slot global `INTERRUPT_AND_RESUME` execution for Whisper; nested
+  interrupts are rejected by the runtime/resource contract.
+- Added reference tests for Pause during a held key, wall/active deadline
+  behavior, Whisper interruption, exact Game resume, Stop inside Scope, and
+  50-cycle Pause/Resume plus 50-boundary Stop stress.
+
+## ABVM phase 0 R2 — explicit runtime contract
+
+- Replaced the ambiguous two-lane Race contract with structured scopes and an
+  explicit `CANCEL_ON_TERMINAL_LANE` policy for fishing.
+- Added fail-closed route transition policies, a fixed resource certificate,
+  full program SHA-256, and an external PC-only source map.
+- Added generated ABI registries and packed layouts for Python, C#, and native
+  firmware consumers.
+- Kept the 16-byte instruction encoding; current real images remain only a few
+  KiB and do not justify an operand-constrained compact encoding.
+
+## ABVM phase 0 — host compiler and ABP1 contract
+
+- Added the first PC-side AMSJ compiler for a binary `ABP1` application image.
+- Added fixed-width opcodes for Game/Whisper, loops, Random Package, a two-lane sound-controlled Race, scoped Watch, relative mouse, keyboard, and humanized Type Text.
+- Added a fail-closed verifier for CRC, section/range integrity, frame depth, lane count, nested Watch, and capability declarations.
+- Added a deterministic host reference VM before any Pico firmware is changed.
+- Production Classroom export and the current Pico runtime remain unchanged.
+
 # Classroom Studio — Current Hardware Changelog
 
 این سند مرجع سریع وضعیت شاخهٔ پایدار `stable/natural-mouse-v1` است. ترتیب ورودی‌ها معکوس زمانی است؛ جدیدترین Build همیشه بالاتر قرار می‌گیرد.

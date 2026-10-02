@@ -12,6 +12,8 @@ public static class PipelineWorkspaceSerializer
         public int pipelineVersion { get; set; }
         public Dictionary<string, List<StepNode>> pipelines { get; set; } = new();
         public List<SoundWatchProfile> soundProfiles { get; set; } = new();
+        public HumanMouseProfile humanMouseProfile { get; set; } = new();
+        public DisplayProfile displayProfile { get; set; } = new();
     }
 
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
@@ -23,6 +25,8 @@ public static class PipelineWorkspaceSerializer
         {
             pipelineVersion = PipelineWorkspace.FormatVersion,
             soundProfiles = workspace.SoundProfiles.Select(CloneSoundProfile).ToList(),
+            humanMouseProfile = workspace.HumanMouseProfile,
+            displayProfile = workspace.DisplayProfile,
         };
         foreach (var tab in workspace.Tabs)
             envelope.pipelines[tab.Kind.ToString()] = tab.Steps.ToList();
@@ -40,10 +44,22 @@ public static class PipelineWorkspaceSerializer
 
         var version = root.TryGetProperty("pipelineVersion", out var versionValue)
             && versionValue.TryGetInt32(out var parsed) ? parsed : 0;
-        if (version is not (1 or 2 or 3 or 4 or 5 or 6))
+        if (version is not (1 or 2 or 3 or 4 or 5 or 6 or 7 or 8 or 9 or 10 or 11))
             throw new InvalidDataException("Unsupported AMS pipeline document.");
 
         var workspace = new PipelineWorkspace();
+        if (version >= 8 && root.TryGetProperty("humanMouseProfile", out var humanProfile)
+            && humanProfile.ValueKind == JsonValueKind.Object)
+            workspace.HumanMouseProfile =
+                humanProfile.Deserialize<HumanMouseProfile>() ?? new();
+        if (version >= 9 && root.TryGetProperty("displayProfile", out var displayProfile)
+            && displayProfile.ValueKind == JsonValueKind.Object)
+        {
+            var loaded = displayProfile.Deserialize<DisplayProfile>() ?? new();
+            if (!loaded.IsValid)
+                throw new InvalidDataException("Display profile dimensions or soft margin are invalid.");
+            workspace.DisplayProfile = loaded;
+        }
         foreach (var tab in workspace.Tabs) tab.Steps.Clear();
         var hasDc = false;
         foreach (var property in pipelines.EnumerateObject())
@@ -66,7 +82,8 @@ public static class PipelineWorkspaceSerializer
             foreach (var source in loaded)
             {
                 var target = workspace.SoundProfiles.FirstOrDefault(x => x.Id == source.Id);
-                if (target is null || source.ResponseTab is not (PipelineKind.Whisper or PipelineKind.Splash))
+                if (target is null || source.ResponseTab is not
+                    (PipelineKind.Whisper or PipelineKind.Splash or PipelineKind.WhisperRepeat))
                     continue;
                 CopySoundProfile(source, target);
             }
@@ -165,6 +182,8 @@ public static class PipelineWorkspaceSerializer
             "Game" => PipelineKind.Game,
             "Targeted" => PipelineKind.Targeted,
             "Whisper" => PipelineKind.Whisper,
+            "WhisperRepeat" => PipelineKind.WhisperRepeat,
+            "Finish" or "End" => PipelineKind.Finish,
             "Splash" => PipelineKind.Splash,
             // The Resumable tab was retired; its old data is intentionally ignored.
             "Resumable" => null,

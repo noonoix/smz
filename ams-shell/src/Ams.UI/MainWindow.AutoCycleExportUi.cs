@@ -36,11 +36,135 @@ internal static class AutoCycleExportUiBootstrap
         button.SetBinding(Button.CommandProperty,
             new Binding(nameof(MainViewModel.ExportAutoCycleModernCommand)));
         panel.Children.Add(button);
-        if (panel.Parent is StackPanel cardBody && !cardBody.Children.OfType<FrameworkElement>()
-                .Any(x => Equals(x.Tag, "AutoCycle.SoundProfiles")))
-            cardBody.Children.Insert(Math.Max(2, cardBody.Children.Count - 1), BuildSoundProfiles(vm));
+
+        var nativeButton = AutoCycleUiKit.Action("ساخت Native UF2 پروژهٔ فعلی", true);
+        nativeButton.Tag = "AutoCycle.NativeUf2";
+        nativeButton.ToolTip =
+            "پروژهٔ باز را محلی به ABP تبدیل می‌کند و بدون SDK، GCC یا GitHub داخل UF2 پایهٔ انتخاب‌شده قرار می‌دهد.";
+        nativeButton.SetBinding(Button.CommandProperty,
+            new Binding(nameof(MainViewModel.ExportNativeUf2Command)));
+        panel.Children.Add(nativeButton);
+        if (panel.Parent is StackPanel cardBody)
+        {
+            if (!cardBody.Children.OfType<FrameworkElement>()
+                    .Any(x => Equals(x.Tag, "AutoCycle.DisplayProfile")))
+                cardBody.Children.Insert(Math.Max(2, cardBody.Children.Count - 1),
+                    BuildDisplayProfile(vm));
+            if (!cardBody.Children.OfType<FrameworkElement>()
+                    .Any(x => Equals(x.Tag, "AutoCycle.HumanMouseProfile")))
+                cardBody.Children.Insert(Math.Max(2, cardBody.Children.Count - 1),
+                    BuildHumanMouseProfile(vm));
+            if (!cardBody.Children.OfType<FrameworkElement>()
+                    .Any(x => Equals(x.Tag, "AutoCycle.SoundProfiles")))
+                cardBody.Children.Insert(Math.Max(2, cardBody.Children.Count - 1),
+                    BuildSoundProfiles(vm));
+        }
         AutoCycleUiKit.ReorderExportSteps(panel);
         AutoCycleUiKit.Reorder(body);
+    }
+
+    private static FrameworkElement BuildDisplayProfile(MainViewModel vm)
+    {
+        var panel = new StackPanel
+        {
+            Tag = "AutoCycle.DisplayProfile",
+            FlowDirection = FlowDirection.RightToLeft,
+            Margin = new Thickness(0, 8, 0, 8),
+        };
+        panel.Children.Add(AutoCycleUiKit.Title("نمایشگر مقصد و مرز نرم موس"));
+        panel.Children.Add(AutoCycleUiKit.Helper(
+            "رزولوشن داخل AMSJ و UF2 ذخیره می‌شود؛ برای سیستم مقصد نیازی به "
+            + "نصب Classroom Studio یا Bridge نیست. اگر رزولوشن در فهرست نبود، Custom را انتخاب کنید."));
+
+        var preset = new System.Windows.Controls.ComboBox
+        {
+            ItemsSource = MainViewModel.DisplayResolutionPresets,
+            MinWidth = 190, Margin = new Thickness(0, 5, 0, 5),
+            FlowDirection = FlowDirection.LeftToRight,
+        };
+        preset.SetBinding(System.Windows.Controls.ComboBox.SelectedItemProperty,
+            new Binding(nameof(MainViewModel.DisplayResolutionPreset))
+            {
+                Mode = BindingMode.TwoWay,
+                UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged,
+            });
+        panel.Children.Add(preset);
+
+        var custom = new Grid { Margin = new Thickness(0, 3, 0, 7) };
+        custom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        custom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        AddNumber(custom, 0, "عرض Custom", nameof(MainViewModel.DisplayCustomWidth));
+        AddNumber(custom, 1, "ارتفاع Custom", nameof(MainViewModel.DisplayCustomHeight));
+        custom.SetBinding(UIElement.VisibilityProperty,
+            new Binding(nameof(MainViewModel.IsCustomDisplayResolution))
+            {
+                Converter = new System.Windows.Controls.BooleanToVisibilityConverter(),
+            });
+        panel.Children.Add(custom);
+
+        var enabled = new CheckBox
+        {
+            Content = "Soft Boundary Steering فعال باشد",
+            Foreground = AutoCycleUiKit.Text,
+            Margin = new Thickness(0, 4, 0, 4),
+        };
+        enabled.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
+            new Binding(nameof(MainViewModel.SoftBoundaryEnabled)) { Mode = BindingMode.TwoWay });
+        panel.Children.Add(enabled);
+
+        var margin = new Grid { Margin = new Thickness(0, 3, 0, 5) };
+        margin.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        AddNumber(margin, 0, "حاشیهٔ نرم از هر طرف (۱ تا ۲۰٪)", nameof(MainViewModel.SoftBoundaryMarginPercent));
+        panel.Children.Add(margin);
+
+        var summary = AutoCycleUiKit.Helper("");
+        summary.Foreground = AutoCycleUiKit.Success;
+        summary.SetBinding(TextBlock.TextProperty,
+            new Binding(nameof(MainViewModel.DisplayProfileSummary)));
+        panel.Children.Add(summary);
+        return panel;
+    }
+
+    private static FrameworkElement BuildHumanMouseProfile(MainViewModel vm)
+    {
+        var panel = new StackPanel
+        {
+            Tag = "AutoCycle.HumanMouseProfile",
+            FlowDirection = FlowDirection.RightToLeft,
+            Margin = new Thickness(0, 8, 0, 8),
+        };
+        panel.Children.Add(AutoCycleUiKit.Title("پروفایل سراسری حرکت دست"));
+        panel.Children.Add(AutoCycleUiKit.Helper(
+            "یک بار ۳۰ ثانیه حرکت طبیعی ضبط می‌شود. Native Export سرعت، ریتم، "
+            + "مکث، طول حرکت، انحنا و اصلاح‌های همان دست را روی حرکات موس اعمال می‌کند؛ اجرای برد به "
+            + "Registry، Bridge یا برنامهٔ پس‌زمینه نیاز ندارد."));
+        var button = AutoCycleUiKit.Action("ساخت دوباره پروفایل دست — ۳۰ ثانیه", true);
+        button.SetBinding(Button.CommandProperty,
+            new Binding(nameof(MainViewModel.CaptureHumanMouseProfileCommand)));
+        panel.Children.Add(button);
+        var ambient = new CheckBox
+        {
+            Content = "Ambient Mouse مستقل خارج از Game فعال باشد",
+            Foreground = AutoCycleUiKit.Text,
+            Margin = new Thickness(0, 8, 0, 4),
+        };
+        ambient.SetBinding(
+            System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
+            new Binding(nameof(MainViewModel.AmbientOutsideGameEnabled))
+            {
+                Mode = BindingMode.TwoWay,
+            });
+        panel.Children.Add(ambient);
+        panel.Children.Add(AutoCycleUiKit.Helper(
+            "پس از پایان Routeهای پایدار Desktop، Login/DC، Dashboard و Loading "
+            + "حرکت انسانی کم‌تعداد ادامه می‌یابد. هنگام تایپ، Whisper، Pause، "
+            + "کالیبراسیون، Restart و اجرای خود Route خودکار متوقف می‌شود."));
+        var summary = AutoCycleUiKit.Helper("");
+        summary.Foreground = AutoCycleUiKit.Success;
+        summary.SetBinding(TextBlock.TextProperty,
+            new Binding(nameof(MainViewModel.HumanMouseProfileSummary)));
+        panel.Children.Add(summary);
+        return panel;
     }
     private static FrameworkElement BuildSoundProfiles(MainViewModel vm)
     {
@@ -51,16 +175,22 @@ internal static class AutoCycleExportUiBootstrap
         };
         panel.Children.Add(AutoCycleUiKit.Title("پروفایل‌های صدای Game"));
         panel.Children.Add(AutoCycleUiKit.Helper(
-            "فقط Whisper شنوندهٔ سراسری Game است و بعد از واکنش همان Cursor را ادامه می‌دهد. " +
+            "Whisper New با ID 1 و Whisper Repeat با ID 3 شنونده‌های سراسری Game هستند و بعد از واکنش همان Cursor را ادامه می‌دهند. " +
             "صدای Catch داخل استپ صریح Wait For Sound تنظیم می‌شود."));
 
         var profiles = new Grid { HorizontalAlignment = HorizontalAlignment.Stretch };
         profiles.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        var whisper = ProfileCard("ویسپر", nameof(MainViewModel.WhisperSoundEnabled),
+        profiles.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var whisper = ProfileCard("Whisper New — ID 1", nameof(MainViewModel.WhisperSoundEnabled),
             nameof(MainViewModel.WhisperPeakMin), nameof(MainViewModel.WhisperPeakMax),
             nameof(MainViewModel.WhisperPriority), nameof(MainViewModel.WhisperCooldownMs));
+        var repeat = ProfileCard("Whisper Repeat — ID 3", nameof(MainViewModel.WhisperRepeatSoundEnabled),
+            nameof(MainViewModel.WhisperRepeatPeakMin), nameof(MainViewModel.WhisperRepeatPeakMax),
+            nameof(MainViewModel.WhisperRepeatPriority), nameof(MainViewModel.WhisperRepeatCooldownMs));
         Grid.SetColumn(whisper, 0);
+        Grid.SetColumn(repeat, 1);
         profiles.Children.Add(whisper);
+        profiles.Children.Add(repeat);
         panel.Children.Add(profiles);
         var summary = AutoCycleUiKit.Helper("");
         summary.Foreground = AutoCycleUiKit.Success;
